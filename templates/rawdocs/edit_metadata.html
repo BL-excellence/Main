@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Métadonnées – {{ doc.basename }}{% endblock %}
+
+{% block content %}
+<div class="bg-gray-50 min-h-screen py-8">
+  <div class="container mx-auto px-4">
+    <div class="flex flex-col lg:flex-row gap-8">
+      <!-- Main form (fixed height) -->
+      <section class="lg:w-2/3 self-start bg-white rounded-xl shadow p-6">
+        <!-- Header -->
+        <div class="flex justify-between items-center border-b pb-4 mb-6">
+          <h2 class="text-2xl font-semibold text-gray-800 flex items-center">
+            <i class="fas fa-edit text-blue-600 mr-2"></i> Métadonnées
+          </h2>
+          <div class="space-x-2">
+            <button onclick="reextractMetadata()"
+                    class="px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-600 rounded hover:bg-blue-50 transition">
+              <i class="fas fa-sync mr-1"></i> Réextraire
+            </button>
+            <button class="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-600 rounded hover:bg-red-50 transition">
+              <i class="fas fa-times mr-1"></i> Refuser
+            </button>
+            <a href="{{ doc.file.url }}" target="_blank"
+               class="px-3 py-1.5 text-sm font-medium text-green-600 border border-green-600 rounded hover:bg-green-50 transition">
+              <i class="fas fa-eye mr-1"></i> Voir
+            </a>
+          </div>
+        </div>
+
+        <form id="metadataForm" method="post" class="space-y-6">
+          {% csrf_token %}
+          <div>
+            <label for="id_title" class="block text-sm font-medium text-gray-700 mb-1">
+              Titre
+              <span class="text-xs bg-green-100 text-green-800 rounded-full px-2 ml-1">Auto</span>
+            </label>
+            <input id="id_title" name="title"
+                   value="{{ form.title.value|default_if_none:'' }}"
+                   class="w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label for="id_type" class="block text-sm font-medium text-gray-700 mb-1">
+                Type
+                <span class="text-xs bg-green-100 text-green-800 rounded-full px-2 ml-1">Auto</span>
+              </label>
+              <input id="id_type" name="type"
+                     value="{{ form.type.value|default_if_none:'' }}"
+                     class="w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div>
+              <label for="id_context" class="block text-sm font-medium text-gray-700 mb-1">
+                Contexte
+                <span class="text-xs bg-green-100 text-green-800 rounded-full px-2 ml-1">Auto</span>
+              </label>
+              <input id="id_context" name="context"
+                     value="{{ form.context.value|default_if_none:'' }}"
+                     class="w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label for="id_language" class="block text-sm font-medium text-gray-700 mb-1">
+                Langue
+                <span class="text-xs bg-green-100 text-green-800 rounded-full px-2 ml-1">Auto</span>
+              </label>
+              <input id="id_language" name="language"
+                     value="{{ form.language.value|default_if_none:'' }}"
+                     class="w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div>
+              <label for="id_publication_date" class="block text-sm font-medium text-gray-700 mb-1">
+                Date de publication
+                <span class="text-xs bg-green-100 text-green-800 rounded-full px-2 ml-1">Auto</span>
+              </label>
+              <input id="id_publication_date" type="date" name="publication_date"
+                     value="{{ form.publication_date.value|default_if_none:'' }}"
+                     class="w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label for="id_version" class="block text-sm font-medium text-gray-700 mb-1">Version</label>
+              <input id="id_version" name="version"
+                     value="{{ form.version.value|default_if_none:'' }}"
+                     class="w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div>
+              <label for="id_source" class="block text-sm font-medium text-gray-700 mb-1">
+                Source
+                <span class="text-xs bg-green-100 text-green-800 rounded-full px-2 ml-1">Auto</span>
+              </label>
+              <input id="id_source" name="source"
+                     value="{{ form.source.value|default_if_none:'' }}"
+                     class="w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div>
+            <label for="id_url_source" class="block text-sm font-medium text-gray-700 mb-1">URL source</label>
+            <input id="id_url_source" name="url_source" type="url"
+                   value="{{ form.url_source.value|default_if_none:'' }}"
+                   class="w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          </div>
+
+          <div class="flex justify-end space-x-4">
+            <a href="{% url 'rawdocs:dashboard' %}"
+               class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition">
+              <i class="fas fa-arrow-left mr-1"></i> Retour
+            </a>
+            <button type="submit"
+                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition">
+              <i class="fas fa-save mr-1"></i> Sauvegarder
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Sidebar: Qualité & Historique (stretch) -->
+      <aside class="lg:w-1/3 space-y-6 flex-1">
+        <!-- Qualité d'extraction -->
+        {% if metadata.quality %}
+        <div class="bg-white rounded-xl shadow p-6">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-chart-pie text-cyan-600 mr-2"></i> Qualité d'extraction
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between text-sm text-gray-600 mb-1">
+                <span>Taux d'extraction</span>
+                <strong class="text-blue-600">{{ metadata.quality.extraction_rate }}%</strong>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div class="h-2 bg-cyan-500" style="width: {{ metadata.quality.extraction_rate }}%"></div>
+              </div>
+            </div>
+            <div>
+              <small class="text-gray-600 font-medium">Champs extraits</small>
+              <div class="mt-2 flex flex-wrap gap-2">
+                {% for field, score in metadata.quality.field_scores.items %}
+                  <span class="px-2 py-1 rounded-full text-xs font-medium
+                               {% if score >= 80 %}bg-green-100 text-green-800
+                               {% elif score >= 50 %}bg-yellow-100 text-yellow-800
+                               {% else %}bg-red-100 text-red-800{% endif %}">
+                    {{ field|title }}
+                  </span>
+                {% endfor %}
+              </div>
+            </div>
+            <div>
+              <small class="text-gray-600 font-medium">Scores de confiance</small>
+              <div class="mt-2 space-y-2 text-sm">
+                {% for field, score in metadata.quality.field_scores.items %}
+                  <div class="flex justify-between items-center">
+                    <span>{{ field|title }}</span>
+                    <span class="font-semibold
+                                 {% if score >= 80 %}text-green-600
+                                 {% elif score >= 50 %}text-yellow-600
+                                 {% else %}text-red-600{% endif %}">
+                      {{ score }}%
+                    </span>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Historique des modifications -->
+        <div class="bg-white rounded-xl shadow p-6">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-history text-gray-600 mr-2"></i> Historique
+          </h3>
+          <div class="space-y-4 overflow-auto max-h-[60vh]">
+            {% for log in logs %}
+            <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-sm font-medium text-gray-700">{{ log.field_name|title }}</span>
+                <time class="text-xs text-gray-500">{{ log.modified_at|date:"d/m/Y H:i" }}</time>
+              </div>
+              <p class="text-sm text-gray-800 mb-1">{{ log.old_value }} → {{ log.new_value }}</p>
+              <p class="text-xs text-gray-600 flex items-center">
+                <i class="fas fa-user mr-1"></i>{{ log.modified_by.username }}
+              </p>
+            </div>
+            {% empty %}
+            <p class="text-gray-500">Aucune modification enregistrée.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    function reextractMetadata() {
+      if (confirm("Relancer l'extraction automatique ?")) {
+        alert("Extraction relancée !");
+      }
+    }
+  </script>
+</div>
+{% endblock %}

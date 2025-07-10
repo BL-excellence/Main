@@ -1,0 +1,68 @@
+{# templates/base.html #}
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}RawDocs{% endblock %}</title>
+
+  <!-- TailwindCSS CDN (ajoute ceci AVANT ton propre CSS pour override) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Ton CSS existant (facultatif, en dernier si tu veux override Tailwind) -->
+  <link rel="stylesheet" href="{% static 'rawdocs/css/styles.css' %}">
+
+  <!-- FontAwesome pour les icônes -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+  <div class="app-container">
+    <header class="site-header">
+      <div class="header-content">
+        <a href="{% url 'rawdocs:dashboard' %}" class="logo">
+          <i class="fas fa-file-pdf"></i>
+          <span>IABlockLabs</span>
+        </a>
+
+        {% if user.is_authenticated %}
+          <div class="user-info">
+            <span class="user-role">
+              <i class="fas fa-id-badge"></i>
+              {{ user.groups.first.name }}
+            </span>
+            <span class="user-name">
+              <i class="fas fa-user"></i>
+              {{ user.username }}
+            </span>
+            <form method="post" action="{% url 'rawdocs:logout' %}" class="logout-form">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Déconnexion
+              </button>
+            </form>
+          </div>
+        {% else %}
+          <nav class="nav-menu">
+            <a href="{% url 'rawdocs:login'    %}" class="nav-link"><i class="fas fa-sign-in-alt"></i> Connexion</a>
+            <a href="{% url 'rawdocs:register' %}" class="nav-link"><i class="fas fa-user-plus"></i> Inscription</a>
+          </nav>
+        {% endif %}
+      </div>
+    </header>
+
+    <main class="site-main">
+      <div class="main-content">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-content">
+        <p>&copy; 2025 IABlockLabs – Gestionnaire et Extraction de documents</p>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

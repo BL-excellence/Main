@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load rawdocs_extras %}
+
+{% block title %}Mes documents – RawDocs{% endblock %}
+
+{% block content %}
+<section class="card metadata-card">
+  <h2><i class="fas fa-folder-open"></i> Documents importés</h2>
+
+  {% if documents %}
+    <table class="metadata-table">
+      <thead>
+        <tr>
+          <th>Fichier</th>
+          <th>Date d’import</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in documents %}
+        <tr>
+          <td>{{ doc.file.name|basename }}</td>
+          <td>{{ doc.created_at|date:"d/m/Y H:i" }}</td>
+          <td class="actions-cell">
+          <a href="{% url 'rawdocs:edit_metadata' doc.id %}" class="btn-outline" title="Voir / éditer les métadonnées">
+          <i class="fas fa-eye"></i>
+          </a>
+            <form method="post"
+                  action="{% url 'rawdocs:document_delete' doc.id %}">
+              {% csrf_token %}
+              <button type="submit" class="btn-outline btn-delete">
+                <i class="fas fa-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Aucun document importé pour le moment.</p>
+  {% endif %}
+
+  <div class="upload-cell" style="margin-top:1.5rem;">
+    <a href="{% url 'rawdocs:upload' %}" class="upload-cell__enter-btn">
+      <i class="fas fa-upload"></i> Importer un nouveau PDF
+    </a>
+  </div>
+</section>
+
+<style>
+/* Réutilisation de vos styles pour .card et .metadata-card */
+.card.metadata-card {
+  padding: 1.5rem;
+  margin: 2rem auto;
+  max-width: 800px;
+}
+.metadata-card h2 {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+.metadata-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.metadata-table thead th {
+  text-align: left;
+  padding: .75rem;
+  background: var(--background-color);
+  border-bottom: 2px solid var(--border-color);
+}
+.metadata-table tbody td {
+  padding: .75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.metadata-table tbody tr:hover {
+  background: rgba(0,0,0,0.03);
+}
+
+/* Cellule d’actions : icônes alignées sur la même ligne */
+.actions-cell {
+  white-space: nowrap;             /* empêche le wrapping */
+}
+.actions-cell a,
+.actions-cell form {
+  display: inline-flex;            /* boutons côte à côte */
+  align-items: center;
+  margin-right: .5rem;
+}
+
+/* Boutons hérités */
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 2px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  color: var(--primary-color);
+  background: transparent;
+  text-decoration: none;
+  font-size: 1rem;
+  transition: var(--transition-all);
+}
+.btn-outline:hover {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+/* Bouton supprimer */
+.btn-delete {
+  border-color: #e3342f;
+}
+.btn-delete:hover {
+  background: #e3342f;
+}
+
+/* Section Import */
+.upload-cell {
+  display: flex;
+  justify-content: center;
+}
+.upload-cell__enter-btn {
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  padding: .6rem 1.2rem;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: var(--transition-all);
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.upload-cell__enter-btn:hover {
+  background: var(--primary-hover);
+}
+</style>
+{% endblock %}

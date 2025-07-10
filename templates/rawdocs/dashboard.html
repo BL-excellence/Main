@@ -1,0 +1,591 @@
+{% extends "base.html" %}
+{% load rawdocs_extras %}
+{% block title %}Tableau de bord{% endblock %}
+{% block content %}
+
+<style>
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+  }
+  @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+  }
+  .card-hover {
+      transition: all 0.3s ease;
+  }
+  .card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1),
+                  0 10px 10px -5px rgba(0,0,0,0.04);
+  }
+  .animate-fade-in { animation: fadeIn 0.5s ease-in-out; }
+  .animate-slide-up { animation: slideUp 0.3s ease-out; }
+
+  /* Styles repris de document_list.html pour l’onglet Validation */
+  .metadata-card {
+    padding: 1.5rem;
+    margin: 2rem auto;
+    max-width: 800px;
+  }
+  .metadata-card h2 {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+  .metadata-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .metadata-table thead th {
+    text-align: left;
+    padding: .75rem;
+    background: var(--background-color);
+    border-bottom: 2px solid var(--border-color);
+  }
+  .metadata-table tbody td {
+    padding: .75rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .metadata-table tbody tr:hover {
+    background: rgba(0,0,0,0.03);
+  }
+  .actions-cell {
+    white-space: nowrap;
+  }
+  .actions-cell a,
+  .actions-cell form {
+    display: inline-flex;
+    align-items: center;
+    margin-right: .5rem;
+  }
+  .btn-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    color: var(--primary-color);
+    background: transparent;
+    text-decoration: none;
+    font-size: 1rem;
+    transition: var(--transition-all);
+  }
+  .btn-outline:hover {
+    background: var(--primary-color);
+    color: #fff;
+  }
+  .btn-delete {
+    border-color: #e3342f;
+  }
+  .btn-delete:hover {
+    background: #e3342f;
+  }
+  .upload-cell {
+    display: flex;
+    justify-content: center;
+  }
+  .upload-cell__enter-btn {
+    background: var(--primary-color);
+    color: #fff;
+    border: none;
+    padding: .6rem 1.2rem;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition-all);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .upload-cell__enter-btn:hover {
+    background: var(--primary-hover);
+  }
+
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .card-hover {
+        transition: all 0.3s ease;
+    }
+    .card-hover:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+                    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+    .animate-fade-in {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    .animate-slide-up {
+        animation: slideUp 0.3s ease-out;
+    }
+</style>
+
+<nav class="bg-white shadow-sm border-b mb-6">
+  <div class="container mx-auto px-6">
+    <div class="flex space-x-8 border-b border-gray-200">
+      <button id="tab-dashboard"
+              class="py-4 px-2 border-b-2 font-medium text-blue-600 border-blue-600">
+        Tableau de bord
+      </button>
+      <button id="tab-metadata"
+              class="py-4 px-2 text-gray-600 hover:text-blue-600 transition-colors">
+        Validation Métadonnées
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- SECTION : Tableau de bord -->
+<div id="dashboard-tab" class="tab-content block">
+  <div class="container mx-auto px-4 py-6 space-y-6">
+    <h1 class="text-3xl font-bold text-gray-800">Tableau de bord</h1>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Documents Scrappés -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 card-hover animate-fade-in">
+            <div class="flex items-center justify-between">
+                <div class="w-full">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-file-alt text-blue-600"></i>
+                        </div>
+                        <span class="text-sm font-medium text-gray-600">Documents Scrappés</span>
+                    </div>
+                    <div class="flex items-baseline space-x-2">
+                        <span class="text-2xl font-bold text-blue-600">{{ total_scrapped }}</span>
+                        <span class="text-sm text-gray-500">/ {{ total_planned }}</span>
+                    </div>
+                    <div class="mt-2">
+                        <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                            <span>Réalisé</span>
+                            <span>
+                                {% if total_planned > 0 %}
+                                    {% widthratio total_scrapped total_planned 100 %}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                 style="width: {% if total_planned > 0 %}{% widthratio total_scrapped total_planned 100 %}%{% else %}0%{% endif %}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- En cours -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 card-hover animate-fade-in"
+             style="animation-delay: 0.1s">
+            <div class="flex items-center justify-between">
+                <div class="w-full">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-spinner text-purple-600"></i>
+                        </div>
+                        <span class="text-sm font-medium text-gray-600">En cours</span>
+                    </div>
+                    <div class="flex items-baseline space-x-2">
+                        <span class="text-2xl font-bold text-purple-600">{{ in_progress }}</span>
+                        <span class="text-sm text-gray-500">/ {{ total_in_reextraction }}</span>
+                    </div>
+                    <div class="mt-2">
+                        <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                            <span>En cours</span>
+                            <span>
+                                {% if total_in_reextraction > 0 %}
+                                    {% widthratio in_progress total_in_reextraction 100 %}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                                 style="width: {% if total_in_reextraction > 0 %}{% widthratio in_progress total_in_reextraction 100 %}%{% else %}0%{% endif %}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terminés -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 card-hover animate-fade-in"
+             style="animation-delay: 0.2s">
+            <div class="flex items-center justify-between">
+                <div class="w-full">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-check-circle text-green-600"></i>
+                        </div>
+                        <span class="text-sm font-medium text-gray-600">Terminés</span>
+                    </div>
+                    <div class="flex items-baseline space-x-2">
+                        <span class="text-2xl font-bold text-green-600">{{ total_completed }}</span>
+                        <span class="text-sm text-gray-500">/ {{ total_scrapped }}</span>
+                    </div>
+                    <div class="mt-2">
+                        <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                            <span>Terminé</span>
+                            <span>
+                                {% if total_scrapped > 0 %}
+                                    {% widthratio total_completed total_scrapped 100 %}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-green-500 h-2 rounded-full transition-all duration-300"
+                                 style="width: {% if total_scrapped > 0 %}{% widthratio total_completed total_scrapped 100 %}%{% else %}0%{% endif %}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documents Refusés -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 card-hover animate-fade-in"
+             style="animation-delay: 0.3s">
+            <div class="flex items-center justify-between">
+                <div class="w-full">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-times-circle text-red-600"></i>
+                        </div>
+                        <span class="text-sm font-medium text-gray-600">Documents Refusés</span>
+                    </div>
+                    <div class="flex items-baseline space-x-2">
+                        <span class="text-2xl font-bold text-red-600">{{ documents_refused|default:0 }}</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            Attention requise
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Stats Row -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Rescrapping -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 card-hover animate-fade-in"
+             style="animation-delay: 0.4s">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-2 mb-3">
+                        <div class="w-8 h-8 bg-cyan-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-redo text-cyan-600"></i>
+                        </div>
+                        <span class="text-sm font-medium text-gray-600">Rescrapping / Total à réextraire</span>
+                    </div>
+                    <div class="flex items-baseline space-x-2 mb-2">
+                        <span class="text-2xl font-bold text-cyan-600">{{ rescrapping_count|default:0 }}</span>
+                        <span class="text-sm text-gray-500">/ {{ total_to_reextract|default:0 }}</span>
+                    </div>
+                    <span class="text-xs text-cyan-600 font-medium">
+                        {% if total_to_reextract > 0 %}
+                            {% widthratio rescrapping_count total_to_reextract 100 %}% en rescrapping
+                        {% else %}
+                            0% en rescrapping
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="w-16 h-16 relative">
+                    <svg class="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                              fill="none" stroke="#e5e7eb" stroke-width="3"/>
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                              fill="none" stroke="#0891b2" stroke-width="3"
+                              stroke-dasharray="{% if total_to_reextract > 0 %}{% widthratio rescrapping_count total_to_reextract 88 %}, 88{% else %}0, 88{% endif %}"/>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-xs font-bold text-cyan-600">
+                            {% if total_to_reextract > 0 %}
+                                {% widthratio rescrapping_count total_to_reextract 100 %}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graphiques -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Bar Chart -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-slide-up">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center mr-3">
+                        <i class="fas fa-chart-bar text-indigo-600"></i>
+                    </div>
+                    KPIs des Documents
+                </h2>
+                <div class="flex space-x-2">
+                    <button class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                        <i class="fas fa-refresh"></i>
+                    </button>
+                    <button class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="relative">
+                <canvas id="barChart" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Pie Chart -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-slide-up"
+             style="animation-delay: 0.1s">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                        <i class="fas fa-chart-pie text-purple-600"></i>
+                    </div>
+                    Tâches Assignées
+                </h2>
+                <div class="flex space-x-2">
+                    <button class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                        <i class="fas fa-refresh"></i>
+                    </button>
+                    <button class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="relative">
+                <canvas id="pieChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-slide-up"
+         style="animation-delay: 0.2s">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+            <div class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+                <i class="fas fa-clock text-orange-600"></i>
+            </div>
+            Activité Récente
+        </h2>
+        <div class="space-y-4">
+            <div class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <i class="fas fa-file-alt text-blue-600 text-sm"></i>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-800">Nouveau document ajouté</p>
+                    <p class="text-xs text-gray-500">Il y a 5 minutes</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <i class="fas fa-check text-green-600 text-sm"></i>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-800">Validation métadonnées terminée</p>
+                    <p class="text-xs text-gray-500">Il y a 12 minutes</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                    <i class="fas fa-spinner text-purple-600 text-sm"></i>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-800">Extraction en cours</p>
+                    <p class="text-xs text-gray-500">Il y a 18 minutes</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const barData = JSON.parse('{{ bar_data|escapejs }}');
+    const pieData = JSON.parse('{{ pie_data|escapejs }}');
+
+    const barCtx = document.getElementById('barChart').getContext('2d');
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Planifiés', 'Scrappés', 'Terminés', 'En cours'],
+            datasets: [{
+                label: 'Documents',
+                data: barData,
+                backgroundColor: ['#3b82f6','#10b981','#22c55e','#9333ea'],
+                borderColor: ['#3b82f6','#10b981','#22c55e','#9333ea'],
+                borderWidth: 2,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleColor: 'white',
+                    bodyColor: 'white',
+                    cornerRadius: 8,
+                    displayColors: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    ticks: { color: '#6b7280' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#6b7280' }
+                }
+            },
+            animation: {
+                duration: 1000,
+                easing: 'easeOutQuart'
+            }
+        }
+    });
+
+    const pieCtx = document.getElementById('pieChart').getContext('2d');
+    new Chart(pieCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Extraction','Validation','Annotation','Correction','Finalisation'],
+            datasets:[{
+                data: pieData,
+                backgroundColor:['#ef4444','#8b5cf6','#3b82f6','#f59e0b','#06b6d4'],
+                borderColor: '#ffffff',
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color:'#374151',
+                        font:{ size:12 },
+                        padding:20,
+                        usePointStyle:true,
+                        pointStyle:'circle'
+                    }
+                },
+                tooltip: {
+                    backgroundColor:'rgba(0,0,0,0.8)',
+                    titleColor:'white',
+                    bodyColor:'white',
+                    cornerRadius:8
+                }
+            },
+            animation:{ duration:1500,easing:'easeOutQuart' }
+        }
+    });
+</script>
+
+<!-- SECTION : Validation Métadonnées -->
+<div id="metadata-tab" class="tab-content hidden">
+  <section class="card metadata-card">
+    <h2><i class="fas fa-folder-open"></i> Documents importés</h2>
+
+    {% if documents %}
+      <table class="metadata-table">
+        <thead>
+          <tr>
+            <th>Fichier</th>
+            <th>Date d’import</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in documents %}
+          <tr>
+            <td>{{ doc.file.name|basename }}</td>
+            <td>{{ doc.created_at|date:"d/m/Y H:i" }}</td>
+            <td class="actions-cell">
+              <a href="{% url 'rawdocs:edit_metadata' doc.id %}"
+                 class="btn-outline"
+                 title="Voir / éditer les métadonnées">
+                <i class="fas fa-eye"></i>
+              </a>
+              <form method="post"
+                    action="{% url 'rawdocs:document_delete' doc.id %}"
+                    style="display:inline">
+                {% csrf_token %}
+                <button type="submit" class="btn-outline btn-delete">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Aucun document importé pour le moment.</p>
+    {% endif %}
+
+    <div class="upload-cell" style="margin-top:1.5rem;">
+      <a href="{% url 'rawdocs:upload' %}"
+         class="upload-cell__enter-btn">
+        <i class="fas fa-upload"></i> Importer un nouveau PDF
+      </a>
+    </div>
+  </section>
+</div>
+
+<script>
+  const dashboardTab = document.getElementById('dashboard-tab');
+  const metadataTab  = document.getElementById('metadata-tab');
+  const btnDashboard = document.getElementById('tab-dashboard');
+  const btnMetadata  = document.getElementById('tab-metadata');
+
+  btnDashboard.addEventListener('click', () => {
+    dashboardTab.classList.remove('hidden');    dashboardTab.classList.add('block');
+    metadataTab.classList.add('hidden');       metadataTab.classList.remove('block');
+    btnDashboard.classList.add('text-blue-600','border-b-2','border-blue-600');
+    btnMetadata.classList.remove('text-blue-600','border-b-2','border-blue-600');
+    btnMetadata.classList.add('text-gray-600');
+  });
+
+  btnMetadata.addEventListener('click', () => {
+    metadataTab.classList.remove('hidden');     metadataTab.classList.add('block');
+    dashboardTab.classList.add('hidden');       dashboardTab.classList.remove('block');
+    btnMetadata.classList.add('text-blue-600','border-b-2','border-blue-600');
+    btnDashboard.classList.remove('text-blue-600','border-b-2','border-blue-600');
+    btnDashboard.classList.add('text-gray-600');
+  });
+</script>
+
+{% endblock %}
