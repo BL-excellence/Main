@@ -1,0 +1,112 @@
+{% extends "base_auth.html" %}
+{% block title %}Inscription – DocuFlow{% endblock %}
+
+{% block content %}
+  <h2 class="text-3xl font-bold text-center mb-6">Inscription</h2>
+
+  {# Affiche les messages Django (par exemple, échec de validation) #}
+  {% if messages %}
+    <ul class="messages mb-4">
+      {% for message in messages %}
+        <li class="error">{{ message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {# Note sur les règles de mot de passe #}
+
+  <form method="post" action="{% url 'rawdocs:register' %}">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+      <input
+        type="text"
+        name="{{ form.username.html_name }}"
+        id="{{ form.username.id_for_label }}"
+        value="{{ form.username.value|default_if_none:'' }}"
+        class="input"
+        placeholder="Nom d’utilisateur"
+        required
+      />
+      {% for err in form.username.errors %}
+        <div class="error">{{ err }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="form-group">
+      <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+      <input
+        type="email"
+        name="{{ form.email.html_name }}"
+        id="{{ form.email.id_for_label }}"
+        value="{{ form.email.value|default_if_none:'' }}"
+        class="input"
+        placeholder="email@domaine.com"
+        required
+      />
+      {% for err in form.email.errors %}
+        <div class="error">{{ err }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="form-group">
+      <label for="{{ form.role.id_for_label }}">{{ form.role.label }}</label>
+      <select
+        name="{{ form.role.html_name }}"
+        id="{{ form.role.id_for_label }}"
+        class="input"
+        required
+      >
+        {% for val,label in form.role.field.choices %}
+          <option value="{{ val }}" {% if form.role.value == val %}selected{% endif %}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+      {% for err in form.role.errors %}
+        <div class="error">{{ err }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="form-group">
+      <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+      <input
+        type="password"
+        name="{{ form.password1.html_name }}"
+        id="{{ form.password1.id_for_label }}"
+        class="input"
+        placeholder="Mot de passe"
+        required
+      />
+      {% for err in form.password1.errors %}
+        <div class="error">{{ err }}</div>
+      {% endfor %}
+    </div>
+    <p class="mb-4 text-sm text-gray-600">
+    Votre mot de passe doit contenir au moins <strong>un chiffre</strong> et <strong>un caractère spécial</strong> et au moins <strong>8 lettres</strong>.
+    </p>
+    <br>
+
+    <div class="form-group">
+      <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
+      <input
+        type="password"
+        name="{{ form.password2.html_name }}"
+        id="{{ form.password2.id_for_label }}"
+        class="input"
+        placeholder="Confirmez le mot de passe"
+        required
+      />
+      {% for err in form.password2.errors %}
+        <div class="error">{{ err }}</div>
+      {% endfor %}
+    </div>
+
+    <button type="submit" class="btn">S’enregistrer →</button>
+  </form>
+
+  <p class="mt-6 text-center text-sm text-gray-600">
+    Déjà un compte ?
+    <a href="{% url 'rawdocs:login' %}" class="btn-outline">Connectez-vous</a>.
+  </p>
+{% endblock %}

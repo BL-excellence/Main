@@ -1,0 +1,139 @@
+{# templates/base.html #}
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}RawDocs{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'rawdocs/css/styles.css' %}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <header class="site-header">
+      <div class="header-content">
+        <a href="{% url 'rawdocs:login' %}" class="logo">
+          <i class="fas fa-file-pdf"></i>
+          <span>IABlockLabs</span>
+        </a>
+
+        {% if user.is_authenticated %}
+          <!-- Role-based Navigation -->
+          <nav class="role-nav">
+            {% if user.groups.first.name == "Metadonneur" %}
+              <a href="{% url 'rawdocs:upload' %}" class="nav-link">
+                <i class="fas fa-upload"></i> Import
+              </a>
+              <a href="{% url 'rawdocs:document_list' %}" class="nav-link">
+                <i class="fas fa-list"></i> Documents
+              </a>
+            {% elif user.groups.first.name == "Annotateur" %}
+              <a href="{% url 'rawdocs:annotation_dashboard' %}" class="nav-link">
+                <i class="fas fa-highlighter"></i> Annotation
+              </a>
+            {% elif user.groups.first.name == "Expert" %}
+              <a href="{% url 'rawdocs:annotation_dashboard' %}" class="nav-link">
+                <i class="fas fa-graduation-cap"></i> Expertise
+              </a>
+            {% endif %}
+          </nav>
+
+          <!-- User Info -->
+          <div class="user-info">
+            <span class="user-role">
+              <i class="fas fa-id-badge"></i>
+              {{ user.groups.first.name }}
+            </span>
+            <span class="user-name">
+              <i class="fas fa-user"></i>
+              {{ user.username }}
+            </span>
+            <form method="post" action="{% url 'rawdocs:logout' %}" class="logout-form">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Déconnexion
+              </button>
+            </form>
+          </div>
+        {% else %}
+          <nav class="nav-menu">
+            <a href="{% url 'rawdocs:login'    %}" class="nav-link"><i class="fas fa-sign-in-alt"></i> Connexion</a>
+            <a href="{% url 'rawdocs:register' %}" class="nav-link"><i class="fas fa-user-plus"></i> Inscription</a>
+          </nav>
+        {% endif %}
+      </div>
+    </header>
+
+    <main class="site-main">
+      <div class="main-content">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-content">
+        <p>&copy; 2025 IABlockLabs – Gestionnaire et Extraction de documents</p>
+      </div>
+    </footer>
+  </div>
+
+<style>
+/* Role-based Navigation */
+.role-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-right: 1rem;
+}
+
+.role-nav .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  color: var(--text-alt);
+  text-decoration: none;
+  border-radius: var(--border-radius);
+  transition: var(--transition-all);
+  font-weight: 500;
+}
+
+.role-nav .nav-link:hover {
+  background: var(--primary-color);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+/* Enhanced header layout */
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header-content {
+    flex-wrap: wrap;
+  }
+  
+  .role-nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    margin: 0.5rem 0 0;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+  }
+}
+</style>
+</body>
+</html>

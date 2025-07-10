@@ -1,0 +1,247 @@
+/* static/rawdocs/css/styles.css */
+
+/* Variables */
+:root {
+  --primary-color:    #2563eb;
+  --primary-hover:    #1d4ed8;
+  --secondary-color:  #64748b;
+  --background-color: #f8fafc;
+  --surface-color:    #ffffff;
+  --text-main:        #1e293b;
+  --text-alt:         #64748b;
+  --border-color:     #e2e8f0;
+  --border-radius:    12px;
+  --shadow-sm:        0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md:        0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+  --transition-all:   all 0.2s ease;
+}
+
+/* Reset & Base */
+* {
+  margin: 0; padding: 0; box-sizing: border-box;
+}
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--background-color);
+  color: var(--text-main);
+  min-height: 100vh;
+  font-size: 16px;
+}
+.app-container {
+  display: flex; flex-direction: column; min-height: 100vh;
+}
+
+/* Header */
+.site-header {
+  background: var(--surface-color);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  position: sticky; top: 0; z-index: 10;
+}
+.header-content {
+  max-width: 1200px; margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo {
+  display: flex; align-items: center; gap: .75rem;
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: 1.5rem; font-weight: 700;
+  transition: var(--transition-all);
+}
+.logo:hover { transform: translateY(-1px); }
+.logo i { font-size: 1.75rem; }
+
+/* Authenticated user info */
+.user-info {
+  display: flex; align-items: center; gap: 1rem;
+}
+.user-role, .user-name {
+  display: flex; align-items: center; gap: .5rem;
+  background: var(--surface-color);
+  padding: .5rem 1rem;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  font-weight: 500; color: var(--text-main);
+}
+.btn-logout {
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: transparent;
+  border: 1px solid var(--primary-color);
+  color: var(--primary-color);
+  padding: .5rem 1rem;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: var(--transition-all);
+}
+.btn-logout:hover {
+  background: var(--primary-color);
+  color: #fff;
+  box-shadow: var(--shadow-md);
+}
+
+/* Nav for guests */
+.nav-menu {
+  display: flex; gap: 1rem; align-items: center;
+}
+.nav-link {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .5rem 1rem;
+  color: var(--text-alt);
+  text-decoration: none;
+  border-radius: var(--border-radius);
+  transition: var(--transition-all);
+}
+.nav-link:hover {
+  background: var(--primary-color); color: #fff;
+  transform: translateY(-1px);
+}
+
+/* Main content */
+.site-main {
+  flex: 1; padding: 2rem 0;
+}
+.main-content {
+  max-width: 1000px; margin: 0 auto; padding: 0 2rem;
+}
+
+/* Footer */
+.site-footer {
+  background: var(--surface-color);
+  border-top: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+.footer-content {
+  max-width: 1200px; margin: 0 auto;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  color: var(--text-alt);
+  font-size: .875rem;
+}
+
+
+/* =======================================================================
+   == Styles spécifiques AUTH (login/register) intégrés ici          ==
+   ======================================================================= */
+
+/* Layout général de la page auth */
+.auth-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--background-color);
+}
+
+/* Navbar auth */
+.auth-header {
+  background: var(--surface-color);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+.auth-header .header-content {
+  max-width: 1200px; margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.auth-header .logo {
+  display: flex; align-items: center; gap: .5rem;
+  color: var(--text-main); font-size: 1.5rem; font-weight: 700;
+  text-decoration: none;
+}
+.auth-header .logo i {
+  color: var(--primary-color);
+}
+.auth-header .nav-menu a {
+  margin-left: 1.5rem;
+  color: var(--text-alt);
+  text-decoration: none;
+  font-weight: 500;
+  transition: var(--transition-all);
+}
+.auth-header .nav-menu a:hover {
+  color: var(--primary-color);
+}
+
+/* Conteneur deux colonnes */
+.auth-container {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 2rem;
+  gap: 2rem;
+}
+@media (max-width: 768px) {
+  .auth-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Colonne “pitch” */
+.auth-hero {
+  display: flex; flex-direction: column; gap: 1.5rem;
+}
+.hero-title {
+  font-size: 2.5rem; font-weight: 700;
+  color: var(--text-main);
+}
+.hero-text {
+  font-size: 1rem; color: var(--text-alt);
+  line-height: 1.6;
+}
+.hero-cta {
+  display: inline-block;
+  padding: .75rem 1.5rem;
+  border: 2px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: var(--transition-all);
+}
+.hero-cta:hover {
+  background: var(--primary-color);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+/* Carte formulaire auth */
+.auth-card {
+  background: var(--surface-color);
+  padding: 2rem;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* Animation fadeInUp */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Footer auth */
+.auth-footer {
+  background: var(--text-main);
+  color: var(--surface-color);
+  padding: 2rem 0;
+}
+.auth-footer .footer-content {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2rem;
+}
+.auth-footer .footer-col h4,
+.auth-footer .footer-col h5 {
+  margin-bottom: .5rem; font-weight: 600;
+}
+.auth-footer .footer-col ul { list-style: none; padding: 0; }
+.auth-footer .footer-col ul li a {
+  color: var(--surface-color); text-decoration: none;
+  transition: var(--transition-all);
+}
+.auth-footer .footer-col ul li a:hover {
+  text-decoration: underline;
+}
+.auth-footer .footer-bottom {
+  text-align: center; margin-top: 1rem; font-size: .875rem; opacity: .8;
+}

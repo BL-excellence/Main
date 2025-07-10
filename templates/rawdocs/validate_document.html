@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+{% load rawdocs_extras %}
+{% block title %}Valider Document – RawDocs{% endblock %}
+
+{% block content %}
+<section class="card validation-card">
+  <div class="validation-header">
+    <h2>
+      <i class="fas fa-check-circle"></i> 
+      Validation du Document
+    </h2>
+    <div class="document-info">
+      <h3>{{ document.file.name|basename }}</h3>
+      <div class="document-meta">
+        <span class="meta-item">
+          <i class="fas fa-user"></i> 
+          Propriétaire: {{ document.owner.username }}
+        </span>
+        <span class="meta-item">
+          <i class="fas fa-calendar"></i> 
+          Importé le: {{ document.created_at|date:"d/m/Y H:i" }}
+        </span>
+        <span class="meta-item">
+          <i class="fas fa-link"></i> 
+          <a href="{{ document.url }}" target="_blank">Source</a>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="validation-content">
+    <div class="validation-info">
+      <h4><i class="fas fa-info-circle"></i> Que fait la validation ?</h4>
+      <ul class="validation-steps">
+        <li>
+          <i class="fas fa-file-text"></i>
+          <strong>Extraction des pages :</strong> Le PDF sera divisé en pages individuelles
+        </li>
+        <li>
+          <i class="fas fa-brain"></i>
+          <strong>Préparation pour l'IA :</strong> Chaque page sera préparée pour l'annotation automatique
+        </li>
+        <li>
+          <i class="fas fa-users"></i>
+          <strong>Disponible pour annotation :</strong> Le document apparaîtra dans le dashboard des annotateurs
+        </li>
+        <li>
+          <i class="fas fa-tags"></i>
+          <strong>Annotation automatique :</strong> L'IA pourra identifier automatiquement les entités
+        </li>
+      </ul>
+    </div>
+
+    {% if document.is_validated %}
+      <div class="already-validated">
+        <i class="fas fa-check-circle"></i>
+        <h3>Document déjà validé</h3>
+        <p>Ce document a été validé le {{ document.validated_at|date:"d/m/Y à H:i" }}</p>
+        <p><strong>Pages extraites :</strong> {{ document.total_pages }}</p>
+        
+        <div class="validated-actions">
+          <a href="{% url 'rawdocs:annotation_dashboard' %}" class="btn-primary">
+            <i class="fas fa-highlighter"></i> Aller à l'annotation
+          </a>
+          <a href="{% url 'rawdocs:document_list' %}" class="btn-outline">
+            <i class="fas fa-arrow-left"></i> Retour à la liste
+          </a>
+        </div>
+      </div>
+    {% else %}
+      <div class="validation-actions">
+        <form method="post" class="validation-form">
+          {% csrf_token %}
+          <div class="validation-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p>
+              <strong>Attention :</strong> Cette action va extraire toutes les pages du PDF 
+              et le rendre disponible pour l'annotation par l'IA. Cette opération peut prendre 
+              quelques secondes selon la taille du document.
+            </p>
+          </div>
+          
+          <div class="form-actions">
+            <button type="submit" class="btn-validate">
+              <i class="fas fa-check"></i>
+              Valider le Document
+            </button>
+            <a href="{% url 'rawdocs:document_list' %}" class="btn-cancel">
+              <i class="fas fa-times"></i>
+              Annuler
+            </a>
+          </div>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<style>
+.validation-card {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+}
+
+.validation-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.validation-header h2 {
+  margin: 0 0 1rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.document-info h3 {
+  margin: 0 0 0.5rem;
+  color: var(--primary-color);
+  font-size: 1.25rem;
+}
+
+.document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.meta-item {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.meta-item a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.meta-item a:hover {
+  text-decoration: underline;
+}
+
+.validation-content {
+  display: grid;
+  gap: 2rem;
+}
+
+.validation-info h4 {
+  margin: 0 0 1rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.validation-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.validation-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.validation-steps li:last-child {
+  border-bottom: none;
+}
+
+.validation-steps li i {
+  color: var(--primary-color);
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+.already-validated {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  padding: 2rem;
+  border-radius: var(--border-radius);
+  text-align: center;
+  border: 2px solid #10b981;
+}
+
+.already-validated i {
+  font-size: 3rem;
+  color: #047857;
+  margin-bottom: 1rem;
+}
+
+.already-validated h3 {
+  margin: 0 0 0.5rem;
+  color: #047857;
+}
+
+.already-validated p {
+  margin: 0.5rem 0;
+  color: #065f46;
+}
+
+.validated-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.validation-form {
+  background: var(--surface-color);
+  padding: 1.5rem;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+}
+
+.validation-warning {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.validation-warning i {
+  color: #d97706;
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+.validation-warning p {
+  margin: 0;
+  color: #92400e;
+  line-height: 1.5;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.btn-validate {
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: var(--transition-all);
+}
+
+.btn-validate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-cancel {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 2px solid var(--border-color);
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--border-radius);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  transition: var(--transition-all);
+}
+
+.btn-cancel:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--border-radius);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  transition: var(--transition-all);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--primary-color);
+  border: 2px solid var(--primary-color);
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--border-radius);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  transition: var(--transition-all);
+}
+
+.btn-outline:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .validation-card {
+    margin: 1rem;
+    padding: 1rem;
+  }
+  
+  .document-meta {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .form-actions,
+  .validated-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,78 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Authentification{% endblock %}</title>
+
+  {# Global styles & auth-specific #}
+  <link rel="stylesheet" href="{% static 'rawdocs/css/styles.css' %}">
+  <link rel="stylesheet" href="{% static 'rawdocs/css/style_auth.css' %}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        rel="stylesheet">
+</head>
+<body class="auth-page">
+
+  <!-- Navbar minimaliste -->
+  <header class="auth-header">
+    <div class="header-content">
+      <a href="{% url 'rawdocs:upload' %}" class="logo">
+        <i class="fas fa-file-pdf"></i>
+        <span>IABlockLabs</span>
+      </a>
+      <nav class="nav-menu">
+        <a href="#features">Fonctionnalités</a>
+        <a href="#about">À propos</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Deux colonnes : gauche « pitch », droite formulaire -->
+  <main class="auth-container">
+    <div class="auth-hero">
+      {% block hero %}
+      <h1 class="hero-title">Plateforme d’Extraction & Validation</h1>
+      <p class="hero-text">
+        Automatisez l’extraction de métadonnées et la validation de vos documents
+        avec notre solution IA avancée. Optimisez votre workflow documentaire.
+      </p>
+      <a href="#features" class="hero-cta">En savoir plus</a>
+      {% endblock %}
+    </div>
+
+    <div class="auth-card">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="auth-footer">
+    <div class="footer-content">
+      <div class="footer-col">
+        <h4>IABlockLabs</h4>
+        <p>Extraction & validation automatisées</p>
+      </div>
+      <div class="footer-col">
+        <h5>Produit</h5>
+        <ul>
+          <li><a href="#features">Fonctionnalités</a></li>
+          <li><a href="#pricing">Tarifs</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Support</h5>
+        <ul>
+          <li><a href="#contact">Contact</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2025 IABlockLabs. Tous droits réservés.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

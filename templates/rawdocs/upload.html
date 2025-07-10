@@ -1,0 +1,487 @@
+{# templates/rawdocs/upload.html #}
+{% extends "base.html" %}
+{% block title %}Importer un PDF – RawDocs{% endblock %}
+
+{% block content %}
+<!-- 1) Upload Form -->
+<section class="upload-cell">
+  <form method="post" class="upload-cell__form" novalidate>
+    {% csrf_token %}
+    <button type="submit" class="upload-cell__enter-btn">
+      <i class="fas fa-sign-in-alt"></i> Entrer
+    </button>
+    {{ form.pdf_url }}
+  </form>
+</section>
+
+<!-- 2) REAL LLM Quality Dashboard -->
+{% if metadata.quality %}
+<section class="card quality-card">
+  <h3>
+    <i class="fas fa-brain"></i> 
+    Qualité d'Extraction LLM
+    {% if metadata.quality.llm_powered %}
+      <span class="llm-badge">AI-Powered</span>
+    {% else %}
+      <span class="basic-badge">Basic</span>
+    {% endif %}
+  </h3>
+  
+  <div class="quality-overview">
+    <!-- Overall Rate from LLM -->
+    <div class="extraction-rate">
+      <div class="rate-label">Taux d'extraction:</div>
+      <div class="rate-value">{{ metadata.quality.extraction_rate }}%</div>
+      <div class="rate-bar">
+        <div class="rate-fill" style="width: {{ metadata.quality.extraction_rate }}%"></div>
+      </div>
+    </div>
+    
+    <!-- Field Badges based on REAL confidence -->
+    <div class="fields-extracted">
+      <span class="fields-label">Champs extraits automatiquement:</span>
+      <div class="field-badges">
+        {% for field, score in metadata.quality.field_scores.items %}
+          {% if score >= 70 %}
+            <span class="field-badge excellent">{{ field|title }}</span>
+          {% elif score >= 50 %}
+            <span class="field-badge good">{{ field|title }}</span>
+          {% elif score >= 20 %}
+            <span class="field-badge poor">{{ field|title }}</span>
+          {% else %}
+            <span class="field-badge missing">{{ field|title }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    
+    <!-- REAL LLM Confidence Scores -->
+    <div class="confidence-scores">
+      <div class="scores-label">Scores de confiance LLM:</div>
+      <div class="score-list">
+        {% for field, score in metadata.quality.field_scores.items %}
+        <div class="score-item">
+          <div class="score-details">
+            <span class="score-name">{{ field|title }}:</span>
+            {% if metadata.quality.extraction_reasoning %}
+              <span class="score-reasoning">
+                {% for reason_field, reason_text in metadata.quality.extraction_reasoning.items %}
+                  {% if reason_field == field %}{{ reason_text }}{% endif %}
+                {% endfor %}
+              </span>
+            {% endif %}
+          </div>
+          <div class="score-container">
+            <span class="score-value" style="color: {% if score >= 80 %}#10b981{% elif score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}">
+              {{ score }}%
+            </span>
+            <div class="mini-bar">
+              <div class="mini-fill" style="width: {{ score }}%; background: {% if score >= 80 %}#10b981{% elif score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"></div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- 3) Metadata Table -->
+{% if metadata %}
+<section class="card metadata-card">
+  <h3><i class="fas fa-info-circle"></i> Métadonnées extraites</h3>
+  <table class="metadata-table">
+    <tbody>
+      <tr><th>Titre</th><td>{{ metadata.title|default:"Non spécifié" }}</td></tr>
+      <tr><th>Type de document</th><td>{{ metadata.type|default:"–" }}</td></tr>
+      <tr><th>Langue</th><td>{{ metadata.language|default:"–" }}</td></tr>
+      <tr><th>Version</th><td>{{ metadata.version|default:"–" }}</td></tr>
+      <tr><th>URL Source</th>
+        <td>
+          <a href="{{ metadata.url_source }}" target="_blank" class="source-link">
+            <i class="fas fa-external-link-alt"></i>
+            {{ metadata.url_source }}
+          </a>
+        </td>
+      </tr>
+      <tr><th>Source interne</th><td>{{ metadata.source|default:"Non spécifiée" }}</td></tr>
+      <tr><th>Date de publication</th><td>{{ metadata.publication_date|default:"Non spécifiée" }}</td></tr>
+      <tr><th>Contexte</th>
+        <td>
+          <div class="context-text">
+            {{ metadata.context|default:"Aucun contexte fourni" }}
+          </div>
+        </td>
+      </tr>
+      <tr><th>Pays</th><td>{{ metadata.country|default:"–" }}</td></tr>
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<!-- 4) Text Extract -->
+{% if extracted_text %}
+<section class="card text-card">
+  <h3><i class="fas fa-file-alt"></i> Texte complet extrait</h3>
+  <div class="text-card__body">
+    <pre>{{ extracted_text }}</pre>
+  </div>
+  <a href="{% url 'rawdocs:upload' %}" class="btn-outline">
+    <i class="fas fa-arrow-left"></i> Nouvel upload
+  </a>
+</section>
+{% endif %}
+
+<!-- 5) Document List Link -->
+<section class="upload-cell" style="margin-top:2rem;">
+  <a href="{% url 'rawdocs:document_list' %}" class="upload-cell__enter-btn">
+    <i class="fas fa-list"></i> Voir tous les documents
+  </a>
+</section>
+
+<style>
+/* LLM Quality Styles */
+.quality-card {
+  background: var(--surface-color);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 2rem;
+  border-left: 4px solid #8b5cf6;
+}
+
+.llm-badge {
+  background: linear-gradient(45deg, #8b5cf6, #06b6d4);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.basic-badge {
+  background: #6b7280;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  margin-left: 0.5rem;
+}
+
+.quality-card h3 {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 1.5rem;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+}
+
+.quality-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Extraction Rate */
+.extraction-rate {
+  text-align: center;
+}
+
+.rate-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.rate-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #8b5cf6;
+  margin-bottom: 0.5rem;
+}
+
+.rate-bar {
+  width: 100%;
+  height: 12px;
+  background: #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 0 auto;
+  max-width: 300px;
+}
+
+.rate-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #06b6d4);
+  border-radius: 6px;
+  transition: width 0.8s ease;
+}
+
+/* Field Badges with Real Confidence Levels */
+.field-badge.excellent {
+  background: #d1fae5;
+  color: #047857;
+  border: 1px solid #10b981;
+}
+
+.field-badge.good {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.field-badge.poor {
+  background: #fed7d7;
+  color: #c53030;
+  border: 1px solid #f56565;
+}
+
+.field-badge.missing {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
+/* Real LLM Scores */
+.confidence-scores {
+  background: var(--background-color);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+}
+
+.score-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.score-details {
+  flex: 1;
+}
+
+.score-name {
+  display: block;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.score-reasoning {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-alt);
+  font-style: italic;
+}
+
+.score-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 100px;
+}
+
+.score-value {
+  font-weight: 700;
+  font-size: 1rem;
+  min-width: 45px;
+  text-align: right;
+}
+
+.mini-bar {
+  width: 40px;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mini-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+/* LLM Reasoning Section */
+.llm-reasoning {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--border-radius);
+  padding: 1rem;
+}
+
+.reasoning-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.reasoning-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.reasoning-item {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.reasoning-item strong {
+  color: var(--text-primary);
+}
+
+/* Rest of existing styles... */
+.upload-cell {
+  display: flex;
+  justify-content: center;
+  margin: 2rem 0;
+}
+.upload-cell__form {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  width: 100%;
+  max-width: 500px;
+}
+.upload-cell__enter-btn {
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  padding: .5rem .75rem;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: var(--transition-all);
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.upload-cell__enter-btn:hover {
+  background: var(--primary-hover);
+}
+.upload-cell__input {
+  flex: 1;
+  padding: .75rem 1rem;
+  font-size: 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: var(--border-radius);
+  transition: var(--transition-all);
+}
+.upload-cell__input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}
+
+.metadata-card {
+  background: var(--surface-color);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 2rem;
+}
+.metadata-card h3 {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+.metadata-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.metadata-table th,
+.metadata-table td {
+  padding: .5rem .75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.metadata-table th {
+  text-align: left;
+  font-weight: 600;
+  width: 25%;
+}
+.source-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+}
+.source-link:hover {
+  text-decoration: underline;
+}
+.context-text {
+  background: var(--background-color);
+  padding: .75rem;
+  border-radius: var(--border-radius);
+  font-size: .95rem;
+  line-height: 1.4;
+}
+
+.text-card {
+  background: var(--surface-color);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 2rem;
+}
+.text-card h3 {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+.text-card__body {
+  max-height: 40vh;
+  overflow: auto;
+  background: var(--background-color);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
+}
+.text-card__body pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem 1rem;
+  border: 2px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: var(--transition-all);
+}
+.btn-outline:hover {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .score-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .score-container {
+    align-self: flex-end;
+  }
+}
+</style>
+{% endblock %}
