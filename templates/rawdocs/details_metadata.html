@@ -2,243 +2,306 @@
 {% block title %}Métadonnées – {{ doc.basename }}{% endblock %}
 
 {% block content %}
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Métadonnées – {{ doc.basename }}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  <style>
-    .progress-bar { transition: width 0.3s ease; }
-    .badge { @apply inline-flex items-center px-2 py-1 rounded text-xs font-medium; }
-    .badge-success { @apply bg-green-100 text-green-800; }
-    .badge-warning { @apply bg-yellow-100 text-yellow-800; }
-    .badge-info    { @apply bg-blue-100 text-blue-800; }
-    .badge-secondary { @apply bg-gray-100 text-gray-800; }
-    .field-tag { @apply inline-block px-2 py-1 rounded text-xs font-medium m-1; }
-    .field-extracted { @apply bg-blue-500 text-white; }
-    .field-type      { @apply bg-purple-500 text-white; }
-    .field-context   { @apply bg-indigo-500 text-white; }
-    .field-date      { @apply bg-green-500 text-white; }
-    .field-language  { @apply bg-cyan-500 text-white; }
-    .field-country   { @apply bg-emerald-500 text-white; }
-    .field-source    { @apply bg-orange-500 text-white; }
-    .field-version   { @apply bg-gray-500 text-white; }
-    .confidence-high   { @apply text-green-600; }
-    .confidence-medium { @apply text-yellow-600; }
-    .confidence-low    { @apply text-red-600; }
-  </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-  <div class="container mx-auto px-4 py-6">
+<div class="dashboard-container">
     <div class="flex flex-col lg:flex-row gap-6">
-      <!-- Main form -->
-      <div class="lg:w-2/3">
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-          <!-- Header -->
-          <div class="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-            <h5 class="text-lg font-medium text-gray-900 flex items-center">
-              <i class="fas fa-edit text-blue-600 mr-2"></i>
-              Métadonnées du document
-            </h5>
-            <div class="flex space-x-2">
-              <button type="button"
-                      class="px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-blue-600 rounded-md hover:bg-blue-50 transition-colors"
-                      onclick="reextractMetadata()">
-                <i class="fas fa-sync mr-1"></i> Réextraire
-              </button>
-              <button type="button"
-                      class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-                <i class="fas fa-times mr-1"></i> Refuser
-              </button>
-              <a href="{{ doc.file.url }}"
-                 target="_blank"
-                 class="px-3 py-1.5 text-sm font-medium text-cyan-600 bg-white border border-cyan-600 rounded-md hover:bg-cyan-50 transition-colors">
-                <i class="fas fa-eye mr-1"></i> Voir le doc
-              </a>
+        <!-- Main form -->
+        <div class="lg:w-2/3">
+            <div class="card">
+                <!-- Header -->
+                <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-6">
+                    <h2 class="card-title">
+                        <i class="fas fa-edit text-blue-400"></i>
+                        Métadonnées du document
+                    </h2>
+                    <div class="flex space-x-2">
+                        <button onclick="reextractMetadata()"
+                                class="btn btn-outline">
+                            <i class="fas fa-sync mr-1"></i> Réextraire
+                        </button>
+                        <button class="btn btn-outline text-red-400 border-red-400 hover:bg-red-500/10">
+                            <i class="fas fa-times mr-1"></i> Refuser
+                        </button>
+                        <a href="{{ doc.file.url }}" target="_blank"
+                           class="btn btn-outline text-cyan-400 border-cyan-400 hover:bg-cyan-500/10">
+                            <i class="fas fa-eye mr-1"></i> Voir le doc
+                        </a>
+                    </div>
+                </div>
+
+                <form id="metadataForm" method="post" class="space-y-6">
+                    {% csrf_token %}
+
+                    <!-- Title -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">
+                            Titre du document
+                            <span class="badge badge-success ml-2">Auto-extrait</span>
+                        </label>
+                        <input type="text"
+                               name="title"
+                               value="{{ form.title.value|default_if_none:'' }}"
+                               class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none" />
+                    </div>
+
+                    <!-- Type & Context -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
+                                Type de document
+                                <span class="badge badge-success ml-2">Auto-détecté</span>
+                            </label>
+                            {{ form.type }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
+                                Contexte
+                                <span class="badge badge-success ml-2">Auto-détecté</span>
+                            </label>
+                            {{ form.context }}
+                        </div>
+                    </div>
+
+                    <!-- Langue & Date -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
+                                Langue
+                                <span class="badge badge-success ml-2">Auto-détectée</span>
+                            </label>
+                            {{ form.language }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
+                                Date de publication
+                                <span class="badge badge-success ml-2">Auto-extraite</span>
+                            </label>
+                            {{ form.publication_date }}
+                        </div>
+                    </div>
+
+                    <!-- Version & Source -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Version</label>
+                            {{ form.version }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
+                                Source
+                                <span class="badge badge-success ml-2">Auto-extraite</span>
+                            </label>
+                            {{ form.source }}
+                        </div>
+                    </div>
+
+                    <!-- URL source -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">URL source</label>
+                        {{ form.url_source }}
+                    </div>
+
+                    <!-- Submit -->
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <a href="{% url 'rawdocs:dashboard' %}"
+                           class="btn btn-outline">
+                            <i class="fas fa-arrow-left mr-1"></i> Retour
+                        </a>
+                        <button type="submit"
+                                class="btn btn-primary">
+                            <i class="fas fa-save mr-1"></i> Sauvegarder
+                        </button>
+                    </div>
+                </form>
             </div>
-          </div>
-
-          <div class="p-6">
-            <form id="metadataForm" method="post">
-              {% csrf_token %}
-
-              <!-- Title -->
-              <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Titre du document
-                  <span class="badge badge-success ml-2">Auto-extrait</span>
-                </label>
-                <input type="text"
-                       name="title"
-                       value="{{ form.title.value|default_if_none:'' }}"
-                       class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
-              </div>
-
-              <!-- Type & Context -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Type de document
-                    <span class="badge badge-success ml-2">Auto-détecté</span>
-                  </label>
-                  {{ form.type }}
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Contexte
-                    <span class="badge badge-success ml-2">Auto-détecté</span>
-                  </label>
-                  {{ form.context }}
-                </div>
-              </div>
-
-              <!-- Langue & Date -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Langue
-                    <span class="badge badge-success ml-2">Auto-détectée</span>
-                  </label>
-                  {{ form.language }}
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Date de publication
-                    <span class="badge badge-success ml-2">Auto-extraite</span>
-                  </label>
-                  {{ form.publication_date }}
-                </div>
-              </div>
-
-              <!-- Version & Source -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Version</label>
-                  {{ form.version }}
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Source
-                    <span class="badge badge-success ml-2">Auto-extraite</span>
-                  </label>
-                  {{ form.source }}
-                </div>
-              </div>
-
-              <!-- URL source -->
-              <div class="mb-8">
-                <label class="block text-sm font-medium text-gray-700 mb-2">URL source</label>
-                {{ form.url_source }}
-              </div>
-
-              <!-- Submit -->
-              <div class="flex justify-end space-x-3">
-                <a href="{% url 'rawdocs:dashboard' %}"
-                   class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-                  <i class="fas fa-arrow-left mr-1"></i> Retour
-                </a>
-                <button type="submit"
-                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors">
-                  <i class="fas fa-save mr-1"></i> Sauvegarder
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
-      </div>
 
-      <!-- Sidebar -->
-      <div class="lg:w-1/3 space-y-6">
+        <!-- Sidebar -->
+        <div class="lg:w-1/3 space-y-6">
+            {% if metadata.quality %}
+            <!-- Quality -->
+            <div class="card">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-pie text-cyan-400"></i>
+                    Qualité d'extraction
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm text-gray-400">Taux d'extraction:</span>
+                            <strong class="text-lg text-blue-400">{{ metadata.quality.extraction_rate }}%</strong>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar bg-green-500" style="width: {{ metadata.quality.extraction_rate }}%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <small class="text-gray-400 font-medium">Champs extraits:</small>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            {% for field, score in metadata.quality.field_scores.items %}
+                                <span class="px-2 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400">
+                                    {{ field|title }}
+                                </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div>
+                        <small class="text-gray-400 font-medium">Scores de confiance:</small>
+                        <div class="mt-2 space-y-2">
+                            {% for field, score in metadata.quality.field_scores.items %}
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-300">{{ field|title }}</span>
+                                    <span class="text-sm font-medium
+                                             {% if score >= 80 %}text-green-400
+                                             {% elif score >= 50 %}text-yellow-400
+                                             {% else %}text-red-400{% endif %}">
+                                        {{ score }}%
+                                    </span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
-        {% if metadata.quality %}
-        <!-- LLM Quality -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div class="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-            <h6 class="text-base font-medium text-gray-900 flex items-center">
-              <i class="fas fa-chart-pie text-cyan-600 mr-2"></i> Qualité d'extraction
-            </h6>
-          </div>
-          <div class="p-4">
-            <div class="mb-4">
-              <div class="flex justify-between items-center mb-2">
-                <span class="text-sm text-gray-600">Taux d'extraction:</span>
-                <strong class="text-lg text-blue-600">{{ metadata.quality.extraction_rate }}%</strong>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
-                <div class="h-2 rounded-full bg-green-500 progress-bar"
-                     style="width: {{ metadata.quality.extraction_rate }}%"></div>
-              </div>
+            <!-- History -->
+            <div class="card">
+                <h3 class="card-title">
+                    <i class="fas fa-history text-gray-400"></i>
+                    Historique des modifications
+                </h3>
+                <div class="space-y-4 max-h-[60vh] overflow-y-auto">
+                    {% for log in logs %}
+                    <div class="border border-gray-700 rounded-lg p-4 bg-gray-800/50">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-300">{{ log.field_name|title }}</span>
+                            <time class="text-xs text-gray-500">{{ log.modified_at|date:"d/m/Y H:i" }}</time>
+                        </div>
+                        <p class="text-sm text-gray-200 mb-1">{{ log.old_value }} → {{ log.new_value }}</p>
+                        <p class="text-xs text-gray-400 flex items-center">
+                            <i class="fas fa-user mr-1"></i>{{ log.modified_by.username }}
+                        </p>
+                    </div>
+                    {% empty %}
+                    <p class="text-gray-500">Aucune modification enregistrée.</p>
+                    {% endfor %}
+                </div>
             </div>
-            <div class="mb-4">
-              <small class="text-gray-500 font-medium">Champs extraits automatiquement:</small>
-              <div class="mt-2 flex flex-wrap">
-                {% for field, score in metadata.quality.field_scores.items %}
-                  <span class="field-tag field-extracted">{{ field|title }}</span>
-                {% endfor %}
-              </div>
-            </div>
-            <div>
-              <small class="text-gray-500 font-medium">Scores de confiance:</small>
-              <div class="mt-2 space-y-1">
-                {% for field, score in metadata.quality.field_scores.items %}
-                  <div class="flex justify-between items-center">
-                    <span class="text-sm text-gray-600">{{ field|title }}:</span>
-                    <span class="text-sm font-medium
-                                 {% if score >= 80 %}confidence-high
-                                 {% elif score >= 50 %}confidence-medium
-                                 {% else %}confidence-low{% endif %}">
-                      {{ score }}%
-                    </span>
-                  </div>
-                {% endfor %}
-              </div>
-            </div>
-          </div>
         </div>
-        {% endif %}
-
-        <!-- Audit trail -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div class="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-            <h6 class="text-base font-medium text-gray-900 flex items-center">
-              <i class="fas fa-history text-gray-600 mr-2"></i> Historique des modifications
-            </h6>
-          </div>
-          <div class="p-4 space-y-4">
-            {% for log in logs %}
-              <div class="border border-gray-100 rounded-lg p-3 bg-gray-50">
-                <div class="flex justify-between items-center mb-1">
-                  <span class="badge badge-info">{{ log.field_name }}</span>
-                  <small class="text-gray-600 font-bold">
-                    {{ log.modified_at|date:"d/m/Y H:i" }}
-                  </small>
-                </div>
-                <div class="text-sm text-gray-800 mb-1">
-                  {{ log.old_value }} → {{ log.new_value }}
-                </div>
-                <div class="text-xs text-gray-600 flex items-center">
-                  <i class="fas fa-user mr-1"></i>{{ log.modified_by.username }}
-                </div>
-              </div>
-            {% empty %}
-              <p class="text-gray-500 text-sm">Aucune modification enregistrée.</p>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
     </div>
-  </div>
+</div>
 
-  <script>
-    function reextractMetadata() {
-      if (!confirm("Relancer l'extraction automatique ?")) return;
-      alert("Extraction relancée !");
+<script>
+function reextractMetadata() {
+    if (!confirm("Relancer l'extraction automatique ?")) return;
+    alert("Extraction relancée !");
+}
+</script>
+
+<style>
+.dashboard-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
+
+.card {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+.btn-outline:hover {
+    background: rgba(96, 165, 250, 0.1);
+}
+
+.progress-container {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    border-radius: 8px;
+    transition: width 0.6s ease;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.badge-success {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: rgb(16, 185, 129);
+}
+
+:root {
+    --primary: #2563eb;
+    --primary-light: #3b82f6;
+    --secondary: #1e293b;
+    --secondary-dark: #0f172a;
+    --accent: #60a5fa;
+    --text: #f8fafc;
+    --text-secondary: #e2e8f0;
+    --card-bg: rgba(15, 23, 42, 0.7);
+    --card-border: rgba(59, 130, 246, 0.2);
+}
+
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: 0 1rem;
     }
-  </script>
-</body>
-</html>
+
+    .card {
+        padding: 1rem;
+    }
+}
+</style>
 {% endblock %}

@@ -3,218 +3,774 @@
 {% block title %}Dashboard Annotation – RawDocs{% endblock %}
 
 {% block content %}
-<section class="card">
-  <h2><i class="fas fa-highlighter"></i> Documents Validés pour Annotation</h2>
-  
-  {% if documents %}
-    <div class="documents-grid">
-      {% for doc in documents %}
-      <div class="document-card">
-        <div class="doc-header">
-          <h3>{{ doc.file.name|basename }}</h3>
-          <span class="doc-status validated">✅ Validé</span>
-        </div>
-        
-        <div class="doc-details">
-          <p><strong>Pages:</strong> {{ doc.total_pages }}</p>
-          <p><strong>Propriétaire:</strong> {{ doc.owner.username }}</p>
-          <p><strong>Validé le:</strong> {{ doc.validated_at|date:"d/m/Y H:i" }}</p>
-          
-          {% if doc.pages.exists %}
-            <div class="annotation-progress">
-              {% with annotated_count=doc.pages.filter|length total_count=doc.total_pages %}
-                <div class="progress-bar">
-                  <div class="progress-fill" style="width: {% widthratio annotated_count total_count 100 %}%"></div>
-                </div>
-                <span class="progress-text">{{ annotated_count }}/{{ total_count }} pages annotées</span>
-              {% endwith %}
-            </div>
-          {% endif %}
-        </div>
-        
-        <div class="doc-actions">
-          <a href="{% url 'rawdocs:annotate_document' doc.id %}" class="btn-primary">
-            <i class="fas fa-highlighter"></i> Annoter
-          </a>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    
-    <!-- Pagination -->
-    {% if documents.has_other_pages %}
-    <div class="pagination">
-      {% if documents.has_previous %}
-        <a href="?page=1" class="page-link">Première</a>
-        <a href="?page={{ documents.previous_page_number }}" class="page-link">Précédente</a>
-      {% endif %}
-      
-      <span class="current-page">
-        Page {{ documents.number }} sur {{ documents.paginator.num_pages }}
-      </span>
-      
-      {% if documents.has_next %}
-        <a href="?page={{ documents.next_page_number }}" class="page-link">Suivante</a>
-        <a href="?page={{ documents.paginator.num_pages }}" class="page-link">Dernière</a>
-      {% endif %}
-    </div>
-    {% endif %}
-    
-  {% else %}
-    <div class="empty-state">
-      <i class="fas fa-file-alt"></i>
-      <h3>Aucun document à annoter</h3>
-      <p>Les documents doivent être validés par un métadonneur avant annotation.</p>
-    </div>
-  {% endif %}
-</section>
-
 <style>
-.documents-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
-  margin-top: 1rem;
-}
+    :root {
+        --primary: #2563eb;
+        --primary-light: #3b82f6;
+        --secondary: #1e293b;
+        --secondary-dark: #0f172a;
+        --accent: #60a5fa;
+        --text: #f8fafc;
+        --text-secondary: #e2e8f0;
+        --card-bg: rgba(15, 23, 42, 0.7);
+        --card-border: rgba(59, 130, 246, 0.2);
+        --success: #10b981;
+        --success-bg: rgba(16, 185, 129, 0.15);
+    }
 
-.document-card {
-  background: var(--surface-color);
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
-  transition: var(--transition-all);
-}
+    .dashboard-container {
+        max-width: 1400px;
+        margin: 2rem auto;
+        padding: 0 1.5rem;
+    }
 
-.document-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
+    /* Navigation tabs */
+    .nav-tabs {
+        display: flex;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 2rem;
+        padding-top: 1rem;
+    }
 
-.doc-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-}
+    .nav-tab {
+        padding: 1rem 1.5rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-bottom: 2px solid transparent;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
 
-.doc-header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: var(--text-primary);
-  line-height: 1.3;
-}
+    .nav-tab:hover {
+        color: var(--accent);
+    }
 
-.doc-status {
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
+    .nav-tab.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+    }
 
-.doc-status.validated {
-  background: #d1fae5;
-  color: #047857;
-}
+    /* Cards */
+    .card {
+        background: var(--card-bg);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+    }
 
-.doc-details p {
-  margin: 0.5rem 0;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
 
-.annotation-progress {
-  margin-top: 1rem;
-}
+    .card-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
 
-.progress-bar {
-  width: 100%;
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 0.5rem;
-}
+    /* Stats */
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text);
+        line-height: 1;
+    }
 
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #1d4ed8);
-  transition: width 0.3s ease;
-}
+    .stat-label {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-top: 0.5rem;
+    }
 
-.progress-text {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
+    /* Progress bars */
+    .progress-container {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        height: 8px;
+        margin-top: 1rem;
+        overflow: hidden;
+    }
 
-.doc-actions {
-  margin-top: 1.5rem;
-  display: flex;
-  gap: 0.5rem;
-}
+    .progress-bar {
+        height: 100%;
+        border-radius: 8px;
+        transition: width 0.6s ease;
+    }
 
-.btn-primary {
-  background: var(--primary-color);
-  color: #fff;
-  padding: 0.75rem 1rem;
-  border-radius: var(--border-radius);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  transition: var(--transition-all);
-  border: none;
-  cursor: pointer;
-}
+    /* Document cards */
+    .documents-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
 
-.btn-primary:hover {
-  background: var(--primary-hover);
-  transform: translateY(-1px);
-}
+    .document-card {
+        background: var(--card-bg);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        position: relative;
+    }
 
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 2rem;
-  padding: 1rem 0;
-}
+    .document-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        border-color: rgba(59, 130, 246, 0.4);
+    }
 
-.page-link {
-  color: var(--primary-color);
-  text-decoration: none;
-  padding: 0.5rem 1rem;
-  border-radius: var(--border-radius);
-  transition: var(--transition-all);
-}
+    .doc-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: var(--success-bg);
+        color: var(--success);
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        z-index: 2;
+    }
 
-.page-link:hover {
-  background: var(--primary-color);
-  color: #fff;
-}
+    .doc-content {
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
 
-.current-page {
-  font-weight: 600;
-  color: var(--text-primary);
-}
+    .doc-header {
+        margin-bottom: 1.5rem;
+    }
 
-.empty-state {
-  text-align: center;
-  padding: 3rem 2rem;
-  color: var(--text-secondary);
-}
+    .doc-header h3 {
+        margin: 0 0 0.75rem 0;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.4;
+    }
 
-.empty-state i {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-  color: var(--border-color);
-}
+    .doc-meta {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
 
-.empty-state h3 {
-  margin: 1rem 0 0.5rem;
-  color: var(--text-primary);
-}
+    .doc-meta span {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .doc-footer {
+        margin-top: auto;
+    }
+
+    .doc-progress {
+        margin-bottom: 1.5rem;
+    }
+
+    .progress-info {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+
+    .doc-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1rem;
+    }
+
+    .doc-date {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    /* Buttons */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.65rem 1.25rem;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .btn-primary {
+        background: var(--primary);
+        color: white;
+        border: none;
+    }
+
+    .btn-primary:hover {
+        background: var(--primary-light);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    }
+
+    .btn-outline {
+        background: transparent;
+        color: var(--accent);
+        border: 1px solid var(--accent);
+    }
+
+    .btn-outline:hover {
+        background: rgba(96, 165, 250, 0.1);
+    }
+
+    /* Tables */
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .table th {
+        text-align: left;
+        padding: 0.75rem 1rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .table td {
+        padding: 0.75rem 1rem;
+        color: var(--text);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .table tr:hover td {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: var(--text-secondary);
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .empty-icon {
+        font-size: 3.5rem;
+        margin-bottom: 1.5rem;
+        color: rgba(96, 165, 250, 0.3);
+    }
+
+    .empty-state h3 {
+        margin: 1rem 0 0.5rem;
+        color: var(--text);
+        font-size: 1.25rem;
+    }
+
+    /* Pagination */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 3rem;
+        flex-wrap: wrap;
+    }
+
+    .current-page {
+        font-weight: 500;
+        color: var(--text-secondary);
+        padding: 0 1rem;
+    }
+
+    /* Chart containers */
+    .chart-container {
+        position: relative;
+        width: 100%;
+        height: 300px; /* Hauteur fixe pour des graphiques carrés */
+    }
+
+    /* Animations */
+    @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .animate-slide-up {
+        animation: slideUp 0.4s ease-out forwards;
+    }
+
+    .animate-fade-in {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .documents-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .doc-header h3 {
+            font-size: 1.1rem;
+        }
+
+        .grid-cols-4 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .chart-container {
+            height: 250px;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .grid-cols-4 {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
+
+<div class="dashboard-container">
+    <!-- Navigation tabs -->
+    <div class="nav-tabs">
+        <button id="tab-dashboard" class="nav-tab active">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </button>
+        <button id="tab-metadata" class="nav-tab">
+            <i class="fas fa-check-circle"></i> Validation Annotation
+        </button>
+    </div>
+
+    <!-- Dashboard Tab -->
+    <div id="dashboard-tab" class="tab-content block">
+        <h1 class="text-3xl font-bold text-white mb-8">Dashboard Annotation</h1>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Documents Validés -->
+            <div class="card animate-fade-in">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center mr-3">
+                        <i class="fas fa-check-circle text-blue-400"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white">Documents Validés</h3>
+                </div>
+                <div class="stat-value text-blue-400">{{ documents|length }}</div>
+                <div class="stat-label">prêts pour annotation</div>
+                <div class="progress-container mt-4">
+                    <div class="progress-bar bg-blue-500" style="width: {% if total_documents > 0 %}{% widthratio documents|length total_documents 100 %}%{% else %}0%{% endif %}"></div>
+                </div>
+            </div>
+
+            <!-- Pages Annotées -->
+            <div class="card animate-fade-in" style="animation-delay: 0.1s">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center mr-3">
+                        <i class="fas fa-highlighter text-green-400"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white">Pages Annotées</h3>
+                </div>
+                <div class="stat-value text-green-400">{{ total_annotated_pages }}</div>
+                <div class="stat-label">sur {{ total_pages }} pages</div>
+                <div class="progress-container mt-4">
+                    <div class="progress-bar bg-green-500" style="width: {% if total_pages > 0 %}{% widthratio total_annotated_pages total_pages 100 %}%{% else %}0%{% endif %}"></div>
+                </div>
+            </div>
+
+            <!-- En cours -->
+            <div class="card animate-fade-in" style="animation-delay: 0.2s">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center mr-3">
+                        <i class="fas fa-spinner text-purple-400"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white">En cours</h3>
+                </div>
+                <div class="stat-value text-purple-400">{{ in_progress_count }}</div>
+                <div class="stat-label">documents en annotation</div>
+                <div class="progress-container mt-4">
+                    <div class="progress-bar bg-purple-500" style="width: {% if documents|length > 0 %}{% widthratio in_progress_count documents|length 100 %}%{% else %}0%{% endif %}"></div>
+                </div>
+            </div>
+
+            <!-- Complétés -->
+            <div class="card animate-fade-in" style="animation-delay: 0.3s">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center mr-3">
+                        <i class="fas fa-clipboard-check text-amber-400"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white">Complétés</h3>
+                </div>
+                <div class="stat-value text-amber-400">{{ completed_count }}</div>
+                <div class="stat-label">documents finalisés</div>
+                <div class="mt-4">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-500/10 text-amber-400">
+                        <i class="fas fa-trophy mr-2"></i>
+                        Progression
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row - Modifié pour des graphiques carrés -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Bar Chart -->
+            <div class="card animate-slide-up">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="card-title">
+                        <i class="fas fa-chart-bar text-indigo-400"></i>
+                        Progression des Annotations
+                    </h2>
+                    <div class="flex space-x-2">
+                        <button class="text-gray-400 hover:text-accent transition-colors">
+                            <i class="fas fa-refresh"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="annotationChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Pie Chart -->
+            <div class="card animate-slide-up" style="animation-delay: 0.1s">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="card-title">
+                        <i class="fas fa-chart-pie text-purple-400"></i>
+                        Répartition des Documents
+                    </h2>
+                    <div class="flex space-x-2">
+                        <button class="text-gray-400 hover:text-accent transition-colors">
+                            <i class="fas fa-refresh"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="documentPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Documents -->
+        <div class="card animate-slide-up" style="animation-delay: 0.2s">
+            <h2 class="card-title">
+                <i class="fas fa-file-alt text-blue-400"></i>
+                Derniers Documents Validés
+            </h2>
+
+            {% if documents %}
+                <div class="documents-grid">
+                    {% for doc in documents|slice:":4" %}
+                    <div class="document-card">
+                        <div class="doc-badge">
+                            <i class="fas fa-check-circle"></i> Validé
+                        </div>
+
+                        <div class="doc-content">
+                            <div class="doc-header">
+                                <h3>{{ doc.file.name|basename }}</h3>
+                                <div class="doc-meta">
+                                    <span><i class="fas fa-file-alt"></i> {{ doc.total_pages }} pages</span>
+                                    <span><i class="fas fa-user"></i> {{ doc.owner.username }}</span>
+                                </div>
+                            </div>
+
+                            <div class="doc-footer">
+                                <div class="doc-progress">
+                                    {% if doc.pages.exists %}
+                                        {% with annotated_count=doc.pages.filter|length total_count=doc.total_pages %}
+                                            <div class="progress-info">
+                                                <span>Progression</span>
+                                                <span>{% widthratio annotated_count total_count 100 %}%</span>
+                                            </div>
+                                            <div class="progress-container">
+                                                <div class="progress-bar" style="width: {% widthratio annotated_count total_count 100 %}%"></div>
+                                            </div>
+                                            <div class="progress-count">
+                                                {{ annotated_count }}/{{ total_count }} pages annotées
+                                            </div>
+                                        {% endwith %}
+                                    {% endif %}
+                                </div>
+
+                                <div class="doc-actions">
+                                    <a href="{% url 'rawdocs:annotate_document' doc.id %}" class="btn btn-primary">
+                                        <i class="fas fa-highlighter"></i> Annoter
+                                    </a>
+                                    <div class="doc-date">
+                                        <i class="fas fa-calendar-check"></i> {{ doc.validated_at|date:"d/m/Y" }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="mt-6 text-center">
+                    <a href="#metadata-tab" class="btn btn-outline" onclick="switchToMetadataTab()">
+                        <i class="fas fa-list"></i> Voir tous les documents
+                    </a>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <h3>Aucun document à annoter</h3>
+                    <p>Les documents doivent être validés par un métadonneur avant annotation.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Metadata Validation Tab -->
+    <div id="metadata-tab" class="tab-content hidden">
+        <div class="card">
+            <h2 class="card-title">
+                <i class="fas fa-check-circle text-green-400"></i>
+                Documents Validés pour Annotation
+            </h2>
+
+            {% if documents %}
+                <div class="documents-grid">
+                    {% for doc in documents %}
+                    <div class="document-card animate-slide-up" style="animation-delay: {{ forloop.counter0|divisibleby:1|yesno:'0.05,0.1,0.15,0.2,0.25' }}s">
+                        <div class="doc-badge">
+                            <i class="fas fa-check-circle"></i> Validé
+                        </div>
+
+                        <div class="doc-content">
+                            <div class="doc-header">
+                                <h3>{{ doc.file.name|basename }}</h3>
+                                <div class="doc-meta">
+                                    <span><i class="fas fa-file-alt"></i> {{ doc.total_pages }} pages</span>
+                                    <span><i class="fas fa-user"></i> {{ doc.owner.username }}</span>
+                                </div>
+                            </div>
+
+                            <div class="doc-footer">
+                                <div class="doc-progress">
+                                    {% if doc.pages.exists %}
+                                        {% with annotated_count=doc.pages.filter|length total_count=doc.total_pages %}
+                                            <div class="progress-info">
+                                                <span>Progression</span>
+                                                <span>{% widthratio annotated_count total_count 100 %}%</span>
+                                            </div>
+                                            <div class="progress-container">
+                                                <div class="progress-bar" style="width: {% widthratio annotated_count total_count 100 %}%"></div>
+                                            </div>
+                                            <div class="progress-count">
+                                                {{ annotated_count }}/{{ total_count }} pages annotées
+                                            </div>
+                                        {% endwith %}
+                                    {% endif %}
+                                </div>
+
+                                <div class="doc-actions">
+                                    <a href="{% url 'rawdocs:annotate_document' doc.id %}" class="btn btn-primary">
+                                        <i class="fas fa-highlighter"></i> Annoter
+                                    </a>
+                                    <div class="doc-date">
+                                        <i class="fas fa-calendar-check"></i> {{ doc.validated_at|date:"d/m/Y" }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Pagination -->
+                {% if documents.has_other_pages %}
+                <div class="pagination">
+                    {% if documents.has_previous %}
+                        <a href="?page=1" class="btn btn-outline">
+                            <i class="fas fa-angle-double-left"></i> Première
+                        </a>
+                        <a href="?page={{ documents.previous_page_number }}" class="btn btn-outline">
+                            <i class="fas fa-angle-left"></i> Précédente
+                        </a>
+                    {% endif %}
+
+                    <span class="current-page">
+                        Page {{ documents.number }} sur {{ documents.paginator.num_pages }}
+                    </span>
+
+                    {% if documents.has_next %}
+                        <a href="?page={{ documents.next_page_number }}" class="btn btn-outline">
+                            Suivante <i class="fas fa-angle-right"></i>
+                        </a>
+                        <a href="?page={{ documents.paginator.num_pages }}" class="btn btn-outline">
+                            Dernière <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <h3>Aucun document à annoter</h3>
+                    <p>Les documents doivent être validés par un métadonneur avant annotation.</p>
+                    <a href="{% url 'rawdocs:document_list' %}" class="btn btn-primary mt-4">
+                        <i class="fas fa-list"></i> Voir les documents
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Tab switching
+    function switchToMetadataTab() {
+        document.getElementById('metadata-tab').classList.remove('hidden');
+        document.getElementById('metadata-tab').classList.add('block');
+        document.getElementById('dashboard-tab').classList.add('hidden');
+        document.getElementById('dashboard-tab').classList.remove('block');
+        document.getElementById('tab-metadata').classList.add('active');
+        document.getElementById('tab-dashboard').classList.remove('active');
+    }
+
+    document.getElementById('tab-dashboard').addEventListener('click', () => {
+        document.getElementById('dashboard-tab').classList.remove('hidden');
+        document.getElementById('dashboard-tab').classList.add('block');
+        document.getElementById('metadata-tab').classList.add('hidden');
+        document.getElementById('metadata-tab').classList.remove('block');
+        document.getElementById('tab-dashboard').classList.add('active');
+        document.getElementById('tab-metadata').classList.remove('active');
+    });
+
+    document.getElementById('tab-metadata').addEventListener('click', () => {
+        switchToMetadataTab();
+    });
+
+    // Annotation Chart (Bar)
+    const annotationCtx = document.getElementById('annotationChart').getContext('2d');
+    new Chart(annotationCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Validés', 'En cours', 'Annotés', 'Complétés'],
+            datasets: [{
+                label: 'Documents',
+                data: [
+                    {{ documents|length }},
+                    {{ in_progress_count }},
+                    {{ in_progress_count }}, // Ajustez selon vos données
+                    {{ completed_count }}
+                ],
+                backgroundColor: ['#3b82f6','#a855f7','#10b981','#f59e0b'],
+                borderColor: ['#1d4ed8','#7e22ce','#047857','#d97706'],
+                borderWidth: 1,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleColor: 'white',
+                    bodyColor: 'white',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    padding: 12,
+                    displayColors: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#e2e8f0' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#e2e8f0' }
+                }
+            }
+        }
+    });
+
+    // Document Pie Chart
+    const documentPieCtx = document.getElementById('documentPieChart').getContext('2d');
+    new Chart(documentPieCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Validés', 'En annotation', 'Complétés'],
+            datasets:[{
+                data: [
+                    {{ documents|length }},
+                    {{ in_progress_count }},
+                    {{ completed_count }}
+                ],
+                backgroundColor:['#3b82f6','#a855f7','#10b981'],
+                borderColor: 'rgba(15, 23, 42, 0.8)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color:'#e2e8f0',
+                        font:{ size:11 },
+                        padding:20,
+                        usePointStyle:true,
+                        pointStyle:'circle'
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleColor: 'white',
+                    bodyColor: 'white',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    padding: 12
+                }
+            }
+        }
+    });
+</script>
 {% endblock %}

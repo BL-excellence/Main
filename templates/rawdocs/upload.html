@@ -2,252 +2,350 @@
 {% block title %}Importer un PDF – RawDocs{% endblock %}
 
 {% block content %}
-<!-- 1) Upload Form (URL ou fichier local) -->
-<section class="upload-cell">
-  <form method="post" enctype="multipart/form-data" class="upload-cell__form" novalidate>
-    {% csrf_token %}
-    <!-- URL Field -->
-    <input
-      type="url"
-      name="pdf_url"
-      placeholder="Entrez l’URL du PDF…"
-      value="{{ form.pdf_url.value|default_if_none:'' }}"
-      class="upload-cell__input"
-    />
-
-    <!-- OR Separator -->
-    <span class="upload-cell__or">OU</span>
-
-    <!-- Local File Field -->
-    <input
-      type="file"
-      name="pdf_file"
-      accept="application/pdf"
-      class="upload-cell__input upload-cell__file-input"
-    />
-
-    <button type="submit" class="upload-cell__enter-btn">
-      <i class="fas fa-upload"></i> Importer
-    </button>
-  </form>
-</section>
-
-<!-- 2) Metadata Table -->
-{% if metadata %}
-<section class="card metadata-card">
-  <h3><i class="fas fa-info-circle"></i> Métadonnées extraites</h3>
-  <table class="metadata-table">
-    <tbody>
-      <tr><th>Titre</th>              <td>{{ metadata.title|default:"Non spécifié" }}</td></tr>
-      <tr><th>Type de document</th>   <td>{{ metadata.type|default:"–" }}</td></tr>
-      <tr><th>Langue</th>             <td>{{ metadata.language|default:"–" }}</td></tr>
-      <tr><th>Version</th>            <td>{{ metadata.version|default:"–" }}</td></tr>
-      <tr>
-        <th>URL Source</th>
-        <td>
-          {% if metadata.url_source %}
-          <a href="{{ metadata.url_source }}" target="_blank" class="source-link">
-            <i class="fas fa-external-link-alt"></i>
-            {{ metadata.url_source }}
-          </a>
-          {% else %}
-            –
-          {% endif %}
-        </td>
-      </tr>
-      <tr><th>Source interne</th>     <td>{{ metadata.source|default:"Non spécifiée" }}</td></tr>
-      <tr><th>Date de publication</th><td>{{ metadata.publication_date|default:"Non spécifiée" }}</td></tr>
-      <tr>
-        <th>Contexte</th>
-        <td>
-          <div class="context-text">
-            {{ metadata.context|default:"Aucun contexte fourni" }}
-          </div>
-        </td>
-      </tr>
-      <tr><th>Pays</th>               <td>{{ metadata.country|default:"–" }}</td></tr>
-    </tbody>
-  </table>
-</section>
-{% endif %}
-
-<!-- 3) Texte Extrait -->
-{% if extracted_text %}
-<section class="card text-card">
-  <h3><i class="fas fa-file-alt"></i> Texte complet extrait</h3>
-  <div class="text-card__body">
-    <pre>{{ extracted_text }}</pre>
-  </div>
-  <a href="{% url 'rawdocs:upload' %}" class="btn-outline">
-    <i class="fas fa-arrow-left"></i> Nouvel upload
-  </a>
-</section>
-{% endif %}
-
-<!-- 4) Lien vers la liste des documents (Dashboard onglet Validation Métadonnées) -->
-<section class="upload-cell" style="margin-top:2rem;">
-  <a href="{% url 'rawdocs:document_list' %}"
-     class="upload-cell__enter-btn">
-    <i class="fas fa-list"></i> Voir tous les documents
-  </a>
-</section>
-
-
 <style>
-/* —— Upload Cell —— */
-.upload-cell {
-  display: flex;
-  justify-content: center;
-  margin: 2rem 0;
-}
-.upload-cell__form {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  flex-wrap: wrap;
-  width: 100%;
-  max-width: 600px;
-}
-.upload-cell__input {
-  flex: 1;
-  min-width: 200px;
-  padding: .75rem 1rem;
-  font-size: 1rem;
-  border: 2px solid var(--border-color);
-  border-radius: var(--border-radius);
-  transition: var(--transition-all);
-}
-.upload-cell__file-input {
-  padding: .5rem;
-}
-.upload-cell__input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-}
-.upload-cell__or {
-  font-weight: bold;
-  color: var(--text-alt);
-  margin: 0 .5rem;
-}
+  /* Styles harmonisés avec base_auth */
+  :root {
+    --primary: #2563eb;
+    --primary-light: #3b82f6;
+    --secondary: #1e293b;
+    --secondary-dark: #0f172a;
+    --accent: #60a5fa;
+    --text: #f8fafc;
+    --text-secondary: #e2e8f0;
+    --card-bg: rgba(15, 23, 42, 0.7);
+    --card-border: rgba(59, 130, 246, 0.2);
+  }
 
-/* —— Submit Button —— */
-.upload-cell__enter-btn {
-  background: var(--primary-color);
-  color: #fff;
-  border: none;
-  padding: .6rem 1.2rem;
-  border-radius: var(--border-radius);
-  cursor: pointer;
-  transition: var(--transition-all);
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-}
-.upload-cell__enter-btn:hover {
-  background: var(--primary-hover);
-}
+  .upload-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
 
-/* —— Métadonnées —— */
-.metadata-card {
-  background: var(--surface-color);
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-lg);
-  margin-bottom: 2rem;
-}
-.metadata-card h3 {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  margin-bottom: 1rem;
-  color: var(--text-primary);
-}
-.metadata-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.metadata-table th,
-.metadata-table td {
-  padding: .5rem .75rem;
-  border-bottom: 1px solid var(--border-color);
-}
-.metadata-table th {
-  text-align: left;
-  font-weight: 600;
-  width: 25%;
-}
-.source-link {
-  color: var(--primary-color);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: .25rem;
-}
-.source-link:hover {
-  text-decoration: underline;
-}
-.context-text {
-  background: var(--background-color);
-  padding: .75rem;
-  border-radius: var(--border-radius);
-  font-size: .95rem;
-  line-height: 1.4;
-}
+  /* Upload Form */
+  .upload-form {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+  }
 
-/* —— Texte Extrait —— */
-.text-card {
-  background: var(--surface-color);
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-lg);
-  margin-bottom: 2rem;
-}
-.text-card h3 {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  margin-bottom: 1rem;
-  color: var(--text-primary);
-}
-.text-card__body {
-  max-height: 40vh;
-  overflow: auto;
-  background: var(--background-color);
-  padding: 1rem;
-  border-radius: var(--border-radius);
-  margin-bottom: 1rem;
-}
-.text-card__body pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
+  .upload-form:hover {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  }
 
-/* —— Bouton secondaire —— */
-.btn-outline {
-  display: inline-flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .5rem 1rem;
-  border: 2px solid var(--primary-color);
-  border-radius: var(--border-radius);
-  color: var(--primary-color);
-  text-decoration: none;
-  transition: var(--transition-all);
-}
-.btn-outline:hover {
-  background: var(--primary-color);
-  color: #fff;
-}
+  .upload-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 0.85rem 1.25rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(5px);
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .form-input::placeholder {
+    color: rgba(226, 232, 240, 0.6);
+  }
+
+  .form-separator {
+    display: flex;
+    align-items: center;
+    margin: 1.5rem 0;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .form-separator::before,
+  .form-separator::after {
+    content: "";
+    flex: 1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .form-separator::before {
+    margin-right: 1rem;
+  }
+
+  .form-separator::after {
+    margin-left: 1rem;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+  }
+
+  .btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: var(--accent);
+    text-decoration: none;
+    transition: all 0.3s ease;
+  }
+
+  .btn-outline:hover {
+    background: rgba(96, 165, 250, 0.1);
+  }
+
+  /* Metadata Card */
+  .metadata-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+  }
+
+  .metadata-card:hover {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  }
+
+  .card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .metadata-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .metadata-table th,
+  .metadata-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .metadata-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-secondary);
+    width: 30%;
+  }
+
+  .metadata-table td {
+    color: var(--text);
+  }
+
+  .source-link {
+    color: var(--accent);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .source-link:hover {
+    text-decoration: underline;
+  }
+
+  /* Extracted Text */
+  .text-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+  }
+
+  .text-card:hover {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  }
+
+  .text-content {
+    max-height: 40vh;
+    overflow: auto;
+    background: rgba(15, 23, 42, 0.5);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+
+  .text-content pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.5;
+    color: var(--text);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .upload-container {
+      padding: 1rem;
+    }
+
+    .upload-form {
+      padding: 1.5rem;
+    }
+
+    .metadata-table th,
+    .metadata-table td {
+      padding: 0.5rem;
+      font-size: 0.9rem;
+    }
+  }
 </style>
 
+<div class="upload-container">
+  <!-- Upload Form -->
+  <form method="post" enctype="multipart/form-data" class="upload-form" novalidate>
+    {% csrf_token %}
+    <h2 class="upload-title">
+      <i class="fas fa-upload"></i> Importer un document
+    </h2>
+
+    <div class="form-group">
+      <input
+        type="url"
+        name="pdf_url"
+        placeholder="Entrez l'URL du PDF..."
+        value="{{ form.pdf_url.value|default_if_none:'' }}"
+        class="form-input"
+      />
+    </div>
+
+    <div class="form-separator">OU</div>
+
+    <div class="form-group">
+      <input
+        type="file"
+        name="pdf_file"
+        accept="application/pdf"
+        class="form-input"
+      />
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+      <i class="fas fa-upload"></i>Extraire
+    </button>
+  </form>
+
+  <!-- Metadata Table -->
+  {% if metadata %}
+  <div class="metadata-card">
+    <h3 class="card-title">
+      <i class="fas fa-info-circle"></i> Métadonnées extraites
+    </h3>
+    <table class="metadata-table">
+      <tbody>
+        <tr><th>Titre</th><td>{{ metadata.title|default:"Non spécifié" }}</td></tr>
+        <tr><th>Type de document</th><td>{{ metadata.type|default:"–" }}</td></tr>
+        <tr><th>Langue</th><td>{{ metadata.language|default:"–" }}</td></tr>
+        <tr><th>Version</th><td>{{ metadata.version|default:"–" }}</td></tr>
+        <tr>
+          <th>URL Source</th>
+          <td>
+            {% if metadata.url_source %}
+            <a href="{{ metadata.url_source }}" target="_blank" class="source-link">
+              <i class="fas fa-external-link-alt"></i>
+              {{ metadata.url_source|truncatechars:40 }}
+            </a>
+            {% else %}
+              –
+            {% endif %}
+          </td>
+        </tr>
+        <tr><th>Source interne</th><td>{{ metadata.source|default:"Non spécifiée" }}</td></tr>
+        <tr><th>Date de publication</th><td>{{ metadata.publication_date|default:"Non spécifiée" }}</td></tr>
+        <tr>
+          <th>Contexte</th>
+          <td>
+            <div class="text-content" style="max-height: 120px;">
+              {{ metadata.context|default:"Aucun contexte fourni" }}
+            </div>
+          </td>
+        </tr>
+        <tr><th>Pays</th><td>{{ metadata.country|default:"–" }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Extracted Text -->
+  {% if extracted_text %}
+  <div class="text-card">
+    <h3 class="card-title">
+      <i class="fas fa-file-alt"></i> Texte complet extrait
+    </h3>
+    <div class="text-content">
+      <pre>{{ extracted_text }}</pre>
+    </div>
+    <a href="{% url 'rawdocs:upload' %}" class="btn-outline">
+      <i class="fas fa-arrow-left"></i> Nouvel upload
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Link to Document List -->
+  <div style="text-align: center; margin-top: 2rem;">
+    <a href="{% url 'rawdocs:document_list' %}#metadata-tab" class="btn-outline">
+      <i class="fas fa-list"></i> Voir tous les documents
+    </a>
+  </div>
+</div>
 
 <script>
-  // Au chargement, si on arrive sur #metadata-tab, on bascule sur l’onglet Validation Métadonnées
   document.addEventListener('DOMContentLoaded', () => {
-    if (location.hash === '#metadata-tab' && typeof btnMetadata !== 'undefined') {
-      btnMetadata.click();
+    if (location.hash === '#metadata-tab') {
+      // Scroll to top if coming from document list
       window.scrollTo(0, 0);
     }
   });

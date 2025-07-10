@@ -31,12 +31,22 @@
     <header class="site-header bg-white/80 backdrop-blur-lg shadow-lg border-b border-blue-100">
       <div class="header-content container mx-auto px-6 flex items-center justify-between py-4">
         <!-- Logo / Home -->
-        <a href="{% url 'rawdocs:dashboard' %}" class="logo group flex items-center text-xl font-bold text-blue-600 hover:text-blue-700 transition-all duration-300">
-          <div class="logo-icon bg-gradient-to-r from-blue-500 to-blue-600 p-2 rounded-xl mr-3 group-hover:scale-110 transition-transform duration-300 shadow-lg">
-            <i class="fas fa-file-pdf text-white"></i>
-          </div>
-          <span class="bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">IABlockLabs</span>
-        </a>
+        {% comment %} Logo / Home link dynamique selon le rôle {% endcomment %}
+{% if user.groups.first.name == "Annotateur" %}
+  <a href="{% url 'rawdocs:annotation_dashboard' %}"
+     class="logo group flex items-center text-xl font-bold text-blue-600 hover:text-blue-700 transition-all duration-300">
+{% else %}
+  <a href="{% url 'rawdocs:dashboard' %}"
+     class="logo group flex items-center text-xl font-bold text-blue-600 hover:text-blue-700 transition-all duration-300">
+{% endif %}
+    <div class="logo-icon bg-gradient-to-r from-blue-500 to-blue-600 p-2 rounded-xl mr-3 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+      <i class="fas fa-file-pdf text-white"></i>
+    </div>
+    <span class="bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
+      IABlockLabs
+    </span>
+  </a>
+
 
         {% if user.is_authenticated %}
           <!-- Role-based Navigation -->
