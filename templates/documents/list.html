@@ -1,0 +1,413 @@
+<!-- templates/extraction/validation_list.html -->
+{% extends 'base.html' %}
+
+{% block title %}Validation des métadonnées{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h3 mb-0">
+                        <i class="bi bi-check-circle me-2"></i>Validation des métadonnées
+                    </h2>
+                    <p class="text-muted mb-0">{{ page_obj.paginator.count }} document{{ page_obj.paginator.count|pluralize }} nécessitant une validation</p>
+                </div>
+                <div>
+                    <button class="btn btn-outline-secondary" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Actualiser
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                <i class="bi bi-search me-1"></i>Recherche
+                            </label>
+                            <input type="text" class="form-control" name="search" 
+                                   value="{{ current_filters.search }}" 
+                                   placeholder="Titre, source...">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                <i class="bi bi-flag me-1"></i>Statut
+                            </label>
+                            <select class="form-select" name="status">
+                                {% for status_code, status_label in status_choices %}
+                                <option value="{{ status_code }}" {% if status_code == current_filters.status %}selected{% endif %}>
+                                    {{ status_label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                <i class="bi bi-graph-up me-1"></i>Confiance
+                            </label>
+                            <select class="form-select" name="confidence">
+                                {% for conf_code, conf_label in confidence_choices %}
+                                <option value="{{ conf_code }}" {% if conf_code == current_filters.confidence %}selected{% endif %}>
+                                    {{ conf_label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-search me-1"></i>Filtrer
+                                </button>
+                                <a href="{% url 'extraction:validation_list' %}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-x me-1"></i>Reset
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des documents -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th><i class="bi bi-file-earmark-text me-1"></i>Document</th>
+                                    <th><i class="bi bi-flag me-1"></i>Statut</th>
+                                    <th><i class="bi bi-graph-up me-1"></i>Confiance IA</th>
+                                    <th><i class="bi bi-robot me-1"></i>Métadonnées extraites</th>
+                                    <th><i class="bi bi-clock me-1"></i>Date extraction</th>
+                                    <th><i class="bi bi-gear me-1"></i>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for document in page_obj %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold text-primary">
+                                            <i class="bi bi-file-earmark-{% if document.file_type == 'pdf' %}pdf{% elif document.file_type == 'docx' %}word{% elif document.file_type in 'png,jpg,jpeg' %}image{% else %}text{% endif %} me-2"></i>
+                                            {{ document.title|truncatechars:50 }}
+                                        </div>
+                                        <small class="text-muted">
+                                            ID: {{ document.id }} • {{ document.file_type|upper }}
+                                            {% if document.source %}• {{ document.source }}{% endif %}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if document.status == 'extracted' %}bg-success
+                                            {% elif document.status == 'extracting' %}bg-warning text-dark
+                                            {% elif document.status == 'refused' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                            {% if document.status == 'extracted' %}<i class="bi bi-check-circle me-1"></i>
+                                            {% elif document.status == 'extracting' %}<i class="bi bi-hourglass-split me-1"></i>
+                                            {% elif document.status == 'refused' %}<i class="bi bi-x-circle me-1"></i>
+                                            {% else %}<i class="bi bi-question-circle me-1"></i>{% endif %}
+                                            {{ document.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if document.extraction_result %}
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress me-2" style="width: 60px; height: 8px;">
+                                                <div class="progress-bar 
+                                                    {% if document.extraction_result.confidence_score >= 0.8 %}bg-success
+                                                    {% elif document.extraction_result.confidence_score >= 0.5 %}bg-warning
+                                                    {% else %}bg-danger{% endif %}" 
+                                                    style="width: {% widthratio document.extraction_result.confidence_score 1 100 %}%"></div>
+                                            </div>
+                                            <small class="fw-semibold">
+                                                {% widthratio document.extraction_result.confidence_score 1 100 %}%
+                                            </small>
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="bi bi-cpu me-1"></i>IA {{ document.extraction_result.extraction_method|default:"Mistral" }}
+                                        </small>
+                                        {% else %}
+                                        <span class="text-muted">
+                                            <i class="bi bi-dash-circle me-1"></i>Pas d'extraction
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if document.extraction_result and document.extraction_result.extracted_data %}
+                                        <div class="small">
+                                            {% if document.extraction_result.extracted_data.title %}
+                                            <div><strong>Titre:</strong> {{ document.extraction_result.extracted_data.title|truncatechars:30 }}</div>
+                                            {% endif %}
+                                            {% if document.extraction_result.extracted_data.language %}
+                                            <div><strong>Langue:</strong> {{ document.extraction_result.extracted_data.language|upper }}</div>
+                                            {% endif %}
+                                            {% if document.extraction_result.extracted_data.publication_date %}
+                                            <div><strong>Date:</strong> {{ document.extraction_result.extracted_data.publication_date }}</div>
+                                            {% endif %}
+                                            <div class="mt-1">
+                                                <span class="badge bg-info">
+                                                    {{ document.extraction_result.extracted_fields_count }} champs
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <div class="small text-muted">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>
+                                            Aucune donnée extraite
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if document.extraction_completed_at %}
+                                        <div class="small">
+                                            <i class="bi bi-calendar3 me-1"></i>{{ document.extraction_completed_at|date:"d/m/Y" }}
+                                        </div>
+                                        <div class="text-muted small">
+                                            <i class="bi bi-clock me-1"></i>{{ document.extraction_completed_at|time:"H:i" }}
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">
+                                            <i class="bi bi-hourglass-split me-1"></i>En cours...
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <!-- Bouton principal de validation -->
+                                            <a href="{% url 'extraction:validation_detail' document.id %}" 
+                                               class="btn btn-primary" 
+                                               title="✅ Valider les métadonnées extraites"
+                                               data-bs-toggle="tooltip">
+                                                <i class="bi bi-check-circle"></i>
+                                                <span class="d-none d-lg-inline ms-1">Valider</span>
+                                            </a>
+                                            
+                                            <!-- Ré-extraction -->
+                                            <button class="btn btn-outline-warning" 
+                                                    onclick="reExtract({{ document.id }})" 
+                                                    title="🔄 Relancer l'extraction IA"
+                                                    data-bs-toggle="tooltip">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </button>
+                                            
+                                            <!-- Voir le document -->
+                                            <a href="{% url 'documents:view' document.id %}" 
+                                               class="btn btn-outline-secondary" 
+                                               title="👁️ Voir le document original" 
+                                               target="_blank"
+                                               data-bs-toggle="tooltip">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            
+                                            <!-- Menu plus d'actions -->
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-outline-secondary dropdown-toggle" 
+                                                        type="button" 
+                                                        data-bs-toggle="dropdown" 
+                                                        aria-expanded="false"
+                                                        title="Plus d'actions">
+                                                    <i class="bi bi-three-dots"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end">
+                                                    <li>
+                                                        <a class="dropdown-item" href="#" onclick="showExtractionDetails({{ document.id }})">
+                                                            <i class="bi bi-info-circle me-2"></i>Détails extraction
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item" href="#" onclick="downloadDocument({{ document.id }})">
+                                                            <i class="bi bi-download me-2"></i>Télécharger
+                                                        </a>
+                                                    </li>
+                                                    {% if user.role == 'admin' %}
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <a class="dropdown-item text-danger" href="#" onclick="refuseDocument({{ document.id }})">
+                                                            <i class="bi bi-x-circle me-2"></i>Refuser définitivement
+                                                        </a>
+                                                    </li>
+                                                    {% endif %}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if page_obj.has_other_pages %}
+                    <nav class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                                        <i class="bi bi-chevron-left me-1"></i>Précédent
+                                    </a>
+                                </li>
+                            {% endif %}
+                            
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ num }}">{{ num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">
+                                        Suivant<i class="bi bi-chevron-right ms-1"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-check-circle" style="font-size: 3rem; color: #10B981;"></i>
+                        <h4 class="mt-3 text-muted">Aucun document à valider</h4>
+                        <p class="text-muted">Tous les documents ont été traités avec succès par l'IA !</p>
+                        <a href="{% url 'documents:upload' %}" class="btn btn-primary">
+                            <i class="bi bi-cloud-upload me-2"></i>Uploader un nouveau document
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function reExtract(documentId) {
+    if (confirm('🤖 Êtes-vous sûr de vouloir relancer l\'extraction IA pour ce document ?')) {
+        // Afficher un indicateur de chargement
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        btn.disabled = true;
+        
+        fetch(`/extraction/re-extract/${documentId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Ré-extraction IA lancée avec succès');
+                location.reload();
+            } else {
+                alert('❌ Erreur: ' + data.error);
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('❌ Erreur lors du lancement de la ré-extraction');
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        });
+    }
+}
+
+function showExtractionDetails(documentId) {
+    fetch(`/extraction/status/${documentId}/`)
+        .then(response => response.json())
+        .then(data => {
+            let message = `📊 Détails de l'extraction IA:\n\n`;
+            message += `🔸 Statut: ${data.document_status}\n`;
+            message += `🔸 Extraction terminée: ${data.extraction_completed ? 'Oui' : 'Non'}\n`;
+            message += `🔸 Score de confiance: ${data.confidence_score * 100}%\n`;
+            message += `🔸 Champs extraits: ${data.extracted_fields}`;
+            alert(message);
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('❌ Erreur lors du chargement des détails');
+        });
+}
+
+function downloadDocument(documentId) {
+    window.open(`/documents/${documentId}/view/`, '_blank');
+}
+
+function refuseDocument(documentId) {
+    if (confirm('❌ Êtes-vous sûr de vouloir refuser définitivement ce document ?')) {
+        alert('⚠️ Fonctionnalité de refus à implémenter');
+    }
+}
+
+// Initialiser les tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+
+<style>
+.progress {
+    background-color: #e9ecef;
+}
+
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #6B7280;
+    background-color: #f8f9fa;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.badge {
+    font-size: 0.75em;
+    font-weight: 500;
+}
+
+.btn-group .btn {
+    transition: all 0.2s ease;
+}
+
+.btn-group .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+</style>
+
+{% csrf_token %}
+{% endblock %}

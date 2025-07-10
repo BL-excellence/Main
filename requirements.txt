@@ -1,0 +1,15 @@
+django-crispy-forms
+crispy-bootstrap5
+django-extensions
+channels
+Django
+celery
+redis
+psycopg2-binary
+spacy
+PyPDF2
+python-docx
+Pillow
+pytesseract
+requests
+python-decouple

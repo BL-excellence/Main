@@ -1,0 +1,106 @@
+<!-- templates/accounts/login.html -->
+{% extends 'base.html' %}
+
+{% block title %}Connexion - Plateforme d'Extraction & Validation{% endblock %}
+
+{% block content %}
+<div class="min-vh-100 d-flex align-items-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="row shadow-lg rounded-4 overflow-hidden bg-white">
+                    <!-- Section gauche - Information -->
+                    <div class="col-lg-6 p-5 d-flex flex-column justify-content-center" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white;">
+                        <h1 class="display-4 fw-bold mb-4">Plateforme d'Extraction & Validation</h1>
+                        <p class="lead mb-4">
+                            Automatisez l'extraction de métadonnées et la validation de vos documents avec notre solution IA avancée. 
+                            Optimisez votre workflow de traitement documentaire.
+                        </p>
+                        
+                        <div class="row mt-4">
+                            <div class="col-6">
+                                <button class="btn btn-outline-light btn-lg w-100 btn-custom">
+                                    <i class="bi bi-play-circle me-2"></i>
+                                    Découvrir la démo
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <button class="btn btn-light btn-lg w-100 btn-custom">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    En savoir plus
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section droite - Formulaire de connexion -->
+                    <div class="col-lg-6 p-5">
+                        <div class="text-center mb-4">
+                            <h2 class="h3 fw-bold text-dark">Connexion</h2>
+                        </div>
+
+                        <form method="post" class="needs-validation" novalidate>
+                            {% csrf_token %}
+                            
+                            <div class="mb-3">
+                                <label for="email" class="form-label fw-semibold">Email</label>
+                                <input type="email" class="form-control form-control-lg" id="email" name="email" 
+                                       placeholder="votre@email.com" required>
+                                <div class="invalid-feedback">Veuillez entrer un email valide.</div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="password" class="form-label fw-semibold">Mot de passe</label>
+                                <input type="password" class="form-control form-control-lg" id="password" name="password" 
+                                       placeholder="••••••••" required>
+                                <div class="invalid-feedback">Veuillez entrer votre mot de passe.</div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg w-100 btn-custom">
+                                <i class="bi bi-arrow-right me-2"></i>
+                                Se connecter →
+                            </button>
+                        </form>
+
+                        <!-- Comptes de démonstration -->
+                        <div class="mt-5">
+                            <h6 class="fw-semibold text-muted mb-3">Comptes de démonstration :</h6>
+                            {% for account in demo_accounts %}
+                            <div class="border rounded-3 p-3 mb-2 bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="fw-semibold">{{ account.email }}</div>
+                                        <div class="text-muted small">({{ account.role }})</div>
+                                    </div>
+                                    <span class="text-muted small">{{ account.password }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            <p class="text-muted small mt-2">Mot de passe : password123</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Validation du formulaire
+(function() {
+    'use strict';
+    window.addEventListener('load', function() {
+        var forms = document.getElementsByClassName('needs-validation');
+        var validation = Array.prototype.filter.call(forms, function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.checkValidity() === false) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    }, false);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,208 @@
+<!-- templates/accounts/admin_dashboard.html -->
+{% extends 'base.html' %}
+
+{% block title %}Administration - Tableau de bord{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête Admin -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h3 mb-0">Administration Système</h2>
+                    <p class="text-muted mb-0">Gestion des utilisateurs et supervision générale</p>
+                </div>
+                <div>
+                    <a href="{% url 'accounts:create_user' %}" class="btn btn-primary">
+                        <i class="bi bi-person-plus me-2"></i>Créer un utilisateur
+                    </a>
+                    <a href="{% url 'admin:index' %}" class="btn btn-outline-secondary ms-2">
+                        <i class="bi bi-gear me-2"></i>Administration Django
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques utilisateurs -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card primary">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="stat-number">{{ total_users }}</div>
+                        <div class="stat-label">Total utilisateurs</div>
+                    </div>
+                    <div class="ms-3">
+                        <i class="bi bi-people" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card success">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="stat-number">{{ active_users }}</div>
+                        <div class="stat-label">Utilisateurs actifs</div>
+                    </div>
+                    <div class="ms-3">
+                        <i class="bi bi-person-check" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card warning">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="stat-number">{{ inactive_users }}</div>
+                        <div class="stat-label">Utilisateurs inactifs</div>
+                    </div>
+                    <div class="ms-3">
+                        <i class="bi bi-person-x" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card info">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="stat-number">{{ total_documents }}</div>
+                        <div class="stat-label">Documents total</div>
+                    </div>
+                    <div class="ms-3">
+                        <i class="bi bi-file-earmark-text" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Répartition par rôles -->
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-person-badge me-2"></i>Répartition par rôles
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for role, count in role_stats.items %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-role badge-{{ role|lower }} me-3">{{ role }}</span>
+                        </div>
+                        <div class="text-end">
+                            <span class="h6 mb-0">{{ count }}</span>
+                            <div class="small text-muted">utilisateur{{ count|pluralize }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-graph-up me-2"></i>Activité récente
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <div class="d-flex mb-3">
+                            <div class="me-3">
+                                <span class="badge bg-success">Nouveau</span>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">Utilisateur marie@company.com créé</div>
+                                <div class="small text-muted">Il y a 2 heures</div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex mb-3">
+                            <div class="me-3">
+                                <span class="badge bg-primary">Connexion</span>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">jean@company.com s'est connecté</div>
+                                <div class="small text-muted">Il y a 3 heures</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex mb-3">
+                            <div class="me-3">
+                                <span class="badge bg-warning">Modifié</span>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">Rôle de sophie@company.com modifié</div>
+                                <div class="small text-muted">Il y a 5 heures</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions rapides -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-lightning me-2"></i>Actions rapides
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'accounts:manage_users' %}" class="card text-decoration-none h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-people text-primary" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">Gérer les utilisateurs</h6>
+                                </div>
+                            </a>
+                        </div>
+                        
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'documents:list' %}" class="card text-decoration-none h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-file-earmark-text text-success" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">Voir les documents</h6>
+                                </div>
+                            </a>
+                        </div>
+                        
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'audit:trail' %}" class="card text-decoration-none h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-clock-history text-info" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">Logs d'audit</h6>
+                                </div>
+                            </a>
+                        </div>
+                        
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'admin:index' %}" class="card text-decoration-none h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-gear text-warning" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">Configuration</h6>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,453 @@
+<!-- templates/annotation/expert_validation_detail.html - CORRIGÉ -->
+{% extends 'base.html' %}
+
+{% block title %}Validation Experte - {{ document.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <a href="{% url 'annotation:expert_validation_list' %}" class="btn btn-outline-secondary me-3">
+                        <i class="bi bi-arrow-left me-2"></i>Retour à la liste
+                    </a>
+                    <h2 class="h4 mb-0 d-inline">
+                        <i class="bi bi-award me-2 text-warning"></i>
+                        Validation Experte
+                    </h2>
+                </div>
+                <div>
+                    <button class="btn btn-outline-info" onclick="showAuditTrail()">
+                        <i class="bi bi-clock-history me-2"></i>Historique
+                    </button>
+                    <a href="{% url 'documents:view' document.id %}" class="btn btn-outline-secondary" target="_blank">
+                        <i class="bi bi-eye me-2"></i>Voir le document
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informations document -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-warning">
+                <div class="card-header bg-warning bg-opacity-10">
+                    <h5 class="card-title mb-0">{{ document.title }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div class="d-flex align-items-center flex-wrap">
+                                {% if document.context %}
+                                <span class="badge me-2 mb-2" style="background-color: {{ document.context.color }}; color: white;">
+                                    <i class="bi bi-folder2 me-1"></i>{{ document.context.name }}
+                                </span>
+                                {% endif %}
+                                {% if document.document_type %}
+                                <span class="badge me-2 mb-2" style="background-color: {{ document.document_type.color }}; color: white;">
+                                    <i class="bi bi-bookmark me-1"></i>{{ document.document_type.name }}
+                                </span>
+                                {% endif %}
+                                <span class="badge bg-secondary me-2 mb-2">
+                                    <i class="bi bi-hash me-1"></i>ID: {{ document.id }}
+                                </span>
+                                {% if document.language %}
+                                <span class="badge bg-info me-2 mb-2">
+                                    {{ document.language|upper }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-lg-4 text-end">
+                            <div class="small text-muted">
+                                {% if document.assigned_to %}
+                                <div><strong>Assigné à:</strong> {{ document.assigned_to.get_full_name|default:document.assigned_to.username }}</div>
+                                {% endif %}
+                                <div><strong>Statut:</strong> 
+                                    <span class="badge bg-warning">{{ document.get_status_display }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Contenu du document avec annotations -->
+        <div class="col-lg-8">
+            <div class="card h-100">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-file-earmark-text me-2"></i>
+                        Contenu avec Annotations
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="documentContent" class="document-content">
+                        {{ document_content|linebreaks }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panneau de validation -->
+        <div class="col-lg-4">
+            <!-- Statistiques d'annotation -->
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="card-title mb-0">
+                        <i class="bi bi-graph-up me-2"></i>Qualité des Annotations
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-semibold">Score global:</span>
+                            <span class="h4 mb-0 text-primary">{{ annotation_stats.overall_quality|floatformat:1 }}%</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 10px;">
+                            <div class="progress-bar 
+                                {% if annotation_stats.overall_quality >= 80 %}bg-success
+                                {% elif annotation_stats.overall_quality >= 50 %}bg-warning
+                                {% else %}bg-danger{% endif %}" 
+                                style="width: {{ annotation_stats.overall_quality }}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <h6 class="fw-semibold mb-2">Répartition:</h6>
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="h5 text-success mb-0">{{ annotations|length }}</div>
+                                <small class="text-muted">Total</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="h5 text-success mb-0">{{ annotation_stats.entity_stats|length }}</div>
+                                <small class="text-muted">Types</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="h5 text-info mb-0">{{ annotation_stats.annotator_stats|length }}</div>
+                                <small class="text-muted">Annotateurs</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="small">
+                        <h6 class="fw-semibold mb-2">Par type d'entité:</h6>
+                        {% for entity_name, stats in annotation_stats.entity_stats.items %}
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>{{ entity_name }}:</span>
+                            <span>{{ stats.validated }}/{{ stats.total }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions de validation -->
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="card-title mb-0">
+                        <i class="bi bi-tools me-2"></i>Actions Expert
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form id="validationForm">
+                        <div class="mb-3">
+                            <label class="form-label">Commentaires (optionnel):</label>
+                            <textarea class="form-control" id="comments" rows="3" 
+                                      placeholder="Ajoutez vos commentaires sur la qualité des annotations..."></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-success" onclick="finalValidation('validate')">
+                                <i class="bi bi-check-circle me-2"></i>
+                                Valider Définitivement
+                            </button>
+                            <button type="button" class="btn btn-warning" onclick="finalValidation('reject')">
+                                <i class="bi bi-arrow-clockwise me-2"></i>
+                                Remettre en Annotation
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Liste des annotations -->
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h6 class="card-title mb-0">
+                        <i class="bi bi-tags me-2"></i>
+                        Annotations ({{ annotations|length }})
+                    </h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+                        {% for annotation in annotations %}
+                        <div class="list-group-item annotation-item" data-annotation-id="{{ annotation.id }}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">{{ annotation.text }}</div>
+                                    <small class="text-muted">
+                                        <span class="badge" style="background-color: {{ annotation.entity_type.color }}; color: white;">
+                                            {{ annotation.entity_type.name }}
+                                        </span>
+                                        <i class="bi bi-person ms-2"></i>
+                                        {{ annotation.created_by.get_full_name|default:annotation.created_by.username }}
+                                    </small>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    {% if annotation.status != 'validated' %}
+                                    <button class="btn btn-outline-success" 
+                                            onclick="annotationFeedback({{ annotation.id }}, 'approve')"
+                                            title="Approuver">
+                                        <i class="bi bi-check"></i>
+                                    </button>
+                                    {% endif %}
+                                    {% if annotation.status != 'rejected' %}
+                                    <button class="btn btn-outline-danger" 
+                                            onclick="annotationFeedback({{ annotation.id }}, 'reject')"
+                                            title="Rejeter">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mt-1">
+                                <span class="badge 
+                                    {% if annotation.status == 'validated' %}bg-success
+                                    {% elif annotation.status == 'rejected' %}bg-danger
+                                    {% elif annotation.status == 'modified' %}bg-warning
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ annotation.get_status_display }}
+                                </span>
+                                {% if annotation.confidence_percentage %}
+                                <span class="badge bg-info">{{ annotation.confidence_percentage }}%</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="list-group-item text-center text-muted">
+                            Aucune annotation trouvée
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Trail (masqué par défaut) -->
+    <div class="row mt-4" id="auditSection" style="display: none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-clock-history me-2"></i>Historique du Document
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for log in audit_logs %}
+                        <div class="d-flex mb-3 p-3 
+                            {% if log.action == 'expert_validate' %}bg-success bg-opacity-10
+                            {% elif log.action == 'expert_reject' %}bg-danger bg-opacity-10
+                            {% elif log.action == 'annotate' %}bg-info bg-opacity-10
+                            {% else %}bg-light{% endif %} rounded">
+                            <div class="me-3">
+                                <span class="badge 
+                                    {% if log.action == 'expert_validate' %}bg-success
+                                    {% elif log.action == 'expert_reject' %}bg-danger
+                                    {% elif log.action == 'annotate' %}bg-info
+                                    {% else %}bg-secondary{% endif %}">
+                                    <i class="bi bi-
+                                        {% if log.action == 'expert_validate' %}check-circle
+                                        {% elif log.action == 'expert_reject' %}x-circle
+                                        {% elif log.action == 'annotate' %}pencil
+                                        {% else %}clock{% endif %}"></i>
+                                </span>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">{{ log.get_action_display|default:log.action|title }}</div>
+                                <div class="small text-muted">{{ log.description }}</div>
+                                <div class="small text-muted">
+                                    <i class="bi bi-person me-1"></i>
+                                    {{ log.user.get_full_name|default:log.user.username }}
+                                    <i class="bi bi-clock ms-3 me-1"></i>
+                                    {{ log.timestamp|date:"d/m/Y H:i" }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const documentId = {{ document.id }};
+const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+// Surligner les annotations dans le texte
+document.addEventListener('DOMContentLoaded', function() {
+    highlightAnnotations();
+});
+
+function highlightAnnotations() {
+    try {
+        const annotations = {{ annotations_json|safe }};
+        const content = document.getElementById('documentContent');
+        
+        // Cette fonction pourrait idéalement traiter le texte pour surligner les annotations
+        // Pour l'instant, on ajoute juste une classe pour les rendre visibles
+        if (annotations && annotations.length > 0) {
+            console.log(`${annotations.length} annotations à surligner`);
+            // Logique de surlignage à implémenter selon le format du contenu
+        }
+    } catch (error) {
+        console.log('Pas d\'annotations à surligner');
+    }
+}
+
+function showAuditTrail() {
+    const auditSection = document.getElementById('auditSection');
+    auditSection.style.display = auditSection.style.display === 'none' ? 'block' : 'none';
+}
+
+function finalValidation(action) {
+    const comments = document.getElementById('comments').value;
+    const actionText = action === 'validate' ? 'valider définitivement' : 'remettre en annotation';
+    
+    if (confirm(`Êtes-vous sûr de vouloir ${actionText} ce document ?`)) {
+        showAlert('info', 'Traitement en cours...');
+        
+        fetch(`/annotation/expert/validate/${documentId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: action,
+                comments: comments
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', '✅ ' + data.message);
+                setTimeout(() => {
+                    window.location.href = '{% url "annotation:expert_validation_list" %}';
+                }, 2000);
+            } else {
+                showAlert('danger', '❌ Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showAlert('danger', '❌ Erreur lors de la validation');
+        });
+    }
+}
+
+function annotationFeedback(annotationId, action) {
+    fetch(`/annotation/expert/annotation/${annotationId}/feedback/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            action: action,
+            feedback: ''
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', `✅ Annotation ${action === 'approve' ? 'approuvée' : 'rejetée'}`);
+            
+            // Mettre à jour l'interface
+            const item = document.querySelector(`[data-annotation-id="${annotationId}"]`);
+            if (item) {
+                const badges = item.querySelectorAll('.badge');
+                const statusBadge = badges[badges.length - 2]; // Avant-dernier badge (status)
+                if (action === 'approve') {
+                    statusBadge.className = 'badge bg-success';
+                    statusBadge.textContent = 'Validé';
+                } else {
+                    statusBadge.className = 'badge bg-danger';
+                    statusBadge.textContent = 'Rejeté';
+                }
+            }
+        } else {
+            showAlert('danger', '❌ Erreur: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        showAlert('danger', '❌ Erreur lors du feedback');
+    });
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 350px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+
+<style>
+.document-content {
+    max-height: 600px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.375rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.annotation-highlight {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 3px;
+    padding: 1px 3px;
+    cursor: pointer;
+}
+
+.annotation-item:hover {
+    background-color: #f8f9fa;
+}
+
+.timeline .badge {
+    min-width: 40px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+</style>
+
+{% csrf_token %}
+{% endblock %}

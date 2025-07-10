@@ -1,0 +1,422 @@
+<!-- templates/annotation/expert_validation_list.html -->
+{% extends 'base.html' %}
+
+{% block title %}Validation Experte - Documents{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h3 mb-0">
+                        <i class="bi bi-award me-2 text-warning"></i>
+                        Validation Experte
+                    </h2>
+                    <p class="text-muted mb-0">
+                        {{ page_obj.paginator.count }} document{{ page_obj.paginator.count|pluralize }} 
+                        en attente de validation finale
+                    </p>
+                </div>
+                <div>
+                    <button class="btn btn-outline-secondary" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Actualiser
+                    </button>
+                    <button class="btn btn-outline-info" onclick="showStats()">
+                        <i class="bi bi-graph-up me-2"></i>Statistiques
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques rapides -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <div class="h3 text-primary mb-0" id="pendingCount">{{ page_obj.paginator.count }}</div>
+                    <small class="text-muted">En attente</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <div class="h3 text-warning mb-0" id="validatingCount">-</div>
+                    <small class="text-muted">En validation</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <div class="h3 text-success mb-0" id="validatedCount">-</div>
+                    <small class="text-muted">Validés</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <div class="h3 text-info mb-0" id="qualityScore">-</div>
+                    <small class="text-muted">Qualité moyenne (%)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Recherche</label>
+                            <input type="text" class="form-control" name="search" 
+                                   value="{{ current_filters.search }}" 
+                                   placeholder="Titre, source...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Statut</label>
+                            <select class="form-select" name="status">
+                                {% for status_code, status_label in status_choices %}
+                                <option value="{{ status_code }}" {% if status_code == current_filters.status %}selected{% endif %}>
+                                    {{ status_label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Qualité</label>
+                            <select class="form-select" name="quality">
+                                {% for quality_code, quality_label in quality_choices %}
+                                <option value="{{ quality_code }}" {% if quality_code == current_filters.quality %}selected{% endif %}>
+                                    {{ quality_label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-search me-1"></i>Filtrer
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des documents -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Annotations</th>
+                                    <th>Qualité</th>
+                                    <th>Assigné à</th>
+                                    <th>Date annotation</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for document in page_obj %}
+                                <tr data-document-id="{{ document.id }}">
+                                    <td>
+                                        <div class="fw-semibold text-primary">
+                                            {{ document.title|truncatechars:50 }}
+                                        </div>
+                                        <small class="text-muted">
+                                            ID: {{ document.id }} • 
+                                            {% if document.document_type %}{{ document.document_type.name }}{% endif %}
+                                            {% if document.context %} • {{ document.context.name }}{% endif %}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-2">
+                                                <span class="badge bg-secondary">
+                                                    {{ document.annotation_stats.total }} total
+                                                </span>
+                                            </div>
+                                            <div class="small">
+                                                <div class="text-success">
+                                                    <i class="bi bi-check-circle"></i> 
+                                                    {{ document.annotation_stats.validated }}
+                                                </div>
+                                                {% if document.annotation_stats.pending > 0 %}
+                                                <div class="text-warning">
+                                                    <i class="bi bi-clock"></i> 
+                                                    {{ document.annotation_stats.pending }}
+                                                </div>
+                                                {% endif %}
+                                                {% if document.annotation_stats.rejected > 0 %}
+                                                <div class="text-danger">
+                                                    <i class="bi bi-x-circle"></i> 
+                                                    {{ document.annotation_stats.rejected }}
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress me-2" style="width: 60px; height: 8px;">
+                                                <div class="progress-bar 
+                                                    {% if document.annotation_stats.quality_score >= 80 %}bg-success
+                                                    {% elif document.annotation_stats.quality_score >= 50 %}bg-warning
+                                                    {% else %}bg-danger{% endif %}" 
+                                                    style="width: {{ document.annotation_stats.quality_score }}%">
+                                                </div>
+                                            </div>
+                                            <small class="fw-semibold">
+                                                {{ document.annotation_stats.quality_score }}%
+                                            </small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if document.assigned_to %}
+                                        <div class="small">
+                                            <i class="bi bi-person"></i>
+                                            {{ document.assigned_to.get_full_name|default:document.assigned_to.username }}
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">Non assigné</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="small">{{ document.updated_at|date:"d/m/Y" }}</div>
+                                        <div class="text-muted small">{{ document.updated_at|time:"H:i" }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'annotation:expert_validation_detail' document.id %}" 
+                                               class="btn btn-outline-primary" title="Valider">
+                                                <i class="bi bi-award"></i>
+                                            </a>
+                                            <a href="{% url 'documents:view' document.id %}" 
+                                               class="btn btn-outline-secondary" title="Voir document" target="_blank">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <button class="btn btn-outline-success" 
+                                                    onclick="quickValidate({{ document.id }})" title="Validation rapide">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if page_obj.has_other_pages %}
+                    <nav class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                                        Précédent
+                                    </a>
+                                </li>
+                            {% endif %}
+                            
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ num }}">
+                                            {{ num }}
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">
+                                        Suivant
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-award" style="font-size: 3rem; color: #6B7280;"></i>
+                        <h4 class="mt-3 text-muted">Aucun document à valider</h4>
+                        <p class="text-muted">Tous les documents ont été traités par l'expert !</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Statistiques -->
+<div class="modal fade" id="statsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-graph-up me-2"></i>Statistiques Détaillées
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="statsContent">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Chargement...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Charger les statistiques au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardStats();
+});
+
+function loadDashboardStats() {
+    fetch('{% url "annotation:expert_dashboard_stats" %}')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('pendingCount').textContent = data.documents_pending;
+            document.getElementById('validatingCount').textContent = data.documents_validating;
+            document.getElementById('validatedCount').textContent = data.documents_validated;
+            document.getElementById('qualityScore').textContent = data.annotation_quality;
+        })
+        .catch(error => {
+            console.error('Erreur chargement stats:', error);
+        });
+}
+
+function showStats() {
+    const modal = new bootstrap.Modal(document.getElementById('statsModal'));
+    
+    fetch('{% url "annotation:expert_dashboard_stats" %}')
+        .then(response => response.json())
+        .then(data => {
+            let html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Résumé</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Documents en attente:</strong> ${data.documents_pending}</li>
+                            <li><strong>En validation:</strong> ${data.documents_validating}</li>
+                            <li><strong>Validés:</strong> ${data.documents_validated}</li>
+                            <li><strong>Total annotations:</strong> ${data.total_annotations}</li>
+                            <li><strong>Annotations validées:</strong> ${data.validated_annotations}</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Qualité par type d'entité</h6>
+                        <div class="small">
+            `;
+            
+            data.entity_stats.forEach(entity => {
+                html += `
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>${entity.name}:</span>
+                        <span class="fw-bold">${entity.quality.toFixed(1)}%</span>
+                    </div>
+                `;
+            });
+            
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('statsContent').innerHTML = html;
+        })
+        .catch(error => {
+            document.getElementById('statsContent').innerHTML = 
+                '<div class="alert alert-danger">Erreur lors du chargement des statistiques</div>';
+        });
+    
+    modal.show();
+}
+
+function quickValidate(documentId) {
+    if (confirm('Valider rapidement ce document ?\n\nToutes les annotations seront approuvées automatiquement.')) {
+        showAlert('info', 'Validation en cours...');
+        
+        fetch(`/annotation/expert/validate/${documentId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'validate',
+                comments: 'Validation rapide depuis la liste'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', '✅ ' + data.message);
+                // Retirer la ligne du tableau
+                const row = document.querySelector(`tr[data-document-id="${documentId}"]`);
+                if (row) {
+                    row.remove();
+                }
+                // Recharger les stats
+                loadDashboardStats();
+            } else {
+                showAlert('danger', '❌ Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showAlert('danger', '❌ Erreur lors de la validation');
+        });
+    }
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 350px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+
+{% csrf_token %}
+{% endblock %}

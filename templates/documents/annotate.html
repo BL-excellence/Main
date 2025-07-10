@@ -1,0 +1,1070 @@
+<!-- templates/documents/annotate.html - VERSION CORRIGÉE -->
+{% extends 'base.html' %}
+
+{% block title %}Annotation - {{ document.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid annotation-interface">
+    <!-- En-tête compact -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-outline-secondary btn-sm me-3" onclick="history.back()">
+                        <i class="bi bi-arrow-left me-1"></i>Retour
+                    </button>
+                    <h4 class="mb-0">Annotation du document</h4>
+                    <button class="btn btn-outline-info btn-sm ms-3" onclick="showDocumentInfo()">
+                        <i class="bi bi-info-circle me-1"></i>Infos document
+                    </button>
+                </div>
+                <div>
+                    {% if document.status == 'annotating' %}
+                        <span class="badge bg-warning text-dark">
+                            {{ document.get_status_display }}
+                        </span>
+                    {% else %}
+                        <span class="badge bg-primary">
+                            {{ document.get_status_display }}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informations document -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="document-header">
+                <h3 class="document-title">{{ document.title }}</h3>
+                <div class="document-badges">
+                    {% if document.context %}
+                    <span class="badge me-2" style="background-color: {{ document.context.color }}; color: white;">
+                        {{ document.context.name }}
+                    </span>
+                    {% endif %}
+                    {% if document.document_type %}
+                    <span class="badge me-2" style="background-color: {{ document.document_type.color }}; color: white;">
+                        {{ document.document_type.name }}
+                    </span>
+                    {% endif %}
+                    <span class="badge bg-secondary">ID: {{ document.id|stringformat:"03d" }}</span>
+                    {% if document.file_type %}
+                    <span class="badge bg-info ms-2">{{ document.file_type|upper }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Document à annoter -->
+        <div class="col-lg-8">
+            <div class="card annotation-document">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Document à annoter</h5>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" onclick="toggleTextSelection()" id="selectionToggle">
+                            <i class="bi bi-cursor-text me-1"></i>Mode sélection
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="runAutoAnnotation()">
+                            <i class="bi bi-robot me-1"></i>IA
+                        </button>
+                        <button class="btn btn-outline-info" onclick="reloadContent()">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="document-content" class="document-content">
+                        {% if document_content and document_content != "Erreur lors de l'extraction du contenu du document." %}
+                            <div id="annotated-text" class="annotated-text-content">{{ document_content|linebreaks }}</div>
+                        {% else %}
+                            <div class="content-error text-center py-5">
+                                <i class="bi bi-file-earmark-x text-muted" style="font-size: 3rem;"></i>
+                                <h5 class="mt-3 text-muted">Contenu du document non disponible</h5>
+                                {% if document_content %}
+                                    <p class="text-danger">{{ document_content }}</p>
+                                {% endif %}
+                                <div class="mt-3">
+                                    <button class="btn btn-primary me-2" onclick="extractDocumentContent()">
+                                        <i class="bi bi-magic me-2"></i>Extraire le contenu
+                                    </button>
+                                    {% if document.file %}
+                                    <a href="{% url 'documents:view' document.id %}" class="btn btn-outline-secondary" target="_blank">
+                                        <i class="bi bi-eye me-2"></i>Voir le fichier original
+                                    </a>
+                                    {% endif %}
+                                </div>
+                                <div class="mt-3">
+                                    <small class="text-muted">
+                                        Type de fichier supporté : {{ document.file_type|upper|default:"Inconnu" }}
+                                        {% if document.file %}
+                                        | Taille : {{ document.file.size|filesizeformat }}
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Outils d'annotation -->
+        <div class="col-lg-4">
+            <!-- Types d'entités -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="card-title mb-0">Types d'entités</h6>
+                    <small class="text-muted">{{ entity_types|length }} types</small>
+                </div>
+                <div class="card-body">
+                    <div class="entity-types-grid">
+                        {% for entity_type in entity_types %}
+                        <button class="entity-type-btn" 
+                                data-entity-id="{{ entity_type.id }}"
+                                data-entity-name="{{ entity_type.name }}"
+                                data-entity-color="{{ entity_type.color }}"
+                                style="background-color: {{ entity_type.color }}; color: white;"
+                                onclick="selectEntityType(this)"
+                                title="{{ entity_type.description }}">
+                            {{ entity_type.name }}
+                        </button>
+                        {% empty %}
+                        <p class="text-muted small">Aucun type d'entité défini</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Sélectionnez un type puis surlignez du texte
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Annotations détectées -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="card-title mb-0">Annotations</h6>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary" id="annotations-count">{{ annotations|length }}</span>
+                        <button class="btn btn-outline-success btn-sm" onclick="addManualAnnotation()">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="annotations-list" id="annotations-list">
+                        {% for annotation in annotations %}
+                        <div class="annotation-item" 
+                             data-annotation-id="{{ annotation.id }}"
+                             data-start="{{ annotation.start_position }}"
+                             data-end="{{ annotation.end_position }}"
+                             data-entity-color="{{ annotation.entity_type.color }}">
+                            <div class="annotation-content">
+                                <div class="annotation-text">
+                                    <strong>"{{ annotation.text|truncatechars:30 }}"</strong>
+                                    <div class="entity-label" style="color: {{ annotation.entity_type.color }};">
+                                        → {{ annotation.entity_type.name|upper }}
+                                    </div>
+                                </div>
+                                <div class="annotation-meta">
+                                    {% if annotation.status == 'validated' %}
+                                    <span class="status-badge validated">
+                                        <i class="bi bi-check-circle"></i> Validé
+                                    </span>
+                                    {% elif annotation.status == 'rejected' %}
+                                    <span class="status-badge rejected">
+                                        <i class="bi bi-x-circle"></i> Rejeté
+                                    </span>
+                                    {% elif annotation.is_automatic %}
+                                    <span class="status-badge pending">
+                                        <i class="bi bi-robot"></i> IA - À valider
+                                    </span>
+                                    {% else %}
+                                    <span class="status-badge manual">
+                                        <i class="bi bi-pencil"></i> Manuel
+                                    </span>
+                                    {% endif %}
+                                    {% if annotation.confidence_score %}
+                                    <small class="confidence-score">{{ annotation.confidence_score|floatformat:0 }}%</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="annotation-actions">
+                                {% if annotation.status != 'validated' %}
+                                <button class="action-btn validate" 
+                                        onclick="validateAnnotation({{ annotation.id }})"
+                                        title="Valider">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                                {% endif %}
+                                {% if annotation.status != 'rejected' %}
+                                <button class="action-btn reject" 
+                                        onclick="rejectAnnotation({{ annotation.id }})"
+                                        title="Rejeter">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                                {% endif %}
+                                <button class="action-btn locate" 
+                                        onclick="locateAnnotation({{ annotation.start_position }}, {{ annotation.end_position }})"
+                                        title="Localiser">
+                                    <i class="bi bi-geo-alt"></i>
+                                </button>
+                                <button class="action-btn delete" 
+                                        onclick="deleteAnnotation({{ annotation.id }})"
+                                        title="Supprimer">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="empty-annotations text-center py-4">
+                            <i class="bi bi-inbox text-muted" style="font-size: 2rem;"></i>
+                            <p class="text-muted mt-2">Aucune annotation détectée</p>
+                            {% if document_content and document_content != "Erreur lors de l'extraction du contenu du document." %}
+                            <button class="btn btn-primary btn-sm" onclick="runAutoAnnotation()">
+                                <i class="bi bi-robot me-1"></i>Lancer l'IA
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions globales -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-success" onclick="validateAllAnnotations()" id="validateAllBtn">
+                            <i class="bi bi-check-circle me-2"></i>Valider toutes les annotations
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="saveProgress()">
+                            <i class="bi bi-save me-2"></i>Sauvegarder le progrès
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="exportAnnotations()">
+                            <i class="bi bi-download me-2"></i>Exporter
+                        </button>
+                    </div>
+                    
+                    <!-- Statistiques rapides -->
+                    <div class="annotation-stats mt-3 pt-3 border-top">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="stat-number" id="total-annotations">{{ annotations|length }}</div>
+                                <div class="stat-label">Total</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-number text-success" id="validated-count">
+                                    {% for annotation in annotations %}{% if annotation.status == 'validated' %}{{ forloop.counter0|add:1 }}{% endif %}{% endfor %}
+                                </div>
+                                <div class="stat-label">Validées</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-number text-warning" id="pending-count">
+                                    {% for annotation in annotations %}{% if annotation.status != 'validated' and annotation.status != 'rejected' %}{{ forloop.counter0|add:1 }}{% endif %}{% endfor %}
+                                </div>
+                                <div class="stat-label">En attente</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour nouvelle annotation manuelle -->
+<div class="modal fade" id="manualAnnotationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-circle me-2"></i>Ajouter une annotation
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="manualAnnotationForm">
+                    <div class="mb-3">
+                        <label class="form-label">Texte à annoter</label>
+                        <textarea class="form-control" id="selectedText" rows="3" 
+                                  placeholder="Sélectionnez du texte dans le document ou saisissez manuellement"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type d'entité</label>
+                        <select class="form-select" id="entityTypeSelect" required>
+                            <option value="">Choisir un type...</option>
+                            {% for entity_type in entity_types %}
+                            <option value="{{ entity_type.id }}" data-color="{{ entity_type.color }}">
+                                {{ entity_type.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Position dans le texte</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="number" class="form-control" id="startPosition" 
+                                       placeholder="Début" min="0">
+                            </div>
+                            <div class="col-6">
+                                <input type="number" class="form-control" id="endPosition" 
+                                       placeholder="Fin" min="0">
+                            </div>
+                        </div>
+                        <small class="text-muted">Laissez vide pour auto-détection</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="saveManualAnnotation()">
+                    <i class="bi bi-save me-2"></i>Sauvegarder
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variables globales
+const documentId = {{ document.id }};
+const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+let selectedEntityType = null;
+let documentText = '';
+let textSelectionMode = false;
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    initializeInterface();
+    loadAnnotations();
+    setupTextSelection();
+});
+
+function initializeInterface() {
+    // Récupérer le texte du document
+    const contentDiv = document.getElementById('annotated-text');
+    if (contentDiv) {
+        documentText = contentDiv.textContent || contentDiv.innerText || '';
+        console.log(`Document texte chargé: ${documentText.length} caractères`);
+        highlightExistingAnnotations();
+    } else {
+        console.warn('Aucun contenu de document trouvé');
+    }
+    
+    // Calculer les statistiques
+    updateStatistics();
+}
+
+function extractDocumentContent() {
+    showNotification('Extraction du contenu en cours...', 'info');
+    
+    // Appeler l'API d'extraction
+    fetch(`/extraction/extract/${documentId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Contenu extrait avec succès', 'success');
+            // Recharger la page pour afficher le nouveau contenu
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification('Erreur: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        showNotification('Erreur lors de l\'extraction', 'danger');
+    });
+}
+
+function reloadContent() {
+    location.reload();
+}
+
+function loadAnnotations() {
+    // Charger les annotations depuis l'API
+    fetch(`/annotation/document/${documentId}/annotations/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log(`${data.annotations.length} annotations chargées`);
+                displayAnnotations(data.annotations);
+                highlightAnnotationsInText(data.annotations);
+                updateStatistics();
+            }
+        })
+        .catch(error => {
+            console.error('Erreur chargement annotations:', error);
+        });
+}
+
+function displayAnnotations(annotations) {
+    const listContainer = document.getElementById('annotations-list');
+    
+    if (annotations.length === 0) {
+        listContainer.innerHTML = `
+            <div class="empty-annotations text-center py-4">
+                <i class="bi bi-inbox text-muted" style="font-size: 2rem;"></i>
+                <p class="text-muted mt-2">Aucune annotation détectée</p>
+                ${documentText ? `<button class="btn btn-primary btn-sm" onclick="runAutoAnnotation()">
+                    <i class="bi bi-robot me-1"></i>Lancer l'IA
+                </button>` : ''}
+            </div>
+        `;
+        return;
+    }
+
+    listContainer.innerHTML = annotations.map(annotation => `
+        <div class="annotation-item" 
+             data-annotation-id="${annotation.id}"
+             data-start="${annotation.start_position}"
+             data-end="${annotation.end_position}"
+             data-entity-color="${annotation.entity_type.color}">
+            <div class="annotation-content">
+                <div class="annotation-text">
+                    <strong>"${annotation.text.substring(0, 30)}${annotation.text.length > 30 ? '...' : ''}"</strong>
+                    <div class="entity-label" style="color: ${annotation.entity_type.color};">
+                        → ${annotation.entity_type.name.toUpperCase()}
+                    </div>
+                </div>
+                <div class="annotation-meta">
+                    ${getStatusBadge(annotation)}
+                    ${annotation.confidence_score ? `<small class="confidence-score">${Math.round(annotation.confidence_score * 100)}%</small>` : ''}
+                </div>
+            </div>
+            <div class="annotation-actions">
+                ${getActionButtons(annotation)}
+            </div>
+        </div>
+    `).join('');
+    
+    // Mettre à jour le compteur
+    document.getElementById('annotations-count').textContent = annotations.length;
+}
+
+function getStatusBadge(annotation) {
+    if (annotation.status === 'validated') {
+        return '<span class="status-badge validated"><i class="bi bi-check-circle"></i> Validé</span>';
+    } else if (annotation.status === 'rejected') {
+        return '<span class="status-badge rejected"><i class="bi bi-x-circle"></i> Rejeté</span>';
+    } else if (annotation.is_automatic) {
+        return '<span class="status-badge pending"><i class="bi bi-robot"></i> IA - À valider</span>';
+    } else {
+        return '<span class="status-badge manual"><i class="bi bi-pencil"></i> Manuel</span>';
+    }
+}
+
+function getActionButtons(annotation) {
+    let buttons = '';
+    
+    if (annotation.status !== 'validated') {
+        buttons += `<button class="action-btn validate" onclick="validateAnnotation(${annotation.id})" title="Valider">
+                      <i class="bi bi-check"></i>
+                    </button>`;
+    }
+    
+    if (annotation.status !== 'rejected') {
+        buttons += `<button class="action-btn reject" onclick="rejectAnnotation(${annotation.id})" title="Rejeter">
+                      <i class="bi bi-x"></i>
+                    </button>`;
+    }
+    
+    buttons += `<button class="action-btn locate" onclick="locateAnnotation(${annotation.start_position}, ${annotation.end_position})" title="Localiser">
+                  <i class="bi bi-geo-alt"></i>
+                </button>`;
+    
+    buttons += `<button class="action-btn delete" onclick="deleteAnnotation(${annotation.id})" title="Supprimer">
+                  <i class="bi bi-trash"></i>
+                </button>`;
+    
+    return buttons;
+}
+
+function highlightAnnotationsInText(annotations) {
+    const contentDiv = document.getElementById('annotated-text');
+    if (!contentDiv || !documentText) return;
+
+    let highlightedText = documentText;
+    const sortedAnnotations = annotations.sort((a, b) => b.start_position - a.start_position);
+
+    sortedAnnotations.forEach(annotation => {
+        const before = highlightedText.substring(0, annotation.start_position);
+        const annotatedPart = highlightedText.substring(annotation.start_position, annotation.end_position);
+        const after = highlightedText.substring(annotation.end_position);
+        
+        const statusClass = annotation.status === 'validated' ? 'validated' : 
+                           annotation.status === 'rejected' ? 'rejected' : 'pending';
+        
+        const highlightedPart = `<mark class="annotation-highlight ${statusClass}" 
+                                      style="background-color: ${annotation.entity_type.color}40; border-left: 3px solid ${annotation.entity_type.color};"
+                                      data-annotation-id="${annotation.id}"
+                                      title="${annotation.entity_type.name}: ${annotation.text}">
+                                   ${annotatedPart}
+                                 </mark>`;
+        
+        highlightedText = before + highlightedPart + after;
+    });
+
+    contentDiv.innerHTML = highlightedText.replace(/\n/g, '<br>');
+}
+
+function setupTextSelection() {
+    const contentDiv = document.getElementById('annotated-text');
+    if (!contentDiv) return;
+
+    contentDiv.addEventListener('mouseup', function() {
+        if (!textSelectionMode) return;
+        
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+        
+        if (selectedText.length > 0 && selectedEntityType) {
+            createQuickAnnotation(selectedText, selection);
+        }
+    });
+}
+
+function toggleTextSelection() {
+    textSelectionMode = !textSelectionMode;
+    const button = document.getElementById('selectionToggle');
+    
+    if (textSelectionMode) {
+        button.innerHTML = '<i class="bi bi-cursor-text me-1"></i>Mode actif';
+        button.classList.remove('btn-outline-secondary');
+        button.classList.add('btn-primary');
+        showNotification('Mode sélection activé - sélectionnez un type d\'entité puis surlignez du texte', 'info');
+    } else {
+        button.innerHTML = '<i class="bi bi-cursor-text me-1"></i>Mode sélection';
+        button.classList.remove('btn-primary');
+        button.classList.add('btn-outline-secondary');
+        showNotification('Mode sélection désactivé', 'info');
+    }
+}
+
+function selectEntityType(button) {
+    // Désélectionner tous les autres
+    document.querySelectorAll('.entity-type-btn').forEach(btn => {
+        btn.classList.remove('selected');
+    });
+    
+    // Sélectionner celui-ci
+    button.classList.add('selected');
+    
+    selectedEntityType = {
+        id: button.dataset.entityId,
+        name: button.dataset.entityName,
+        color: button.dataset.entityColor
+    };
+    
+    showNotification(`Type d'entité sélectionné: ${selectedEntityType.name}`, 'info');
+    
+    // Activer automatiquement le mode sélection
+    if (!textSelectionMode) {
+        toggleTextSelection();
+    }
+}
+
+function createQuickAnnotation(text, selection) {
+    const range = selection.getRangeAt(0);
+    const contentDiv = document.getElementById('annotated-text');
+    
+    // Calculer la position dans le texte
+    const preSelectionRange = range.cloneRange();
+    preSelectionRange.selectNodeContents(contentDiv);
+    preSelectionRange.setEnd(range.startContainer, range.startOffset);
+    const startPosition = preSelectionRange.toString().length;
+    const endPosition = startPosition + text.length;
+    
+    createAnnotation(text, startPosition, endPosition, selectedEntityType.id);
+    window.getSelection().removeAllRanges();
+}
+
+function createAnnotation(text, startPos, endPos, entityTypeId) {
+    fetch('/annotation/create/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            document_id: documentId,
+            entity_type_id: parseInt(entityTypeId),
+            text: text,
+            start_position: startPos,
+            end_position: endPos
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Annotation créée avec succès', 'success');
+            loadAnnotations(); // Recharger les annotations
+        } else {
+            showNotification('Erreur: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        showNotification('Erreur lors de la création', 'danger');
+    });
+}
+
+function validateAnnotation(annotationId) {
+    updateAnnotationStatus(annotationId, 'validated');
+}
+
+function rejectAnnotation(annotationId) {
+    updateAnnotationStatus(annotationId, 'rejected');
+}
+
+function deleteAnnotation(annotationId) {
+    if (!confirm('Supprimer cette annotation ?')) return;
+    
+    fetch(`/annotation/${annotationId}/delete/`, {
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': csrfToken }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Annotation supprimée', 'success');
+            loadAnnotations();
+        } else {
+            showNotification('Erreur: ' + data.error, 'danger');
+        }
+    });
+}
+
+function updateAnnotationStatus(annotationId, status) {
+    fetch(`/annotation/${annotationId}/update/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ status: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const statusText = status === 'validated' ? 'validée' : 'rejetée';
+            showNotification(`Annotation ${statusText}`, 'success');
+            loadAnnotations(); // Recharger pour mettre à jour l'affichage
+        } else {
+            showNotification('Erreur: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        showNotification('Erreur lors de la mise à jour', 'danger');
+    });
+}
+
+function validateAllAnnotations() {
+    if (!confirm('Valider toutes les annotations en attente ?')) return;
+    
+    fetch(`/annotation/document/${documentId}/validate-all/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadAnnotations();
+        } else {
+            showNotification('Erreur: ' + data.error, 'danger');
+        }
+    });
+}
+
+function runAutoAnnotation() {
+    if (!confirm('Lancer l\'annotation automatique par IA ?')) return;
+    
+    showNotification('Annotation automatique en cours...', 'info');
+    
+    fetch(`/annotation/auto-annotate/${documentId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Annotation automatique lancée', 'success');
+            setTimeout(() => loadAnnotations(), 3000); // Recharger après 3 secondes
+        } else {
+            showNotification('Erreur: ' + data.error, 'danger');
+        }
+    });
+}
+
+function locateAnnotation(start, end) {
+    const marks = document.querySelectorAll('.annotation-highlight');
+    marks.forEach(mark => mark.classList.remove('highlight-active'));
+    
+    const targetMark = document.querySelector(`[data-annotation-id]`);
+    if (targetMark) {
+        targetMark.classList.add('highlight-active');
+        targetMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        setTimeout(() => {
+            targetMark.classList.remove('highlight-active');
+        }, 3000);
+    }
+}
+
+function addManualAnnotation() {
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+    
+    if (selectedText) {
+        document.getElementById('selectedText').value = selectedText;
+    }
+    
+    new bootstrap.Modal(document.getElementById('manualAnnotationModal')).show();
+}
+
+function saveManualAnnotation() {
+    const text = document.getElementById('selectedText').value.trim();
+    const entityTypeId = document.getElementById('entityTypeSelect').value;
+    const startPos = parseInt(document.getElementById('startPosition').value) || 0;
+    const endPos = parseInt(document.getElementById('endPosition').value) || (startPos + text.length);
+    
+    if (!text || !entityTypeId) {
+        showNotification('Veuillez remplir tous les champs requis', 'warning');
+        return;
+    }
+    
+    createAnnotation(text, startPos, endPos, entityTypeId);
+    bootstrap.Modal.getInstance(document.getElementById('manualAnnotationModal')).hide();
+}
+
+function saveProgress() {
+    showNotification('Progrès sauvegardé', 'success');
+}
+
+function exportAnnotations() {
+    window.open(`/annotation/document/${documentId}/export/`, '_blank');
+}
+
+function updateStatistics() {
+    const annotations = document.querySelectorAll('.annotation-item');
+    const validated = document.querySelectorAll('.status-badge.validated').length;
+    const pending = annotations.length - validated - document.querySelectorAll('.status-badge.rejected').length;
+    
+    document.getElementById('total-annotations').textContent = annotations.length;
+    document.getElementById('validated-count').textContent = validated;
+    document.getElementById('pending-count').textContent = pending;
+}
+
+function showNotification(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 4000);
+}
+
+function showDocumentInfo() {
+    let info = `Document: {{ document.title }}\n`;
+    info += `Type: {{ document.document_type.name|default:"Non défini" }}\n`;
+    info += `Contexte: {{ document.context.name|default:"Non défini" }}\n`;
+    info += `Statut: {{ document.get_status_display }}\n`;
+    info += `Type de fichier: {{ document.file_type|upper|default:"Inconnu" }}\n`;
+    {% if document.file %}info += `Taille: {{ document.file.size|filesizeformat }}\n`;{% endif %}
+    info += `Annotations: ${document.getElementById('total-annotations').textContent}`;
+    
+    alert(info);
+}
+</script>
+
+<style>
+.annotation-interface {
+    background-color: #f8f9fa;
+}
+
+.document-header {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.document-title {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.document-badges .badge {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+}
+
+.annotation-document {
+    border: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.document-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    min-height: 500px;
+    font-family: 'Georgia', serif;
+    line-height: 1.8;
+    font-size: 1.1rem;
+}
+
+.annotated-text-content {
+    user-select: text;
+    cursor: text;
+}
+
+.content-error {
+    background-color: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 2rem;
+}
+
+.entity-types-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.entity-type-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    opacity: 0.9;
+}
+
+.entity-type-btn:hover {
+    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.entity-type-btn.selected {
+    opacity: 1;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.6);
+}
+
+.annotations-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.annotation-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+    transition: all 0.2s ease;
+}
+
+.annotation-item:hover {
+    background-color: #f8f9fa;
+}
+
+.annotation-content {
+    flex: 1;
+}
+
+.annotation-text {
+    font-weight: 500;
+    color: #2c3e50;
+    margin-bottom: 0.3rem;
+}
+
+.entity-label {
+    font-weight: 700;
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+}
+
+.annotation-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-badge.validated {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-badge.rejected {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.status-badge.pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.manual {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.confidence-score {
+    background-color: #e9ecef;
+    color: #495057;
+    padding: 0.2rem 0.4rem;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.annotation-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.action-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 0.8rem;
+}
+
+.action-btn.validate {
+    background-color: #28a745;
+    color: white;
+}
+
+.action-btn.reject {
+    background-color: #dc3545;
+    color: white;
+}
+
+.action-btn.locate {
+    background-color: #6c757d;
+    color: white;
+}
+
+.action-btn.delete {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.action-btn:hover {
+    transform: scale(1.1);
+    opacity: 0.9;
+}
+
+.annotation-highlight {
+    border-radius: 3px;
+    padding: 2px 4px;
+    margin: 0 1px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.annotation-highlight:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.annotation-highlight.highlight-active {
+    animation: pulse 1s infinite;
+    box-shadow: 0 0 15px rgba(255,193,7,0.6);
+}
+
+.annotation-stats {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.stat-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+.empty-annotations {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    .entity-types-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .document-content {
+        padding: 1rem;
+        font-size: 1rem;
+    }
+    
+    .annotation-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .annotation-actions {
+        flex-direction: row;
+    }
+}
+</style>
+
+{% csrf_token %}
+{% endblock %}

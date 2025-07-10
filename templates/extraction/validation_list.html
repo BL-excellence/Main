@@ -1,0 +1,239 @@
+<!-- templates/extraction/validation_list.html -->
+
+{% extends 'base.html' %}
+{% load math_filters %}
+
+{% block title %}Validation des métadonnées{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h3 mb-0">Validation des métadonnées</h2>
+                    <p class="text-muted mb-0">{{ page_obj.paginator.count }} document{{ page_obj.paginator.count|pluralize }} nécessitant une validation</p>
+                </div>
+                <div>
+                    <button class="btn btn-outline-secondary" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Actualiser
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Recherche</label>
+                            <input type="text" class="form-control" name="search" 
+                                   value="{{ current_filters.search }}" 
+                                   placeholder="Titre, source...">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Statut</label>
+                            <select class="form-select" name="status">
+                                {% for status_code, status_label in status_choices %}
+                                <option value="{{ status_code }}" {% if status_code == current_filters.status %}selected{% endif %}>
+                                    {{ status_label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Confiance</label>
+                            <select class="form-select" name="confidence">
+                                {% for conf_code, conf_label in confidence_choices %}
+                                <option value="{{ conf_code }}" {% if conf_code == current_filters.confidence %}selected{% endif %}>
+                                    {{ conf_label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-search me-1"></i>Filtrer
+                                </button>
+                                <a href="{% url 'extraction:validation_list' %}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-x me-1"></i>Reset
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des documents -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Statut</th>
+                                    <th>Confiance</th>
+                                    <th>Métadonnées extraites</th>
+                                    <th>Date extraction</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for document in page_obj %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold text-primary">{{ document.title|truncatechars:50 }}</div>
+                                        <small class="text-muted">
+                                            ID: {{ document.id }} • {{ document.file_type|upper }}
+                                            {% if document.source %}• {{ document.source }}{% endif %}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if document.status == 'extracted' %}bg-success
+                                            {% elif document.status == 'extracting' %}bg-warning
+                                            {% elif document.status == 'refused' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ document.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if document.extraction_result %}
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress me-2" style="width: 60px; height: 8px;">
+                                                <div class="progress-bar 
+                                                    {% if document.extraction_result.confidence_score >= 0.8 %}bg-success
+                                                    {% elif document.extraction_result.confidence_score >= 0.5 %}bg-warning
+                                                    {% else %}bg-danger{% endif %}" 
+                                                    style="width: {{ document.extraction_result.confidence_score|floatformat:0|mul:100 }}%"></div>
+                                            </div>
+                                            <small class="fw-semibold">{{ document.extraction_result.confidence_score|floatformat:0|mul:100 }}%</small>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="small">
+                                            {% if document.extracted_title %}
+                                            <div><strong>Titre:</strong> {{ document.extracted_title|truncatechars:30 }}</div>
+                                            {% endif %}
+                                            {% if document.language %}
+                                            <div><strong>Langue:</strong> {{ document.language|upper }}</div>
+                                            {% endif %}
+                                            {% if document.publication_date %}
+                                            <div><strong>Date:</strong> {{ document.publication_date|date:"d/m/Y" }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if document.extraction_completed_at %}
+                                        <div class="small">{{ document.extraction_completed_at|date:"d/m/Y" }}</div>
+                                        <div class="text-muted small">{{ document.extraction_completed_at|time:"H:i" }}</div>
+                                        {% else %}
+                                        <span class="text-muted">En cours...</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'extraction:validation_detail' document.id %}" 
+                                               class="btn btn-outline-primary" title="Valider">
+                                                <i class="bi bi-check-circle"></i>
+                                            </a>
+                                            <button class="btn btn-outline-warning" 
+                                                    onclick="reExtract({{ document.id }})" title="Re-extraire">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </button>
+                                            <a href="{% url 'documents:view' document.id %}" 
+                                               class="btn btn-outline-secondary" title="Voir" target="_blank">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if page_obj.has_other_pages %}
+                    <nav class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">Précédent</a>
+                                </li>
+                            {% endif %}
+                            
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ num }}">{{ num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">Suivant</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-check-circle" style="font-size: 3rem; color: #10B981;"></i>
+                        <h4 class="mt-3 text-muted">Aucun document à valider</h4>
+                        <p class="text-muted">Tous les documents ont été traités avec succès !</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function reExtract(documentId) {
+    if (confirm('Êtes-vous sûr de vouloir relancer l\'extraction pour ce document ?')) {
+        fetch(`/extraction/re-extract/${documentId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Ré-extraction lancée avec succès');
+                location.reload();
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        });
+    }
+}
+</script>
+
+{% csrf_token %}
+{% endblock %}

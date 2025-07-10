@@ -1,0 +1,269 @@
+<!-- templates/dashboard/admin.html -->
+{% extends 'base.html' %}
+
+{% block title %}Tableau de bord - Administration{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête Admin -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h3 mb-0">Administration Système</h2>
+                    <p class="text-muted mb-0">Vue d'ensemble et gestion globale de la plateforme</p>
+                </div>
+                <div>
+                    <a href="{% url 'admin:index' %}" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-gear me-2"></i>Admin Django
+                    </a>
+{#                    <a href="{% url 'api:swagger-ui' %}" class="btn btn-outline-info">#}
+{#                        <i class="bi bi-code me-2"></i>API Docs#}
+{#                    </a>#}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques principales -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card primary">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="stat-number">{{ total_users }}</div>
+                        <div class="stat-label">Utilisateurs total</div>
+                    </div>
+                    <div class="ms-3">
+                        <i class="bi bi-people" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card success">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="stat-number">{{ total_documents }}</div>
+                        <div class="stat-label">Documents total</div>
+                    </div>
+                    <div class="ms-3">
+                        <i class="bi bi-file-earmark-text" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card warning">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="stat-number">{{ documents_processed }}</div>
+                        <div class="stat-label">Documents traités</div>
+                    </div>
+                    <div class="ms-3">
+                        <i class="bi bi-check-circle" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card info">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="stat-number">{{ processing_rate }}%</div>
+                        <div class="stat-label">Taux de traitement</div>
+                    </div>
+                    <div class="ms-3">
+                        <i class="bi bi-graph-up" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Répartition par rôles -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-person-badge me-2"></i>Répartition par rôles
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for role, count in role_stats.items %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3">
+                                <i class="bi bi-person-circle" style="font-size: 1.5rem; color: #4F46E5;"></i>
+                            </div>
+                            <span class="fw-semibold">{{ role }}</span>
+                        </div>
+                        <div class="text-end">
+                            <span class="h6 mb-0">{{ count }}</span>
+                            <div class="small text-muted">utilisateur{{ count|pluralize }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Documents par statut -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-file-bar-graph me-2"></i>Documents par statut
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for status, count in documents_by_status.items %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3">
+                                <span class="badge 
+                                    {% if status == 'validated' %}bg-success
+                                    {% elif status == 'annotated' %}bg-info
+                                    {% elif status == 'extracted' %}bg-primary
+                                    {% elif status == 'refused' %}bg-danger
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ count }}
+                                </span>
+                            </div>
+                            <span class="fw-semibold">{{ status|capfirst }}</span>
+                        </div>
+                        <div class="text-end">
+                            <div class="progress" style="width: 100px; height: 6px;">
+                                <div class="progress-bar" style="width: {% widthratio count total_documents 100 %}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activité récente -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-clock-history me-2"></i>Activité récente
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_activity %}
+                    <div class="timeline">
+                        {% for log in recent_activity %}
+                        <div class="d-flex mb-3">
+                            <div class="me-3">
+                                <span class="badge 
+                                    {% if log.action == 'upload' %}bg-info
+                                    {% elif log.action == 'extract' %}bg-warning
+                                    {% elif log.action == 'validate' %}bg-success
+                                    {% elif log.action == 'annotate' %}bg-primary
+                                    {% else %}bg-secondary{% endif %}">
+                                    <i class="bi bi-
+                                        {% if log.action == 'upload' %}upload
+                                        {% elif log.action == 'extract' %}cpu
+                                        {% elif log.action == 'validate' %}check
+                                        {% elif log.action == 'annotate' %}pencil
+                                        {% else %}gear{% endif %}"></i>
+                                </span>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">{{ log.get_action_display }}</div>
+                                <div class="text-muted small">{{ log.description }}</div>
+                                <div class="text-muted small">
+                                    <i class="bi bi-person me-1"></i>{{ log.user.get_full_name|default:log.user.username }}
+                                    <i class="bi bi-clock ms-3 me-1"></i>{{ log.timestamp|timesince }} ago
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-3">
+                        <i class="bi bi-journal-x" style="font-size: 2rem;"></i>
+                        <p class="mt-2 mb-0">Aucune activité récente</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions rapides -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-lightning me-2"></i>Actions rapides
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'admin:accounts_user_changelist' %}" class="card text-decoration-none h-100 card-hover">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-people text-primary" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">Gérer les utilisateurs</h6>
+                                    <small class="text-muted">Créer, modifier, désactiver</small>
+                                </div>
+                            </a>
+                        </div>
+                        
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'documents:list' %}" class="card text-decoration-none h-100 card-hover">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-file-earmark-text text-success" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">Voir les documents</h6>
+                                    <small class="text-muted">Supervision globale</small>
+                                </div>
+                            </a>
+                        </div>
+                        
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'audit:trail' %}" class="card text-decoration-none h-100 card-hover">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-clock-history text-info" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">Logs d'audit</h6>
+                                    <small class="text-muted">Traçabilité complète</small>
+                                </div>
+                            </a>
+                        </div>
+                        
+                        <div class="col-lg-3 col-md-6">
+{#                            <a href="{% url 'api:swagger-ui' %}" class="card text-decoration-none h-100 card-hover">#}
+                                <div class="card-body text-center">
+                                    <i class="bi bi-code text-warning" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">API Documentation</h6>
+                                    <small class="text-muted">Swagger UI</small>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card-hover {
+    transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+</style>
+{% endblock %}
