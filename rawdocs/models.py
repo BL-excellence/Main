@@ -49,6 +49,7 @@ class DocumentPage(models.Model):
     cleaned_text = models.TextField(help_text="Texte nettoyé pour annotation")
     
     # Annotation status
+    
     is_annotated = models.BooleanField(default=False)
     annotated_at = models.DateTimeField(null=True, blank=True)
     annotated_by = models.ForeignKey(
@@ -59,6 +60,9 @@ class DocumentPage(models.Model):
     )
     
     created_at = models.DateTimeField(auto_now_add=True)
+    is_validated_by_human = models.BooleanField(default=False)
+    human_validated_at = models.DateTimeField(null=True, blank=True) 
+    validated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='validated_pages')
     
     class Meta:
         unique_together = ['document', 'page_number']
@@ -146,3 +150,53 @@ class AnnotationSession(models.Model):
     
     def __str__(self):
         return f"Session {self.annotator.username} - {self.document}"
+    
+
+class AnnotationFeedback(models.Model):
+    """Track human feedback for AI annotations"""
+    page = models.ForeignKey(DocumentPage, on_delete=models.CASCADE, related_name='feedbacks')
+    annotator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    
+    # AI's original predictions
+    ai_annotations_before = models.JSONField(help_text="AI annotations before human correction")
+    
+    # Human corrections
+    human_annotations_after = models.JSONField(help_text="Final annotations after human validation")
+    
+    # Feedback analysis
+    corrections_made = models.JSONField(help_text="What was corrected: additions, deletions, modifications")
+    feedback_score = models.FloatField(default=0.0, help_text="Overall feedback score (0-1)")
+    
+    # Timestamps
+    validated_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['page', 'annotator']
+
+class AILearningMetrics(models.Model):
+    """Track AI performance over time"""
+    model_version = models.CharField(max_length=50, default="groq_llama3.3_70b")
+    
+    # Performance metrics
+    precision_score = models.FloatField(default=0.0)
+    recall_score = models.FloatField(default=0.0)
+    f1_score = models.FloatField(default=0.0)
+    
+    # Learning data
+    total_feedbacks = models.IntegerField(default=0)
+    improvement_rate = models.FloatField(default=0.0)
+    
+    # Entity-specific performance
+    entity_performance = models.JSONField(default=dict, help_text="Performance per entity type")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class PromptOptimization(models.Model):
+    """Store optimized prompts based on learning"""
+    entity_type = models.CharField(max_length=100)
+    optimized_prompt = models.TextField()
+    performance_score = models.FloatField()
+    feedback_count = models.IntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)

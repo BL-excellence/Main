@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% load rawdocs_extras %}
+{% load static %} 
 {% block title %}Annotation {{ document.file.name|basename }} – RawDocs{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{% static 'rawdocs/css/rlhf_styles.css' %}">
+
 <!-- Annotation Header -->
 <section class="annotation-header">
   <div class="header-info">
@@ -72,7 +75,7 @@
         <option value="{{ page.page_number }}" 
                 {% if page.page_number == current_page.page_number %}selected{% endif %}>
           Page {{ page.page_number }}
-          {% if page.is_annotated %}✅{% endif %}
+          {% if page.is_validated_by_human %}🎓{% elif page.is_annotated %}✅{% endif %}
         </option>
         {% endfor %}
       </select>
@@ -86,47 +89,36 @@
   </div>
   
   <div class="ai-controls">
+    <!-- Enhanced AI Button -->
     <button id="groq-annotate-btn" class="btn-groq" onclick="annotateWithGroq()">
-      <i class="fas fa-rocket"></i> Annotate with AI
+      <i class="fas fa-rocket"></i> Annotate with AI 🧠
+    </button>
+    
+    <!-- NEW: Validate Page Button -->
+    <button id="validate-page-btn" class="btn-validate" onclick="validatePage()" 
+            {% if current_page.is_validated_by_human %}disabled{% endif %}>
+      <i class="fas fa-graduation-cap"></i> 
+      {% if current_page.is_validated_by_human %}
+        Page Validée 🎓
+      {% else %}
+        Validate Page
+      {% endif %}
     </button>
     
     <div id="ai-loading" class="ai-loading" style="display: none;">
       <i class="fas fa-spinner fa-spin"></i> IA en cours...
     </div>
+    
+    <!-- Learning Progress Indicator -->
+    <div id="learning-progress" class="learning-progress" style="display: none;">
+      <i class="fas fa-brain"></i> IA en apprentissage...
+    </div>
   </div>
-
 </section>
-   <!-- Replace your button with this optimized version -->
-<!-- Replace your AI controls section with this EXACT same style -->
+<section class="learning-dashboard-widget" id="learning-widget" style="display: none;">
+</section>
 
 
-  <script>
-  function annotateWithGroq() {
-      const btn = document.getElementById('groq-annotate-btn');
-      const loading = document.getElementById('ai-loading');
-      
-      btn.style.display = 'none';
-      loading.style.display = 'lex';
-      
-      fetch(`/annotation/groq/{{ current_page.id }}/`, {
-          method: 'POST',
-          headers: {'X-CSRFToken': getCookie('csrftoken')}
-      })
-      .then(response => response.json())
-      .then(data => {
-          if (data.success) {
-              alert(`🎉 ${data.annotations_created} annotations avec AI!`);
-              location.reload();
-          } else {
-              alert('Erreur: ' + data.error);
-          }
-      })
-      .finally(() => {
-          btn.style.display = 'flex';
-          loading.style.display = 'none';
-      });
-  }
-  </script>
 
   <style>
   .btn-groq {
@@ -148,7 +140,9 @@
   <h3>
     <i class="fas fa-file-text"></i> 
     Page {{ current_page.page_number }}
-    {% if current_page.is_annotated %}
+    {% if current_page.is_validated_by_human %}
+      <span class="page-status validated-human">Validée par humain</span>
+    {% elif current_page.is_annotated %}
       <span class="page-status annotated">Annotée</span>
     {% else %}
       <span class="page-status pending">En attente</span>
@@ -186,6 +180,8 @@
     {% endfor %}
   </div>
 </section>
+<script src="{% static 'rawdocs/js/rlhf_annotation.js' %}"></script>
+
 
 <style>
 /* Annotation Header */

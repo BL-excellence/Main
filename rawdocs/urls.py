@@ -101,4 +101,11 @@ urlpatterns = [
         views.ai_annotate_page_groq, 
         name='ai_annotate_page_groq'),
 
+    path('annotation/validate-page/<int:page_id>/', 
+         views.validate_page_annotations, 
+         name='validate_page_annotations'),
+    
+    path('learning/dashboard/', 
+         views.get_learning_dashboard, 
+         name='learning_dashboard'),
 ]

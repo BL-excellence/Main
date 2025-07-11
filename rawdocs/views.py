@@ -19,6 +19,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 import requests
+from django.db import models 
 
 # Define URLForm here since it's missing
 class URLForm(forms.Form):
@@ -371,49 +372,158 @@ def delete_annotation(request, annotation_id):
             'error': f'Erreur lors de la suppression: {str(e)}'
         }, status=500)
     
+    
+from .rlhf_learning import RLHFGroqAnnotator
+
+
 @login_required
 @csrf_exempt
-def ai_annotate_page_groq(request, page_id):
-    """Django view for FREE GROQ annotation - Claude-level quality"""
-    
+def validate_page_annotations(request, page_id):
+    """
+    Validate page annotations and trigger RLHF learning
+    """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     
     try:
         page = get_object_or_404(DocumentPage, id=page_id)
         
-        # Initialize GROQ annotator
-        try:
-            annotator = GroqAnnotator()
-        except ValueError as e:
-            return JsonResponse({
-                'error': 'GROQ API key not set. Get free key from https://console.groq.com/',
-                'details': str(e)
-            }, status=500)
+        # Get AI annotations that were made before human corrections
+        ai_session_data = request.session.get(f'ai_annotations_{page_id}', [])
         
-        print(f"🚀 Processing page {page.page_number} with FREE GROQ...")
+        # Get current annotations (after human corrections)
+        current_annotations = []
+        for annotation in page.annotations.all():
+            current_annotations.append({
+                'text': annotation.selected_text,
+                'type': annotation.annotation_type.name,
+                'start_pos': annotation.start_pos,
+                'end_pos': annotation.end_pos,
+                'confidence': annotation.confidence_score / 100.0
+            })
         
-        # Create page data
-        page_data = {
-            'page_num': page.page_number,
-            'text': page.cleaned_text,
-            'char_count': len(page.cleaned_text)
-        }
+        # Initialize RLHF annotator
+        rlhf_annotator = RLHFGroqAnnotator()
         
-        # Process with GROQ
-        annotations = annotator.annotate_page_with_groq(page_data)
+        # Process human feedback
+        feedback_result = rlhf_annotator.process_human_feedback(
+            page_id=page_id,
+            ai_annotations=ai_session_data,
+            human_annotations=current_annotations,
+            annotator_id=request.user.id
+        )
+        
+        # Mark page as validated
+        page.is_validated_by_human = True
+        page.human_validated_at = datetime.now()
+        page.validated_by = request.user
+        page.save()
+        
+        # Clear the session data
+        if f'ai_annotations_{page_id}' in request.session:
+            del request.session[f'ai_annotations_{page_id}']
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Page validée! Score: {feedback_result["feedback_score"]:.0%} - IA améliorée! 🎓',
+            'feedback_score': feedback_result['feedback_score'],
+            'corrections_summary': feedback_result['corrections_summary'],
+            'ai_improved': True
+        })
+        
+    except Exception as e:
+        print(f"❌ Validation error: {e}")
+        return JsonResponse({
+            'error': f'Erreur lors de la validation: {str(e)}'
+        }, status=500)
+
+@login_required
+def get_learning_dashboard(request):
+    """
+    Get AI learning progress dashboard
+    """
+    try:
+        from .models import AILearningMetrics, AnnotationFeedback
+        
+        # Get recent metrics
+        recent_metrics = AILearningMetrics.objects.order_by('-created_at')[:10]
+        
+        # Calculate improvement over time
+        improvement_data = []
+        for metric in recent_metrics:
+            improvement_data.append({
+                'date': metric.created_at.strftime('%Y-%m-%d'),
+                'f1_score': metric.f1_score,
+                'precision': metric.precision_score,
+                'recall': metric.recall_score
+            })
+        
+        # Get feedback summary
+        total_feedbacks = AnnotationFeedback.objects.count()
+        avg_feedback_score = AnnotationFeedback.objects.aggregate(
+            avg_score=models.Avg('feedback_score')
+        )['avg_score'] or 0
+        
+        # Get entity performance
+        latest_metric = recent_metrics.first()
+        entity_performance = latest_metric.entity_performance if latest_metric else {}
+        
+        return JsonResponse({
+            'total_feedbacks': total_feedbacks,
+            'average_feedback_score': avg_feedback_score,
+            'improvement_trend': improvement_data,
+            'entity_performance': entity_performance,
+            'learning_active': True
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@csrf_exempt  
+def ai_annotate_page_groq(request, page_id):
+    """
+    Enhanced AI annotation with RLHF learning
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        
+        # Clear existing annotations for this page
+        page.annotations.all().delete()
+        
+        # Initialize RLHF annotator (now with learning)
+        rlhf_annotator = RLHFGroqAnnotator()
+        
+        print(f"🚀 Processing page {page.page_number} with RLHF-enhanced GROQ...")
+        
+        # Use adaptive prompt based on learning
+        adaptive_prompt = rlhf_annotator.create_adaptive_prompt(page.cleaned_text)
+        
+        # Call GROQ with enhanced prompt
+        response = rlhf_annotator.call_groq_api(adaptive_prompt)
+        
+        if response:
+            annotations = rlhf_annotator.parse_groq_response(response, page.page_number)
+        else:
+            annotations = []
+        
+        # Store AI annotations in session for later feedback processing
+        request.session[f'ai_annotations_{page_id}'] = annotations
         
         # Save to database
         saved_count = 0
         for ann_data in annotations:
             try:
-                # Get annotation type
+                # Get or create annotation type
                 ann_type, created = AnnotationType.objects.get_or_create(
                     name=ann_data['type'],
                     defaults={
                         'display_name': ann_data['type'].replace('_', ' ').title(),
-                        'color': '#3b82f6',  # Blue for GROQ
-                        'description': f"GROQ Llama 3.1 70B detected {ann_data['type']}"
+                        'color': '#3b82f6',
+                        'description': f"RLHF GROQ Llama 3.3 70B detected {ann_data['type']}"
                     }
                 )
                 
@@ -425,7 +535,7 @@ def ai_annotate_page_groq(request, page_id):
                     end_pos=ann_data.get('end_pos', 0),
                     selected_text=ann_data.get('text', ''),
                     confidence_score=ann_data.get('confidence', 0.8) * 100,
-                    ai_reasoning=ann_data.get('reasoning', 'GROQ Llama 3.1 70B FREE classification'),
+                    ai_reasoning=ann_data.get('reasoning', 'RLHF-enhanced GROQ classification'),
                     created_by=request.user
                 )
                 saved_count += 1
@@ -444,12 +554,13 @@ def ai_annotate_page_groq(request, page_id):
         return JsonResponse({
             'success': True,
             'annotations_created': saved_count,
-            'message': f'{saved_count} annotations créées avec GROQ FREE!',
-            'cost_estimate': 0.0  # FREE!
+            'message': f'{saved_count} annotations créées avec RLHF GROQ! 🧠',
+            'learning_enhanced': True,
+            'cost_estimate': 0.0
         })
         
     except Exception as e:
-        print(f"❌ GROQ annotation error: {e}")
+        print(f"❌ Enhanced GROQ annotation error: {e}")
         return JsonResponse({
-            'error': f'Erreur GROQ: {str(e)}'
+            'error': f'Erreur RLHF GROQ: {str(e)}'
         }, status=500)
