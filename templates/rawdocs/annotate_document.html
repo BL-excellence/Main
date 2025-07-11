@@ -366,7 +366,7 @@ function annotateWithAI() {
     btn.classList.add('hidden');
     loading.classList.remove('hidden');
 
-    fetch(`{% url "rawdocs:ai_annotate_page" current_page.id %}`, {
+    fetch(`{% url "rawdocs:ai_annotate_page_groq" current_page.id %}`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': getCookie('csrftoken')

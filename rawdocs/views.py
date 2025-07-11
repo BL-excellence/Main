@@ -16,7 +16,7 @@ from django.contrib.auth.models import User, Group
 from django.core.paginator import Paginator
 from django.db import transaction
 from django import forms
-
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import views as auth_views
 
 from .models import (
@@ -25,12 +25,8 @@ from .models import (
     Annotation, AnnotationSession
 )
 from .utils import extract_metadonnees, extract_full_text
-from .annotation_utils import (
-    extract_pages_from_pdf,
-    call_legal_bert_annotation,
-    create_annotation_types
-)
-
+from .annotation_utils import extract_pages_from_pdf, create_annotation_types
+from .groq_annotation_system import GroqAnnotator
 
 # ——— Forms ——————————————————————————————————————————
 
@@ -71,7 +67,7 @@ class MetadataEditForm(forms.Form):
     title = forms.CharField(required=False)
     type = forms.CharField(required=False)
     publication_date = forms.DateField(required=False,
-                                       widget=forms.DateInput(attrs={'type': 'date'}))
+                                     widget=forms.DateInput(attrs={'type': 'date'}))
     version = forms.CharField(required=False)
     source = forms.CharField(required=False)
     context = forms.CharField(required=False)
@@ -148,7 +144,7 @@ def upload_pdf(request):
             rd.file.save(f.name, f)
         else:
             url = form.cleaned_data['pdf_url']
-            resp = requests.get(url, timeout=30);
+            resp = requests.get(url, timeout=30)
             resp.raise_for_status()
             ts, fn = datetime.now().strftime('%Y%m%d_%H%M%S'), os.path.basename(url)
             rd = RawDocument(url=url, owner=request.user)
@@ -230,7 +226,7 @@ def validate_document(request, doc_id):
                 document.total_pages = len(pages)
                 document.pages_extracted = True
             except Exception as e:
-                messages.error(request, f"Errorextract pages: {e}")
+                messages.error(request, f"Erreur lors de l'extraction des pages: {e}")
                 return redirect('rawdocs:document_list')
         document.is_validated = True
         document.validated_at = datetime.now()
@@ -269,60 +265,6 @@ def annotate_document(request, doc_id):
         'existing_annotations': page_obj.annotations.all().order_by('start_pos'),
         'total_pages': document.total_pages
     })
-
-
-@login_required(login_url='rawdocs:login')
-@user_passes_test(is_annotateur)
-def ai_annotate_page(request, page_id):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'POST required'}, status=405)
-    page = get_object_or_404(DocumentPage, id=page_id)
-    try:
-        print(f"⚡ Starting Legal-BERT annotation for page {page.page_number}")
-
-        # Call Legal-BERT for annotation
-        ai_anns = call_legal_bert_annotation(page.cleaned_text, page.page_number)
-        print(f"🔍 Legal-BERT returned {len(ai_anns)} annotations")
-
-        created = 0
-        with transaction.atomic():
-            for ann in ai_anns:
-                try:
-                    atype = AnnotationType.objects.get(name=ann['type'])
-                except AnnotationType.DoesNotExist:
-                    continue
-                score = ann['confidence']
-                if score <= 1.0: score *= 100
-                Annotation.objects.create(
-                    page=page,
-                    annotation_type=atype,
-                    start_pos=ann['start_pos'],
-                    end_pos=ann['end_pos'],
-                    selected_text=ann['text'],
-                    confidence_score=score,
-                    ai_reasoning=ann.get('reasoning', ''),
-                    created_by=request.user
-                )
-                created += 1
-                print(f"💾 Created annotation: {ann['type']} - '{ann['text'][:30]}...'")
-
-        if created > 0:
-            page.is_annotated = True
-            page.annotated_at = datetime.now()
-            page.annotated_by = request.user
-            page.save()
-            print(f"✅ Successfully created {created} annotations")
-
-        return JsonResponse({
-            'success': True,
-            'annotations_created': created,
-            'message': f'{created} annotations créées avec Legal-BERT'
-        })
-    except Exception as e:
-        print(f"❌ Legal-BERT annotation error: {e}")
-        return JsonResponse({
-            'error': f'Erreur Legal-BERT: {str(e)}'
-        }, status=500)
 
 
 @login_required(login_url='rawdocs:login')
@@ -376,3 +318,87 @@ def delete_annotation(request, annotation_id):
         return JsonResponse({'error': 'Permission denied'}, status=403)
     ann.delete()
     return JsonResponse({'success': True})
+
+
+@login_required
+@csrf_exempt
+def ai_annotate_page_groq(request, page_id):
+    """Django view for FREE GROQ annotation - Llama 3.3 70B quality"""
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        
+        # Initialize GROQ annotator
+        try:
+            annotator = GroqAnnotator()
+        except ValueError as e:
+            return JsonResponse({
+                'error': 'GROQ_API_KEY environment variable not set. Get free key from https://console.groq.com/',
+                'details': str(e)
+            }, status=500)
+        
+        print(f"🚀 Processing page {page.page_number} with FREE GROQ...")
+        
+        # Create page data
+        page_data = {
+            'page_num': page.page_number,
+            'text': page.cleaned_text,
+            'char_count': len(page.cleaned_text)
+        }
+        
+        # Process with GROQ
+        annotations = annotator.annotate_page_with_groq(page_data)
+        
+        # Save to database
+        saved_count = 0
+        for ann_data in annotations:
+            try:
+                # Get annotation type
+                ann_type, created = AnnotationType.objects.get_or_create(
+                    name=ann_data['type'],
+                    defaults={
+                        'display_name': ann_data['type'].replace('_', ' ').title(),
+                        'color': '#3b82f6',  # Blue for GROQ
+                        'description': f"GROQ Llama 3.3 70B detected {ann_data['type']}"
+                    }
+                )
+                
+                # Create annotation
+                annotation = Annotation.objects.create(
+                    page=page,
+                    annotation_type=ann_type,
+                    start_pos=ann_data.get('start_pos', 0),
+                    end_pos=ann_data.get('end_pos', 0),
+                    selected_text=ann_data.get('text', ''),
+                    confidence_score=ann_data.get('confidence', 0.8) * 100,
+                    ai_reasoning=ann_data.get('reasoning', 'GROQ Llama 3.3 70B FREE classification'),
+                    created_by=request.user
+                )
+                saved_count += 1
+                
+            except Exception as e:
+                print(f"❌ Error saving annotation: {e}")
+                continue
+        
+        # Update page status
+        if saved_count > 0:
+            page.is_annotated = True
+            page.annotated_at = datetime.now()
+            page.annotated_by = request.user
+            page.save()
+        
+        return JsonResponse({
+            'success': True,
+            'annotations_created': saved_count,
+            'message': f'{saved_count} annotations créées avec GROQ FREE!',
+            'cost_estimate': 0.0  # FREE!
+        })
+        
+    except Exception as e:
+        print(f"❌ GROQ annotation error: {e}")
+        return JsonResponse({
+            'error': f'Erreur GROQ: {str(e)}'
+        }, status=500)

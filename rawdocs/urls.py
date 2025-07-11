@@ -92,12 +92,11 @@ urlpatterns = [
         views.annotate_document,
         name='annotate_document'
     ),
-
-    # 13) AI automatic annotation of a page
-    path(
-        'annotation/ai/<int:page_id>/',
-        views.ai_annotate_page,
-        name='ai_annotate_page'
+    
+    # AI annotation using Groq
+    path('annotation/groq/<int:page_id>/', 
+        views.ai_annotate_page_groq, 
+        name='ai_annotate_page_groq'
     ),
 
     # 14) Save a manual annotation
