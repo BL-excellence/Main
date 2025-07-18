@@ -1,9 +1,9 @@
 # rawdocs/views.py
-
 import os
 import json
 import requests
 from datetime import datetime
+from PyPDF2 import PdfReader
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.files.base import ContentFile
@@ -18,15 +18,18 @@ from django.db import transaction
 from django import forms
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import views as auth_views
+from django.db import models
 
 from .models import (
     RawDocument, MetadataLog,
     DocumentPage, AnnotationType,
-    Annotation, AnnotationSession
+    Annotation, AnnotationSession,
+    AILearningMetrics, AnnotationFeedback
 )
 from .utils import extract_metadonnees, extract_full_text
 from .annotation_utils import extract_pages_from_pdf, create_annotation_types
 from .groq_annotation_system import GroqAnnotator
+from .rlhf_learning import RLHFGroqAnnotator
 
 # ——— Forms ——————————————————————————————————————————
 
@@ -86,6 +89,10 @@ def is_annotateur(user):
     return user.groups.filter(name="Annotateur").exists()
 
 
+def is_expert(user):
+    return user.groups.filter(name="Expert").exists()
+
+
 # ——— Authentication ————————————————————————————————————
 
 class CustomLoginView(auth_views.LoginView):
@@ -93,9 +100,10 @@ class CustomLoginView(auth_views.LoginView):
 
     def get_success_url(self):
         user = self.request.user
-        grp = user.groups.first().name if user.groups.exists() else None
-        if grp == "Metadonneur": return '/dashboard/'
-        if grp in ("Annotateur", "Expert"): return '/annotation/'
+        if is_metadonneur(user):
+            return '/dashboard/'
+        elif is_annotateur(user) or is_expert(user):
+            return '/annotation/'
         return '/upload/'
 
 
@@ -137,22 +145,29 @@ def upload_pdf(request):
     form = UploadForm(request.POST or None, request.FILES or None)
     context = {'form': form}
     if request.method == 'POST' and form.is_valid():
-        # fichier local prioritaire
-        if form.cleaned_data.get('pdf_file'):
-            f = form.cleaned_data['pdf_file']
-            rd = RawDocument(owner=request.user)
-            rd.file.save(f.name, f)
-        else:
-            url = form.cleaned_data['pdf_url']
-            resp = requests.get(url, timeout=30)
-            resp.raise_for_status()
-            ts, fn = datetime.now().strftime('%Y%m%d_%H%M%S'), os.path.basename(url)
-            rd = RawDocument(url=url, owner=request.user)
-            rd.file.save(os.path.join(ts, fn), ContentFile(resp.content))
-        rd.save()
-        metadata = extract_metadonnees(rd.file.path, rd.url or "")
-        text = extract_full_text(rd.file.path)
-        context.update({'doc': rd, 'metadata': metadata, 'extracted_text': text})
+        try:
+            # fichier local prioritaire
+            if form.cleaned_data.get('pdf_file'):
+                f = form.cleaned_data['pdf_file']
+                rd = RawDocument(owner=request.user)
+                rd.file.save(f.name, f)
+            else:
+                url = form.cleaned_data['pdf_url']
+                resp = requests.get(url, timeout=30)
+                resp.raise_for_status()
+                ts, fn = datetime.now().strftime('%Y%m%d_%H%M%S'), os.path.basename(url)
+                rd = RawDocument(url=url, owner=request.user)
+                rd.file.save(os.path.join(ts, fn), ContentFile(resp.content))
+            
+            rd.save()
+            metadata = extract_metadonnees(rd.file.path, rd.url or "")
+            text = extract_full_text(rd.file.path)
+            context.update({'doc': rd, 'metadata': metadata, 'extracted_text': text})
+            messages.success(request, "Document importé avec succès!")
+            
+        except Exception as e:
+            messages.error(request, f"Erreur lors de l'import: {str(e)}")
+            
     return render(request, 'rawdocs/upload.html', context)
 
 
@@ -175,7 +190,9 @@ def document_metadata(request, doc_id):
 @user_passes_test(is_metadonneur)
 def delete_document(request, doc_id):
     rd = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
-    if request.method == 'POST': rd.delete()
+    if request.method == 'POST': 
+        rd.delete()
+        messages.success(request, "Document supprimé avec succès!")
     return redirect('rawdocs:document_list')
 
 
@@ -184,6 +201,7 @@ def delete_document(request, doc_id):
 def edit_metadata(request, doc_id):
     rd = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
     metadata = extract_metadonnees(rd.file.path, rd.url or "")
+    
     if request.method == 'POST':
         form = MetadataEditForm(request.POST)
         if form.is_valid():
@@ -196,15 +214,15 @@ def edit_metadata(request, doc_id):
                         modified_by=request.user
                     )
                     metadata[f] = v
-            success = True
-        else:
-            success = False
+            messages.success(request, "Métadonnées mises à jour!")
+            return redirect('rawdocs:document_list')
     else:
-        form, success = MetadataEditForm(initial=metadata), False
+        form = MetadataEditForm(initial=metadata)
+        
     logs = MetadataLog.objects.filter(document=rd).order_by('-modified_at')
     return render(request, 'rawdocs/edit_metadata.html', {
         'form': form, 'metadata': metadata,
-        'doc': rd, 'logs': logs, 'success': success
+        'doc': rd, 'logs': logs
     })
 
 
@@ -212,6 +230,7 @@ def edit_metadata(request, doc_id):
 @user_passes_test(is_metadonneur)
 def validate_document(request, doc_id):
     document = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
+    
     if request.method == 'POST':
         if not document.pages_extracted:
             try:
@@ -228,12 +247,17 @@ def validate_document(request, doc_id):
             except Exception as e:
                 messages.error(request, f"Erreur lors de l'extraction des pages: {e}")
                 return redirect('rawdocs:document_list')
+        
         document.is_validated = True
         document.validated_at = datetime.now()
         document.save()
+        
+        # Create standard annotation types
         create_annotation_types()
-        messages.success(request, f"Document validé ({document.total_pages} pages).")
+        
+        messages.success(request, f"Document validé ({document.total_pages} pages). Prêt pour annotation!")
         return redirect('rawdocs:document_list')
+    
     return render(request, 'rawdocs/validate_document.html', {'document': document})
 
 
@@ -257,13 +281,19 @@ def annotate_document(request, doc_id):
     pages = document.pages.all()
     pnum = int(request.GET.get('page', 1))
     page_obj = get_object_or_404(DocumentPage, document=document, page_number=pnum)
+    
+    # Ajoutez ce contexte si vous utilisez l'URL dans le template
+    from django.urls import reverse
+    validate_url = reverse('rawdocs:validate_page_annotations', args=[page_obj.id])
+    
     return render(request, 'rawdocs/annotate_document.html', {
         'document': document,
         'pages': pages,
         'current_page': page_obj,
         'annotation_types': AnnotationType.objects.all(),
         'existing_annotations': page_obj.annotations.all().order_by('start_pos'),
-        'total_pages': document.total_pages
+        'total_pages': document.total_pages,
+        'validate_page_url': validate_url,  # Passez l'URL au template
     })
 
 
@@ -272,10 +302,12 @@ def annotate_document(request, doc_id):
 def save_manual_annotation(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+    
     try:
         data = json.loads(request.body)
         page = get_object_or_404(DocumentPage, id=data['page_id'])
         atype = get_object_or_404(AnnotationType, id=data['type_id'])
+        
         ann = Annotation.objects.create(
             page=page,
             annotation_type=atype,
@@ -285,6 +317,7 @@ def save_manual_annotation(request):
             confidence_score=100.0,
             created_by=request.user
         )
+        
         return JsonResponse({'success': True, 'annotation_id': ann.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -305,7 +338,11 @@ def get_page_annotations(request, page_id):
         'reasoning': a.ai_reasoning,
         'is_validated': a.is_validated,
     } for a in page.annotations.all().order_by('start_pos')]
-    return JsonResponse({'annotations': anns, 'page_text': page.cleaned_text})
+    
+    return JsonResponse({
+        'annotations': anns,
+        'page_text': page.cleaned_text
+    })
 
 
 @login_required(login_url='rawdocs:login')
@@ -313,9 +350,11 @@ def get_page_annotations(request, page_id):
 def delete_annotation(request, annotation_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+    
     ann = get_object_or_404(Annotation, id=annotation_id)
-    if ann.created_by != request.user and not request.user.groups.filter(name="Expert").exists():
+    if ann.created_by != request.user and not is_expert(request.user):
         return JsonResponse({'error': 'Permission denied'}, status=403)
+    
     ann.delete()
     return JsonResponse({'success': True})
 
@@ -323,82 +362,176 @@ def delete_annotation(request, annotation_id):
 @login_required
 @csrf_exempt
 def ai_annotate_page_groq(request, page_id):
-    """Django view for FREE GROQ annotation - Llama 3.3 70B quality"""
-    
+    """Enhanced AI annotation with RLHF learning"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    
+
     try:
         page = get_object_or_404(DocumentPage, id=page_id)
-        
-        # Initialize GROQ annotator
+
+        # Initialize RLHF annotator
         try:
-            annotator = GroqAnnotator()
+            annotator = RLHFGroqAnnotator()
         except ValueError as e:
             return JsonResponse({
                 'error': 'GROQ_API_KEY environment variable not set. Get free key from https://console.groq.com/',
                 'details': str(e)
             }, status=500)
-        
-        print(f"🚀 Processing page {page.page_number} with FREE GROQ...")
-        
-        # Create page data
-        page_data = {
-            'page_num': page.page_number,
-            'text': page.cleaned_text,
-            'char_count': len(page.cleaned_text)
-        }
-        
-        # Process with GROQ
-        annotations = annotator.annotate_page_with_groq(page_data)
-        
-        # Save to database
+
+        print(f"🚀 Processing page {page.page_number} with RLHF-enhanced GROQ...")
+
+        # 1) Créer le prompt adaptatif
+        adaptive_prompt = annotator.create_adaptive_prompt(page.cleaned_text)
+
+        # 2) Appel à l'API GROQ
+        response = annotator.call_groq_api(adaptive_prompt)
+
+        # 3) Parse de la réponse
+        annotations = annotator.parse_groq_response(response, page.page_number) if response else []
+
+        # Store AI annotations in session for later feedback
+        request.session[f'ai_annotations_{page_id}'] = annotations
+
+        # Sauvegarde en base
         saved_count = 0
         for ann_data in annotations:
             try:
-                # Get annotation type
-                ann_type, created = AnnotationType.objects.get_or_create(
+                ann_type, _ = AnnotationType.objects.get_or_create(
                     name=ann_data['type'],
                     defaults={
                         'display_name': ann_data['type'].replace('_', ' ').title(),
-                        'color': '#3b82f6',  # Blue for GROQ
-                        'description': f"GROQ Llama 3.3 70B detected {ann_data['type']}"
+                        'color': '#3b82f6',
+                        'description': f"RLHF GROQ Llama 3.3 70B detected {ann_data['type']}"
                     }
                 )
-                
-                # Create annotation
-                annotation = Annotation.objects.create(
+                Annotation.objects.create(
                     page=page,
                     annotation_type=ann_type,
                     start_pos=ann_data.get('start_pos', 0),
                     end_pos=ann_data.get('end_pos', 0),
                     selected_text=ann_data.get('text', ''),
                     confidence_score=ann_data.get('confidence', 0.8) * 100,
-                    ai_reasoning=ann_data.get('reasoning', 'GROQ Llama 3.3 70B FREE classification'),
+                    ai_reasoning=ann_data.get('reasoning', 'RLHF-enhanced GROQ classification'),
                     created_by=request.user
                 )
                 saved_count += 1
-                
             except Exception as e:
                 print(f"❌ Error saving annotation: {e}")
                 continue
-        
-        # Update page status
-        if saved_count > 0:
+
+        if saved_count:
             page.is_annotated = True
             page.annotated_at = datetime.now()
             page.annotated_by = request.user
             page.save()
-        
+
         return JsonResponse({
             'success': True,
             'annotations_created': saved_count,
-            'message': f'{saved_count} annotations créées avec GROQ FREE!',
-            'cost_estimate': 0.0  # FREE!
+            'message': f'{saved_count} annotations créées avec RLHF GROQ! 🧠',
+            'learning_enhanced': True,
+            'cost_estimate': 0.0
+        })
+
+    except Exception as e:
+        print(f"❌ GROQ annotation error: {e}")
+        return JsonResponse({'error': f'Erreur GROQ: {str(e)}'}, status=500)
+
+
+@login_required
+@csrf_exempt
+def validate_page_annotations(request, page_id):
+    """Validate page annotations and trigger RLHF learning"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        
+        # Get AI annotations that were made before human corrections
+        ai_session_data = request.session.get(f'ai_annotations_{page_id}', [])
+        
+        # Get current annotations (after human corrections)
+        current_annotations = []
+        for annotation in page.annotations.all():
+            current_annotations.append({
+                'text': annotation.selected_text,
+                'type': annotation.annotation_type.name,
+                'start_pos': annotation.start_pos,
+                'end_pos': annotation.end_pos,
+                'confidence': annotation.confidence_score / 100.0
+            })
+        
+        # Initialize RLHF annotator
+        rlhf_annotator = RLHFGroqAnnotator()
+        
+        # Process human feedback
+        feedback_result = rlhf_annotator.process_human_feedback(
+            page_id=page_id,
+            ai_annotations=ai_session_data,
+            human_annotations=current_annotations,
+            annotator_id=request.user.id
+        )
+        
+        # Mark page as validated
+        page.is_validated_by_human = True
+        page.human_validated_at = datetime.now()
+        page.validated_by = request.user
+        page.save()
+        
+        # Clear the session data
+        if f'ai_annotations_{page_id}' in request.session:
+            del request.session[f'ai_annotations_{page_id}']
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Page validée! Score: {feedback_result["feedback_score"]:.0%} - IA améliorée! 🎓',
+            'feedback_score': feedback_result['feedback_score'],
+            'corrections_summary': feedback_result['corrections_summary'],
+            'ai_improved': True
         })
         
     except Exception as e:
-        print(f"❌ GROQ annotation error: {e}")
+        print(f"❌ Validation error: {e}")
         return JsonResponse({
-            'error': f'Erreur GROQ: {str(e)}'
+            'error': f'Erreur lors de la validation: {str(e)}'
         }, status=500)
+
+
+@login_required
+def get_learning_dashboard(request):
+    """Get AI learning progress dashboard"""
+    try:
+        # Get recent metrics
+        recent_metrics = AILearningMetrics.objects.order_by('-created_at')[:10]
+        
+        # Calculate improvement over time
+        improvement_data = []
+        for metric in recent_metrics:
+            improvement_data.append({
+                'date': metric.created_at.strftime('%Y-%m-%d'),
+                'f1_score': metric.f1_score,
+                'precision': metric.precision_score,
+                'recall': metric.recall_score
+            })
+        
+        # Get feedback summary
+        total_feedbacks = AnnotationFeedback.objects.count()
+        avg_feedback_score = AnnotationFeedback.objects.aggregate(
+            avg_score=models.Avg('feedback_score')
+        )['avg_score'] or 0
+        
+        # Get entity performance
+        latest_metric = recent_metrics.first()
+        entity_performance = latest_metric.entity_performance if latest_metric else {}
+        
+        return JsonResponse({
+            'total_feedbacks': total_feedbacks,
+            'average_feedback_score': avg_feedback_score,
+            'improvement_trend': improvement_data,
+            'entity_performance': entity_performance,
+            'learning_active': True
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
