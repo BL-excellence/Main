@@ -1,0 +1,629 @@
+{% extends 'expert/base.html' %}
+
+{% block title %}Révision {{ document.file.name }}{% endblock %}
+{% block page_title %}{{ document.file.name|truncatechars:50 }}{% endblock %}
+{% block page_subtitle %}Révision experte - Page {{ page_obj.number }} sur {{ page_obj.paginator.count }}{% endblock %}
+
+{% block content %}
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+<!-- Navigation -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1">Navigation</h6>
+                    <small class="text-muted">Page {{ page_obj.number }} sur {{ page_obj.paginator.count }}</small>
+                </div>
+                <div class="btn-group">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-outline-primary">
+                            <i class="fas fa-chevron-left"></i> Précédente
+                        </a>
+                    {% endif %}
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}" class="btn btn-outline-primary">
+                            Suivante <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card text-center">
+            <a href="{% url 'expert:document_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour à la liste
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if current_page %}
+<!-- Page Display -->
+<div class="stat-card mb-4">
+    <h6 class="mb-3">Page {{ current_page.page_number }}</h6>
+    <div class="p-3 bg-light rounded" id="page-display" data-page-id="{{ current_page.id }}">
+        {{ current_page.cleaned_text }}
+    </div>
+    
+    <!-- Expert annotation tools -->
+    <div class="mt-3 p-3 bg-primary bg-opacity-10 rounded">
+        <h6 class="text-primary mb-2">🔧 Outils Expert</h6>
+        <div class="document-actions mb-2" style="text-align: left; margin-left: 20px;">
+            <form method="POST" action="{% url 'expert:validate_document' document.id %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success btn-sm" style="font-size: 19px; padding: 8px 16px;">
+                    Validate
+                </button>
+            </form>
+        </div>
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-flex flex-wrap gap-2">
+                    {% for annotation_type in all_annotation_types %}
+                    <button class="btn btn-sm btn-outline-primary" 
+                    onclick="selectEntityType('{{ annotation_type.name }}')"
+                    style="border-color: {{ annotation_type.color }}; color: {{ annotation_type.color }};">
+                    {{ annotation_type.display_name }}
+                </button>
+                {% endfor %}
+                <button class="btn btn-sm btn-outline-success" onclick="showAddAnnotationTypeModal()">
+                    <i class="fas fa-plus"></i> Add Type
+                </button>
+            </div>
+        </div>
+        <div class="col-md-4 text-end">
+            <small class="text-muted">Sélectionnez un type, puis surlignez du texte</small>
+        </div>
+    </div>
+    
+    <div id="expert-mode-info" class="mt-2 text-primary" style="display: none;">
+        <i class="fas fa-magic"></i> <strong>Mode expert activé:</strong> <span id="selected-entity-type"></span>
+        <br><small>Surlignez du texte pour créer une nouvelle annotation</small>
+    </div>
+</div>
+</div>
+
+<!-- Annotations -->
+<div class="stat-card">
+    <h6 class="mb-3">🏷️ Annotations ({{ current_page.annotations.count }})</h6>
+    
+    {% if current_page.annotations.exists %}
+    {% for annotation in current_page.annotations.all %}
+    <div class="border rounded p-3 mb-3">
+        <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <span class="badge bg-info me-2">{{ annotation.annotation_type.display_name }}</span>
+                            <strong>"{{ annotation.selected_text }}"</strong>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            {% if annotation.validation_status == 'validated' or annotation.validation_status == 'expert_created' %}
+                                <span class="badge bg-success">Validée</span>
+                            {% elif annotation.validation_status == 'rejected' %}
+                                <span class="badge bg-danger">Rejetée</span>
+                            {% else %}
+                                <span class="badge bg-warning">En attente</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-3 text-end">
+                            {% if annotation.validation_status == 'pending' %}
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-success" onclick="validateAnnotation({{ annotation.id }}, 'validate')">
+                                        Valider
+                                    </button>
+                                    <button class="btn btn-danger" onclick="validateAnnotation({{ annotation.id }}, 'reject')">
+                                        Rejeter
+                                    </button>
+                                </div>
+                            {% elif annotation.validation_status == 'rejected' %}
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-warning" onclick="showModifyModal({{ annotation.id }}, '{{ annotation.selected_text|escapejs }}', '{{ annotation.annotation_type.name }}')">
+                                        Modifier
+                                    </button>
+                                    <button class="btn btn-danger" onclick="deleteAnnotation({{ annotation.id }})">
+                                        Supprimer
+                                    </button>
+                                </div>
+                            {% elif annotation.validation_status == 'validated' or annotation.validation_status == 'expert_created' %}
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-warning" onclick="undoValidation({{ annotation.id }})">
+                                        Annuler validation
+                                    </button>
+                                </div>
+                            {% else %}
+                                <small class="text-muted">Déjà traitée</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-inbox fa-2x mb-2"></i>
+                <p>Aucune annotation pour cette page</p>
+            </div>
+        {% endif %}
+    </div>
+
+{% else %}
+    <!-- Document completed -->
+    <div class="stat-card text-center py-5">
+        <i class="fas fa-check-circle fa-4x text-success mb-4"></i>
+        <h3>Document révisé !</h3>
+        <p class="text-muted">Vous avez terminé la révision de ce document.</p>
+        <a href="{% url 'expert:document_list' %}" class="btn btn-primary">
+            Retour aux documents
+        </a>
+    </div>
+{% endif %}
+<!-- Modal pour modifier annotation -->
+<div class="modal fade" id="modifyAnnotationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Modifier l'annotation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Texte</label>
+                    <input type="text" class="form-control" id="modify-text" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Type d'entité</label>
+                    <select class="form-select" id="modify-entity-type">
+                        {% for annotation_type in all_annotation_types %}
+                            <option value="{{ annotation_type.name }}">{{ annotation_type.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="confirmModifyAnnotation()">
+                    Sauvegarder
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="addAnnotationTypeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Annotation Type</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Display Name</label>
+                    <input type="text" class="form-control" id="new-annotation-display-name" 
+                           placeholder="e.g., Product, Dosage, Method">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Technical Name (auto-generated)</label>
+                    <input type="text" class="form-control" id="new-annotation-name" readonly>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createAnnotationType()">
+                    Create Type
+                </button>
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+{% endblock %}
+
+
+
+{% block extra_js %}
+<script>
+let selectedEntityType = null;
+let currentSelection = null;
+
+function validateAnnotation(annotationId, action) {
+    const actionText = action === 'validate' ? 'valider' : 'rejeter';
+    if (confirm('Voulez-vous ' + actionText + ' cette annotation ?')) {
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        fetch(`/expert/api/validate/${annotationId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ action: action })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload(); // Reload to see changes
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors de la validation');
+        });
+    }
+}
+function selectEntityType(entityType) {
+    selectedEntityType = entityType;
+    
+    // Update button styles - target all annotation type buttons
+    document.querySelectorAll('.btn-outline-primary, .btn-outline-success, .btn-outline-warning, .btn-outline-danger, .btn-outline-info, .btn-outline-secondary').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Mark selected button as active
+    event.target.classList.add('active');
+    
+    // Show expert mode info with DISPLAY NAME instead of technical name
+    document.getElementById('expert-mode-info').style.display = 'block';
+    document.getElementById('selected-entity-type').textContent = getEntityDisplayName(entityType); // CHANGED THIS LINE
+    
+    console.log('Selected entity type:', entityType); // For debugging
+}
+
+// Handle text selection for creating annotations
+document.addEventListener('mouseup', function(event) {
+    // Only proceed if an entity type is selected
+    if (!selectedEntityType) return;
+    
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+    
+    // Must have selected text
+    if (selectedText.length === 0) return;
+    
+    // Must be selecting within the page display area
+    const pageElement = document.getElementById('page-display');
+    if (!pageElement || !pageElement.contains(selection.anchorNode)) {
+        console.log('Selection not within page display area');
+        return;
+    }
+    
+    // Minimum text length check
+    if (selectedText.length < 2) {
+        alert('Veuillez sélectionner au moins 2 caractères de texte');
+        window.getSelection().removeAllRanges();
+        return;
+    }
+    
+    // Maximum text length check
+    if (selectedText.length > 500) {
+        alert('Le texte sélectionné est trop long (max 500 caractères)');
+        window.getSelection().removeAllRanges();
+        return;
+    }
+    
+    currentSelection = {
+        text: selectedText,
+        range: selection.getRangeAt(0)
+    };
+    
+    // Show confirmation with better formatting
+    const entityDisplayName = getEntityDisplayName(selectedEntityType);
+    const truncatedText = selectedText.length > 50 ? selectedText.substring(0, 50) + '...' : selectedText;
+    
+    if (confirm(`Créer une annotation "${truncatedText}" de type "${entityDisplayName}" ?`)) {
+        createNewAnnotation();
+    }
+    
+    // Always clear selection after handling
+    window.getSelection().removeAllRanges();
+});
+function getEntityDisplayName(entityType) {
+    const displayNames = {
+        'variation_code': 'Code de Variation',
+        'authority': 'Autorité',
+        'delay': 'Délai',
+        'legal_reference': 'Référence Légale',
+        'country': 'Pays',
+        'required_document': 'Document Requis',
+        'required_condition': 'Condition Requise',
+        'procedure_type': 'Type de Procédure'
+    };
+    return displayNames[entityType] || entityType;
+}
+
+function createAnnotationType() {
+    const displayName = document.getElementById('new-annotation-display-name').value.trim();
+    const name = document.getElementById('new-annotation-name').value.trim();
+    
+    if (!displayName) {
+        alert('Please enter a display name');
+        return;
+    }
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    // FIXED: Use the correct URL pattern
+    fetch('/expert/api/create-annotation-type/', {  // <- CHANGED THIS LINE
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            display_name: displayName,
+            name: name
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            
+            // Add new button to the interface immediately
+            addNewAnnotationButtonToExpert(data.annotation_type);
+            
+            // Close modal and reset form
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addAnnotationTypeModal'));
+            modal.hide();
+            document.getElementById('new-annotation-display-name').value = '';
+            document.getElementById('new-annotation-name').value = '';
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating annotation type');
+    });
+}
+
+
+function addNewAnnotationButtonToExpert(annotationType) {
+    // Vérifiez si le bouton existe déjà (éviter les doublons)
+    const existingButton = document.querySelector(`button[onclick="selectEntityType('${annotationType.name}')"]`);
+    if (existingButton) {
+        console.log('Button already exists for type:', annotationType.name);
+        return;
+    }
+    
+    // Create new button element
+    const newButton = document.createElement('button');
+    newButton.className = 'btn btn-sm btn-outline-primary';
+    newButton.textContent = annotationType.display_name;
+    newButton.style.borderColor = annotationType.color;
+    newButton.style.color = annotationType.color;
+    newButton.onclick = function() { selectEntityType(annotationType.name); };
+    
+    // Add to expert tools container (before the "Add Type" button)
+    const container = document.querySelector('.d-flex.flex-wrap.gap-2');
+    const addButton = container.querySelector('button[onclick="showAddAnnotationTypeModal()"]');
+    container.insertBefore(newButton, addButton);
+    
+    // AUSSI ajouter au select de modification
+    const modifySelect = document.getElementById('modify-entity-type');
+    if (modifySelect) {
+        const newOption = document.createElement('option');
+        newOption.value = annotationType.name;
+        newOption.textContent = annotationType.display_name;
+        modifySelect.appendChild(newOption);
+    }
+}
+
+let currentModifyingAnnotationId = null;
+
+function showModifyModal(annotationId, currentText, currentEntityType) {
+    currentModifyingAnnotationId = annotationId;
+    
+    document.getElementById('modify-text').value = currentText;
+    document.getElementById('modify-entity-type').value = currentEntityType;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modifyAnnotationModal'));
+    modal.show();
+}
+
+function confirmModifyAnnotation() {
+    const newText = document.getElementById('modify-text').value;
+    const newEntityType = document.getElementById('modify-entity-type').value;
+    
+    if (!newText.trim()) {
+        alert('Le texte ne peut pas être vide');
+        return;
+    }
+    
+    modifyAnnotation(currentModifyingAnnotationId, newText, newEntityType);
+}
+
+function modifyAnnotation(annotationId, newText, newEntityType) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`/expert/api/modify/${annotationId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            text: newText,
+            entity_type: newEntityType
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Annotation modifiée avec succès');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modifyAnnotationModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        alert('Erreur lors de la modification');
+    });
+}
+
+function deleteAnnotation(annotationId) {
+    if (confirm('Voulez-vous vraiment supprimer cette annotation ? Cette action est irréversible.')) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        fetch(`/expert/api/delete/${annotationId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Annotation supprimée');
+                location.reload();
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors de la suppression');
+        });
+    }
+}
+
+function undoValidation(annotationId) {
+    if (confirm('Voulez-vous annuler la validation de cette annotation ?')) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        fetch(`/expert/api/undo/${annotationId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Validation annulée');
+                location.reload();
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors de l\'annulation');
+        });
+    }
+}
+
+
+
+function showAddAnnotationTypeModal() {
+    const modal = new bootstrap.Modal(document.getElementById('addAnnotationTypeModal'));
+    modal.show();
+}
+
+// Auto-generate technical name from display name
+document.getElementById('new-annotation-display-name').addEventListener('input', function() {
+    const displayName = this.value;
+    const technicalName = displayName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    document.getElementById('new-annotation-name').value = technicalName;
+});
+
+function createNewAnnotation() {
+    if (!currentSelection || !selectedEntityType) {
+        alert('No text selected or entity type chosen');
+        return;
+    }
+    
+    const pageId = document.getElementById('page-display').dataset.pageId;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    // Calculate text positions (simplified for now)
+    const startOffset = 0; // You might want to improve this later
+    const endOffset = currentSelection.text.length;
+    
+    fetch('/expert/api/create-annotation/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            page_id: pageId,
+            text: currentSelection.text,
+            entity_type: selectedEntityType,
+            start_offset: startOffset,
+            end_offset: endOffset
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Annotation créée avec succès!');
+            location.reload(); // Reload to show new annotation
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Erreur lors de la création de l\'annotation');
+    });
+    
+    // Reset selection
+    currentSelection = null;
+}
+
+
+
+</script>
+
+<style>
+/* Active state for annotation type buttons */
+.btn.active {
+    background-color: var(--bs-primary) !important;
+    color: white !important;
+    border-color: var(--bs-primary) !important;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Improve selection highlighting */
+#page-display {
+    user-select: text;
+    cursor: text;
+    line-height: 1.6;
+}
+
+#page-display::selection {
+    background-color: rgba(13, 110, 253, 0.3);
+}
+
+/* Expert mode info styling */
+#expert-mode-info {
+    border-left: 4px solid var(--bs-primary);
+    background-color: rgba(13, 110, 253, 0.05);
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Better button spacing */
+.d-flex.flex-wrap.gap-2 .btn {
+    margin-bottom: 0.25rem;
+}
+
+/* Status badges styling */
+.badge.bg-success { background-color: #198754 !important; }
+.badge.bg-danger { background-color: #dc3545 !important; }
+.badge.bg-warning { background-color: #ffc107 !important; color: #000 !important; }
+</style>
+{% endblock %}

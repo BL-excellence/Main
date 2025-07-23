@@ -1,0 +1,563 @@
+{% extends 'client/base.html' %}
+{% load static %}
+
+{% block title %}Documents - Library - RegX Platform{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/library.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="library-dashboard">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-info">
+                <h1>Documents Réglementaires</h1>
+                <p>Parcourir et rechercher dans la bibliothèque documentaire</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-outline" onclick="location.href='{% url 'client:library:upload_document' %}'">
+                    <i class="material-icons">cloud_upload</i>
+                    Upload Document
+                </button>
+                <button class="btn btn-primary" onclick="location.href='{% url 'client:library:dashboard' %}'">
+                    <i class="material-icons">dashboard</i>
+                    Dashboard
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-section">
+        <form method="get" class="filters-form">
+            <div class="filters-row">
+                <div class="filter-group">
+                    <label>Recherche</label>
+                    <input type="text" name="search" value="{{ filters.search }}" placeholder="Rechercher par titre, description, tags...">
+                </div>
+                
+                <div class="filter-group">
+                    <label>Type</label>
+                    <select name="type">
+                        <option value="">Tous les types</option>
+                        {% for type_code, type_name in document_types %}
+                        <option value="{{ type_code }}" {% if filters.type == type_code %}selected{% endif %}>
+                            {{ type_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Autorité</label>
+                    <select name="authority">
+                        <option value="">Toutes les autorités</option>
+                        {% for authority in authorities %}
+                        <option value="{{ authority.id }}" {% if filters.authority == authority.id|stringformat:"s" %}selected{% endif %}>
+                            {{ authority.code }} - {{ authority.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Langue</label>
+                    <select name="language">
+                        <option value="">Toutes les langues</option>
+                        {% for lang_code, lang_name in languages %}
+                        <option value="{{ lang_code }}" {% if filters.language == lang_code %}selected{% endif %}>
+                            {{ lang_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filters-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="material-icons">search</i>
+                    Rechercher
+                </button>
+                <a href="{% url 'client:library:document_list' %}" class="btn btn-outline">
+                    <i class="material-icons">clear</i>
+                    Réinitialiser
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section">
+        <div class="results-header">
+            <div class="results-info">
+                <h2>{{ documents.paginator.count }} document{{ documents.paginator.count|pluralize }} trouvé{{ documents.paginator.count|pluralize }}</h2>
+                {% if documents.has_other_pages %}
+                <span class="pagination-info">
+                    Page {{ documents.number }} sur {{ documents.paginator.num_pages }}
+                </span>
+                {% endif %}
+            </div>
+            
+            <div class="view-options">
+                <!-- Could add list/grid view toggle here -->
+            </div>
+        </div>
+        
+        <div class="documents-grid">
+            {% for document in documents %}
+            <div class="document-card-large" onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
+                <div class="card-header">
+                    <div class="document-type-badge type-{{ document.document_type }}">
+                        {{ document.get_document_type_display }}
+                    </div>
+                    <div class="document-status status-{{ document.validation_status }}">
+                        {% if document.validation_status == 'validated' %}
+                        <i class="material-icons">verified</i>
+                        {% else %}
+                        <i class="material-icons">schedule</i>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="card-content">
+                    <h3 class="document-title">{{ document.title }}</h3>
+                    
+                    <p class="document-description">
+                        {{ document.description|truncatechars:150 }}
+                    </p>
+                    
+                    <div class="document-metadata">
+                        <div class="metadata-row">
+                            <span class="metadata-item">
+                                <i class="material-icons">account_balance</i>
+                                {{ document.authority.code }}
+                            </span>
+                            <span class="metadata-item">
+                                <i class="material-icons">calendar_today</i>
+                                {{ document.publication_date|date:"d/m/Y" }}
+                            </span>
+                            <span class="metadata-item">
+                                <i class="material-icons">language</i>
+                                {{ document.get_language_display }}
+                            </span>
+                        </div>
+                        
+                        {% if document.tags_list %}
+                        <div class="document-tags">
+                            {% for tag in document.tags_list|slice:":3" %}
+                            <span class="tag">{{ tag }}</span>
+                            {% endfor %}
+                            {% if document.tags_list|length > 3 %}
+                            <span class="tag-more">+{{ document.tags_list|length|add:"-3" }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="card-footer">
+                    <div class="document-stats">
+                        <span class="stat">
+                            <i class="material-icons">visibility</i>
+                            {{ document.view_count }}
+                        </span>
+                        <span class="stat">
+                            <i class="material-icons">download</i>
+                            {{ document.download_count }}
+                        </span>
+                    </div>
+                    
+                    {% if document.file_size %}
+                    <div class="file-info">
+                        <span class="file-size">{{ document.formatted_file_size }}</span>
+                        <span class="file-ext">{{ document.file_extension|upper }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state">
+                <i class="material-icons">search_off</i>
+                <h3>Aucun document trouvé</h3>
+                <p>Essayez de modifier vos critères de recherche ou d'ajouter de nouveaux documents.</p>
+                <button class="btn btn-primary" onclick="location.href='{% url 'client:library:upload_document' %}'">
+                    <i class="material-icons">cloud_upload</i>
+                    Upload Document
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Pagination -->
+        {% if documents.has_other_pages %}
+        <div class="pagination-section">
+            <div class="pagination">
+                {% if documents.has_previous %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.previous_page_number }}" class="page-link">
+                    <i class="material-icons">chevron_left</i>
+                </a>
+                {% endif %}
+                
+                {% for num in documents.paginator.page_range %}
+                {% if num == documents.number %}
+                <span class="page-link active">{{ num }}</span>
+                {% else %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}" class="page-link">{{ num }}</a>
+                {% endif %}
+                {% endfor %}
+                
+                {% if documents.has_next %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.next_page_number }}" class="page-link">
+                    <i class="material-icons">chevron_right</i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+/* Filters Section */
+.filters-section {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f1f5f9;
+}
+
+.filters-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.filter-group input,
+.filter-group select {
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.filter-group input:focus,
+.filter-group select:focus {
+    border-color: #4f46e5;
+}
+
+.filters-actions {
+    display: flex;
+    gap: 12px;
+}
+
+/* Results Section */
+.results-section {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f1f5f9;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.results-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+}
+
+.pagination-info {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+/* Document Cards Grid */
+.documents-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+}
+
+.document-card-large {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.document-card-large:hover {
+    border-color: #4f46e5;
+    box-shadow: 0 8px 25px rgba(79, 70, 229, 0.15);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.document-type-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.type-guideline {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.type-regulation {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.type-gmp {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.type-ich {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.type-qa {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.type-template {
+    background: #f3e8ff;
+    color: #7c3aed;
+}
+
+.type-other {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.document-status {
+    font-size: 16px;
+}
+
+.status-validated {
+    color: #16a34a;
+}
+
+.status-pending {
+    color: #eab308;
+}
+
+.card-content {
+    padding: 20px;
+}
+
+.document-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 12px 0;
+    line-height: 1.4;
+}
+
+.document-description {
+    font-size: 0.9rem;
+    color: #6b7280;
+    line-height: 1.5;
+    margin: 0 0 16px 0;
+}
+
+.document-metadata {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.metadata-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.metadata-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.metadata-item .material-icons {
+    font-size: 14px;
+}
+
+.document-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.tag-more {
+    background: #e5e7eb;
+    color: #6b7280;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+}
+
+.document-stats {
+    display: flex;
+    gap: 16px;
+}
+
+.stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.stat .material-icons {
+    font-size: 14px;
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+}
+
+.file-size {
+    color: #6b7280;
+}
+
+.file-ext {
+    background: #374151;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+/* Pagination */
+.pagination-section {
+    margin-top: 32px;
+    display: flex;
+    justify-content: center;
+}
+
+.pagination {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.page-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    color: #374151;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.page-link:hover {
+    border-color: #4f46e5;
+    color: #4f46e5;
+}
+
+.page-link.active {
+    background: #4f46e5;
+    border-color: #4f46e5;
+    color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .filters-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .documents-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .results-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .metadata-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .filters-actions {
+        flex-direction: column;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/library.js' %}"></script>
+{% endblock %}

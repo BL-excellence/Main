@@ -1,0 +1,477 @@
+{% extends 'client/base.html' %}
+{% load static %}
+
+{% block title %}Reports - RegX Platform{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/reports.css' %}">
+<style>
+    /* Keep sidebar but make reports full width */
+    .app-container {
+        display: flex !important;
+    }
+    
+    .main-content {
+        margin-left: 250px !important;
+        width: calc(100% - 250px) !important;
+        min-height: 100vh;
+        background-color: #f8f9fa;
+    }
+    
+    /* Ensure sidebar stays visible */
+    .sidebar {
+        display: flex !important;
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 250px !important;
+        height: 100vh !important;
+        z-index: 1000 !important;
+    }
+    
+    /* Full width container within the main content area */
+    .reports-container {
+        width: 100%;
+        min-height: 100vh;
+        margin: 0;
+        padding: 0;
+        background-color: #f8f9fa;
+    }
+    
+    /* Responsive sidebar */
+    @media (max-width: 768px) {
+        .sidebar {
+            width: 70px !important;
+        }
+        
+        .main-content {
+            margin-left: 70px !important;
+            width: calc(100% - 70px) !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reports-container">
+    <!-- Custom Reports Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="header-title">
+                    <h1>RegX Reports</h1>
+                    <p>Suivi & Visualisation Réglementaire</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn" onclick="refreshData()">
+                        <i class="material-icons">refresh</i>
+                        Actualiser
+                    </button>
+                    <button class="btn" onclick="window.location.href='{% url "client:reports:settings" %}'">
+                        <i class="material-icons">settings</i>
+                        Paramètres
+                    </button>
+                    <button class="btn btn-primary" onclick="window.location.href='{% url "client:reports:create" %}'">
+                        <i class="material-icons">bar_chart</i>
+                        Nouveau Rapport
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Filter Panel -->
+        <div class="filter-panel fade-in">
+            <div class="filter-header">
+                <div class="filter-title">
+                    <i class="material-icons">filter_list</i>
+                    Filtres
+                    <span class="filter-badge">{{ active_filters_count|default:1 }}</span>
+                </div>
+                <button class="btn" onclick="toggleFilters()">
+                    <span id="filter-toggle-text">Réduire</span>
+                </button>
+            </div>
+            <div class="filter-content" id="filter-content">
+                <form method="GET" action="{% url 'client:reports:dashboard' %}" id="filter-form">
+                    <div class="filter-grid">
+                        <div class="filter-group">
+                            <label for="period-filter">Période</label>
+                            <select id="period-filter" name="period" class="filter-select" onchange="submitFilters()">
+                                <option value="30d" {% if filters.period == '30d' %}selected{% endif %}>30 derniers jours</option>
+                                <option value="90d" {% if filters.period == '90d' %}selected{% endif %}>3 derniers mois</option>
+                                <option value="6m" {% if filters.period == '6m' %}selected{% endif %}>6 derniers mois</option>
+                                <option value="1y" {% if filters.period == '1y' %}selected{% endif %}>Année en cours</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="product-filter">Produit</label>
+                            <select id="product-filter" name="product" class="filter-select" onchange="submitFilters()">
+                                <option value="">Tous les produits</option>
+                                {% for product in products %}
+                                <option value="{{ product.id }}" {% if filters.product == product.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ product.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="status-filter">Statut</label>
+                            <select id="status-filter" name="status" class="filter-select" onchange="submitFilters()">
+                                <option value="">Tous les statuts</option>
+                                <option value="en-cours" {% if filters.status == 'en-cours' %}selected{% endif %}>En cours</option>
+                                <option value="approuve" {% if filters.status == 'approuve' %}selected{% endif %}>Approuvé</option>
+                                <option value="rejete" {% if filters.status == 'rejete' %}selected{% endif %}>Rejeté</option>
+                                <option value="en-attente" {% if filters.status == 'en-attente' %}selected{% endif %}>En attente</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="team-filter">Équipe</label>
+                            <select id="team-filter" name="team" class="filter-select" onchange="submitFilters()">
+                                <option value="">Toutes les équipes</option>
+                                <option value="ra-europe" {% if filters.team == 'ra-europe' %}selected{% endif %}>RA Europe</option>
+                                <option value="ra-amerique" {% if filters.team == 'ra-amerique' %}selected{% endif %}>RA Amérique</option>
+                                <option value="qa-centrale" {% if filters.team == 'qa-centrale' %}selected{% endif %}>QA Centrale</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-actions">
+                        <button type="button" class="btn" onclick="clearFilters()">
+                            <i class="material-icons">clear</i>
+                            Effacer les filtres
+                        </button>
+                        <div class="export-buttons">
+                            <button type="button" class="btn" onclick="exportData('csv')">
+                                <i class="material-icons">download</i>
+                                CSV
+                            </button>
+                            <button type="button" class="btn" onclick="exportData('excel')">
+                                <i class="material-icons">download</i>
+                                Excel
+                            </button>
+                            <button type="button" class="btn" onclick="exportData('pdf')">
+                                <i class="material-icons">download</i>
+                                PDF
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid fade-in">
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <span class="kpi-title">Total Soumissions</span>
+                    <i class="material-icons kpi-icon">description</i>
+                </div>
+                <div class="kpi-value">{{ kpis.total_submissions|default:247 }}</div>
+                <div class="kpi-trend positive">
+                    <i class="material-icons">trending_up</i>
+                    <span>{{ kpis.submissions_trend|floatformat:0|default:12 }}% vs mois dernier</span>
+                </div>
+            </div>
+
+            <div class="kpi-card success">
+                <div class="kpi-header">
+                    <span class="kpi-title">Délai Moyen</span>
+                    <i class="material-icons kpi-icon">schedule</i>
+                </div>
+                <div class="kpi-value">{{ kpis.average_delay|default:28 }}j</div>
+                <div class="kpi-trend negative">
+                    <i class="material-icons">trending_down</i>
+                    <span>{{ kpis.delay_trend|floatformat:0|default:5 }}% vs mois dernier</span>
+                </div>
+            </div>
+
+            <div class="kpi-card success">
+                <div class="kpi-header">
+                    <span class="kpi-title">Taux de Succès</span>
+                    <i class="material-icons kpi-icon">check_circle</i>
+                </div>
+                <div class="kpi-value">{{ kpis.success_rate|default:87 }}%</div>
+                <div class="kpi-trend positive">
+                    <i class="material-icons">trending_up</i>
+                    <span>{{ kpis.success_trend|floatformat:0|default:3 }}% vs mois dernier</span>
+                </div>
+            </div>
+
+            <div class="kpi-card warning">
+                <div class="kpi-header">
+                    <span class="kpi-title">En Retard</span>
+                    <i class="material-icons kpi-icon">warning</i>
+                </div>
+                <div class="kpi-value">{{ kpis.delayed_count|default:15 }}</div>
+                <div class="kpi-trend positive">
+                    <i class="material-icons">trending_up</i>
+                    <span>{{ kpis.delayed_trend|floatformat:0|default:8 }}% vs mois dernier</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="chart-grid fade-in">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">Évolution des soumissions</h3>
+                </div>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">Répartition par statut</h3>
+                </div>
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Grid -->
+        <div class="bottom-grid fade-in">
+            <!-- Heatmap -->
+            <div class="heatmap-container">
+                <h3 class="heatmap-title">Heatmap des délais par produit</h3>
+                <div class="heatmap-grid">
+                    <div class="heatmap-row">
+                        <div class="heatmap-header">Produit / Type</div>
+                        <div class="heatmap-header">Autorisation</div>
+                        <div class="heatmap-header">Variation</div>
+                        <div class="heatmap-header">Renouvellement</div>
+                    </div>
+                    {% for row in heatmap_data %}
+                    <div class="heatmap-row">
+                        <div class="heatmap-product">{{ row.product }}</div>
+                        <div class="heatmap-cell {{ row.authorization_status }}">
+                            {% if row.authorization_delay %}{{ row.authorization_delay }}j{% else %}-{% endif %}
+                        </div>
+                        <div class="heatmap-cell {{ row.variation_status }}">
+                            {% if row.variation_delay %}{{ row.variation_delay }}j{% else %}-{% endif %}
+                        </div>
+                        <div class="heatmap-cell {{ row.renewal_status }}">
+                            {% if row.renewal_delay %}{{ row.renewal_delay }}j{% else %}-{% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="heatmap-row">
+                        <div class="heatmap-product">Médicament A</div>
+                        <div class="heatmap-cell good">25j</div>
+                        <div class="heatmap-cell warning">45j</div>
+                        <div class="heatmap-cell critical">70j</div>
+                    </div>
+                    <div class="heatmap-row">
+                        <div class="heatmap-product">Médicament B</div>
+                        <div class="heatmap-cell good">30j</div>
+                        <div class="heatmap-cell warning">35j</div>
+                        <div class="heatmap-cell good">-</div>
+                    </div>
+                    <div class="heatmap-row">
+                        <div class="heatmap-product">Dispositif X</div>
+                        <div class="heatmap-cell good">20j</div>
+                        <div class="heatmap-cell good">28j</div>
+                        <div class="heatmap-cell good">-</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Recent Submissions -->
+            <div class="submissions-container">
+                <h3 class="submissions-title">Soumissions récentes</h3>
+                <div class="submissions-list">
+                    {% for submission in recent_submissions %}
+                    <div class="submission-item">
+                        <div class="submission-header">
+                            <div class="submission-info">
+                                <h4>{{ submission.product.name }} - {{ submission.get_type_display }}</h4>
+                                <div class="submission-meta">
+                                    <div class="submission-meta-item">
+                                        <i class="material-icons">calendar_today</i>
+                                        <span>{{ submission.submission_date|date:"d/m/Y" }}</span>
+                                    </div>
+                                    <div class="submission-meta-item">
+                                        <i class="material-icons">person</i>
+                                        <span>{{ submission.responsible }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="submission-actions">
+                                <span class="status-badge {{ submission.status }}">{{ submission.get_status_display }}</span>
+                                <button class="btn" style="padding: 0.25rem;" onclick="window.location.href='{% url "client:reports:submission_detail" submission.id %}'">
+                                    <i class="material-icons">visibility</i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-header">
+                                <span>Progression</span>
+                                <span>{{ submission.progress }}%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ submission.progress }}%"></div>
+                            </div>
+                            <div class="progress-footer">
+                                <div class="left">
+                                    <i class="material-icons">schedule</i>
+                                    <span>Fin estimée: {{ submission.estimated_completion|date:"d/m/Y" }}</span>
+                                </div>
+                                <div class="right {% if submission.days_delay > 0 %}delay{% elif submission.days_delay < -7 %}warning{% else %}success{% endif %}">
+                                    {% if submission.days_delay > 0 %}
+                                        {{ submission.days_delay }}j de retard
+                                    {% elif submission.days_delay < 0 %}
+                                        {{ submission.days_delay|add:"-1" }}j d'avance
+                                    {% else %}
+                                        À temps
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="submission-item">
+                        <div class="submission-header">
+                            <div class="submission-info">
+                                <h4>Médicament A - Variation Type II</h4>
+                                <div class="submission-meta">
+                                    <div class="submission-meta-item">
+                                        <i class="material-icons">calendar_today</i>
+                                        <span>15/01/2024</span>
+                                    </div>
+                                    <div class="submission-meta-item">
+                                        <i class="material-icons">person</i>
+                                        <span>Dr. Martin</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="submission-actions">
+                                <span class="status-badge en-cours">En cours</span>
+                                <button class="btn" style="padding: 0.25rem;">
+                                    <i class="material-icons">visibility</i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-header">
+                                <span>Progression</span>
+                                <span>65%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 65%"></div>
+                            </div>
+                            <div class="progress-footer">
+                                <div class="left">
+                                    <i class="material-icons">schedule</i>
+                                    <span>Fin estimée: 28/02/2024</span>
+                                </div>
+                                <div class="right delay">50j de retard</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="submission-item">
+                        <div class="submission-header">
+                            <div class="submission-info">
+                                <h4>Dispositif X - Autorisation initiale</h4>
+                                <div class="submission-meta">
+                                    <div class="submission-meta-item">
+                                        <i class="material-icons">calendar_today</i>
+                                        <span>10/01/2024</span>
+                                    </div>
+                                    <div class="submission-meta-item">
+                                        <i class="material-icons">person</i>
+                                        <span>Dr. Dubois</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="submission-actions">
+                                <span class="status-badge en-attente">En attente</span>
+                                <button class="btn" style="padding: 0.25rem;">
+                                    <i class="material-icons">visibility</i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-header">
+                                <span>Progression</span>
+                                <span>30%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 30%"></div>
+                            </div>
+                            <div class="progress-footer">
+                                <div class="left">
+                                    <i class="material-icons">schedule</i>
+                                    <span>Fin estimée: 15/03/2024</span>
+                                </div>
+                                <div class="right delay">48j de retard</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="submission-item">
+                        <div class="submission-header">
+                            <div class="submission-info">
+                                <h4>Médicament B - Renouvellement</h4>
+                                <div class="submission-meta">
+                                    <div class="submission-meta-item">
+                                        <i class="material-icons">calendar_today</i>
+                                        <span>01/12/2023</span>
+                                    </div>
+                                    <div class="submission-meta-item">
+                                        <i class="material-icons">person</i>
+                                        <span>Dr. Leroy</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="submission-actions">
+                                <span class="status-badge approuve">Approuvé</span>
+                                <button class="btn" style="padding: 0.25rem;">
+                                    <i class="material-icons">visibility</i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-header">
+                                <span>Progression</span>
+                                <span>100%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 100%"></div>
+                            </div>
+                            <div class="progress-footer">
+                                <div class="left">
+                                    <i class="material-icons">schedule</i>
+                                    <span>Fin estimée: 20/01/2024</span>
+                                </div>
+                                <div class="right delay">54j de retard</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script src="{% static 'js/reports.js' %}"></script>
+<script>
+    // Pass data to JavaScript
+    const chartData = {
+        trend: {{ trend_data|safe|default:'{"labels": ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun"], "datasets": [{"label": "Total soumissions", "data": [65, 78, 82, 91, 95, 88], "borderColor": "#3498db", "backgroundColor": "rgba(52, 152, 219, 0.1)", "tension": 0.4, "fill": false}, {"label": "Approuvées", "data": [52, 68, 71, 79, 83, 76], "borderColor": "#27ae60", "backgroundColor": "rgba(39, 174, 96, 0.1)", "tension": 0.4, "fill": false}, {"label": "Rejetées", "data": [8, 6, 7, 9, 8, 7], "borderColor": "#e74c3c", "backgroundColor": "rgba(231, 76, 60, 0.1)", "tension": 0.4, "fill": false}]}' }},
+        status: {{ status_data|safe|default:'{"labels": ["Approuvé", "En cours", "En attente", "Rejeté"], "datasets": [{"data": [156, 67, 18, 6], "backgroundColor": ["#27ae60", "#3498db", "#f39c12", "#e74c3c"], "borderWidth": 0, "cutout": "60%"}]}' }}
+    };
+    
+    // Filter data
+    const currentFilters = {{ filters|safe|default:'{}' }};
+</script>
+{% endblock %}

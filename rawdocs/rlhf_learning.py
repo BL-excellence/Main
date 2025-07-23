@@ -476,10 +476,3 @@ Focus on precision for {entity_type}."""
             
         except Exception as e:
             print(f"❌ Error optimizing prompts: {e}")
-            
-            
-    def annotate_page_with_groq(self, page_data, prompt=None):
-        # page_data['text'] doit être utilisé si besoin, mais on se base ici sur prompt
-        p = prompt if prompt else self.create_adaptive_prompt(page_data['text'])
-        resp = self.call_groq_api(p)
-        return self.parse_groq_response(resp, page_data['page_num']) if resp else []

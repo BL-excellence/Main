@@ -1,0 +1,196 @@
+{% extends 'client/base.html' %}
+{% load static %}
+
+{% block title %}Library - RegX Platform{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/library.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="library-dashboard">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-info">
+                <h1>RegX Library</h1>
+                <p>Hub documentaire réglementaire intelligent</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-outline" onclick="location.href='{% url 'client:library:upload_document' %}'">
+                    <i class="material-icons">cloud_upload</i>
+                    Upload Document
+                </button>
+                <button class="btn btn-primary" onclick="location.href='{% url 'client:library:document_list' %}'">
+                    <i class="material-icons">library_books</i>
+                    Parcourir Documents
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon blue">
+                <i class="material-icons">library_books</i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ total_documents }}</h3>
+                <p>Documents validés</p>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon orange">
+                <i class="material-icons">schedule</i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ pending_validation }}</h3>
+                <p>En attente de validation</p>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon green">
+                <i class="material-icons">account_balance</i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ authorities_count }}</h3>
+                <p>Autorités réglementaires</p>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon purple">
+                <i class="material-icons">category</i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ categories_count }}</h3>
+                <p>Catégories</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenu principal -->
+    <div class="dashboard-content">
+        <!-- Documents récents -->
+        <div class="dashboard-section">
+            <div class="section-header">
+                <h2>Documents récents</h2>
+                <a href="{% url 'client:library:document_list' %}" class="view-all">Voir tout</a>
+            </div>
+            
+            <div class="documents-list">
+                {% for document in recent_documents %}
+                <div class="document-card" onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
+                    <div class="document-icon">
+                        {% if document.file_extension == '.pdf' %}
+                        <i class="material-icons red">picture_as_pdf</i>
+                        {% elif document.file_extension == '.doc' or document.file_extension == '.docx' %}
+                        <i class="material-icons blue">description</i>
+                        {% elif document.file_extension == '.xls' or document.file_extension == '.xlsx' %}
+                        <i class="material-icons green">table_chart</i>
+                        {% else %}
+                        <i class="material-icons grey">insert_drive_file</i>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="document-content">
+                        <h4>{{ document.title|truncatechars:80 }}</h4>
+                        <div class="document-meta">
+                            <span class="meta-item">
+                                <i class="material-icons">account_balance</i>
+                                {{ document.authority.code }}
+                            </span>
+                            <span class="meta-item">
+                                <i class="material-icons">calendar_today</i>
+                                {{ document.publication_date|date:"d/m/Y" }}
+                            </span>
+                            <span class="meta-item">
+                                <i class="material-icons">language</i>
+                                {{ document.get_language_display }}
+                            </span>
+                        </div>
+                        
+                        {% if document.tags_list %}
+                        <div class="document-tags">
+                            {% for tag in document.tags_list|slice:":3" %}
+                            <span class="tag">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="document-actions">
+                        <span class="views">{{ document.view_count }} vues</span>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="empty-state">
+                    <i class="material-icons">library_books</i>
+                    <h3>Aucun document disponible</h3>
+                    <p>Commencez par uploader votre premier document réglementaire.</p>
+                    <button class="btn btn-primary" onclick="location.href='{% url 'client:library:upload_document' %}'">
+                        <i class="material-icons">cloud_upload</i>
+                        Upload Document
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Statistiques par catégorie et autorité -->
+        <div class="dashboard-grid">
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2>Par catégorie</h2>
+                </div>
+                
+                <div class="category-stats">
+                    {% for category in category_stats %}
+                    <div class="category-item">
+                        <div class="category-color" style="background-color: {{ category.color }};"></div>
+                        <span class="category-name">{{ category.name }}</span>
+                        <span class="category-count">{{ category.doc_count }}</span>
+                    </div>
+                    {% empty %}
+                    <p class="no-data">Aucune catégorie configurée</p>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2>Par autorité</h2>
+                </div>
+                
+                <div class="authority-stats">
+                    {% for authority in authority_stats %}
+                    <div class="authority-item">
+                        <span class="authority-code">{{ authority.code }}</span>
+                        <span class="authority-name">{{ authority.name }}</span>
+                        <span class="authority-count">{{ authority.doc_count }}</span>
+                    </div>
+                    {% empty %}
+                    <p class="no-data">Aucune autorité configurée</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Bar flottante -->
+    <div class="floating-search">
+        <div class="search-container">
+            <input type="text" id="global-search" placeholder="Rechercher un document..." />
+            <i class="material-icons">search</i>
+        </div>
+        <div id="search-results" class="search-results"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/library.js' %}"></script>
+{% endblock %}

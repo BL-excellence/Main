@@ -27,13 +27,14 @@ STOPWORDS = {
 }
 
 
-def call_mistral_with_confidence(text_chunk, document_url=""):
+def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
     """
     Get extraction + confidence scores from Mistral in one call.
     La clé API est lue depuis la variable d'environnement MISTRAL_API_KEY.
     """
-    api_key = os.getenv("MISTRAL_API_KEY") or "oKdjCl98ACUqpUc4TCyqcfZFMzNNdapl"  # Fallback à la clé hardcodée si .env non disponible
-    
+    api_key = os.getenv(
+        "MISTRAL_API_KEY") or "oKdjCl98ACUqpUc4TCyqcfZFMzNNdapl"  # Fallback à la clé hardcodée si .env non disponible
+
     try:
         url = "https://api.mistral.ai/v1/chat/completions"
         headers = {
@@ -48,18 +49,21 @@ def call_mistral_with_confidence(text_chunk, document_url=""):
         {text_chunk[:2000]}
 
         SOURCE URL: {document_url}
+        FILENAME: {filename}
+
+        HINT: Look for version numbers in headers like "DTC_S006597_PF_R_FAB_17319_EN_15.0" where 15.0 is the version
 
         TASK: Return ONLY a JSON object with extracted metadata AND your confidence scores:
 
         {{
             "metadata": {{
-                "title": "the ACTUAL document title",
-                "type": "guideline|regulation|directive|report|procedure|standard|other",
+                "title": "the MAIN document title (not technical headers)",
+                "type": "guideline|regulation|directive|report|procedure|standard|manufacturer|certificate|authorization|specifications|other",
                 "publication_date": "exact date (DD Month YYYY format)",
                 "version": "document version/reference number",
-                "source": "EMA for European docs, FDA for US docs, or actual organization",
+                "source": "organization name",
                 "context": "main domain (pharmaceutical, medical, legal, etc.)",
-                "country": "country code (EU, US, etc.)",
+                "country": "country code (EU, US, FR, IE, PL, etc.)",
                 "language": "language code (en, fr, etc.)"
             }},
             "confidence_scores": {{
@@ -84,14 +88,72 @@ def call_mistral_with_confidence(text_chunk, document_url=""):
             }}
         }}
 
-        INSTRUCTIONS:
-        - Confidence scores: 0-100 (0=not found, 50=uncertain, 100=completely certain)
-        - Give HONEST confidence scores based on text evidence
-        - If you're unsure about something, give it a low score (20-40)
-        - If clearly found in text, give high score (80-100)
-        - Provide reasoning for each extraction
-        - For SOURCE: Use EMA for European, FDA for US
-        - Return ONLY the JSON, no other text
+        INSTRUCTIONS FOR DOCUMENT TYPE DETECTION:
+        - "manufacturer": Documents listing manufacturing sites, manufacturer information, production details
+        - "specifications": Documents detailing product specifications, technical specifications, drug product specs
+        - "guideline": Official guidance documents from regulatory agencies
+        - "regulation": Legal regulatory texts, laws, regulations
+        - "directive": EU directives and similar regulatory directives  
+        - "report": Assessment reports, evaluation reports, inspection reports
+        - "procedure": Standard operating procedures, process descriptions
+        - "standard": Technical standards, quality standards
+        - "certificate": Certificates, authorizations, approvals
+        - "authorization": Marketing authorizations, permits, licenses
+        - "other": Any other document type
+
+        TYPE DETECTION KEYWORDS:
+        - "SPECIFICATIONS OF" → type: "specifications"
+        - "MANUFACTURERS" → type: "manufacturer"  
+        - "GUIDELINE" → type: "guideline"
+        - "PROCEDURE" → type: "procedure"
+        - Look for explicit type indicators in document titles and headers
+
+        INSTRUCTIONS FOR TITLE EXTRACTION:
+        - Extract the MAIN document title from the body content, not technical headers
+        - Ignore technical codes like "DTC_S006597_PF_R_FAB_17319_EN_15.0"
+        - Look for the primary subject/topic in the document body
+        - For manufacturer docs: "MANUFACTURERS" + product name + description
+        - Combine logical title elements: "MANUFACTURERS S 6597 Film-coated tablet..."
+        - Avoid including addresses, company names, or metadata in the title
+
+        INSTRUCTIONS FOR VERSION DETECTION:
+        - Look for version numbers in document headers/titles (e.g., "EN_15.0" → version "15.0")
+        - Check for reference numbers that contain versions (DTC_xxx_15.0)
+        - Look for explicit version statements in text ("Version 2.1", "v3.0", etc.)
+        - Extract numerical versions from document codes/identifiers
+        - If multiple version indicators, use the most prominent one
+
+        INSTRUCTIONS FOR SOURCE DETECTION:
+        - Look for explicit organization names in the document
+        - Check for regulatory agency indicators (EMA, FDA, ANSM, MHRA, etc.)
+        - For manufacturer documents, use the company name mentioned
+        - For specifications documents, look for regulatory authority context
+        - Check for "European Pharmacopoeia" → likely EMA/European regulatory context
+        - If from URL domain: .ema.europa.eu = "EMA", .fda.gov = "FDA", etc.
+        - If unclear, analyze content to determine likely source organization
+        - Do NOT default to EMA unless clearly an EMA document
+
+        INSTRUCTIONS FOR COUNTRY DETECTION:
+        - Look for country-specific indicators in text
+        - Check addresses, phone numbers, regulatory codes
+        - Analyze URL domain for country hints
+        - For manufacturer docs, use country where facilities are located
+        - Use specific country codes (FR, IE, PL) not just EU when possible
+
+        CONFIDENCE SCORING:
+        - 90-100: Explicitly stated in document
+        - 70-89: Strong indicators/evidence  
+        - 50-69: Reasonable inference from context
+        - 30-49: Weak indicators, uncertain
+        - 0-29: Not found or very unclear
+
+        TITLE EXTRACTION EXAMPLES:
+        ✅ GOOD: "MANUFACTURERS S 6597 Film-coated tablet containing 10 mg of perindopril arginine and 2.5 mg of indapamide"
+        ✅ GOOD: "SPECIFICATIONS OF THE DRUG PRODUCT S 20098 Film-coated tablets containing 25 mg of drug substance"
+        ❌ BAD: "DTC_S006597_PF_R_FAB_17319_EN_15.0 MANUFACTURERS S 6597..."
+        ❌ BAD: Including addresses or company details in title
+
+        Return ONLY the JSON, no other text.
         """
 
         data = {
@@ -107,7 +169,7 @@ def call_mistral_with_confidence(text_chunk, document_url=""):
         if response.status_code == 200:
             result = response.json()
             response_text = result['choices'][0]['message']['content']
-            
+
             # Find JSON in response
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
@@ -172,17 +234,18 @@ def extract_metadonnees(file_path: str, source_url: str) -> dict:
     """
     print("🔍 Starting LLM extraction with confidence scoring...")
     full_text = extract_full_text(file_path)
-    llm_result = call_mistral_with_confidence(full_text, source_url)
+    filename = Path(file_path).name
+    llm_result = call_mistral_with_confidence(full_text, source_url, filename)
 
     if llm_result and 'metadata' in llm_result and 'confidence_scores' in llm_result:
         print("✅ Using LLM extraction with real confidence scores!")
-        
+
         metadata = llm_result['metadata']
         conf_scores = llm_result['confidence_scores']
         reasoning = llm_result.get('extraction_reasoning', {})
 
         metadata['url_source'] = source_url
-        
+
         # Calculate quality metrics
         overall_quality = calculate_overall_quality(conf_scores)
         extracted_fields = sum(1 for s in conf_scores.values() if s >= 50)
@@ -199,7 +262,7 @@ def extract_metadonnees(file_path: str, source_url: str) -> dict:
         return metadata
 
     # Fallback basic extraction
-    print("⚠️ LLM extraction failed, using basic fallback")
+    print("⚠ LLM extraction failed, using basic fallback")
     return extract_basic_fallback(file_path, source_url)
 
 
@@ -239,7 +302,7 @@ def extract_basic_fallback(file_path: str, source_url: str) -> dict:
     }
 
     overall_quality = calculate_overall_quality(conf_scores)
-    
+
     basic_meta['quality'] = {
         'extraction_rate': overall_quality,
         'field_scores': conf_scores,
