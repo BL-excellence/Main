@@ -335,575 +335,555 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+/* Pharma color variables */
 :root {
-  --primary: #0f172a;       /* Bleu nuit très foncé */
-  --primary-hover: #1e293b; /* Bleu nuit foncé */
-  --secondary: #1e293b;     /* Bleu nuit */
-  --accent: #3b82f6;        /* Bleu vif */
-  --text-primary: #f8fafc;  /* Blanc très clair */
-  --text-secondary: #e2e8f0;/* Gris bleuté clair */
-  --surface-color: #1e293b; /* Bleu nuit */
-  --border-color: #334155;  /* Bleu nuit moyen */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --border-radius: 8px;
-  --transition-all: all 0.3s ease;
+  --pharma-primary: #0ea5e9;
+  --pharma-primary-dark: #0284c7;
+  --pharma-accent: #10b981;
+  --pharma-bg: #f8fafc;
+  --pharma-bg-card: rgba(255,255,255,0.95);
+  --pharma-glass: rgba(14,165,233,0.10);
+  --pharma-border: #cbd5e1;
+  --pharma-shadow: 0 8px 32px 0 rgba(14, 165, 233, 0.07);
+  --pharma-text: #1e293b;
+  --pharma-text-soft: #64748b;
+  --pharma-valid: #22c55e;
+  --pharma-warn: #f59e0b;
+  --pharma-error: #ef4444;
+  --pharma-info: #38bdf8;
+  --pharma-radius: 18px;
+  --pharma-radius-sm: 12px;
+  --pharma-font: 'Inter', sans-serif;
+  --pharma-transition: all 0.28s cubic-bezier(.4,0,.2,1);
 }
 
-/* CRITICAL FIX: Ensure modals appear above everything */
-.modal {
-  z-index: 1060 !important;
+/* Reset and base */
+body {
+  background: linear-gradient(135deg, var(--pharma-bg) 70%, #e0f2fe 100%);
+  color: var(--pharma-text);
+  font-family: var(--pharma-font);
 }
 
-.modal-backdrop {
-  z-index: 1055 !important;
+.main-content {
+  max-width: 850px;
+  margin: auto;
 }
 
-/* Fix modal dialog to ensure it's clickable */
-.modal-dialog {
-  z-index: 1061 !important;
-  pointer-events: auto !important;
-}
-
-.modal-content {
-  background: white !important;
-  pointer-events: auto !important;
-}
-
-/* Remove any conflicting z-index from other elements */
-.annotation-header, .page-navigation, .annotation-types-panel {
-  z-index: auto !important;
-}
-
-/* Annotation Header */
+/* Annotation header */
 .annotation-header {
-  background: var(--surface-color);
-  padding: 1.5rem;
-  border-radius: var(--border-radius);
-  margin-bottom: 1.5rem;
+  background: var(--pharma-bg-card);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  border: 1px solid var(--pharma-border);
+  padding: 1.5rem 2rem;
+  margin-bottom: 2.2rem;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
+  align-items: flex-start;
+  gap: 1.5rem;
+  animation: fadeInUp 0.5s;
 }
 
 .header-info h2 {
-  margin: 0 0 0.5rem;
-  color: var(--text-primary);
+  color: var(--pharma-primary-dark);
+  font-size: 1.45rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .document-meta {
   display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 1.2rem;
+  font-size: 0.98rem;
+  margin-top: 0.2rem;
 }
 
 .meta-item {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.header-actions {
+  color: var(--pharma-text-soft);
+  gap: 0.3rem;
   display: flex;
   align-items: center;
 }
 
-/* Bouton Retour visible */
-.btn-outline {
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  padding: 0.65rem 1.25rem;
-  border-radius: var(--border-radius);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: var(--transition-all);
+.header-actions .btn-outline {
+  background: var(--pharma-glass);
+  border: 1.5px solid var(--pharma-primary);
+  color: var(--pharma-primary-dark);
+  border-radius: var(--pharma-radius-sm);
+  font-size: 1rem;
+  padding: 0.6rem 1.3rem;
   font-weight: 500;
-  font-size: 0.9rem;
+  transition: var(--pharma-transition);
 }
-
-.btn-outline:hover {
-  background: rgba(59, 130, 246, 0.1);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+.header-actions .btn-outline:hover {
+  background: var(--pharma-primary);
+  color: #fff;
+  border-color: var(--pharma-primary-dark);
+  transform: translateY(-2px) scale(1.04);
 }
 
 /* Annotation Types Panel */
 .annotation-types-panel {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 1.5rem;
-  border-radius: var(--border-radius);
-  margin-bottom: 1.5rem;
-  border: 1px solid var(--border-color);
+  background: linear-gradient(120deg, #f0fdfa 70%, #bae6fd 100%);
+  border: 1.5px solid var(--pharma-primary-light, #38bdf8);
+  border-radius: var(--pharma-radius);
+  margin-bottom: 2rem;
+  box-shadow: var(--pharma-shadow);
+  padding: 2rem;
 }
 
 .annotation-types-panel h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1.25rem;
-  color: white;
+  font-size: 1.2rem;
+  color: var(--pharma-primary-dark);
+  margin-bottom: 0.35rem;
+  font-weight: 600;
 }
 
-.instructions {
-  margin: 0 0 1rem;
-  opacity: 0.9;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
+.instructions,
+.help-text {
+  color: var(--pharma-text-soft);
+  font-size: 0.97rem;
+  opacity: 0.88;
+  margin-bottom: 0.7rem;
 }
 
 .annotation-types {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 0.65rem;
+  margin-bottom: 0.8rem;
 }
 
 .annotation-type-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  color: white;
-  cursor: pointer;
-  transition: var(--transition-all);
+  border-radius: 999px;
+  background: var(--pharma-bg-card);
+  border: 2px solid var(--pharma-primary);
+  color: var(--pharma-primary-dark);
   font-weight: 500;
+  font-size: 1rem;
+  padding: 0.45rem 1.25rem;
+  box-shadow: 0 2px 10px rgba(14,165,233,0.05);
+  transition: var(--pharma-transition);
+  outline: none;
 }
-
-.annotation-type-btn:hover,
-.annotation-type-btn.active {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
+.annotation-type-btn:hover, .annotation-type-btn.active {
+  background: var(--pharma-primary);
+  color: #fff;
+  transform: translateY(-2px) scale(1.07);
+  border-color: var(--pharma-primary-dark);
+  box-shadow: 0 6px 18px rgba(14,165,233,0.14);
 }
-
 .annotation-type-btn-add {
-  background: linear-gradient(45deg, #10b981, #059669);
-  border: 2px solid #10b981;
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: var(--transition-all);
-  font-weight: 500;
+  background: linear-gradient(90deg, var(--pharma-accent), var(--pharma-primary));
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 999px;
+  font-size: 1rem;
+  padding: 0.45rem 1.35rem;
+  transition: var(--pharma-transition);
+  box-shadow: 0 2px 12px rgba(16,185,129,0.11);
 }
-
 .annotation-type-btn-add:hover {
-  background: linear-gradient(45deg, #059669, #047857);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
-
-.annotation-mode {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-  color: white;
+  background: linear-gradient(90deg, var(--pharma-primary), var(--pharma-accent));
+  transform: translateY(-1.5px) scale(1.06);
 }
 
 .current-mode {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 0.25rem 0.75rem;
-  border-radius: 15px;
+  background: var(--pharma-primary-dark);
+  color: #fff;
+  border-radius: 12px;
+  padding: 0.23rem 1rem;
+  font-size: 1.03rem;
+  margin-left: 0.7rem;
   font-weight: 600;
-  color: white;
 }
 
-.help-text {
-  margin: 0;
-  font-size: 0.85rem;
-  opacity: 0.8;
-  color: var(--text-secondary);
+/* Context Menu */
+.context-menu {
+  position: absolute;
+  background: var(--pharma-bg-card);
+  border: 1.5px solid var(--pharma-border);
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.13);
+  min-width: 170px;
+  z-index: 10010;
+  font-size: 1rem;
+  padding: 0.1rem;
 }
+.context-menu-item {
+  color: var(--pharma-text);
+  padding: 9px 14px;
+  background: none;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  text-align: left;
+  transition: background .18s;
+}
+.context-menu-item:hover { background: #e0f2fe; }
+.context-menu-item.danger { color: var(--pharma-error); }
+.context-menu-item.danger:hover { background: #ffe4e6; }
+.context-menu.hidden { display: none; }
 
 /* Page Navigation */
 .page-navigation {
-  background: var(--surface-color);
-  padding: 1rem 1.5rem;
-  border-radius: var(--border-radius);
-  margin-bottom: 1.5rem;
+  background: var(--pharma-bg-card);
+  border: 1px solid var(--pharma-border);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  padding: 1.1rem 1.9rem;
+  margin-bottom: 2.1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
 }
 
-.page-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+.page-controls { display: flex; align-items: center; gap: 1.5rem; }
+.page-selector select {
+  padding: 0.48rem 1.1rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--pharma-primary);
+  background: var(--pharma-glass);
+  color: var(--pharma-primary-dark);
+  font-weight: 600;
+  font-size: 1rem;
+  outline: none;
+  transition: border .18s;
+}
+.page-selector select:focus {
+  border-color: var(--pharma-accent);
 }
 
 .nav-btn {
-  background: var(--primary);
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: var(--border-radius);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: var(--transition-all);
-  border: 1px solid var(--border-color);
-}
-
-.nav-btn:hover {
-  background: var(--primary-hover);
-  transform: translateY(-1px);
-}
-
-.page-selector select {
-  padding: 0.5rem;
-  border-radius: var(--border-radius);
-  border: 1px solid var(--border-color);
-  background: var(--primary);
-  color: white;
-}
-
-.ai-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-/* Bouton AI */
-.btn-groq {
-  background: linear-gradient(45deg, #3b82f6, #1d4ed8);
-  color: white;
+  background: var(--pharma-primary-dark);
+  color: #fff;
+  border-radius: 11px;
+  font-size: 1rem;
+  padding: 0.5rem 1.4rem;
+  font-weight: 600;
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.3s ease;
+  transition: var(--pharma-transition);
+  box-shadow: 0 3px 10px rgba(14,165,233,0.11);
+  outline: none;
+}
+.nav-btn:hover {
+  background: var(--pharma-primary);
+  color: #fff;
+  transform: scale(1.04) translateY(-1px);
 }
 
-.btn-groq:hover {
-  background: var(--primary-hover);
+/* AI, Validate, Expert Buttons */
+.ai-controls { display: flex; align-items: center; gap: 1.1rem; }
+.btn-groq {
+  background: linear-gradient(90deg, var(--pharma-primary), var(--pharma-info));
+  color: #fff;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 0.65rem 1.4rem;
+  font-size: 1.04rem;
+  border: none;
+  box-shadow: 0 4px 18px rgba(56,189,248,0.08);
+  transition: var(--pharma-transition);
 }
+.btn-groq:hover { background: linear-gradient(90deg, var(--pharma-info), var(--pharma-primary-dark)); }
 
-/* Bouton Validate */
 .btn-validate {
-  background: var(--primary);
-  color: white;
-  border: 1px solid #10b981;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.3s ease;
+  background: var(--pharma-accent);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 0.65rem 1.4rem;
+  font-weight: 700;
+  font-size: 1.04rem;
+  box-shadow: 0 4px 12px rgba(16,185,129,0.09);
+  transition: var(--pharma-transition);
 }
-
-.btn-validate:hover:not(:disabled) {
-  background: var(--primary-hover);
-}
-
 .btn-validate:disabled {
-  background: #1e293b;
-  color: #64748b;
+  background: #e5e7eb;
+  color: #9ca3af;
   cursor: not-allowed;
 }
+.btn-validate:hover:not(:disabled) {
+  background: #059669;
+}
 
-/* Bouton Expert */
 .btn-expert {
-  background: linear-gradient(45deg, #6f42c1, #495057);
-  color: white;
+  background: linear-gradient(90deg, #6d28d9, #4c1d95 90%);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 0.65rem 1.4rem;
+  font-size: 1.04rem;
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(109,40,217,0.13);
+  transition: var(--pharma-transition);
+}
+.btn-expert:hover { background: linear-gradient(90deg, #7c3aed, #a78bfa 80%); }
+
+.btn-success {
+  background: var(--pharma-accent);
+  color: #fff !important;
+  border-radius: 12px;
+  font-weight: 700;
+  padding: 0.65rem 1.4rem;
 }
 
-.btn-expert:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(111, 66, 193, 0.4);
-}
-
-.ai-loading {
-  color: white;
+.ai-loading, .learning-progress {
+  color: var(--pharma-primary-dark);
   font-weight: 500;
+  margin-left: 1rem;
 }
 
-.learning-progress {
-  color: white;
-}
-
-/* Text Content */
+/* Text Content (Zone principale d’annotation) */
 .text-content-card {
-  background: var(--surface-color);
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
+  background: var(--pharma-bg-card);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  border: 1.5px solid var(--pharma-primary-light, #38bdf8);
+  margin-bottom: 2.2rem;
+  padding: 2rem 2.1rem;
+  animation: fadeInUp 0.6s;
 }
 
 .text-content-card h3 {
-  margin: 0 0 1rem;
+  color: var(--pharma-primary-dark);
+  font-size: 1.18rem;
+  font-weight: 700;
+  margin-bottom: 1.2rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: white;
+  gap: 0.7rem;
 }
 
 .page-status {
-  padding: 0.25rem 0.75rem;
-  border-radius: 15px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  margin-left: auto;
+  padding: 0.25rem 1rem;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin-left: 1.1rem;
+  box-shadow: 0 2px 7px rgba(59,130,246,0.05);
 }
-
 .page-status.validated-human {
   background: #d1fae5;
   color: #047857;
 }
-
 .page-status.annotated {
-  background: #d1fae5;
-  color: #047857;
+  background: #bae6fd;
+  color: var(--pharma-primary-dark);
 }
-
 .page-status.pending {
   background: #fef3c7;
   color: #92400e;
 }
 
 .text-content {
-  border: 2px dashed var(--border-color);
-  padding: 1.5rem;
-  border-radius: var(--border-radius);
-  line-height: 1.6;
-  font-size: 1rem;
+  border: 2px dashed var(--pharma-primary);
+  border-radius: var(--pharma-radius-sm);
+  background: #e0f2fe;
+  color: var(--pharma-primary-dark);
+  padding: 1.6rem 1.2rem;
+  font-size: 1.14rem;
+  line-height: 1.7;
   user-select: text;
   cursor: text;
-  white-space: pre-wrap;
-  min-height: 300px;
-  background: var(--primary);
-  color: white;
+  min-height: 220px;
+  box-shadow: 0 2px 6px rgba(56,189,248,0.05);
+  transition: box-shadow .2s;
+}
+.text-content:focus, .text-content:hover {
+  box-shadow: 0 6px 26px rgba(14,165,233,0.13);
 }
 
-/* Annotations List */
+/* Annotations List (as cards) */
 .annotations-list {
-  background: var(--surface-color);
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
+  background: var(--pharma-bg-card);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  border: 1.5px solid var(--pharma-border);
+  padding: 1.8rem 2rem;
+  margin-bottom: 1.8rem;
 }
-
 .annotations-list h3 {
-  margin: 0 0 1rem;
+  color: var(--pharma-primary-dark);
+  font-size: 1.13rem;
+  margin-bottom: 1.1rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: white;
+  gap: 0.7rem;
 }
 
 .annotation-item {
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  padding: 1rem;
-  margin-bottom: 1rem;
-  background: var(--primary);
+  background: var(--pharma-glass);
+  border: 1.5px solid var(--pharma-border);
+  border-radius: var(--pharma-radius-sm);
+  margin-bottom: 1.1rem;
+  padding: 1rem 1.1rem;
+  transition: box-shadow .2s, border .2s;
+  box-shadow: 0 3px 15px rgba(14,165,233,0.09);
+  position: relative;
+}
+.annotation-item:hover {
+  border-color: var(--pharma-primary-dark);
+  box-shadow: 0 8px 28px rgba(14,165,233,0.14);
 }
 
 .annotation-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.7rem;
+  margin-bottom: 0.6rem;
 }
 
 .annotation-type {
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 15px;
-  font-size: 0.8rem;
+  background: linear-gradient(90deg, var(--pharma-primary), var(--pharma-accent) 90%);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.97rem;
   font-weight: 600;
+  padding: 0.24rem 1.05rem;
 }
 
 .annotation-confidence {
-  background: var(--surface-color);
-  padding: 0.25rem 0.5rem;
-  border-radius: 10px;
-  font-size: 0.8rem;
+  background: #bae6fd;
+  color: var(--pharma-primary-dark);
+  border-radius: 9px;
+  font-size: 0.88rem;
   font-weight: 600;
-  color: white;
+  padding: 0.19rem 0.7rem;
 }
 
 .delete-annotation {
   background: none;
   border: none;
-  color: #ef4444;
+  color: var(--pharma-error);
   cursor: pointer;
-  padding: 0.25rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 7px;
+  transition: background .13s;
   margin-left: auto;
 }
+.delete-annotation:hover { background: #ffe4e6; }
 
 .annotation-text {
   font-style: italic;
-  color: white;
-  margin-bottom: 0.5rem;
+  color: var(--pharma-primary-dark);
+  font-size: 1.02rem;
+  margin-bottom: 0.3rem;
 }
 
 .annotation-reasoning {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+  font-size: 0.94rem;
+  color: var(--pharma-accent);
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.29rem;
+}
+
+/* RLHF/AI Generated */
+.ai-generated .annotation-type {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24 80%);
+  color: #fff;
+}
+.rlhf-indicator {
+  margin-top: 0.6rem;
+  color: var(--pharma-warn);
+  font-weight: 700;
+  font-size: 0.98rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 /* Learning Dashboard Widget */
 .learning-dashboard-widget {
-  background: var(--primary);
-  color: white;
-  padding: 1.5rem;
-  border-radius: var(--border-radius);
-  margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
+  background: linear-gradient(90deg, var(--pharma-primary), var(--pharma-accent));
+  color: #fff;
+  padding: 1.25rem 2rem;
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  margin-bottom: 2rem;
+  border: none;
+  font-size: 1.08rem;
 }
 
-.learning-dashboard-widget h4 {
-  color: white;
-  margin-top: 0;
-}
+.learning-dashboard-widget h4 { color: #fff; font-weight: 700; margin-top: 0; }
 
-/* Validation Success Message */
+.metric {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 0.35rem 0;
+}
+.metric-label { font-weight: 600; opacity: 0.87; }
+.metric-value { font-size: 1.07rem; font-weight: 700; }
+.performance-indicator { font-size: 1.18rem; margin-left: 0.5rem; }
+.learning-explanation { font-size: 0.88rem; opacity: 0.89; margin-top: 0.4rem; }
+
+/* Validation Success */
 .validation-success {
-  background: linear-gradient(45deg, #10b981, #059669);
-  color: white;
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-  margin-bottom: 1rem;
+  background: linear-gradient(90deg, #10b981, #38bdf8);
+  color: #fff;
+  padding: 1rem 1.6rem;
+  border-radius: 14px;
+  box-shadow: 0 2px 18px rgba(16,185,129,0.13);
+  margin-bottom: 1.2rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  transition: opacity 0.5s ease;
+  gap: 1.2rem;
+  transition: opacity 0.5s;
 }
 
-.validation-success i {
-  font-size: 1.5rem;
-}
-
-.validation-details {
-  margin-top: 0.5rem;
-}
-
-.metric-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0.25rem 0;
-}
-
-.metric-row.total {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(255,255,255,0.2);
-}
-
-.metric-row.score {
-  font-weight: bold;
-  color: #fef3c7;
-}
-
-/* BOOTSTRAP MODAL FIXES - CRITICAL */
-.modal-dialog {
-  margin: 1.75rem auto !important;
-  max-width: 500px !important;
-}
-
+/* Modal (boost appearance) */
 .modal-content {
-  border: none !important;
-  border-radius: 0.5rem !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+  background: #fff;
+  border-radius: var(--pharma-radius-sm);
+  box-shadow: 0 8px 40px rgba(14,165,233,0.23);
+  border: none;
 }
-
-.modal-header {
-  background-color: #f8f9fa !important;
-  border-bottom: 1px solid #dee2e6 !important;
-  border-radius: 0.5rem 0.5rem 0 0 !important;
+.modal-header, .modal-footer {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 12px 12px 0 0;
 }
-
-.modal-body {
-  background-color: white !important;
-  padding: 1.5rem !important;
+.modal-title { color: var(--pharma-primary-dark); font-weight: 600; }
+.btn-close { color: var(--pharma-text-soft); }
+.btn-primary {
+  background: var(--pharma-primary-dark);
+  color: #fff;
+  border-radius: 10px;
+  border: none;
+  font-weight: 700;
+  padding: 0.48rem 1.4rem;
+  transition: var(--pharma-transition);
 }
-
-.modal-footer {
-  background-color: #f8f9fa !important;
-  border-top: 1px solid #dee2e6 !important;
-  border-radius: 0 0 0.5rem 0.5rem !important;
-}
-
-/* Form controls in modal */
-.modal .form-control {
-  background-color: white !important;
-  border: 1px solid #ced4da !important;
-  color: #495057 !important;
-}
-
-.modal .form-control:focus {
-  border-color: #80bdff !important;
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
-}
-
-.modal .form-label {
-  color: #495057 !important;
-  font-weight: 500 !important;
-}
+.btn-primary:hover { background: var(--pharma-primary); color: #fff; }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .annotation-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .page-navigation {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .annotation-types {
-    justify-content: center;
-  }
-
-  .header-actions {
-    margin-top: 1rem;
-    width: 100%;
-  }
-
-  .btn-outline {
-    width: 100%;
-    justify-content: center;
+@media (max-width: 900px) {
+  .main-content { max-width: 99vw; }
+  .annotation-header, .text-content-card, .annotations-list, .learning-dashboard-widget, .annotation-types-panel, .page-navigation {
+    padding: 1.1rem 0.8rem !important;
   }
 }
+@media (max-width: 700px) {
+  .annotation-header, .annotation-types-panel, .page-navigation, .text-content-card, .annotations-list, .learning-dashboard-widget {
+    flex-direction: column !important;
+    gap: 1rem !important;
+  }
+  .header-actions { width: 100%; }
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(40px);}
+  to   { opacity: 1; transform: translateY(0);}
+}
 </style>
+
 
 <!-- Annotation Header -->
 <section class="annotation-header">
