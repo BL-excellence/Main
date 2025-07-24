@@ -157,6 +157,14 @@ urlpatterns = [
         views.create_annotation_type,
         name='create_annotation_type'
     ),
-    path('delete-annotation-type/', views.delete_annotation_type, name='delete_annotation_type'),
+    path('delete-annotation-type/', 
+         views.delete_annotation_type, 
+         name='delete_annotation_type'
+    ),
+    
+    path('documents/<int:document_id>/view-original/', 
+         views.view_original_document, 
+         name='view_original_document'
+    ),
 
 ]

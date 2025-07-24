@@ -309,15 +309,39 @@
 }
 
 .document-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* New view document button */
+.view-document-btn {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background-color: #27ae60;
+    background-color: #3498db;
+    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: background-color 0.3s ease;
+}
+
+.view-document-btn:hover {
+    background-color: #2980b9;
+}
+
+.view-document-btn i {
+    color: white;
+    font-size: 16px;
+}
+
+/* No document indicator */
+.no-document {
+    color: #9ca3af;
+    font-size: 16px;
+    font-weight: 500;
 }
 
 .document-status:hover {

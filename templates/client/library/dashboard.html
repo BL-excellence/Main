@@ -1,10 +1,111 @@
 {% extends 'client/base.html' %}
 {% load static %}
+{% load document_filters %}
 
-{% block title %}Library - RegX Platform{% endblock %}
+{% block title %}Library - Documents des Métadonneurs{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/library.css' %}">
+<style>
+/* Source Categories Grid */
+.source-categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.source-category-card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f1f5f9;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.source-category-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    border-color: #e2e8f0;
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.category-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.category-info h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 4px 0;
+}
+
+.category-count {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.category-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+    min-width: 35px;
+    text-align: right;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .source-categories-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .category-header {
+        gap: 12px;
+    }
+    
+    .category-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+    }
+}
+</style>
 {% endblock %}
 
 {% block content %}
@@ -13,14 +114,10 @@
     <div class="page-header">
         <div class="header-content">
             <div class="header-info">
-                <h1>RegX Library</h1>
-                <p>Hub documentaire réglementaire intelligent</p>
+                <h1>Bibliothèque de Documents</h1>
+                <p>Documents uploadés et validés par les métadonneurs</p>
             </div>
             <div class="header-actions">
-                <button class="btn btn-outline" onclick="location.href='{% url 'client:library:upload_document' %}'">
-                    <i class="material-icons">cloud_upload</i>
-                    Upload Document
-                </button>
                 <button class="btn btn-primary" onclick="location.href='{% url 'client:library:document_list' %}'">
                     <i class="material-icons">library_books</i>
                     Parcourir Documents
@@ -53,11 +150,11 @@
         
         <div class="stat-card">
             <div class="stat-icon green">
-                <i class="material-icons">account_balance</i>
+                <i class="material-icons">person</i>
             </div>
             <div class="stat-content">
-                <h3>{{ authorities_count }}</h3>
-                <p>Autorités réglementaires</p>
+                <h3>{{ total_metadonneurs }}</h3>
+                <p>Métadonneurs actifs</p>
             </div>
         </div>
         
@@ -66,8 +163,8 @@
                 <i class="material-icons">category</i>
             </div>
             <div class="stat-content">
-                <h3>{{ categories_count }}</h3>
-                <p>Catégories</p>
+                <h3>{{ document_type_stats|length }}</h3>
+                <p>Types de documents</p>
             </div>
         </div>
     </div>
@@ -85,99 +182,134 @@
                 {% for document in recent_documents %}
                 <div class="document-card" onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
                     <div class="document-icon">
-                        {% if document.file_extension == '.pdf' %}
                         <i class="material-icons red">picture_as_pdf</i>
-                        {% elif document.file_extension == '.doc' or document.file_extension == '.docx' %}
-                        <i class="material-icons blue">description</i>
-                        {% elif document.file_extension == '.xls' or document.file_extension == '.xlsx' %}
-                        <i class="material-icons green">table_chart</i>
-                        {% else %}
-                        <i class="material-icons grey">insert_drive_file</i>
-                        {% endif %}
                     </div>
                     
                     <div class="document-content">
-                        <h4>{{ document.title|truncatechars:80 }}</h4>
+                        <h4>{{ document|document_title|truncatechars:80 }}</h4>
                         <div class="document-meta">
                             <span class="meta-item">
-                                <i class="material-icons">account_balance</i>
-                                {{ document.authority.code }}
+                                <i class="material-icons">person</i>
+                                {{ document.owner.username|default:"Anonyme" }}
                             </span>
                             <span class="meta-item">
                                 <i class="material-icons">calendar_today</i>
-                                {{ document.publication_date|date:"d/m/Y" }}
+                                {{ document.created_at|date:"d/m/Y" }}
                             </span>
+                            {% if document.language %}
                             <span class="meta-item">
                                 <i class="material-icons">language</i>
-                                {{ document.get_language_display }}
+                                {{ document.language }}
                             </span>
+                            {% endif %}
                         </div>
                         
-                        {% if document.tags_list %}
+                        {% if document.doc_type %}
                         <div class="document-tags">
-                            {% for tag in document.tags_list|slice:":3" %}
-                            <span class="tag">{{ tag }}</span>
-                            {% endfor %}
+                            <span class="tag">{{ document.doc_type }}</span>
+                            {% if document.country %}
+                            <span class="tag">{{ document.country }}</span>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </div>
                     
                     <div class="document-actions">
-                        <span class="views">{{ document.view_count }} vues</span>
+                        <span class="status validated">Validé</span>
                     </div>
                 </div>
                 {% empty %}
                 <div class="empty-state">
                     <i class="material-icons">library_books</i>
                     <h3>Aucun document disponible</h3>
-                    <p>Commencez par uploader votre premier document réglementaire.</p>
-                    <button class="btn btn-primary" onclick="location.href='{% url 'client:library:upload_document' %}'">
-                        <i class="material-icons">cloud_upload</i>
-                        Upload Document
-                    </button>
+                    <p>Les documents uploadés et validés par les métadonneurs apparaîtront ici.</p>
                 </div>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Statistiques par catégorie et autorité -->
+        <!-- Statistiques par type et pays -->
         <div class="dashboard-grid">
             <div class="dashboard-section">
                 <div class="section-header">
-                    <h2>Par catégorie</h2>
+                    <h2>Par type de document</h2>
                 </div>
                 
                 <div class="category-stats">
-                    {% for category in category_stats %}
+                    {% for type_stat in document_type_stats %}
                     <div class="category-item">
-                        <div class="category-color" style="background-color: {{ category.color }};"></div>
-                        <span class="category-name">{{ category.name }}</span>
-                        <span class="category-count">{{ category.doc_count }}</span>
+                        <div class="category-color" style="background-color: #3498db;"></div>
+                        <span class="category-name">{{ type_stat.doc_type }}</span>
+                        <span class="category-count">{{ type_stat.count }}</span>
                     </div>
                     {% empty %}
-                    <p class="no-data">Aucune catégorie configurée</p>
+                    <p class="no-data">Aucun type de document détecté</p>
                     {% endfor %}
                 </div>
             </div>
             
             <div class="dashboard-section">
                 <div class="section-header">
-                    <h2>Par autorité</h2>
+                    <h2>Par pays</h2>
                 </div>
                 
                 <div class="authority-stats">
-                    {% for authority in authority_stats %}
+                    {% for country_stat in country_stats %}
                     <div class="authority-item">
-                        <span class="authority-code">{{ authority.code }}</span>
-                        <span class="authority-name">{{ authority.name }}</span>
-                        <span class="authority-count">{{ authority.doc_count }}</span>
+                        <span class="authority-code">{{ country_stat.country|slice:":3"|upper }}</span>
+                        <span class="authority-name">{{ country_stat.country }}</span>
+                        <span class="authority-count">{{ country_stat.count }}</span>
                     </div>
                     {% empty %}
-                    <p class="no-data">Aucune autorité configurée</p>
+                    <p class="no-data">Aucun pays détecté</p>
                     {% endfor %}
                 </div>
             </div>
         </div>
+
+        <!-- 🆕 Catégories par Source -->
+        {% if source_categories %}
+        <div class="dashboard-section">
+            <div class="section-header">
+                <h2>Documents par Organisme Réglementaire</h2>
+                <div class="flex gap-2">
+                    <a href="{% url 'client:library:document_list_horizontal' %}" class="text-sm bg-blue-100 hover:bg-blue-200 px-3 py-1 rounded-lg transition-colors">
+                        Vue Liste
+                    </a>
+                </div>
+            </div>
+            
+            <div class="source-categories-grid">
+                {% for key, category in source_categories.items %}
+                <div class="source-category-card" onclick="location.href='{% url 'client:library:documents_by_category' key|lower %}'">
+                    <div class="category-header">
+                        <div class="category-icon" style="background-color: {{ category.color }}20; color: {{ category.color }};">
+                            <i class="material-icons">
+                                {% if key == 'EMA' %}domain
+                                {% elif key == 'FDA' %}local_hospital
+                                {% elif key == 'ICH' %}public
+                                {% elif key == 'ANSM' %}flag
+                                {% elif key == 'MHRA' %}location_city
+                                {% else %}folder
+                                {% endif %}
+                            </i>
+                        </div>
+                        <div class="category-info">
+                            <h3>{{ category.name }}</h3>
+                            <p class="category-count">{{ category.count }} document{{ category.count|pluralize }}</p>
+                        </div>
+                    </div>
+                    <div class="category-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {% widthratio category.count total_documents 100 %}%; background-color: {{ category.color }};"></div>
+                        </div>
+                        <span class="progress-text">{% widthratio category.count total_documents 100 %}%</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Search Bar flottante -->

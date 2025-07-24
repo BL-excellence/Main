@@ -17,6 +17,8 @@ from django.db import transaction, models
 from django import forms
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import views as auth_views
+from django.http import HttpResponse
+
 
 from .models import (
     RawDocument, MetadataLog,
@@ -99,6 +101,7 @@ def is_expert(user):
 from django.urls import reverse
 from django.conf import settings
 
+
 class CustomLoginView(auth_views.LoginView):
     template_name = 'registration/login.html'
 
@@ -178,6 +181,25 @@ def upload_pdf(request):
             rd.save()
             metadata = extract_metadonnees(rd.file.path, rd.url or "")
             text = extract_full_text(rd.file.path)
+            
+            # Sauvegarder les métadonnées extraites par le LLM dans les champs du modèle
+            if metadata:
+                rd.title = metadata.get('title', '')
+                rd.doc_type = metadata.get('type', '')
+                rd.publication_date = metadata.get('publication_date', '')
+                rd.version = metadata.get('version', '')
+                rd.source = metadata.get('source', '')
+                rd.context = metadata.get('context', '')
+                rd.country = metadata.get('country', '')
+                rd.language = metadata.get('language', '')
+                rd.url_source = metadata.get('url_source', rd.url or '')
+                rd.save()
+                
+                print(f"✅ Métadonnées LLM sauvegardées pour le document {rd.pk}")
+                print(f"   - Titre: {rd.title}")
+                print(f"   - Type: {rd.doc_type}")
+                print(f"   - Source: {rd.source}")
+                print(f"   - Pays: {rd.country}")
 
             context.update({
                 'doc': rd,
@@ -670,7 +692,7 @@ def create_annotation_type(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-    
+
 
 @login_required
 @csrf_exempt
@@ -687,26 +709,26 @@ def delete_annotation_type(request):
 
         # Get the annotation type
         annotation_type = get_object_or_404(AnnotationType, id=type_id)
-        
+
         # Count how many annotations will be deleted
         annotation_count = Annotation.objects.filter(annotation_type=annotation_type).count()
-        
+
         display_name = annotation_type.display_name
-        
+
         # FORCE DELETE: Delete all annotations using this type first
         if annotation_count > 0:
             deleted_annotations = Annotation.objects.filter(annotation_type=annotation_type).delete()
             print(f"🗑️ Deleted {annotation_count} annotations of type '{display_name}'")
-        
+
         # Now delete the annotation type itself
         annotation_type.delete()
-        
+
         # Create success message
         if annotation_count > 0:
             message = f'Annotation type "{display_name}" and {annotation_count} associated annotation(s) deleted successfully!'
         else:
             message = f'Annotation type "{display_name}" deleted successfully!'
-        
+
         return JsonResponse({
             'success': True,
             'message': message,
@@ -716,3 +738,44 @@ def delete_annotation_type(request):
     except Exception as e:
         print(f"❌ Error deleting annotation type: {e}")
         return JsonResponse({'error': str(e)}, status=500)
+    
+@login_required
+def view_original_document(request, document_id):
+    """View the original document PDF - RAWDOCS VERSION"""
+    document = get_object_or_404(RawDocument, id=document_id)
+    
+    # Case 1: Document has a local file
+    if document.file:
+        try:
+            # Serve the PDF file directly in browser
+            response = HttpResponse(document.file.read(), content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="{document.file.name}"'
+            return response
+        except Exception as e:
+            # If file doesn't exist, show error
+            return HttpResponse(
+                f"<html><body><h2>Erreur</h2>"
+                f"<p>Le fichier PDF n'a pas pu être chargé: {str(e)}</p>"
+                f"<script>window.close();</script></body></html>"
+            )
+    
+    # Case 2: Document was uploaded via URL
+    elif document.url:
+        try:
+            # Redirect to the original URL
+            return redirect(document.url)
+        except Exception as e:
+            return HttpResponse(
+                f"<html><body><h2>Erreur</h2>"
+                f"<p>Impossible d'accéder au document via URL: {str(e)}</p>"
+                f"<p><a href='{document.url}' target='_blank'>Essayer d'ouvrir directement: {document.url}</a></p>"
+                f"<script>window.close();</script></body></html>"
+            )
+    
+    # Case 3: No file and no URL
+    else:
+        return HttpResponse(
+            "<html><body><h2>Aucun fichier disponible</h2>"
+            "<p>Ce document n'a ni fichier PDF ni URL source associé.</p>"
+            "<script>window.close();</script></body></html>"
+        )

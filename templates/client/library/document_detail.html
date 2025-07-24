@@ -1,7 +1,8 @@
 {% extends 'client/base.html' %}
 {% load static %}
+{% load document_filters %}
 
-{% block title %}{{ document.title }} - Library - RegX Platform{% endblock %}
+{% block title %}{{ document|document_title }} - Library - RegX Platform{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/library.css' %}">
@@ -363,14 +364,14 @@
 
     <!-- Document Header -->
     <div class="document-header">
-        <h1 class="document-title">{{ document.title }}</h1>
+        <h1 class="document-title">{{ document|document_title }}</h1>
         
-        {% if document.description %}
-        <p class="document-description">{{ document.description }}</p>
+        {% if document.context %}
+        <p class="document-description">{{ document.context }}</p>
         {% endif %}
         
         <div class="document-actions">
-            {% if document.validation_status == 'validated' %}
+            {% if document.is_validated %}
             <span class="status-badge status-validated">
                 <i class="material-icons">verified</i>
                 Validé
@@ -378,19 +379,19 @@
             {% else %}
             <span class="status-badge status-pending">
                 <i class="material-icons">schedule</i>
-                {{ document.get_validation_status_display }}
+                En attente de validation
             </span>
             {% endif %}
             
-            {% if document.file and document.validation_status == 'validated' %}
+            {% if document.file and document.is_validated %}
             <a href="{% url 'client:library:download_document' document.pk %}" class="btn btn-primary">
                 <i class="material-icons">download</i>
                 Télécharger
             </a>
             {% endif %}
             
-            {% if document.source_url %}
-            <a href="{{ document.source_url }}" target="_blank" class="btn btn-outline">
+            {% if document.url_source or document.url %}
+            <a href="{{ document.url_source|default:document.url }}" target="_blank" class="btn btn-outline">
                 <i class="material-icons">open_in_new</i>
                 Source
             </a>
@@ -402,10 +403,21 @@
     <div class="metadata-section">
         <h2 class="metadata-title">
             <i class="material-icons">info</i>
-            Métadonnées du Document
+            Métadonnées Extraites par les Métadonneurs
         </h2>
         
         <div class="metadata-grid">
+            <!-- Titre du document -->
+            <div class="metadata-item">
+                <div class="metadata-icon blue">
+                    <i class="material-icons">title</i>
+                </div>
+                <div class="metadata-content">
+                    <div class="metadata-label">Titre du Document</div>
+                    <div class="metadata-value">{{ metadata.title }}</div>
+                </div>
+            </div>
+            
             <!-- Type de document -->
             <div class="metadata-item">
                 <div class="metadata-icon blue">
@@ -413,31 +425,29 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Type de Document</div>
-                    <div class="metadata-value">{{ document.get_document_type_display }}</div>
+                    <div class="metadata-value">{{ metadata.doc_type }}</div>
                 </div>
             </div>
             
-            <!-- Autorité réglementaire -->
+            <!-- Source/Organisation -->
             <div class="metadata-item">
                 <div class="metadata-icon green">
-                    <i class="material-icons">account_balance</i>
+                    <i class="material-icons">business</i>
                 </div>
                 <div class="metadata-content">
-                    <div class="metadata-label">Autorité Réglementaire</div>
-                    <div class="metadata-value">{{ document.authority.name }} ({{ document.authority.code }})</div>
+                    <div class="metadata-label">Source/Organisation</div>
+                    <div class="metadata-value">{{ metadata.source }}</div>
                 </div>
             </div>
             
-            <!-- Numéro de référence -->
+            <!-- Pays -->
             <div class="metadata-item">
                 <div class="metadata-icon orange">
-                    <i class="material-icons">confirmation_number</i>
+                    <i class="material-icons">public</i>
                 </div>
                 <div class="metadata-content">
-                    <div class="metadata-label">Numéro de Référence</div>
-                    <div class="metadata-value{% if not document.reference_number %} empty{% endif %}">
-                        {{ document.reference_number|default:"Non spécifié" }}
-                    </div>
+                    <div class="metadata-label">Pays</div>
+                    <div class="metadata-value">{{ metadata.country }}</div>
                 </div>
             </div>
             
@@ -448,7 +458,7 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Langue</div>
-                    <div class="metadata-value">{{ document.get_language_display }}</div>
+                    <div class="metadata-value">{{ metadata.language }}</div>
                 </div>
             </div>
             
@@ -459,71 +469,97 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Date de Publication</div>
-                    <div class="metadata-value">{{ document.publication_date|date:"d F Y" }}</div>
+                    <div class="metadata-value">{{ metadata.publication_date }}</div>
                 </div>
             </div>
             
-            <!-- Date d'entrée en vigueur -->
+            <!-- Version -->
             <div class="metadata-item">
                 <div class="metadata-icon teal">
-                    <i class="material-icons">event_available</i>
+                    <i class="material-icons">label</i>
                 </div>
                 <div class="metadata-content">
-                    <div class="metadata-label">Date d'Entrée en Vigueur</div>
-                    <div class="metadata-value{% if not document.effective_date %} empty{% endif %}">
-                        {{ document.effective_date|date:"d F Y"|default:"Non spécifiée" }}
+                    <div class="metadata-label">Version</div>
+                    <div class="metadata-value">{{ metadata.version }}</div>
+                </div>
+            </div>
+            
+            <!-- URL Source -->
+            {% if metadata.url_source and metadata.url_source != "Non spécifiée" %}
+            <div class="metadata-item">
+                <div class="metadata-icon blue">
+                    <i class="material-icons">link</i>
+                </div>
+                <div class="metadata-content">
+                    <div class="metadata-label">URL Source</div>
+                    <div class="metadata-value">
+                        <a href="{{ metadata.url_source }}" target="_blank" class="text-blue-600 hover:text-blue-800">
+                            {{ metadata.url_source|truncatechars:50 }}
+                        </a>
                     </div>
                 </div>
             </div>
-            
-            <!-- Section CTD -->
-            {% if document.ctd_section %}
-            <div class="metadata-item">
-                <div class="metadata-icon blue">
-                    <i class="material-icons">folder</i>
-                </div>
-                <div class="metadata-content">
-                    <div class="metadata-label">Section CTD</div>
-                    <div class="metadata-value">{{ document.ctd_section }}</div>
-                </div>
-            </div>
             {% endif %}
             
-            <!-- Zone thérapeutique -->
-            {% if document.therapeutic_area %}
-            <div class="metadata-item">
-                <div class="metadata-icon green">
-                    <i class="material-icons">local_hospital</i>
-                </div>
-                <div class="metadata-content">
-                    <div class="metadata-label">Zone Thérapeutique</div>
-                    <div class="metadata-value">{{ document.therapeutic_area }}</div>
-                </div>
-            </div>
-            {% endif %}
-            
-            <!-- Taille du fichier -->
-            {% if document.file %}
+            <!-- Nombre de pages -->
+            {% if metadata.total_pages > 0 %}
             <div class="metadata-item">
                 <div class="metadata-icon orange">
-                    <i class="material-icons">storage</i>
+                    <i class="material-icons">pages</i>
                 </div>
                 <div class="metadata-content">
-                    <div class="metadata-label">Taille du Fichier</div>
-                    <div class="metadata-value">{{ document.formatted_file_size }}</div>
+                    <div class="metadata-label">Nombre de Pages</div>
+                    <div class="metadata-value">{{ metadata.total_pages }}</div>
                 </div>
             </div>
             {% endif %}
+            
+            <!-- Métadonneur -->
+            <div class="metadata-item">
+                <div class="metadata-icon green">
+                    <i class="material-icons">person</i>
+                </div>
+                <div class="metadata-content">
+                    <div class="metadata-label">Uploadé par (Métadonneur)</div>
+                    <div class="metadata-value">{{ metadata.owner }}</div>
+                </div>
+            </div>
+            
+            <!-- Date d'ajout -->
+            <div class="metadata-item">
+                <div class="metadata-icon purple">
+                    <i class="material-icons">schedule</i>
+                </div>
+                <div class="metadata-content">
+                    <div class="metadata-label">Date d'Ajout</div>
+                    <div class="metadata-value">{{ metadata.created_at|date:"d F Y à H:i" }}</div>
+                </div>
+            </div>
+            
+            <!-- Statut de validation -->
+            <div class="metadata-item">
+                <div class="metadata-icon {% if metadata.is_validated %}green{% else %}orange{% endif %}">
+                    <i class="material-icons">{% if metadata.is_validated %}check_circle{% else %}schedule{% endif %}</i>
+                </div>
+                <div class="metadata-content">
+                    <div class="metadata-label">Statut de Validation</div>
+                    <div class="metadata-value">
+                        {% if metadata.is_validated %}
+                            Validé le {{ metadata.validated_at|date:"d F Y à H:i"|default:"Non spécifié" }}
+                        {% else %}
+                            En attente de validation
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
         </div>
         
-        <!-- Tags -->
-        {% if document.tags_list %}
+        <!-- Contexte extrait -->
+        {% if document.context %}
         <div style="margin-top: 20px;">
-            <div class="metadata-label" style="margin-bottom: 8px;">MOTS-CLÉS</div>
-            <div class="tags-container">
-                {% for tag in document.tags_list %}
-                <span class="metadata-tag">{{ tag }}</span>
-                {% endfor %}
+            <div class="metadata-label" style="margin-bottom: 8px;">CONTEXTE EXTRAIT</div>
+            <div class="p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border-l-4 border-blue-400">
+                <p class="text-gray-700 leading-relaxed">{{ document.context }}</p>
             </div>
         </div>
         {% endif %}
@@ -533,62 +569,55 @@
     <div class="content-sections">
         <div class="main-content">
             <!-- Validation Info -->
-            {% if document.validation_status == 'validated' %}
+            {% if document.is_validated %}
             <div class="content-section">
                 <h3 class="section-title">
                     <i class="material-icons">verified_user</i>
-                    Informations de Validation
+                    Statut Expert et Validation
                 </h3>
                 <div class="metadata-grid">
                     <div class="metadata-item">
                         <div class="metadata-icon green">
-                            <i class="material-icons">person</i>
+                            <i class="material-icons">check_circle</i>
                         </div>
                         <div class="metadata-content">
-                            <div class="metadata-label">Validé par</div>
-                            <div class="metadata-value">{{ document.validated_by }}</div>
+                            <div class="metadata-label">Document Validé</div>
+                            <div class="metadata-value">{{ document.validated_at|date:"d F Y à H:i"|default:"Oui" }}</div>
                         </div>
                     </div>
                     <div class="metadata-item">
-                        <div class="metadata-icon blue">
-                            <i class="material-icons">schedule</i>
+                        <div class="metadata-icon {% if document.is_ready_for_expert %}green{% else %}orange{% endif %}">
+                            <i class="material-icons">{% if document.is_ready_for_expert %}expert_mode{% else %}schedule{% endif %}</i>
                         </div>
                         <div class="metadata-content">
-                            <div class="metadata-label">Date de Validation</div>
-                            <div class="metadata-value">{{ document.validation_date|date:"d F Y à H:i" }}</div>
+                            <div class="metadata-label">Prêt pour Expert</div>
+                            <div class="metadata-value">
+                                {% if document.is_ready_for_expert %}
+                                    Oui - {{ document.expert_ready_at|date:"d F Y à H:i"|default:"Prêt" }}
+                                {% else %}
+                                    Non
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
+                    {% if document.pages_extracted %}
+                    <div class="metadata-item">
+                        <div class="metadata-icon blue">
+                            <i class="material-icons">auto_awesome</i>
+                        </div>
+                        <div class="metadata-content">
+                            <div class="metadata-label">Pages Extraites</div>
+                            <div class="metadata-value">Oui ({{ document.total_pages }} pages)</div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
-                {% if document.validation_notes %}
-                <div style="margin-top: 16px;">
-                    <div class="metadata-label">Notes de Validation</div>
-                    <p style="margin: 8px 0 0 0; color: #475569;">{{ document.validation_notes }}</p>
-                </div>
-                {% endif %}
             </div>
             {% endif %}
         </div>
         
         <div class="sidebar-content">
-            <!-- Statistics -->
-            <div class="content-section">
-                <h3 class="section-title">
-                    <i class="material-icons">analytics</i>
-                    Statistiques
-                </h3>
-                <div class="stats-row">
-                    <div class="stat-item">
-                        <div class="stat-number">{{ document.view_count }}</div>
-                        <div class="stat-label">Vues</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">{{ document.download_count }}</div>
-                        <div class="stat-label">Téléchargements</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Related Documents -->
+            <!-- Documents Related -->
             {% if related_documents %}
             <div class="content-section">
                 <h3 class="section-title">
@@ -601,9 +630,9 @@
                         <i class="material-icons">description</i>
                     </div>
                     <div class="related-doc-content">
-                        <h5>{{ related.title|truncatechars:60 }}</h5>
+                        <h5>{{ related|document_title|truncatechars:60 }}</h5>
                         <div class="related-doc-meta">
-                            {{ related.authority.code }} • {{ related.get_document_type_display }}
+                            {{ related.source|default:related.country }} • {{ related.doc_type|default:"Document" }}
                         </div>
                     </div>
                 </a>

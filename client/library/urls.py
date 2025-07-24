@@ -1,12 +1,14 @@
 from django.urls import path, include
 from . import views
 
-app_name = 'client_library'
+app_name = 'library'
 
 urlpatterns = [
     # Vues HTML
     path('', views.library_dashboard, name='dashboard'),
     path('documents/', views.document_list, name='document_list'),
+    path('documents/horizontal/', views.document_list_horizontal, name='document_list_horizontal'),
+    path('category/<str:category>/', views.documents_by_category, name='documents_by_category'),
     path('documents/<int:pk>/', views.document_detail, name='document_detail'),
     path('documents/<int:pk>/download/', views.download_document, name='download_document'),
     path('upload/', views.upload_document, name='upload_document'),

@@ -14,7 +14,14 @@ class Product(models.Model):
     form = models.CharField(max_length=100, verbose_name="Forme")
     therapeutic_area = models.CharField(max_length=200, verbose_name="Zone thérapeutique")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='developpement')
-    
+    source_document = models.ForeignKey(
+        'rawdocs.RawDocument', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        verbose_name="Document source",
+        help_text="Document original ayant généré ce produit"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

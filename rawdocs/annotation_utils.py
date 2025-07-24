@@ -6,6 +6,7 @@ import requests
 from typing import List, Dict, Tuple
 from PyPDF2 import PdfReader
 
+
 def extract_pages_from_pdf(file_path: str) -> List[str]:
     """Extract text from each page of the PDF"""
     reader = PdfReader(file_path)
@@ -18,6 +19,7 @@ def extract_pages_from_pdf(file_path: str) -> List[str]:
         pages.append(page_text)
 
     return pages
+
 
 def call_mistral_annotation(page_text: str, page_number: int) -> List[Dict]:
     """
@@ -46,29 +48,29 @@ def call_mistral_annotation(page_text: str, page_number: int) -> List[Dict]:
            - French: "Type IA", "Type IB", "Type II", "notification de type IA/IB/II"
            - English: "IA", "IB", "II", "minor variation", "major variation"
            - "procédure centralisée", "centralised procedure", "MAA", "PSUR"
-           
+
         2. DELAY:
            - French: "immédiatement", "au moment de", "au terme de", "dans les X jours"
            - English: "30 days", "within 6 months", "Day 30", "immediately"
            - ANY time reference in French or English
-           
+
         3. AUTHORITY:
            - "EMA", "FDA", "CHMP", "PRAC", "autorités compétentes"
            - "État membre de référence", "reference Member State"
            - "autorité compétente nationale", "competent authority"
-           
+
         4. LEGAL_REFERENCE:
            - "Article X", "Annexe I/II/III", "ICH/VICH"
            - "lignes directrices applicables", "guidelines"
            - "résumé des caractéristiques du produit"
            - "Règlement", "Directive", ANY legal reference
-           
+
         5. REQUIRED_CONDITION:
            - Look for "Conditions à remplir" or "Conditions" sections
            - Find numbered items like "1. La nouvelle taille...", "2. Le matériau..."
            - French obligation words: "doit", "requise", "nécessaire"
            - Complete sentences that are requirements/conditions
-           
+
         6. REQUIRED_DOCUMENT:
            - Look for "Documents à fournir" or "Documents" sections
            - Find numbered items like "1. Version modifiée...", "2. Justification..."
@@ -105,7 +107,7 @@ def call_mistral_annotation(page_text: str, page_number: int) -> List[Dict]:
             "model": "mistral-large-latest",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.3,  # Slightly higher for more creativity
-            "max_tokens": 2500   # More tokens for more annotations
+            "max_tokens": 2500  # More tokens for more annotations
         }
 
         response = requests.post(url, headers=headers, json=data, timeout=60)
@@ -143,11 +145,12 @@ def call_mistral_annotation(page_text: str, page_number: int) -> List[Dict]:
                     valid_annotations = []
                     for i, ann in enumerate(ai_annotations):
                         if (isinstance(ann, dict) and
-                            all(k in ann for k in ['text', 'start_pos', 'end_pos', 'type', 'confidence', 'reasoning'])):
+                                all(k in ann for k in
+                                    ['text', 'start_pos', 'end_pos', 'type', 'confidence', 'reasoning'])):
                             valid_annotations.append(ann)
-                            print(f"  ✅ Valid annotation {i+1}: {ann['type']} - '{ann['text'][:30]}...'")
+                            print(f"  ✅ Valid annotation {i + 1}: {ann['type']} - '{ann['text'][:30]}...'")
                         else:
-                            print(f"  ❌ Invalid annotation {i+1}: {ann}")
+                            print(f"  ❌ Invalid annotation {i + 1}: {ann}")
 
                     print(f"✅ {len(valid_annotations)} valid annotations after validation")
                     # DEBUG: Show what LLM actually found
@@ -197,6 +200,7 @@ def call_mistral_annotation(page_text: str, page_number: int) -> List[Dict]:
     except Exception as e:
         print(f"❌ Error calling Mistral: {e}")
         return find_aggressive_patterns(page_text)
+
 
 def find_structured_french_entities(text: str) -> List[Dict]:
     """
@@ -253,6 +257,7 @@ def find_structured_french_entities(text: str) -> List[Dict]:
     print(f"🇫🇷 Structured French detection found {len(entities)} conditions/documents")
     return entities
 
+
 def find_aggressive_patterns(text: str) -> List[Dict]:
     """
     FRENCH-AWARE aggressive pattern detection - find everything!
@@ -265,9 +270,11 @@ def find_aggressive_patterns(text: str) -> List[Dict]:
         (r'\bType\s+(IA|IB|II)\b', 'procedure_type', 0.95),
         (r'\bnotification\s+de\s+type\s+(IA|IB|II)\b', 'procedure_type', 0.95),
         (r'\b(IA|IB|II)\s+(?:variation|IN)\b', 'procedure_type', 0.9),
-        (r'\b(IA|IB|II)\b(?!\s+(?:to|the|and|or|is|are|will|can|may|of|in|on|at|by|for|dans|de|du|le|la|les|et|ou|est|sont|avec))', 'procedure_type', 0.85),
+        (r'\b(IA|IB|II)\b(?!\s+(?:to|the|and|or|is|are|will|can|may|of|in|on|at|by|for|dans|de|du|le|la|les|et|ou|est|sont|avec))',
+         'procedure_type', 0.85),
         (r'\b(variation\s+mineure|variation\s+majeure|minor\s+variation|major\s+variation)\b', 'procedure_type', 0.9),
-        (r'\b(procédure\s+centralisée|centralised\s+procedure|mutual\s+recognition|national\s+procedure)\b', 'procedure_type', 0.9),
+        (r'\b(procédure\s+centralisée|centralised\s+procedure|mutual\s+recognition|national\s+procedure)\b',
+         'procedure_type', 0.9),
         (r'\b(MAA|PSUR|PBRER|CCDS)\b', 'procedure_type', 0.85),
 
         # Delays - French time expressions
@@ -299,11 +306,10 @@ def find_aggressive_patterns(text: str) -> List[Dict]:
         (r'\b(ICH/?VICH|ICH\s+[A-Z]\d+)', 'legal_reference', 0.9),
         (r'\b(GCP|GMP|GLP|BPF|BPC|BPL)\b', 'legal_reference', 0.8),
         (r'\b(lignes?\s+directrices?\s+applicables?|guidelines?)', 'legal_reference', 0.8),
-        (r'\b(résumé\s+des\s+caractéristiques\s+du\s+produit|summary\s+of\s+product\s+characteristics)', 'legal_reference', 0.85),
+        (r'\b(résumé\s+des\s+caractéristiques\s+du\s+produit|summary\s+of\s+product\s+characteristics)',
+         'legal_reference', 0.85),
 
-
-
-        ]
+    ]
 
     # Add special detection for STRUCTURED French conditions and documents
     structured_entities = find_structured_french_entities(text)
@@ -336,7 +342,6 @@ def find_aggressive_patterns(text: str) -> List[Dict]:
     return entities
 
 
-
 def combine_llm_and_patterns(llm_results: List[Dict], pattern_results: List[Dict], text: str) -> List[Dict]:
     """
     Combine LLM and pattern results with smart filtering for false positives
@@ -361,7 +366,7 @@ def combine_llm_and_patterns(llm_results: List[Dict], pattern_results: List[Dict
             overlaps = False
             for existing in combined:
                 if (ann['start_pos'] < existing['end_pos'] and
-                    ann['end_pos'] > existing['start_pos']):
+                        ann['end_pos'] > existing['start_pos']):
                     overlaps = True
                     break
 
@@ -373,6 +378,7 @@ def combine_llm_and_patterns(llm_results: List[Dict], pattern_results: List[Dict
 
     print(f"✅ Combined to {len(combined)} unique annotations")
     return combined
+
 
 def is_valid_entity(ann: Dict) -> bool:
     """
@@ -422,6 +428,7 @@ def is_valid_entity(ann: Dict) -> bool:
 
     return True
 
+
 def validate_annotation_positions(text: str, annotations: List[Dict]) -> List[Dict]:
     """
     Validate and fix annotation positions with DEBUG
@@ -439,9 +446,9 @@ def validate_annotation_positions(text: str, annotations: List[Dict]) -> List[Di
             actual_text = text[start:end]
             if actual_text.strip().lower() == expected_text.strip().lower():
                 validated.append(ann)
-                print(f"  ✅ {i+1}: Perfect match '{expected_text[:20]}...'")
+                print(f"  ✅ {i + 1}: Perfect match '{expected_text[:20]}...'")
             else:
-                print(f"  ⚠️  {i+1}: Position mismatch for '{expected_text[:20]}...'")
+                print(f"  ⚠️  {i + 1}: Position mismatch for '{expected_text[:20]}...'")
                 print(f"      Expected: '{expected_text}'")
                 print(f"      Got: '{actual_text}'")
 
@@ -471,7 +478,7 @@ def validate_annotation_positions(text: str, annotations: List[Dict]) -> List[Di
                     else:
                         print(f"      ❌ Could not validate: '{expected_text[:20]}...'")
         else:
-            print(f"  ❌ {i+1}: Invalid position range for '{expected_text[:20]}...'")
+            print(f"  ❌ {i + 1}: Invalid position range for '{expected_text[:20]}...'")
 
     print(f"📍 Validated {len(validated)} out of {len(annotations)} annotations")
 
@@ -479,21 +486,23 @@ def validate_annotation_positions(text: str, annotations: List[Dict]) -> List[Di
     validated = fix_overlapping_annotations(validated, text)
     return validated
 
+
 def get_annotation_colors():
     """
     Return color mapping for different annotation types
     """
     return {
-        'procedure_type': '#3b82f6',    # Blue
-        'country': '#10b981',           # Green
-        'authority': '#8b5cf6',         # Purple
-        'legal_reference': '#f59e0b',   # Yellow
-        'required_document': '#ef4444', # Red
-        'required_condition': '#06b6d4', # Cyan
-        'delay': '#84cc16',             # Lime
-        'variation_code': '#f97316',    # Orange
-        'file_type': '#6b7280',         # Gray
+        'procedure_type': '#3b82f6',  # Blue
+        'country': '#10b981',  # Green
+        'authority': '#8b5cf6',  # Purple
+        'legal_reference': '#f59e0b',  # Yellow
+        'required_document': '#ef4444',  # Red
+        'required_condition': '#06b6d4',  # Cyan
+        'delay': '#84cc16',  # Lime
+        'variation_code': '#f97316',  # Orange
+        'file_type': '#6b7280',  # Gray
     }
+
 
 def create_annotation_types():
     """
@@ -525,6 +534,7 @@ def create_annotation_types():
 
     print("✅ Annotation types created/updated")
 
+
 def fix_overlapping_annotations(annotations, text):
     """
     Fix overlapping annotations
@@ -543,7 +553,7 @@ def fix_overlapping_annotations(annotations, text):
             overlaps = False
             for existing in fixed_annotations:
                 if (ann['start_pos'] < existing['end_pos'] and
-                    ann['end_pos'] > existing['start_pos']):
+                        ann['end_pos'] > existing['start_pos']):
                     overlaps = True
                     break
 

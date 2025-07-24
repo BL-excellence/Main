@@ -1,5 +1,5 @@
-from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils.decorators import method_decorator
@@ -154,6 +154,7 @@ def product_overview(request, pk):
                 'form': product.form,
                 'therapeutic_area': product.therapeutic_area,
                 'status': product.status,
+                'source_document': product.source_document.id if product.source_document else None, 
                 'created_at': product.created_at.isoformat(),
                 'updated_at': product.updated_at.isoformat(),
             },
@@ -262,4 +263,41 @@ def product_variations(request, pk):
         return Response(
             {'error': str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+
+def product_source_document_view(request, pk):
+    """View to display the source document for a product"""
+    product = get_object_or_404(Product, pk=pk)
+    
+    # Check if product has a source document
+    if hasattr(product, 'source_document') and product.source_document:
+        document = product.source_document
+        
+        # Check if document file exists
+        if document.file:
+            try:
+                # Serve the PDF file directly in browser
+                response = HttpResponse(document.file.read(), content_type='application/pdf')
+                response['Content-Disposition'] = f'inline; filename="{document.file.name}"'
+                return response
+            except:
+                # If file doesn't exist, show error
+                return HttpResponse(
+                    "<html><body><h2>Erreur</h2>"
+                    "<p>Le fichier PDF n'a pas pu être chargé.</p>"
+                    "<script>window.close();</script></body></html>"
+                )
+        else:
+            return HttpResponse(
+                "<html><body><h2>Aucun fichier disponible</h2>"
+                "<p>Ce document n'a pas de fichier PDF associé.</p>"
+                "<script>window.close();</script></body></html>"
+            )
+    else:
+        # Return a simple message if no source document exists
+        return HttpResponse(
+            "<html><body><h2>Aucun document source disponible</h2>"
+            "<p>Ce produit n'a pas de document source associé.</p>"
+            "<script>window.close();</script></body></html>"
         )

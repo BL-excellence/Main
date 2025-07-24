@@ -75,7 +75,12 @@
             </div>
         </div>
         <div class="col-md-4 text-end">
-            <small class="text-muted">Sélectionnez un type, puis surlignez du texte</small>
+            <button class="btn btn-outline-info btn-sm me-2" onclick="viewOriginalDocument({{ document.id }})">
+                <i class="fas fa-eye"></i> See Original Doc
+            </button>
+            <div class="mt-1">
+                <small class="text-muted">Sélectionnez un type, puis surlignez du texte</small>
+            </div>
         </div>
     </div>
     
@@ -96,7 +101,10 @@
         <div class="row align-items-center">
                         <div class="col-md-6">
                             <span class="badge bg-info me-2">{{ annotation.annotation_type.display_name }}</span>
-                            <strong>"{{ annotation.selected_text }}"</strong>
+                            <strong class="annotation-text-clickable" 
+                                    onclick="highlightTextInDocument('{{ annotation.selected_text|escapejs }}', {{ annotation.start_pos }}, {{ annotation.end_pos }})"
+                                    style="cursor: pointer; color: #0d6efd; text-decoration: underline;"
+                                    title="Cliquez pour voir dans le texte">"{{ annotation.selected_text }}"</strong>
                         </div>
                         <div class="col-md-3 text-center">
                             {% if annotation.validation_status == 'validated' or annotation.validation_status == 'expert_created' %}
@@ -579,6 +587,137 @@ function createNewAnnotation() {
     // Reset selection
     currentSelection = null;
 }
+function highlightTextInDocument(text, startPos, endPos) {
+    const pageDisplay = document.getElementById('page-display');
+    
+    // Store the clean original text content (not HTML)
+    const originalTextContent = pageDisplay.textContent;
+    
+    // Remove any existing highlights first
+    clearExistingHighlights();
+    
+    try {
+        // Reset to clean text content
+        pageDisplay.textContent = originalTextContent;
+        
+        let content = pageDisplay.textContent;
+        let targetText = text.trim();
+        
+        // Try multiple search strategies
+        let textIndex = -1;
+        
+        // Strategy 1: Exact match
+        textIndex = content.indexOf(targetText);
+        
+        // Strategy 2: Case insensitive
+        if (textIndex === -1) {
+            textIndex = content.toLowerCase().indexOf(targetText.toLowerCase());
+        }
+        
+        // Strategy 3: Remove extra whitespace and try again
+        if (textIndex === -1) {
+            const cleanTarget = targetText.replace(/\s+/g, ' ');
+            const cleanContent = content.replace(/\s+/g, ' ');
+            textIndex = cleanContent.indexOf(cleanTarget);
+            if (textIndex !== -1) {
+                content = cleanContent;
+                targetText = cleanTarget;
+                // Update the display with cleaned content
+                pageDisplay.textContent = cleanContent;
+            }
+        }
+        
+        // Strategy 4: Try with partial match (first 20 chars)
+        if (textIndex === -1 && targetText.length > 20) {
+            const partialTarget = targetText.substring(0, 20);
+            textIndex = content.indexOf(partialTarget);
+            if (textIndex !== -1) {
+                let endIndex = textIndex + targetText.length;
+                if (endIndex > content.length) endIndex = content.length;
+                targetText = content.substring(textIndex, endIndex);
+            }
+        }
+        
+        // Strategy 5: Try word-by-word search for long texts
+        if (textIndex === -1 && targetText.length > 30) {
+            const words = targetText.split(/\s+/).slice(0, 3);
+            const searchPattern = words.join('\\s+');
+            const regex = new RegExp(searchPattern, 'i');
+            const match = content.match(regex);
+            if (match) {
+                textIndex = match.index;
+                targetText = match[0];
+            }
+        }
+        
+        if (textIndex !== -1) {
+            // Create highlighted version
+            const beforeText = content.substring(0, textIndex);
+            const highlightedText = content.substring(textIndex, textIndex + targetText.length);
+            const afterText = content.substring(textIndex + targetText.length);
+            
+            // Replace with highlighted version
+            pageDisplay.innerHTML = 
+                beforeText + 
+                '<span id="highlighted-annotation" style="background-color: #fff3cd; padding: 2px 4px; border-radius: 3px; border: 2px solid #ffc107; animation: highlight-pulse 2s ease-in-out;">' + 
+                highlightedText + 
+                '</span>' + 
+                afterText;
+            
+            // Scroll to the highlighted text
+            document.getElementById('highlighted-annotation').scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+            
+            // Clear any existing timeout
+            if (window.highlightTimeout) {
+                clearTimeout(window.highlightTimeout);
+            }
+            
+            // Remove highlight after 5 seconds and restore clean text
+            window.highlightTimeout = setTimeout(() => {
+                pageDisplay.textContent = originalTextContent; // Restore clean original text
+            }, 5000);
+            
+            console.log('Found and highlighted:', highlightedText);
+            
+        } else {
+            console.log('Text not found:', targetText);
+            alert('Texte non trouvé: "' + targetText.substring(0, 50) + (targetText.length > 50 ? '...' : '') + '"');
+        }
+    } catch (error) {
+        console.error('Error highlighting text:', error);
+        pageDisplay.textContent = originalTextContent;
+    }
+}
+
+function clearExistingHighlights() {
+    // Clear any existing timeout
+    if (window.highlightTimeout) {
+        clearTimeout(window.highlightTimeout);
+    }
+    
+    // Remove any existing highlights
+    const existingHighlight = document.getElementById('highlighted-annotation');
+    if (existingHighlight) {
+        const parent = existingHighlight.parentNode;
+        parent.replaceChild(document.createTextNode(existingHighlight.textContent), existingHighlight);
+        parent.normalize(); // Merge adjacent text nodes
+    }
+}
+function viewOriginalDocument(documentId) {
+    if (!documentId) {
+        alert('Document ID non disponible');
+        return;
+    }
+    
+    // Create the URL to view the original document
+    const documentUrl = `/expert/documents/${documentId}/view-original/`;
+    
+    // Open in new window like the products interface
+    window.open(documentUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+}
 
 
 
@@ -625,5 +764,17 @@ function createNewAnnotation() {
 .badge.bg-success { background-color: #198754 !important; }
 .badge.bg-danger { background-color: #dc3545 !important; }
 .badge.bg-warning { background-color: #ffc107 !important; color: #000 !important; }
+
+@keyframes highlight-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
+    50% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0.3); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+
+.annotation-text-clickable:hover {
+    background-color: #e7f3ff !important;
+    border-radius: 3px;
+    padding: 1px 3px;
+}
 </style>
 {% endblock %}

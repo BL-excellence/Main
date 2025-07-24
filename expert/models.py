@@ -18,7 +18,7 @@ class ExpertLog(models.Model):
         ('validation_undone', 'Validation annulée'),
         ('document_reviewed', 'Document révisé'),
         ('sentence_reviewed', 'Phrase révisée'),
-        ('annotation_type_created', 'Type d\'annotation créé'), 
+        ('annotation_type_created', 'Type d\'annotation créé'),
         ('document_validated_product_created', 'Document validé et produit créé'),
     ]
 
@@ -27,7 +27,7 @@ class ExpertLog(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     session_id = models.CharField(max_length=100, blank=True)
 
-    # Info document/phrase  
+    # Info document/phrase
     document_id = models.IntegerField()
     document_title = models.CharField(max_length=500)
     page_id = models.IntegerField(null=True, blank=True)

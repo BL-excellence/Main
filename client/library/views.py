@@ -10,6 +10,8 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from client.library.models import Document, DocumentCategory, RegulatoryAuthority, DocumentTranslation
+# Import des modèles RawDocument pour la bibliothèque
+from rawdocs.models import RawDocument
 import json
 import logging
 import os
@@ -17,72 +19,119 @@ import os
 logger = logging.getLogger(__name__)
 
 def library_dashboard(request):
-    """Vue principale de la library"""
-    # Statistiques générales
-    total_documents = Document.objects.filter(validation_status='validated').count()
-    pending_validation = Document.objects.filter(validation_status='pending').count()
-    authorities_count = RegulatoryAuthority.objects.count()
-    categories_count = DocumentCategory.objects.count()
+    """Vue principale de la library - affiche les documents des métadonneurs"""
+    # Statistiques générales basées sur RawDocument
+    total_documents = RawDocument.objects.filter(is_validated=True).count()
+    pending_validation = RawDocument.objects.filter(is_validated=False).count()
+    total_metadonneurs = RawDocument.objects.values('owner').distinct().count()
     
-    # Documents récents
-    recent_documents = Document.objects.filter(validation_status='validated').select_related('authority', 'category').order_by('-created_at')[:10]
+    # Documents récents validés avec métadonnées
+    recent_documents = RawDocument.objects.filter(
+        is_validated=True
+    ).select_related('owner').order_by('-created_at')[:10]
     
-    # Statistiques par catégorie
-    category_stats = DocumentCategory.objects.annotate(
-        doc_count=Count('document', filter=Q(document__validation_status='validated'))
-    ).order_by('-doc_count')
+    # Statistiques par type de document
+    document_type_stats = RawDocument.objects.filter(
+        is_validated=True
+    ).exclude(doc_type='').values('doc_type').annotate(
+        count=Count('id')
+    ).order_by('-count')[:5]
     
-    # Statistiques par autorité
-    authority_stats = RegulatoryAuthority.objects.annotate(
-        doc_count=Count('document', filter=Q(document__validation_status='validated'))
-    ).order_by('-doc_count')[:5]
+    # Statistiques par pays
+    country_stats = RawDocument.objects.filter(
+        is_validated=True
+    ).exclude(country='').values('country').annotate(
+        count=Count('id')
+    ).order_by('-count')[:5]
+    
+    # 🆕 Statistiques par source avec catégories personnalisées
+    source_stats = RawDocument.objects.filter(
+        is_validated=True
+    ).exclude(source='').values('source').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    # Créer des catégories basées sur les sources
+    categories = {}
+    neutral_count = 0
+    
+    for stat in source_stats:
+        source_name = stat['source'].upper()
+        count = stat['count']
+        
+        # Mapper les sources aux catégories connues
+        if 'EMA' in source_name or 'EUROPEAN' in source_name:
+            if 'EMA' not in categories:
+                categories['EMA'] = {'name': 'EMA', 'count': 0, 'color': '#3498db'}
+            categories['EMA']['count'] += count
+        elif 'FDA' in source_name:
+            if 'FDA' not in categories:
+                categories['FDA'] = {'name': 'FDA', 'count': 0, 'color': '#e74c3c'}
+            categories['FDA']['count'] += count
+        elif 'ICH' in source_name:
+            if 'ICH' not in categories:
+                categories['ICH'] = {'name': 'ICH', 'count': 0, 'color': '#f39c12'}
+            categories['ICH']['count'] += count
+        elif 'ANSM' in source_name:
+            if 'ANSM' not in categories:
+                categories['ANSM'] = {'name': 'ANSM', 'count': 0, 'color': '#2ecc71'}
+            categories['ANSM']['count'] += count
+        elif 'MHRA' in source_name:
+            if 'MHRA' not in categories:
+                categories['MHRA'] = {'name': 'MHRA', 'count': 0, 'color': '#9b59b6'}
+            categories['MHRA']['count'] += count
+        else:
+            neutral_count += count
+    
+    # Ajouter la catégorie Neutre si nécessaire
+    if neutral_count > 0:
+        categories['NEUTRE'] = {'name': 'Neutre', 'count': neutral_count, 'color': '#95a5a6'}
     
     context = {
         'total_documents': total_documents,
-        'pending_validation': pending_validation,
-        'authorities_count': authorities_count,
-        'categories_count': categories_count,
+        'pending_validation': pending_validation, 
+        'total_metadonneurs': total_metadonneurs,
         'recent_documents': recent_documents,
-        'category_stats': category_stats,
-        'authority_stats': authority_stats,
+        'document_type_stats': document_type_stats,
+        'country_stats': country_stats,
+        'source_categories': categories,  # 🆕 Nouvelles catégories par source
     }
     
     return render(request, 'client/library/dashboard.html', context)
 
 def document_list(request):
-    """Liste des documents avec filtrage"""
+    """Liste des documents RawDocument avec filtrage"""
     # Paramètres de filtrage
     search = request.GET.get('search', '')
     document_type = request.GET.get('type', '')
-    authority_id = request.GET.get('authority', '')
-    category_id = request.GET.get('category', '')
+    country = request.GET.get('country', '')
     language = request.GET.get('language', '')
     validation_status = request.GET.get('status', 'validated')
     
-    # Construction de la requête
-    documents_qs = Document.objects.select_related('authority', 'category').all()
+    # Construction de la requête sur RawDocument
+    documents_qs = RawDocument.objects.select_related('owner').all()
     
-    if validation_status:
-        documents_qs = documents_qs.filter(validation_status=validation_status)
+    # Filtrer seulement les documents validés par défaut
+    if validation_status == 'validated':
+        documents_qs = documents_qs.filter(is_validated=True)
+    elif validation_status == 'pending':
+        documents_qs = documents_qs.filter(is_validated=False)
     
     if search:
         documents_qs = documents_qs.filter(
             Q(title__icontains=search) | 
-            Q(description__icontains=search) |
-            Q(tags__icontains=search)
+            Q(source__icontains=search) |
+            Q(context__icontains=search)
         )
     
     if document_type:
-        documents_qs = documents_qs.filter(document_type=document_type)
+        documents_qs = documents_qs.filter(doc_type__icontains=document_type)
     
-    if authority_id:
-        documents_qs = documents_qs.filter(authority_id=authority_id)
-    
-    if category_id:
-        documents_qs = documents_qs.filter(category_id=category_id)
+    if country:
+        documents_qs = documents_qs.filter(country__icontains=country)
     
     if language:
-        documents_qs = documents_qs.filter(language=language)
+        documents_qs = documents_qs.filter(language__icontains=language)
     
     documents_qs = documents_qs.order_by('-created_at')
     
@@ -91,22 +140,20 @@ def document_list(request):
     page_number = request.GET.get('page')
     documents = paginator.get_page(page_number)
     
-    # Options de filtrage
-    authorities = RegulatoryAuthority.objects.all().order_by('name')
-    categories = DocumentCategory.objects.all().order_by('name')
+    # Options de filtrage basées sur RawDocument
+    document_types = RawDocument.objects.filter(is_validated=True).exclude(doc_type='').values_list('doc_type', flat=True).distinct()
+    countries = RawDocument.objects.filter(is_validated=True).exclude(country='').values_list('country', flat=True).distinct()
+    languages = RawDocument.objects.filter(is_validated=True).exclude(language='').values_list('language', flat=True).distinct()
     
     context = {
         'documents': documents,
-        'authorities': authorities,
-        'categories': categories,
-        'document_types': Document.DOCUMENT_TYPES,
-        'languages': Document.LANGUAGES,
-        'validation_statuses': Document.VALIDATION_STATUS,
+        'document_types': document_types,
+        'countries': countries,
+        'languages': languages,
         'filters': {
             'search': search,
             'type': document_type,
-            'authority': authority_id,
-            'category': category_id,
+            'country': country,
             'language': language,
             'status': validation_status,
         }
@@ -114,53 +161,164 @@ def document_list(request):
     
     return render(request, 'client/library/document_list.html', context)
 
+def documents_by_category(request, category):
+    """Documents filtrés par catégorie de source"""
+    # Définir les filtres de source par catégorie
+    source_filters = {
+        'ema': ['EMA', 'EUROPEAN', 'European Medicines Agency'],
+        'fda': ['FDA', 'Food and Drug Administration'],
+        'ich': ['ICH', 'International Council for Harmonisation'],
+        'ansm': ['ANSM', 'Agence nationale de sécurité du médicament'],
+        'mhra': ['MHRA', 'Medicines and Healthcare products Regulatory Agency'],
+        'neutre': []  # Pour les autres sources
+    }
+    
+    category_lower = category.lower()
+    documents_qs = RawDocument.objects.filter(is_validated=True).select_related('owner')
+    
+    if category_lower in source_filters and source_filters[category_lower]:
+        # Filtrer par sources spécifiques
+        source_query = Q()
+        for source_pattern in source_filters[category_lower]:
+            source_query |= Q(source__icontains=source_pattern)
+        documents_qs = documents_qs.filter(source_query)
+    elif category_lower == 'neutre':
+        # Exclure toutes les sources connues
+        exclude_query = Q()
+        for source_list in source_filters.values():
+            if source_list:  # Ignorer la liste vide pour 'neutre'
+                for pattern in source_list:
+                    exclude_query |= Q(source__icontains=pattern)
+        documents_qs = documents_qs.exclude(exclude_query)
+    
+    documents_qs = documents_qs.order_by('-created_at')
+    
+    # Pagination
+    paginator = Paginator(documents_qs, 20)
+    page_number = request.GET.get('page')
+    documents = paginator.get_page(page_number)
+    
+    context = {
+        'documents': documents,
+        'category': category.upper(),
+        'category_display': {
+            'ema': 'EMA - European Medicines Agency',
+            'fda': 'FDA - Food and Drug Administration', 
+            'ich': 'ICH - International Council for Harmonisation',
+            'ansm': 'ANSM - Agence nationale de sécurité du médicament',
+            'mhra': 'MHRA - Medicines and Healthcare products Regulatory Agency',
+            'neutre': 'Documents - Sources Diverses'
+        }.get(category_lower, category.upper()),
+    }
+    
+    return render(request, 'client/library/documents_by_category.html', context)
+
+def document_list_horizontal(request):
+    """Liste horizontale des documents avec noms et données principales"""
+    # Paramètres de filtrage
+    search = request.GET.get('search', '')
+    document_type = request.GET.get('type', '')
+    country = request.GET.get('country', '')
+    language = request.GET.get('language', '')
+    
+    # Construction de la requête sur RawDocument
+    documents_qs = RawDocument.objects.filter(is_validated=True).select_related('owner')
+    
+    if search:
+        documents_qs = documents_qs.filter(
+            Q(title__icontains=search) | 
+            Q(source__icontains=search) |
+            Q(context__icontains=search)
+        )
+    
+    if document_type:
+        documents_qs = documents_qs.filter(doc_type__icontains=document_type)
+    
+    if country:
+        documents_qs = documents_qs.filter(country__icontains=country)
+    
+    if language:
+        documents_qs = documents_qs.filter(language__icontains=language)
+    
+    documents_qs = documents_qs.order_by('-created_at')
+    
+    # Pagination
+    paginator = Paginator(documents_qs, 50)  # Plus de documents pour la vue horizontale
+    page_number = request.GET.get('page')
+    documents = paginator.get_page(page_number)
+    
+    # Options de filtrage
+    document_types = RawDocument.objects.filter(is_validated=True).exclude(doc_type='').values_list('doc_type', flat=True).distinct()
+    countries = RawDocument.objects.filter(is_validated=True).exclude(country='').values_list('country', flat=True).distinct()
+    languages = RawDocument.objects.filter(is_validated=True).exclude(language='').values_list('language', flat=True).distinct()
+    
+    context = {
+        'documents': documents,
+        'document_types': document_types,
+        'countries': countries,
+        'languages': languages,
+        'filters': {
+            'search': search,
+            'type': document_type,
+            'country': country,
+            'language': language,
+        }
+    }
+    
+    return render(request, 'client/library/document_list_horizontal.html', context)
+
 def document_detail(request, pk):
-    """Détail d'un document"""
-    document = get_object_or_404(Document, pk=pk)
+    """Détail d'un RawDocument avec ses métadonnées extraites par les métadonneurs"""
+    document = get_object_or_404(RawDocument, pk=pk, is_validated=True)
     
-    # Incrémenter le compteur de vues
-    document.view_count += 1
-    document.save(update_fields=['view_count'])
+    # Utiliser directement les métadonnées extraites par les métadonneurs
+    # stockées dans les champs du modèle RawDocument
+    metadata = {
+        'title': document.title or 'Non spécifié',
+        'doc_type': document.doc_type or 'Non spécifié', 
+        'publication_date': document.publication_date or 'Non spécifiée',
+        'version': document.version or 'Non spécifiée',
+        'source': document.source or 'Non spécifiée',
+        'context': document.context or 'Non spécifié',
+        'country': document.country or 'Non spécifié',
+        'language': document.language or 'Non spécifiée',
+        'url_source': document.url_source or document.url or 'Non spécifiée',
+        'owner': document.owner.username if document.owner else 'Non spécifié',
+        'created_at': document.created_at,
+        'is_validated': document.is_validated,
+        'validated_at': document.validated_at,
+        'total_pages': document.total_pages,
+        'pages_extracted': document.pages_extracted,
+        'is_ready_for_expert': document.is_ready_for_expert,
+        'expert_ready_at': document.expert_ready_at,
+    }
     
-    # Traductions disponibles
-    translations = DocumentTranslation.objects.filter(original_document=document, validated=True)
-    
-    # Versions du document
-    versions = document.versions.all().order_by('-created_at')
-    
-    # Documents similaires (même autorité et type)
-    related_documents = Document.objects.filter(
-        authority=document.authority,
-        document_type=document.document_type,
-        validation_status='validated'
-    ).exclude(pk=document.pk).select_related('authority', 'category')[:5]
+    # Documents similaires (même type et pays)
+    related_documents = RawDocument.objects.filter(
+        doc_type=document.doc_type,
+        country=document.country,
+        is_validated=True
+    ).exclude(pk=document.pk)[:5]
     
     context = {
         'document': document,
-        'translations': translations,
-        'versions': versions,
+        'metadata': metadata,
         'related_documents': related_documents,
     }
     
     return render(request, 'client/library/document_detail.html', context)
 
 def download_document(request, pk):
-    """Télécharger un document"""
-    document = get_object_or_404(Document, pk=pk)
-    
-    if document.validation_status != 'validated':
-        raise Http404("Document non validé")
+    """Télécharger un RawDocument"""
+    document = get_object_or_404(RawDocument, pk=pk, is_validated=True)
     
     if not document.file:
         raise Http404("Fichier non trouvé")
     
-    # Incrémenter le compteur de téléchargements
-    document.download_count += 1
-    document.save(update_fields=['download_count'])
-    
     # Retourner le fichier
-    response = HttpResponse(document.file.read(), content_type='application/octet-stream')
-    response['Content-Disposition'] = f'attachment; filename="{document.title}{document.file_extension}"'
+    response = HttpResponse(document.file.read(), content_type='application/pdf')
+    filename = document.file.name.split('/')[-1]
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
 @api_view(['GET'])

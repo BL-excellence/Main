@@ -1,0 +1,472 @@
+{% extends 'client/base.html' %}
+{% load static %}
+{% load document_filters %}
+
+{% block title %}Liste Horizontale - Documents{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Header stylisé */
+.page-header {
+    background: linear-gradient(90deg, #059669 0%, #06b6d4 90%, #14b8a6 100%);
+    border-radius: 2rem;
+    padding: 2.5rem 2rem 2.2rem 2rem;
+    margin-bottom: 1.5rem;
+    color: #fff;
+    box-shadow: 0 6px 36px 0 rgba(16,185,129,0.08), 0 2px 10px 0 rgba(45,212,191,0.11);
+    position: relative;
+    overflow: hidden;
+}
+.page-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2.2rem;
+}
+.page-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+.page-header-icon {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #ef4444 70%, #be185d 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1.1rem;
+    box-shadow: 0 3px 16px #be185d39;
+}
+.page-header-icon .material-icons {
+    font-size: 2.3rem;
+    color: #fff;
+}
+.page-header-titles h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0 0 6px 0;
+    letter-spacing: -1px;
+    color: #fff;
+    text-shadow: 0 1px 4px #14532d33;
+}
+.page-header-titles p {
+    color: #a7f3d0;
+    font-size: 1.05rem;
+    margin: 0;
+    font-weight: 400;
+}
+.page-header-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+.page-header-actions a {
+    background: rgba(255,255,255,0.17);
+    color: #fff;
+    padding: 0.85rem 1.45rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 2px 10px 0 #10b98118;
+    transition: background 0.18s, color 0.16s;
+}
+.page-header-actions a:hover {
+    background: rgba(255,255,255,0.29);
+    color: #16a34a;
+}
+
+/* Filtres stylisés horizontal */
+.filters-bar {
+    background: #fff;
+    border-radius: 1.3rem;
+    box-shadow: 0 1.5px 8px 0 #10b9811b;
+    border: 1.5px solid #d1fae5;
+    padding: 1.1rem 2rem;
+    margin-bottom: 2.1rem;
+    display: flex;
+    align-items: flex-end;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+.filters-bar label {
+    font-size: 0.96rem;
+    color: #047857;
+    font-weight: 600;
+    margin-bottom: 0.32rem;
+    display: block;
+}
+.filters-bar input,
+.filters-bar select {
+    font-size: 0.98rem;
+    border-radius: 0.7rem;
+    border: 1.2px solid #d1d5db;
+    padding: 0.56rem 1.1rem;
+    width: 100%;
+    background: #f0fdf4;
+    transition: border 0.15s;
+}
+.filters-bar input:focus,
+.filters-bar select:focus {
+    border: 1.5px solid #059669;
+    outline: none;
+    background: #fff;
+}
+.filters-bar .filters-col {
+    flex: 1 1 210px;
+    min-width: 140px;
+    margin-bottom: 0;
+}
+.filters-bar .filters-action {
+    flex: 0 0 auto;
+    margin-bottom: 0;
+}
+.filters-bar button {
+    background: linear-gradient(90deg, #059669 60%, #06b6d4 100%);
+    color: #fff;
+    font-weight: 600;
+    padding: 0.72rem 1.8rem;
+    border-radius: 10px;
+    font-size: 1rem;
+    box-shadow: 0 1.5px 6px #10b98124;
+    border: none;
+    transition: background 0.13s, box-shadow 0.12s;
+}
+.filters-bar button:hover {
+    background: linear-gradient(90deg, #059669 60%, #14532d 100%);
+    box-shadow: 0 4px 16px #10b9812b;
+}
+
+/* Table */
+.table-wrap {
+    background: #fff;
+    border-radius: 1.2rem;
+    box-shadow: 0 1.5px 10px #06b6d40c;
+    border: 1.5px solid #f0fdf4;
+    overflow: hidden;
+}
+.table-wrap table {
+    width: 100%;
+    min-width: 900px;
+    font-size: 1rem;
+}
+.table-wrap thead {
+    background: linear-gradient(90deg, #f0fdf4 40%, #a7f3d0 100%);
+    border-bottom: 2px solid #99f6e4;
+}
+.table-wrap th {
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #047857;
+    padding: 1rem 0.7rem;
+    letter-spacing: 0.06em;
+}
+.table-wrap td {
+    padding: 0.88rem 0.7rem;
+    vertical-align: middle;
+    font-size: 0.96rem;
+}
+.table-wrap tbody tr {
+    transition: background 0.18s;
+    cursor: pointer;
+}
+.table-wrap tbody tr:hover {
+    background: #f0fdf4;
+}
+.table-wrap .doc-title {
+    font-weight: 700;
+    color: #0f172a;
+    max-width: 230px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.table-wrap .doc-context {
+    font-size: 0.92em;
+    color: #4b5563;
+    margin-top: 1.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 210px;
+}
+.table-wrap .badge-blue {
+    background: #dbeafe; color: #2563eb; border-radius: 9999px; font-weight:600; padding: 0.19em 0.9em; font-size: 0.95em;
+}
+.table-wrap .badge-green {
+    background: #bbf7d0; color: #047857; border-radius: 9999px; font-weight:600; padding: 0.19em 0.9em; font-size: 0.95em;
+}
+.table-wrap .badge-orange {
+    background: #fde68a; color: #b45309; border-radius: 9999px; font-weight:600; padding: 0.19em 0.9em; font-size: 0.95em;
+}
+.table-wrap .badge-purple {
+    background: #ede9fe; color: #7c3aed; border-radius: 9999px; font-weight:600; padding: 0.19em 0.9em; font-size: 0.95em;
+}
+.table-wrap .badge-gray {
+    background: #f1f5f9; color: #64748b; border-radius: 9999px; font-weight:600; padding: 0.19em 0.9em; font-size: 0.95em;
+}
+.table-wrap .doc-meta-user {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+.table-wrap .doc-meta-user .avatar {
+    width: 25px; height: 25px; border-radius: 50%; background: #e0e7ef;
+    display: flex; align-items: center; justify-content: center;
+}
+.table-wrap .doc-meta-user .material-icons { font-size: 1em; color: #059669; }
+
+.table-wrap .doc-actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    transition: background 0.13s, color 0.13s;
+    padding: 0.34em 0.6em;
+    font-size: 1.13em;
+}
+.table-wrap .doc-actions a.view { color: #2563eb; }
+.table-wrap .doc-actions a.view:hover { background: #dbeafe; }
+.table-wrap .doc-actions a.download { color: #059669; }
+.table-wrap .doc-actions a.download:hover { background: #bbf7d0; }
+
+@media (max-width: 1050px) {
+    .table-wrap table { min-width: 700px; }
+}
+@media (max-width: 700px) {
+    .page-header-content { flex-direction: column; gap: 1.2rem; align-items: flex-start;}
+    .filters-bar { flex-direction: column; gap: 1.2rem; }
+    .filters-bar .filters-col, .filters-bar .filters-action { width: 100%; }
+    .table-wrap table { min-width: 100%; font-size: 0.95em; }
+    .table-wrap .doc-title, .table-wrap .doc-context { max-width: 120px;}
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+
+    <!-- Header super stylisé -->
+    <div class="page-header">
+        <div class="page-header-content">
+            <div class="page-header-left">
+                <div class="page-header-icon">
+                    <i class="material-icons">picture_as_pdf</i>
+                </div>
+                <div class="page-header-titles">
+                    <h1>Liste des Documents</h1>
+                    <p>Vue horizontale avec données principales</p>
+                </div>
+            </div>
+            <div class="page-header-actions">
+                <a href="{% url 'client:library:dashboard' %}">
+                    <i class="material-icons">dashboard</i> Dashboard
+                </a>
+                <a href="{% url 'client:library:document_list' %}">
+                    <i class="material-icons">grid_view</i> Vue Grille
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters - horizontal stylisé -->
+    <form method="get" class="filters-bar">
+        <div class="filters-col">
+            <label>RECHERCHE</label>
+            <input type="text" name="search" value="{{ filters.search }}" placeholder="Rechercher...">
+        </div>
+        <div class="filters-col">
+            <label>TYPE</label>
+            <select name="type">
+                <option value="">Tous les types</option>
+                {% for type in document_types %}
+                <option value="{{ type }}" {% if filters.type == type %}selected{% endif %}>
+                    {{ type }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filters-col">
+            <label>PAYS</label>
+            <select name="country">
+                <option value="">Tous les pays</option>
+                {% for country in countries %}
+                <option value="{{ country }}" {% if filters.country == country %}selected{% endif %}>
+                    {{ country }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filters-col">
+            <label>LANGUE</label>
+            <select name="language">
+                <option value="">Toutes les langues</option>
+                {% for language in languages %}
+                <option value="{{ language }}" {% if filters.language == language %}selected{% endif %}>
+                    {{ language }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filters-action">
+            <button type="submit">
+                <i class="material-icons" style="font-size:1.1em;vertical-align: middle;">search</i>
+                Rechercher
+            </button>
+        </div>
+    </form>
+
+    <!-- Results Count -->
+    <div class="mb-5">
+        <h2 class="text-xl font-semibold text-gray-800">
+            {{ documents.paginator.count }} document{{ documents.paginator.count|pluralize }} trouvé{{ documents.paginator.count|pluralize }}
+        </h2>
+    </div>
+
+    {% if documents %}
+    <div class="table-wrap mb-6">
+        <div class="overflow-x-auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Document</th>
+                        <th>Type</th>
+                        <th>Source</th>
+                        <th>Pays</th>
+                        <th>Langue</th>
+                        <th>Métadonneur</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for document in documents %}
+                    <tr onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
+                        <td>
+                            <div class="flex items-center space-x-3">
+                                <div class="flex-shrink-0">
+                                    <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                        <i class="material-icons text-red-600">picture_as_pdf</i>
+                                    </div>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <span class="doc-title" title="{{ document|document_title }}">
+                                        {{ document|document_title|truncatechars:38 }}
+                                    </span>
+                                    {% if document.context %}
+                                    <div class="doc-context" title="{{ document.context }}">
+                                        {{ document.context|truncatechars:40 }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if document.doc_type %}
+                            <span class="badge-blue">
+                                {{ document.doc_type|truncatechars:18 }}
+                            </span>
+                            {% else %}
+                            <span class="badge-gray">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if document.source %}
+                            <span class="badge-green">
+                                {{ document.source|truncatechars:14 }}
+                            </span>
+                            {% else %}
+                            <span class="badge-gray">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if document.country %}
+                            <span class="badge-orange">
+                                {{ document.country|truncatechars:14 }}
+                            </span>
+                            {% else %}
+                            <span class="badge-gray">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if document.language %}
+                            <span class="badge-purple">
+                                {{ document.language|upper|truncatechars:12 }}
+                            </span>
+                            {% else %}
+                            <span class="badge-gray">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="doc-meta-user">
+                                <span class="avatar">
+                                    <i class="material-icons">person</i>
+                                </span>
+                                <span>{{ document.owner.username|default:"Anonyme" }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div>{{ document.created_at|date:"d/m/Y" }}</div>
+                            <div class="text-xs text-gray-400">{{ document.created_at|date:"H:i" }}</div>
+                        </td>
+                        <td>
+                            <div class="doc-actions flex items-center gap-1">
+                                <a href="{% url 'client:library:document_detail' document.pk %}" class="view" title="Voir le détail"
+                                   onclick="event.stopPropagation();">
+                                    <i class="material-icons">visibility</i>
+                                </a>
+                                <a href="{% url 'client:library:download_document' document.pk %}" class="download" title="Télécharger"
+                                   onclick="event.stopPropagation();">
+                                    <i class="material-icons">download</i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if documents.has_other_pages %}
+    <div class="mt-8 flex justify-center">
+        <div class="flex items-center space-x-2">
+            {% if documents.has_previous %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.previous_page_number }}"
+                   class="p-2 rounded-lg border border-gray-300 hover:bg-green-50 transition-colors">
+                    <i class="material-icons">chevron_left</i>
+                </a>
+            {% endif %}
+            <span class="px-4 py-2 text-sm text-gray-700">
+                Page {{ documents.number }} sur {{ documents.paginator.num_pages }}
+            </span>
+            {% if documents.has_next %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.next_page_number }}"
+                   class="p-2 rounded-lg border border-gray-300 hover:bg-green-50 transition-colors">
+                    <i class="material-icons">chevron_right</i>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-12">
+        <i class="material-icons text-6xl text-green-200 mb-4">table_view</i>
+        <h3 class="text-xl font-semibold text-gray-700 mb-2">Aucun document trouvé</h3>
+        <p class="text-gray-500 mb-6">Aucun document ne correspond à vos critères de recherche.</p>
+        <a href="{% url 'client:library:dashboard' %}"
+           class="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors">
+            <i class="material-icons mr-2">dashboard</i>
+            Retour au Dashboard
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

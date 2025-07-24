@@ -533,16 +533,18 @@ class ProductsApp {
                         
                         <div class="info-section">
                             <h3 class="info-title">Documents Associés</h3>
-                            ${spec ? Object.entries(spec.documents || {}).map(([key, value]) => `
-                                <div class="document-item">
-                                    <span class="document-name">${this.getDocumentLabel(key)}</span>
-                                    <div class="document-status">
-                                        <i class="material-icons">${value ? 'check' : 'close'}</i>
-                                    </div>
+                            <div class="document-item">
+                                <span class="document-name">Dossier CTD complet</span>
+                                <div class="document-status">
+                                    ${data.product.source_document ? `
+                                        <button class="view-document-btn" onclick="window.productsApp.viewSourceDocument(${this.currentProductId})">
+                                            <i class="material-icons">visibility</i>
+                                        </button>
+                                    ` : '<span class="no-document">-</span>'}
                                 </div>
-                            `).join('') : '<p>Aucun document disponible</p>'}
+                            </div>
                         </div>
-                    </div>
+                                            </div>
                 `;
             } else {
                 throw new Error('Failed to load regulatory data');
@@ -962,14 +964,23 @@ async editSites() {
         console.error('Error editing sites:', error);
         this.showNotification('Erreur lors du chargement', 'error');
     }
-}
+    }
+    viewSourceDocument(productId) {
+        if (!productId) {
+            this.showNotification('Aucun produit sélectionné', 'error');
+            return;
+        }
+        
+        const documentUrl = `/client/products/api/products/${productId}/source-document/`;
+        window.open(documentUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+    }
 }
 
-
+// View source document function
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname.includes('/client/products/')) {
-        window.productsApp = new ProductsApp(); // Make it globally accessible for debugging
+        window.productsApp = new ProductsApp(); 
     }
 });
