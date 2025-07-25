@@ -4,22 +4,287 @@
 
 {% block title %}{{ category_display }} - Documents{% endblock %}
 
+{% block extra_css %}
+<style>
+/* -- Place ici tout le style CSS déjà utilisé pour l’autre page document_list -- */
+.page-header {
+    background: linear-gradient(90deg, #4f46e5 0%, #2563eb 80%, #9333ea 100%);
+    border-radius: 2rem;
+    padding: 2.5rem 2rem 2.2rem 2rem;
+    margin-bottom: 1.3rem;
+    color: #fff;
+    box-shadow: 0 6px 36px 0 rgba(79,70,229,0.09), 0 2px 10px 0 rgba(99,102,241,0.09);
+    position: relative;
+    overflow: hidden;
+}
+.page-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2.2rem;
+}
+.page-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+.page-header-icon {
+    width: 58px;
+    height: 58px;
+    background: linear-gradient(135deg, #ef4444 70%, #be185d 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1.1rem;
+    box-shadow: 0 3px 16px #be185d39;
+}
+.page-header-icon .material-icons {
+    font-size: 2.5rem;
+    color: #fff;
+}
+.page-header-titles h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0 0 6px 0;
+    letter-spacing: -1px;
+    color: #fff;
+    text-shadow: 0 1px 4px #312e8133;
+}
+.page-header-titles p {
+    color: #dbeafe;
+    font-size: 1.03rem;
+    margin: 0;
+    font-weight: 400;
+}
+/* Dashboard tile links style */
+.dashboard-tile-links {
+    margin-left: auto;
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+}
+.dashboard-tile-link {
+    background: linear-gradient(90deg, #6366f1 60%, #7c3aed 100%);
+    color: #fff;
+    border-radius: 10px;
+    font-weight: 600;
+    padding: 0.6rem 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    text-decoration: none;
+    box-shadow: 0 2px 8px #a5b4fc49;
+    border: none;
+    font-size: 1rem;
+    transition: background 0.12s, box-shadow 0.12s;
+    white-space: nowrap;
+}
+.dashboard-tile-link:hover {
+    background: linear-gradient(90deg, #4f46e5 60%, #a21caf 100%);
+    box-shadow: 0 4px 16px #818cf870;
+    color: #fff;
+}
+@media (max-width: 950px) {
+    .page-header-content { flex-direction: column; gap: 1.2rem; align-items: flex-start;}
+    .dashboard-tile-links { margin-left: 0; }
+}
+@media (max-width: 700px) {
+    .page-header-content { flex-direction: column; gap: 1.2rem; align-items: flex-start;}
+}
+/* Cards grid and card style */
+.cards-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 1.15rem;
+    margin-bottom: 2rem;
+}
+.document-card {
+    background: #fff;
+    border-radius: 20px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 1.5px 8px 0 rgba(59, 130, 246, 0.07), 0 1px 3px 0 rgba(99,102,241,0.10);
+    overflow: hidden;
+    transition: box-shadow 0.18s, transform 0.16s;
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    min-height: 225px;
+    max-height: 270px;
+}
+.document-card:hover {
+    box-shadow: 0 5px 20px 0 rgba(59,130,246,0.16), 0 5px 16px 0 rgba(99,102,241,0.12);
+    transform: scale(1.016);
+    border-color: #818cf8;
+}
+.ribbon-validated {
+    position: absolute;
+    right: 16px;
+    top: 15px;
+    z-index: 10;
+    padding: 0.32rem 0.9rem;
+    border-radius: 1rem;
+    font-size: 0.77rem;
+    font-weight: 700;
+    color: #22c55e;
+    background: linear-gradient(90deg, #bbf7d0 60%, #34d399 100%);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    box-shadow: 0 0 4px 0 #a7f3d0a6;
+    border: 1px solid #bbf7d0;
+}
+.ribbon-validated .material-icons {
+    font-size: 1em;
+    color: #16a34a;
+}
+.document-card-header {
+    background: linear-gradient(87deg, #f0f9ff 75%, #f5f3ff 100%);
+    border-bottom: 1px solid #e0e7ef;
+    padding: 1.2rem 1.2rem 0.7rem 1.2rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+}
+.document-card-icon {
+    background: linear-gradient(135deg, #ef4444 75%, #be185d 100%);
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 7px #f871718c;
+}
+.document-card-icon .material-icons {
+    font-size: 1.5rem;
+    color: #fff;
+}
+.document-card-title {
+    font-size: 1.07rem;
+    font-weight: 700;
+    margin-bottom: 2px;
+    color: #3730a3;
+    line-height: 1.15;
+    max-width: 210px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.13s;
+}
+.document-card:hover .document-card-title {
+    color: #2563eb;
+}
+.document-card-metas {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.90rem;
+    color: #64748b;
+    margin-bottom: 0px;
+}
+.document-card-metas .material-icons {
+    font-size: 1em;
+    color: #94a3b8;
+}
+.document-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0.70rem 0 0.1rem 0;
+}
+.card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 0.21rem 0.70rem;
+    border-radius: 12px;
+    border-width: 1px;
+    border-style: solid;
+    letter-spacing: 0.01em;
+}
+.badge-blue {
+    color: #2563eb; background: #dbeafe; border-color: #bfdbfe;
+}
+.badge-green {
+    color: #059669; background: #d1fae5; border-color: #a7f3d0;
+}
+.badge-purple {
+    color: #7c3aed; background: #ede9fe; border-color: #c7d2fe;
+}
+.badge-orange {
+    color: #ea580c; background: #fef3c7; border-color: #fdba74;
+}
+.document-card-context {
+    margin: 0.35rem 0 0.08rem 0;
+    background: linear-gradient(90deg, #f0fdf4 40%, #f5f3ff 100%);
+    border-left: 3px solid #818cf8;
+    border-radius: 8px;
+    padding: 0.47rem 0.6rem;
+    font-size: 0.88rem;
+    color: #334155;
+    min-height: 28px;
+    max-height: 38px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.28;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+}
+.document-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0.5rem 1.1rem 0.85rem 1.1rem;
+    border-top: 1px solid #f1f5f9;
+    margin-top: auto;
+    gap: 0.5rem;
+}
+.document-card-actions a {
+    font-weight: 600;
+    padding: 0.43rem 1.3rem;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #2563eb 60%, #7c3aed 100%);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.89em;
+    transition: background 0.12s, box-shadow 0.12s;
+    box-shadow: 0 1.5px 6px #a5b4fc49;
+    border: none;
+}
+.document-card-actions a:hover {
+    background: linear-gradient(90deg, #1e40af 60%, #7c3aed 100%);
+    box-shadow: 0 4px 16px #818cf870;
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container mx-auto px-6 py-8">
-    <!-- Header -->
-    <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 mb-8 text-white">
-        <div class="flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-bold mb-2">{{ category_display }}</h1>
-                <p class="text-blue-100">{{ documents.paginator.count }} document{{ documents.paginator.count|pluralize }} trouvé{{ documents.paginator.count|pluralize }}</p>
+<div class="container mx-auto px-4 py-6">
+    <!-- Header stylisé -->
+    <div class="page-header">
+        <div class="page-header-content">
+            <div class="page-header-left">
+                <div class="page-header-icon">
+                    <i class="material-icons">category</i>
+                </div>
+                <div class="page-header-titles">
+                    <h1>{{ category_display }}</h1>
+                    <p>{{ documents.paginator.count }} document{{ documents.paginator.count|pluralize }} trouvé{{ documents.paginator.count|pluralize }}</p>
+                </div>
             </div>
-            <div class="flex gap-3">
-                <a href="{% url 'client:library:dashboard' %}" class="bg-white/20 hover:bg-white/30 px-6 py-3 rounded-lg font-medium transition-all">
-                    <i class="material-icons inline mr-2">dashboard</i>
+            <div class="dashboard-tile-links">
+                <a href="{% url 'client:library:dashboard' %}" class="dashboard-tile-link">
+                    <i class="material-icons">arrow_forward</i>
                     Dashboard
                 </a>
-                <a href="{% url 'client:library:document_list' %}" class="bg-white/20 hover:bg-white/30 px-6 py-3 rounded-lg font-medium transition-all">
-                    <i class="material-icons inline mr-2">library_books</i>
+                <a href="{% url 'client:library:document_list' %}" class="dashboard-tile-link">
+                    <i class="material-icons">library_books</i>
                     Tous les documents
                 </a>
             </div>
@@ -27,121 +292,78 @@
     </div>
 
     {% if documents %}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <div class="cards-list">
         {% for document in documents %}
-        <div class="group bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 cursor-pointer overflow-hidden"
-             onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
-            
-            <!-- Header avec gradient -->
-            <div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6 border-b border-gray-100">
-                <div class="flex items-start space-x-4">
-                    <div class="flex-shrink-0">
-                        <div class="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
-                            <i class="material-icons text-3xl text-white">picture_as_pdf</i>
-                        </div>
+        <div class="document-card group" onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
+            <!-- Ribbon Validé -->
+            {% if document.is_validated or document.validated %}
+            <span class="ribbon-validated">
+                <i class="material-icons">verified</i> Validé
+            </span>
+            {% endif %}
+
+            <!-- En-tête Document -->
+            <div class="document-card-header">
+                <div class="document-card-icon">
+                    <i class="material-icons">picture_as_pdf</i>
+                </div>
+                <div style="flex: 1 1 0%">
+                    <div class="document-card-title" title="{{ document|document_title }}">
+                        {{ document|document_title|truncatechars:32 }}
                     </div>
-                    
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-xl font-bold text-gray-900 mb-2 leading-tight group-hover:text-blue-600 transition-colors">
-                            {{ document|document_title }}
-                        </h3>
-                        
-                        <div class="flex items-center space-x-2 text-sm text-gray-500">
-                            <i class="material-icons text-sm">person</i>
-                            <span>{{ document.owner.username|default:"Anonyme" }}</span>
-                            <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
-                            <span>{{ document.created_at|date:"d/m/Y" }}</span>
-                        </div>
+                    <div class="document-card-metas">
+                        <i class="material-icons">person</i>
+                        <span>{{ document.owner.username|default:"Anonyme" }}</span>
+                        <span class="w-1 h-1 rounded-full bg-gray-300" style="display:inline-block;width:6px;height:6px;"></span>
+                        <i class="material-icons">date_range</i>
+                        <span>{{ document.created_at|date:"d/m/Y" }}</span>
                     </div>
                 </div>
             </div>
-            
-            <!-- Contenu principal -->
-            <div class="p-6">
-                <div class="space-y-4">
-                    <!-- Métadonnées principales -->
-                    <div class="grid grid-cols-2 gap-4">
-                        {% if document.doc_type %}
-                        <div class="flex items-center space-x-2">
-                            <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <i class="material-icons text-sm text-blue-600">category</i>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 uppercase tracking-wide">Type</p>
-                                <p class="text-sm font-semibold text-gray-800">{{ document.doc_type }}</p>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        {% if document.country %}
-                        <div class="flex items-center space-x-2">
-                            <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                <i class="material-icons text-sm text-green-600">public</i>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 uppercase tracking-wide">Pays</p>
-                                <p class="text-sm font-semibold text-gray-800">{{ document.country }}</p>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        {% if document.language %}
-                        <div class="flex items-center space-x-2">
-                            <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                                <i class="material-icons text-sm text-purple-600">language</i>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 uppercase tracking-wide">Langue</p>
-                                <p class="text-sm font-semibold text-gray-800">{{ document.language }}</p>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        {% if document.source %}
-                        <div class="flex items-center space-x-2">
-                            <div class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                                <i class="material-icons text-sm text-orange-600">source</i>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 uppercase tracking-wide">Source</p>
-                                <p class="text-sm font-semibold text-gray-800 truncate">{{ document.source }}</p>
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <!-- Contexte si disponible -->
-                    {% if document.context %}
-                    <div class="mt-4 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border-l-4 border-blue-400">
-                        <div class="flex items-start space-x-2">
-                            <i class="material-icons text-sm text-blue-600 mt-1">info</i>
-                            <p class="text-sm text-gray-700 leading-relaxed">{{ document.context|truncatewords:20 }}</p>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
+            <!-- Badges -->
+            <div class="document-card-badges">
+                {% if document.doc_type %}
+                <span class="card-badge badge-blue">
+                    <i class="material-icons text-xs">category</i>
+                    {{ document.doc_type|truncatechars:20 }}
+                </span>
+                {% endif %}
+                {% if document.country %}
+                <span class="card-badge badge-green">
+                    <i class="material-icons text-xs">public</i>
+                    {{ document.country|truncatechars:20 }}
+                </span>
+                {% endif %}
+                {% if document.language %}
+                <span class="card-badge badge-purple">
+                    <i class="material-icons text-xs">language</i>
+                    {{ document.language|truncatechars:20 }}
+                </span>
+                {% endif %}
+                {% if document.source %}
+                <span class="card-badge badge-orange">
+                    <i class="material-icons text-xs">source</i>
+                    {{ document.source|truncatechars:20 }}
+                </span>
+                {% endif %}
             </div>
-            
-            <!-- Footer avec actions -->
-            <div class="px-6 pb-6">
-                <div class="flex justify-between items-center pt-4 border-t border-gray-100">
-                    <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200">
-                        <i class="material-icons text-xs mr-1">verified</i>
-                        Validé
-                    </span>
-                    
-                    <a href="{% url 'client:library:download_document' document.pk %}" 
-                       class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-md hover:shadow-lg group-hover:scale-105"
-                       onclick="event.stopPropagation();">
-                        <i class="material-icons text-sm mr-2">download</i>
-                        Télécharger
-                    </a>
-                </div>
+            <!-- Context -->
+            {% if document.context %}
+            <div class="document-card-context">
+                <i class="material-icons text-base" style="vertical-align: middle; color:#4f46e5;">info</i>
+                <span>{{ document.context|truncatechars:70 }}</span>
+            </div>
+            {% endif %}
+            <!-- Actions -->
+            <div class="document-card-actions">
+                <a href="{% url 'client:library:download_document' document.pk %}" onclick="event.stopPropagation();">
+                    <i class="material-icons text-sm">download</i>
+                    Télécharger
+                </a>
             </div>
         </div>
         {% endfor %}
     </div>
-
     <!-- Pagination -->
     {% if documents.has_other_pages %}
     <div class="mt-8 flex justify-center">
@@ -152,11 +374,9 @@
                     <i class="material-icons">chevron_left</i>
                 </a>
             {% endif %}
-            
             <span class="px-4 py-2 text-sm text-gray-700">
                 Page {{ documents.number }} sur {{ documents.paginator.num_pages }}
             </span>
-            
             {% if documents.has_next %}
                 <a href="?page={{ documents.next_page_number }}" 
                    class="p-2 rounded-lg border border-gray-300 hover:bg-gray-50">
@@ -166,7 +386,6 @@
         </div>
     </div>
     {% endif %}
-
     {% else %}
     <div class="text-center py-12">
         <i class="material-icons text-6xl text-gray-400 mb-4">folder_open</i>
