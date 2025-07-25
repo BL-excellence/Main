@@ -9,6 +9,7 @@ Selon votre rôle (_Métadonneur_, _Annotateur_, _Expert_, ou _Client_), vous b�
 ## 🚀 Accès à la Plateforme
 
 - **Lien d’accès :** [https://myprojectiablcoklabs.onrender.com](https://myprojectiablcoklabs.onrender.com)
+- **Lien d’accès :** [https://iablocklabs-zh6i.onrender.com](https://iablocklabs-zh6i.onrender.com)
 
 > **Note importante**  
 > L’hébergement gratuit peut occasionner une attente initiale (5-6 min) lors de la première connexion.  
