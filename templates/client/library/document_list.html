@@ -6,383 +6,594 @@
 
 {% block extra_css %}
 <style>
-/* En-tête sur-stylisé */
+/* Container principal - centré et avec marges */
+.library-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    min-height: 100vh;
+}
+
+/* En-tête stylisé - adapté du dashboard */
 .page-header {
-    background: linear-gradient(90deg, #4f46e5 0%, #2563eb 80%, #9333ea 100%);
-    border-radius: 2rem;
-    padding: 2.5rem 2rem 2.2rem 2rem;
-    margin-bottom: 1.3rem;
+    background: linear-gradient(135deg, #4f46e5 0%, #2563eb 50%, #9333ea 100%);
+    border-radius: 24px;
+    padding: 2.5rem 2.5rem 2rem 2.5rem;
+    margin-bottom: 2.5rem;
     color: #fff;
-    box-shadow: 0 6px 36px 0 rgba(79,70,229,0.09), 0 2px 10px 0 rgba(99,102,241,0.09);
+    box-shadow: 0 10px 40px rgba(79,70,229,0.15), 0 4px 20px rgba(99,102,241,0.10);
     position: relative;
     overflow: hidden;
 }
+
+/* Effets de background pour l'en-tête */
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    border-radius: 50%;
+}
+
+.page-header::after {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    left: -10%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+    border-radius: 50%;
+}
+
 .page-header-content {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 2.2rem;
+    gap: 2rem;
+    position: relative;
+    z-index: 10;
 }
+
 .page-header-left {
     display: flex;
     align-items: center;
-    gap: 1.25rem;
+    gap: 1.5rem;
 }
+
 .page-header-icon {
-    width: 58px;
-    height: 58px;
-    background: linear-gradient(135deg, #ef4444 70%, #be185d 100%);
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #be185d 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 1.1rem;
-    box-shadow: 0 3px 16px #be185d39;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(239,68,68,0.3);
 }
+
 .page-header-icon .material-icons {
     font-size: 2.5rem;
     color: #fff;
 }
+
 .page-header-titles h1 {
-    font-size: 2rem;
+    font-size: 2.25rem;
     font-weight: 800;
-    margin: 0 0 6px 0;
-    letter-spacing: -1px;
+    margin: 0 0 8px 0;
+    letter-spacing: -0.5px;
     color: #fff;
-    text-shadow: 0 1px 4px #312e8133;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
+
 .page-header-titles p {
-    color: #dbeafe;
-    font-size: 1.03rem;
+    color: #e0e7ff;
+    font-size: 1.1rem;
     margin: 0;
     font-weight: 400;
 }
 
-/* Tuile dashboard stylisée avec 2 liens */
-.dashboard-tile {
-    display: flex;
-    align-items: center;
-    gap: 1.1rem;
-    background: linear-gradient(90deg, #ede9fe 60%, #f0f9ff 100%);
-    color: #3730a3;
-    border-radius: 1.3rem;
-    box-shadow: 0 2px 16px 0 #818cf824;
-    border: 1.5px solid #a5b4fc;
-    padding: 1.1rem 1.7rem;
-    margin-bottom: 1.9rem;
-    transition: box-shadow 0.17s, border 0.17s, background 0.2s;
-    flex-wrap: wrap;
-}
-.dashboard-tile .material-icons {
-    font-size: 1.65rem;
-    color: #6366f1;
-}
-.dashboard-tile-center {
-    font-size: 1.08rem;
-    font-weight: 600;
-}
 .dashboard-tile-links {
-    margin-left: auto;
     display: flex;
-    gap: 0.8rem;
+    gap: 1rem;
     flex-wrap: wrap;
-}
-.dashboard-tile-link {
-    background: linear-gradient(90deg, #6366f1 60%, #7c3aed 100%);
-    color: #fff;
-    border-radius: 10px;
-    font-weight: 600;
-    padding: 0.6rem 1.5rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    text-decoration: none;
-    box-shadow: 0 2px 8px #a5b4fc49;
-    border: none;
-    font-size: 1rem;
-    transition: background 0.12s, box-shadow 0.12s;
-    white-space: nowrap;
-}
-.dashboard-tile-link:hover {
-    background: linear-gradient(90deg, #4f46e5 60%, #a21caf 100%);
-    box-shadow: 0 4px 16px #818cf870;
-    color: #fff;
-}
-@media (max-width: 950px) {
-    .dashboard-tile { flex-direction: column; align-items: flex-start; gap: 0.7rem; }
-    .dashboard-tile-links { margin-left: 0; }
-}
-@media (max-width: 700px) {
-    .page-header-content { flex-direction: column; gap: 1.2rem; align-items: flex-start;}
 }
 
-/* Recherche et filtres stylisés horizontalement */
+.dashboard-tile-link {
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    border-radius: 12px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.dashboard-tile-link:hover {
+    background: rgba(255,255,255,0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    color: #fff;
+}
+
+/* Barre de filtres - améliorée */
 .filters-bar {
     background: #fff;
-    border-radius: 1.3rem;
-    box-shadow: 0 1.5px 8px 0 #818cf81b;
-    border: 1.5px solid #f1f5f9;
-    padding: 1.1rem 2rem;
-    margin-bottom: 2.2rem;
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
+    padding: 2rem 2.5rem;
+    margin-bottom: 2.5rem;
     display: flex;
     align-items: flex-end;
     gap: 1.5rem;
     flex-wrap: wrap;
 }
+
 .filters-bar label {
-    font-size: 0.95rem;
-    color: #3730a3;
-    font-weight: 600;
-    margin-bottom: 0.32rem;
+    font-size: 0.9rem;
+    color: #374151;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
     display: block;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
+
 .filters-bar input,
 .filters-bar select {
-    font-size: 0.96rem;
-    border-radius: 0.75rem;
-    border: 1.2px solid #d1d5db;
-    padding: 0.56rem 1.1rem;
+    font-size: 0.95rem;
+    border-radius: 12px;
+    border: 2px solid #e5e7eb;
+    padding: 0.75rem 1.25rem;
     width: 100%;
-    background: #f8fafc;
-    transition: border 0.15s;
+    background: #f9fafb;
+    transition: all 0.3s ease;
+    font-weight: 500;
 }
+
 .filters-bar input:focus,
 .filters-bar select:focus {
-    border: 1.5px solid #818cf8;
+    border: 2px solid #6366f1;
     outline: none;
     background: #fff;
+    box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
 }
-.filters-bar .filters-col {
-    flex: 1 1 210px;
-    min-width: 140px;
+
+.filters-col {
+    flex: 1 1 220px;
+    min-width: 180px;
     margin-bottom: 0;
 }
-.filters-bar .filters-action {
+
+.filters-action {
     flex: 0 0 auto;
     margin-bottom: 0;
 }
+
 .filters-bar button {
-    background: linear-gradient(90deg, #2563eb 60%, #7c3aed 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
     color: #fff;
-    font-weight: 600;
-    padding: 0.7rem 1.8rem;
-    border-radius: 10px;
-    font-size: 1rem;
-    box-shadow: 0 1.5px 6px #a5b4fc49;
+    font-weight: 700;
+    padding: 0.75rem 2rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 16px rgba(37,99,235,0.3);
     border: none;
-    transition: background 0.13s, box-shadow 0.12s;
-}
-.filters-bar button:hover {
-    background: linear-gradient(90deg, #1e40af 60%, #a21caf 100%);
-    box-shadow: 0 4px 16px #818cf870;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-/* Grid Cards */
+.filters-bar button:hover {
+    background: linear-gradient(135deg, #1d4ed8 0%, #6d28d9 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(37,99,235,0.4);
+}
+
+/* Section résultats */
+.results-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    border-left: 4px solid #3b82f6;
+}
+
+.results-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.results-header .material-icons {
+    color: #3b82f6;
+    font-size: 1.75rem;
+}
+
+/* Grid de cartes - responsive amélioré */
 .cards-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-    gap: 1.15rem;
-    margin-bottom: 2rem;
-}
-@media (max-width: 1024px) {
-    .cards-list { gap: 0.7rem; }
-}
-@media (max-width: 700px) {
-    .cards-list { grid-template-columns: 1fr; gap: 0.6rem; }
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
 }
 
-/* Card styles compact */
+/* Card styles - plus espacées et élégantes */
 .document-card {
     background: #fff;
     border-radius: 20px;
     border: 1px solid #f1f5f9;
-    box-shadow: 0 1.5px 8px 0 rgba(59, 130, 246, 0.07), 0 1px 3px 0 rgba(99,102,241,0.10);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
     overflow: hidden;
-    transition: box-shadow 0.18s, transform 0.16s;
+    transition: all 0.3s ease;
     position: relative;
     cursor: pointer;
     display: flex;
     flex-direction: column;
-    min-height: 225px;
-    max-height: 270px;
+    min-height: 280px;
 }
+
 .document-card:hover {
-    box-shadow: 0 5px 20px 0 rgba(59,130,246,0.16), 0 5px 16px 0 rgba(99,102,241,0.12);
-    transform: scale(1.016);
-    border-color: #818cf8;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+    transform: translateY(-4px);
+    border-color: #cbd5e1;
 }
 
 .ribbon-validated {
     position: absolute;
     right: 16px;
-    top: 15px;
+    top: 16px;
     z-index: 10;
-    padding: 0.32rem 0.9rem;
-    border-radius: 1rem;
-    font-size: 0.77rem;
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
     font-weight: 700;
-    color: #22c55e;
-    background: linear-gradient(90deg, #bbf7d0 60%, #34d399 100%);
+    color: #16a34a;
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
     display: flex;
     align-items: center;
-    gap: 5px;
-    box-shadow: 0 0 4px 0 #a7f3d0a6;
+    gap: 4px;
+    box-shadow: 0 2px 8px rgba(34,197,94,0.2);
     border: 1px solid #bbf7d0;
-}
-.ribbon-validated .material-icons {
-    font-size: 1em;
-    color: #16a34a;
 }
 
 /* Header Document */
 .document-card-header {
-    background: linear-gradient(87deg, #f0f9ff 75%, #f5f3ff 100%);
-    border-bottom: 1px solid #e0e7ef;
-    padding: 1.2rem 1.2rem 0.7rem 1.2rem;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f5f3ff 100%);
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1.5rem;
     display: flex;
     align-items: flex-start;
-    gap: 0.7rem;
+    gap: 1rem;
 }
+
 .document-card-icon {
-    background: linear-gradient(135deg, #ef4444 75%, #be185d 100%);
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #be185d 100%);
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 7px #f871718c;
+    box-shadow: 0 4px 12px rgba(239,68,68,0.3);
+    flex-shrink: 0;
 }
+
 .document-card-icon .material-icons {
     font-size: 1.5rem;
     color: #fff;
 }
+
 .document-card-title {
-    font-size: 1.07rem;
+    font-size: 1.1rem;
     font-weight: 700;
-    margin-bottom: 2px;
-    color: #3730a3;
-    line-height: 1.15;
-    max-width: 210px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: color 0.13s;
+    margin-bottom: 0.5rem;
+    color: #1e293b;
+    line-height: 1.3;
+    transition: color 0.3s ease;
 }
+
 .document-card:hover .document-card-title {
     color: #2563eb;
 }
+
 .document-card-metas {
     display: flex;
     align-items: center;
-    gap: 0.45rem;
-    font-size: 0.90rem;
+    gap: 0.75rem;
+    font-size: 0.85rem;
     color: #64748b;
-    margin-bottom: 0px;
+    flex-wrap: wrap;
 }
+
 .document-card-metas .material-icons {
-    font-size: 1em;
+    font-size: 1rem;
     color: #94a3b8;
+}
+
+/* Content area */
+.document-card-body {
+    padding: 1.5rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Metadata badges */
 .document-card-badges {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin: 0.70rem 0 0.1rem 0;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
 }
+
 .card-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 0.74rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    padding: 0.21rem 0.70rem;
-    border-radius: 12px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
     border-width: 1px;
     border-style: solid;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.025em;
 }
+
 .badge-blue {
-    color: #2563eb; background: #dbeafe; border-color: #bfdbfe;
+    color: #1d4ed8; 
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); 
+    border-color: #93c5fd;
 }
+
 .badge-green {
-    color: #059669; background: #d1fae5; border-color: #a7f3d0;
+    color: #059669; 
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
+    border-color: #6ee7b7;
 }
+
 .badge-purple {
-    color: #7c3aed; background: #ede9fe; border-color: #c7d2fe;
+    color: #7c3aed; 
+    background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); 
+    border-color: #c4b5fd;
 }
+
 .badge-orange {
-    color: #ea580c; background: #fef3c7; border-color: #fdba74;
-}
-.badge-gray {
-    color: #64748b; background: #f1f5f9; border-color: #e2e8f0;
+    color: #ea580c; 
+    background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%); 
+    border-color: #fb923c;
 }
 
-/* Context / Description */
+/* Context */
 .document-card-context {
-    margin: 0.35rem 0 0.08rem 0;
-    background: linear-gradient(90deg, #f0fdf4 40%, #f5f3ff 100%);
-    border-left: 3px solid #818cf8;
-    border-radius: 8px;
-    padding: 0.47rem 0.6rem;
-    font-size: 0.88rem;
-    color: #334155;
-    min-height: 28px;
-    max-height: 38px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.28;
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
+    margin: 0.5rem 0 1rem 0;
+    background: linear-gradient(135deg, #f0fdf4 0%, #f5f3ff 100%);
+    border-left: 3px solid #6366f1;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    color: #374151;
+    line-height: 1.4;
+    flex: 1;
 }
 
+/* Actions */
 .document-card-actions {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    padding: 0.5rem 1.1rem 0.85rem 1.1rem;
+    padding: 1rem 1.5rem;
     border-top: 1px solid #f1f5f9;
     margin-top: auto;
-    gap: 0.5rem;
 }
+
 .document-card-actions a {
     font-weight: 600;
-    padding: 0.43rem 1.3rem;
-    border-radius: 10px;
-    background: linear-gradient(90deg, #2563eb 60%, #7c3aed 100%);
+    padding: 0.5rem 1.5rem;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
     color: #fff;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.89em;
-    transition: background 0.12s, box-shadow 0.12s;
-    box-shadow: 0 1.5px 6px #a5b4fc49;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3);
     border: none;
+    text-decoration: none;
 }
+
 .document-card-actions a:hover {
-    background: linear-gradient(90deg, #1e40af 60%, #7c3aed 100%);
-    box-shadow: 0 4px 16px #818cf870;
+    background: linear-gradient(135deg, #1d4ed8 0%, #6d28d9 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(37,99,235,0.4);
+    color: #fff;
 }
 
-@media (max-width: 900px) {
-    .filters-bar { flex-direction: column; gap: 1.2rem; }
-    .filters-bar .filters-col, .filters-bar .filters-action { width: 100%; }
-}
-@media (max-width: 700px) {
-    .document-card-actions { padding: 0.45rem 0.75rem 0.85rem 0.75rem; }
-    .page-header-content { flex-direction: column; gap: 1.2rem; align-items: flex-start;}
-    .dashboard-tile { flex-direction: column; align-items: flex-start; gap: 0.7rem; }
+/* Pagination améliorée */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 3rem;
 }
 
+.pagination-wrapper {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
+    padding: 1rem;
+}
+
+.pagination-wrapper .flex {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.pagination-wrapper a {
+    padding: 0.75rem;
+    border-radius: 12px;
+    border: 2px solid #e5e7eb;
+    background: #fff;
+    transition: all 0.3s ease;
+    color: #6b7280;
+}
+
+.pagination-wrapper a:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    color: #2563eb;
+    transform: translateY(-1px);
+}
+
+.pagination-wrapper span {
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+    border-radius: 12px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+
+.empty-state .material-icons {
+    font-size: 4rem;
+    color: #9ca3af;
+    margin-bottom: 1.5rem;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 1rem;
+}
+
+.empty-state p {
+    color: #6b7280;
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+}
+
+.empty-state a {
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    color: #fff;
+    padding: 0.75rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.empty-state a:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(37,99,235,0.3);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .library-container {
+        max-width: 100%;
+        padding: 1.5rem;
+    }
+    
+    .cards-list {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.25rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .library-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 2rem 1.5rem 1.5rem 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .page-header-content {
+        flex-direction: column;
+        gap: 1.5rem;
+        align-items: flex-start;
+    }
+    
+    .page-header-titles h1 {
+        font-size: 1.75rem;
+    }
+    
+    .filters-bar {
+        flex-direction: column;
+        gap: 1.5rem;
+        padding: 1.5rem;
+    }
+    
+    .filters-col, .filters-action {
+        width: 100%;
+    }
+    
+    .cards-list {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .dashboard-tile-links {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .page-header-icon {
+        width: 56px;
+        height: 56px;
+    }
+    
+    .page-header-icon .material-icons {
+        font-size: 2rem;
+    }
+    
+    .document-card-header {
+        padding: 1.25rem;
+    }
+    
+    .document-card-body {
+        padding: 1.25rem;
+    }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-6">
-
-    <!-- Header super stylisé -->
+<div class="library-container">
+    <!-- Header stylisé -->
     <div class="page-header">
         <div class="page-header-content">
             <div class="page-header-left">
@@ -395,15 +606,15 @@
                 </div>
             </div>
             <div class="dashboard-tile-links">
-            <a href="{% url 'client:library:dashboard' %}" class="dashboard-tile-link">
-                <i class="material-icons">arrow_forward</i>
-                Dashboard
-            </a>
-            <a href="{% url 'client:library:document_list_horizontal' %}" class="dashboard-tile-link">
-                <i class="material-icons">view_list</i>
-                Vue Liste
-            </a>
-        </div>
+                <a href="{% url 'client:library:dashboard' %}" class="dashboard-tile-link">
+                    <i class="material-icons">dashboard</i>
+                    Dashboard
+                </a>
+                <a href="{% url 'client:library:document_list_horizontal' %}" class="dashboard-tile-link">
+                    <i class="material-icons">view_list</i>
+                    Vue Liste
+                </a>
+            </div>
         </div>
     </div>
 
@@ -411,7 +622,7 @@
     <form method="get" class="filters-bar">
         <div class="filters-col">
             <label>RECHERCHE</label>
-            <input type="text" name="search" value="{{ filters.search }}" placeholder="Rechercher...">
+            <input type="text" name="search" value="{{ filters.search }}" placeholder="Rechercher un document...">
         </div>
         <div class="filters-col">
             <label>TYPE</label>
@@ -455,8 +666,9 @@
     </form>
 
     <!-- Résultats -->
-    <div class="mb-4">
-        <h2 class="text-xl font-semibold text-gray-800">
+    <div class="results-header">
+        <h2>
+            <i class="material-icons">library_books</i>
             {{ documents.paginator.count }} document{{ documents.paginator.count|pluralize }} trouvé{{ documents.paginator.count|pluralize }}
         </h2>
     </div>
@@ -464,7 +676,7 @@
     {% if documents %}
     <div class="cards-list">
         {% for document in documents %}
-        <div class="document-card group" onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
+        <div class="document-card" onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
 
             <!-- Ribbon Validé -->
             {% if document.is_validated or document.validated %}
@@ -480,7 +692,7 @@
                 </div>
                 <div style="flex: 1 1 0%">
                     <div class="document-card-title" title="{{ document|document_title }}">
-                        {{ document|document_title|truncatechars:32 }}
+                        {{ document|document_title|truncatechars:50 }}
                     </div>
                     <div class="document-card-metas">
                         <i class="material-icons">person</i>
@@ -492,43 +704,46 @@
                 </div>
             </div>
 
-            <!-- Métadonnées principales en badges -->
-            <div class="document-card-badges">
-                {% if document.doc_type %}
-                <span class="card-badge badge-blue">
-                    <i class="material-icons text-xs">category</i>
-                    {{ document.doc_type|truncatechars:20 }}
-                </span>
-                {% endif %}
-                {% if document.country %}
-                <span class="card-badge badge-green">
-                    <i class="material-icons text-xs">public</i>
-                    {{ document.country|truncatechars:20 }}
-                </span>
-                {% endif %}
-                {% if document.language %}
-                <span class="card-badge badge-purple">
-                    <i class="material-icons text-xs">language</i>
-                    {{ document.language|truncatechars:20 }}
-                </span>
-                {% endif %}
-                {% if document.source %}
-                <span class="card-badge badge-orange">
-                    <i class="material-icons text-xs">source</i>
-                    {{ document.source|truncatechars:20 }}
-                </span>
+            <!-- Corps de la carte -->
+            <div class="document-card-body">
+                <!-- Métadonnées principales en badges -->
+                <div class="document-card-badges">
+                    {% if document.doc_type %}
+                    <span class="card-badge badge-blue">
+                        <i class="material-icons text-xs">category</i>
+                        {{ document.doc_type|truncatechars:20 }}
+                    </span>
+                    {% endif %}
+                    {% if document.country %}
+                    <span class="card-badge badge-green">
+                        <i class="material-icons text-xs">public</i>
+                        {{ document.country|truncatechars:20 }}
+                    </span>
+                    {% endif %}
+                    {% if document.language %}
+                    <span class="card-badge badge-purple">
+                        <i class="material-icons text-xs">language</i>
+                        {{ document.language|truncatechars:20 }}
+                    </span>
+                    {% endif %}
+                    {% if document.source %}
+                    <span class="card-badge badge-orange">
+                        <i class="material-icons text-xs">source</i>
+                        {{ document.source|truncatechars:20 }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Contexte extrait -->
+                {% if document.context %}
+                <div class="document-card-context">
+                    <i class="material-icons text-base" style="vertical-align: middle; color:#4f46e5; margin-right: 0.5rem;">info</i>
+                    <span>{{ document.context|truncatechars:100 }}</span>
+                </div>
                 {% endif %}
             </div>
 
-            <!-- Contexte extrait -->
-            {% if document.context %}
-            <div class="document-card-context">
-                <i class="material-icons text-base" style="vertical-align: middle; color:#4f46e5;">info</i>
-                <span>{{ document.context|truncatechars:70 }}</span>
-            </div>
-            {% endif %}
-
-            <!-- Footer actions -->
+            <!-- Actions -->
             <div class="document-card-actions">
                 <a href="{% url 'client:library:download_document' document.pk %}" onclick="event.stopPropagation();">
                     <i class="material-icons text-sm">download</i>
@@ -541,35 +756,34 @@
 
     <!-- Pagination -->
     {% if documents.has_other_pages %}
-    <div class="mt-8 flex justify-center">
-        <div class="flex items-center space-x-2">
-            {% if documents.has_previous %}
-                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.previous_page_number }}"
-                   class="p-2 rounded-lg border border-gray-300 hover:bg-blue-50 transition-colors">
-                    <i class="material-icons">chevron_left</i>
-                </a>
-            {% endif %}
-            <span class="px-4 py-2 text-sm text-gray-700">
-                Page {{ documents.number }} sur {{ documents.paginator.num_pages }}
-            </span>
-            {% if documents.has_next %}
-                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.next_page_number }}"
-                   class="p-2 rounded-lg border border-gray-300 hover:bg-blue-50 transition-colors">
-                    <i class="material-icons">chevron_right</i>
-                </a>
-            {% endif %}
+    <div class="pagination-container">
+        <div class="pagination-wrapper">
+            <div class="flex items-center space-x-2">
+                {% if documents.has_previous %}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.previous_page_number }}">
+                        <i class="material-icons">chevron_left</i>
+                    </a>
+                {% endif %}
+                <span>
+                    Page {{ documents.number }} sur {{ documents.paginator.num_pages }}
+                </span>
+                {% if documents.has_next %}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.next_page_number }}">
+                        <i class="material-icons">chevron_right</i>
+                    </a>
+                {% endif %}
+            </div>
         </div>
     </div>
     {% endif %}
 
     {% else %}
-    <div class="text-center py-12">
-        <i class="material-icons text-6xl text-gray-400 mb-4">search_off</i>
-        <h3 class="text-xl font-semibold text-gray-700 mb-2">Aucun document trouvé</h3>
-        <p class="text-gray-500 mb-6">Aucun document ne correspond à vos critères de recherche.</p>
-        <a href="{% url 'client:library:dashboard' %}"
-           class="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
-            <i class="material-icons mr-2">dashboard</i>
+    <div class="empty-state">
+        <i class="material-icons">search_off</i>
+        <h3>Aucun document trouvé</h3>
+        <p>Aucun document ne correspond à vos critères de recherche.</p>
+        <a href="{% url 'client:library:dashboard' %}">
+            <i class="material-icons">dashboard</i>
             Retour au Dashboard
         </a>
     </div>

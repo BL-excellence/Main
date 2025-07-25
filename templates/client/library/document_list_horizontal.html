@@ -6,252 +6,675 @@
 
 {% block extra_css %}
 <style>
-/* Header stylisé */
+/* Container principal - centré et avec marges */
+.library-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    min-height: 100vh;
+}
+
+/* En-tête stylisé - adapté du dashboard */
 .page-header {
-    background: linear-gradient(90deg, #059669 0%, #06b6d4 90%, #14b8a6 100%);
-    border-radius: 2rem;
-    padding: 2.5rem 2rem 2.2rem 2rem;
-    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, #4f46e5 0%, #2563eb 50%, #9333ea 100%);
+    border-radius: 24px;
+    padding: 2.5rem 2.5rem 2rem 2.5rem;
+    margin-bottom: 2.5rem;
     color: #fff;
-    box-shadow: 0 6px 36px 0 rgba(16,185,129,0.08), 0 2px 10px 0 rgba(45,212,191,0.11);
+    box-shadow: 0 10px 40px rgba(79,70,229,0.15), 0 4px 20px rgba(99,102,241,0.10);
     position: relative;
     overflow: hidden;
 }
+
+/* Effets de background pour l'en-tête */
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    border-radius: 50%;
+}
+
+.page-header::after {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    left: -10%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+    border-radius: 50%;
+}
+
 .page-header-content {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 2.2rem;
+    gap: 2rem;
+    position: relative;
+    z-index: 10;
 }
+
 .page-header-left {
     display: flex;
     align-items: center;
-    gap: 1.25rem;
+    gap: 1.5rem;
 }
+
 .page-header-icon {
-    width: 56px;
-    height: 56px;
-    background: linear-gradient(135deg, #ef4444 70%, #be185d 100%);
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #be185d 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 1.1rem;
-    box-shadow: 0 3px 16px #be185d39;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(239,68,68,0.3);
 }
+
 .page-header-icon .material-icons {
-    font-size: 2.3rem;
+    font-size: 2.5rem;
     color: #fff;
 }
+
 .page-header-titles h1 {
-    font-size: 2rem;
+    font-size: 2.25rem;
     font-weight: 800;
-    margin: 0 0 6px 0;
-    letter-spacing: -1px;
+    margin: 0 0 8px 0;
+    letter-spacing: -0.5px;
     color: #fff;
-    text-shadow: 0 1px 4px #14532d33;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
+
 .page-header-titles p {
-    color: #a7f3d0;
-    font-size: 1.05rem;
+    color: #e0e7ff;
+    font-size: 1.1rem;
     margin: 0;
     font-weight: 400;
 }
-.page-header-actions {
+
+.dashboard-tile-links {
     display: flex;
-    gap: 0.75rem;
-}
-.page-header-actions a {
-    background: rgba(255,255,255,0.17);
-    color: #fff;
-    padding: 0.85rem 1.45rem;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 1rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    border: 1px solid rgba(255,255,255,0.12);
-    box-shadow: 0 2px 10px 0 #10b98118;
-    transition: background 0.18s, color 0.16s;
-}
-.page-header-actions a:hover {
-    background: rgba(255,255,255,0.29);
-    color: #16a34a;
+    gap: 1rem;
+    flex-wrap: wrap;
 }
 
-/* Filtres stylisés horizontal */
+.dashboard-tile-link {
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    border-radius: 12px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.dashboard-tile-link:hover {
+    background: rgba(255,255,255,0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    color: #fff;
+}
+
+/* Barre de filtres - améliorée */
 .filters-bar {
     background: #fff;
-    border-radius: 1.3rem;
-    box-shadow: 0 1.5px 8px 0 #10b9811b;
-    border: 1.5px solid #d1fae5;
-    padding: 1.1rem 2rem;
-    margin-bottom: 2.1rem;
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
+    padding: 2rem 2.5rem;
+    margin-bottom: 2.5rem;
     display: flex;
     align-items: flex-end;
     gap: 1.5rem;
     flex-wrap: wrap;
 }
+
 .filters-bar label {
-    font-size: 0.96rem;
-    color: #047857;
-    font-weight: 600;
-    margin-bottom: 0.32rem;
+    font-size: 0.9rem;
+    color: #374151;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
     display: block;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
+
 .filters-bar input,
 .filters-bar select {
-    font-size: 0.98rem;
-    border-radius: 0.7rem;
-    border: 1.2px solid #d1d5db;
-    padding: 0.56rem 1.1rem;
+    font-size: 0.95rem;
+    border-radius: 12px;
+    border: 2px solid #e5e7eb;
+    padding: 0.75rem 1.25rem;
     width: 100%;
-    background: #f0fdf4;
-    transition: border 0.15s;
+    background: #f9fafb;
+    transition: all 0.3s ease;
+    font-weight: 500;
 }
+
 .filters-bar input:focus,
 .filters-bar select:focus {
-    border: 1.5px solid #059669;
+    border: 2px solid #6366f1;
     outline: none;
     background: #fff;
+    box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
 }
-.filters-bar .filters-col {
-    flex: 1 1 210px;
-    min-width: 140px;
+
+.filters-col {
+    flex: 1 1 220px;
+    min-width: 180px;
     margin-bottom: 0;
 }
-.filters-bar .filters-action {
+
+.filters-action {
     flex: 0 0 auto;
     margin-bottom: 0;
 }
+
 .filters-bar button {
-    background: linear-gradient(90deg, #059669 60%, #06b6d4 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
     color: #fff;
-    font-weight: 600;
-    padding: 0.72rem 1.8rem;
-    border-radius: 10px;
-    font-size: 1rem;
-    box-shadow: 0 1.5px 6px #10b98124;
+    font-weight: 700;
+    padding: 0.75rem 2rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 16px rgba(37,99,235,0.3);
     border: none;
-    transition: background 0.13s, box-shadow 0.12s;
-}
-.filters-bar button:hover {
-    background: linear-gradient(90deg, #059669 60%, #14532d 100%);
-    box-shadow: 0 4px 16px #10b9812b;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-/* Table */
+.filters-bar button:hover {
+    background: linear-gradient(135deg, #1d4ed8 0%, #6d28d9 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(37,99,235,0.4);
+}
+
+/* Section résultats */
+.results-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    border-left: 4px solid #3b82f6;
+}
+
+.results-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.results-header .material-icons {
+    color: #3b82f6;
+    font-size: 1.75rem;
+}
+
+/* Table horizontale modernisée */
 .table-wrap {
     background: #fff;
-    border-radius: 1.2rem;
-    box-shadow: 0 1.5px 10px #06b6d40c;
-    border: 1.5px solid #f0fdf4;
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
     overflow: hidden;
+    margin-bottom: 3rem;
 }
+
 .table-wrap table {
     width: 100%;
-    min-width: 900px;
+    min-width: 1100px;
     font-size: 1rem;
+    table-layout: fixed;
 }
+
+/* Largeurs de colonnes optimisées */
+.table-wrap th:nth-child(1),
+.table-wrap td:nth-child(1) { width: 280px; } /* Document */
+.table-wrap th:nth-child(2),
+.table-wrap td:nth-child(2) { width: 130px; } /* Type */
+.table-wrap th:nth-child(3),
+.table-wrap td:nth-child(3) { width: 120px; } /* Source */
+.table-wrap th:nth-child(4),
+.table-wrap td:nth-child(4) { width: 120px; } /* Pays */
+.table-wrap th:nth-child(5),
+.table-wrap td:nth-child(5) { width: 100px; } /* Langue */
+.table-wrap th:nth-child(6),
+.table-wrap td:nth-child(6) { width: 150px; } /* Métadonneur */
+.table-wrap th:nth-child(7),
+.table-wrap td:nth-child(7) { width: 120px; } /* Date */
+.table-wrap th:nth-child(8),
+.table-wrap td:nth-child(8) { width: 100px; } /* Actions */
+
 .table-wrap thead {
-    background: linear-gradient(90deg, #f0fdf4 40%, #a7f3d0 100%);
-    border-bottom: 2px solid #99f6e4;
+    background: linear-gradient(135deg, #f0fdf4 0%, #e0e7ff 50%, #f5f3ff 100%);
+    border-bottom: 2px solid #e0e7ff;
 }
+
 .table-wrap th {
     text-transform: uppercase;
     font-weight: 700;
-    font-size: 0.88rem;
-    color: #047857;
-    padding: 1rem 0.7rem;
-    letter-spacing: 0.06em;
+    font-size: 0.9rem;
+    color: #374151;
+    padding: 1.5rem 1rem;
+    letter-spacing: 0.5px;
+    position: relative;
 }
+
+.table-wrap th:after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 2px;
+    background: linear-gradient(135deg, #3b82f6 0%, #7c3aed 100%);
+    border-radius: 1px;
+}
+
 .table-wrap td {
-    padding: 0.88rem 0.7rem;
+    padding: 1.25rem 1rem;
     vertical-align: middle;
-    font-size: 0.96rem;
+    font-size: 0.95rem;
+    border-bottom: 1px solid #f8fafc;
 }
+
 .table-wrap tbody tr {
-    transition: background 0.18s;
+    transition: all 0.3s ease;
     cursor: pointer;
 }
+
 .table-wrap tbody tr:hover {
-    background: #f0fdf4;
+    background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
+
 .table-wrap .doc-title {
     font-weight: 700;
-    color: #0f172a;
-    max-width: 230px;
+    color: #1e293b;
+    max-width: 180px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    transition: color 0.3s ease;
 }
+
+.table-wrap tbody tr:hover .doc-title {
+    color: #2563eb;
+}
+
 .table-wrap .doc-context {
-    font-size: 0.92em;
-    color: #4b5563;
-    margin-top: 1.5px;
+    font-size: 0.82rem;
+    color: #64748b;
+    margin-top: 3px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 210px;
+    max-width: 180px;
 }
+
+/* Badges modernisés */
 .table-wrap .badge-blue {
-    background: #dbeafe; color: #2563eb; border-radius: 9999px; font-weight:600; padding: 0.19em 0.9em; font-size: 0.95em;
+    color: #1d4ed8;
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border: 1px solid #93c5fd;
+    border-radius: 20px;
+    font-weight: 600;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.025em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: inline-block;
 }
+
 .table-wrap .badge-green {
-    background: #bbf7d0; color: #047857; border-radius: 9999px; font-weight:600; padding: 0.19em 0.9em; font-size: 0.95em;
+    color: #059669;
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    border: 1px solid #6ee7b7;
+    border-radius: 20px;
+    font-weight: 600;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.025em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: inline-block;
 }
+
 .table-wrap .badge-orange {
-    background: #fde68a; color: #b45309; border-radius: 9999px; font-weight:600; padding: 0.19em 0.9em; font-size: 0.95em;
+    color: #ea580c;
+    background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+    border: 1px solid #fb923c;
+    border-radius: 20px;
+    font-weight: 600;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.025em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: inline-block;
 }
+
 .table-wrap .badge-purple {
-    background: #ede9fe; color: #7c3aed; border-radius: 9999px; font-weight:600; padding: 0.19em 0.9em; font-size: 0.95em;
+    color: #7c3aed;
+    background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+    border: 1px solid #c4b5fd;
+    border-radius: 20px;
+    font-weight: 600;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.025em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: inline-block;
 }
+
 .table-wrap .badge-gray {
-    background: #f1f5f9; color: #64748b; border-radius: 9999px; font-weight:600; padding: 0.19em 0.9em; font-size: 0.95em;
+    color: #64748b;
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    border: 1px solid #cbd5e1;
+    border-radius: 20px;
+    font-weight: 600;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.025em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: inline-block;
 }
+
+/* Métadonnées utilisateur */
 .table-wrap .doc-meta-user {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 0.5rem;
 }
+
 .table-wrap .doc-meta-user .avatar {
-    width: 25px; height: 25px; border-radius: 50%; background: #e0e7ef;
-    display: flex; align-items: center; justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(59,130,246,0.15);
+    flex-shrink: 0;
 }
-.table-wrap .doc-meta-user .material-icons { font-size: 1em; color: #059669; }
+
+.table-wrap .doc-meta-user .material-icons {
+    font-size: 1rem;
+    color: #3b82f6;
+}
+
+.table-wrap .doc-meta-user span {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80px;
+}
+
+/* Actions */
+.table-wrap .doc-actions {
+    display: flex;
+    gap: 0.5rem;
+}
 
 .table-wrap .doc-actions a {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 7px;
-    transition: background 0.13s, color 0.13s;
-    padding: 0.34em 0.6em;
-    font-size: 1.13em;
-}
-.table-wrap .doc-actions a.view { color: #2563eb; }
-.table-wrap .doc-actions a.view:hover { background: #dbeafe; }
-.table-wrap .doc-actions a.download { color: #059669; }
-.table-wrap .doc-actions a.download:hover { background: #bbf7d0; }
-
-@media (max-width: 1050px) {
-    .table-wrap table { min-width: 700px; }
-}
-@media (max-width: 700px) {
-    .page-header-content { flex-direction: column; gap: 1.2rem; align-items: flex-start;}
-    .filters-bar { flex-direction: column; gap: 1.2rem; }
-    .filters-bar .filters-col, .filters-bar .filters-action { width: 100%; }
-    .table-wrap table { min-width: 100%; font-size: 0.95em; }
-    .table-wrap .doc-title, .table-wrap .doc-context { max-width: 120px;}
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    padding: 0.5rem;
+    font-size: 1.2rem;
 }
 
+.table-wrap .doc-actions a.view {
+    color: #2563eb;
+    background: rgba(37,99,235,0.1);
+}
+
+.table-wrap .doc-actions a.view:hover {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37,99,235,0.2);
+}
+
+.table-wrap .doc-actions a.download {
+    color: #059669;
+    background: rgba(5,150,105,0.1);
+}
+
+.table-wrap .doc-actions a.download:hover {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(5,150,105,0.2);
+}
+
+/* Document icon in table */
+.document-icon-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.document-table-icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #be185d 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(239,68,68,0.25);
+    flex-shrink: 0;
+}
+
+.document-table-icon .material-icons {
+    font-size: 1.1rem;
+    color: #fff;
+}
+
+/* Pagination améliorée */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 3rem;
+}
+
+.pagination-wrapper {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
+    padding: 1rem;
+}
+
+.pagination-wrapper .flex {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.pagination-wrapper a {
+    padding: 0.75rem;
+    border-radius: 12px;
+    border: 2px solid #e5e7eb;
+    background: #fff;
+    transition: all 0.3s ease;
+    color: #6b7280;
+}
+
+.pagination-wrapper a:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    color: #2563eb;
+    transform: translateY(-1px);
+}
+
+.pagination-wrapper span {
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+    border-radius: 12px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+
+.empty-state .material-icons {
+    font-size: 4rem;
+    color: #9ca3af;
+    margin-bottom: 1.5rem;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 1rem;
+}
+
+.empty-state p {
+    color: #6b7280;
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+}
+
+.empty-state a {
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    color: #fff;
+    padding: 0.75rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.empty-state a:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(37,99,235,0.3);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .library-container {
+        max-width: 100%;
+        padding: 1.5rem;
+    }
+    
+    .table-wrap table {
+        min-width: 700px;
+    }
+}
+
+@media (max-width: 768px) {
+    .library-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 2rem 1.5rem 1.5rem 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .page-header-content {
+        flex-direction: column;
+        gap: 1.5rem;
+        align-items: flex-start;
+    }
+    
+    .page-header-titles h1 {
+        font-size: 1.75rem;
+    }
+    
+    .filters-bar {
+        flex-direction: column;
+        gap: 1.5rem;
+        padding: 1.5rem;
+    }
+    
+    .filters-col, .filters-action {
+        width: 100%;
+    }
+    
+    .dashboard-tile-links {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .table-wrap table {
+        min-width: 100%;
+        font-size: 0.9rem;
+    }
+    
+    .table-wrap .doc-title,
+    .table-wrap .doc-context {
+        max-width: 120px;
+    }
+}
+
+@media (max-width: 480px) {
+    .page-header-icon {
+        width: 56px;
+        height: 56px;
+    }
+    
+    .page-header-icon .material-icons {
+        font-size: 2rem;
+    }
+    
+    .table-wrap th,
+    .table-wrap td {
+        padding: 1rem 0.75rem;
+    }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-6">
-
-    <!-- Header super stylisé -->
+<div class="library-container">
+    <!-- Header stylisé -->
     <div class="page-header">
         <div class="page-header-content">
             <div class="page-header-left">
@@ -263,12 +686,14 @@
                     <p>Vue horizontale avec données principales</p>
                 </div>
             </div>
-            <div class="page-header-actions">
-                <a href="{% url 'client:library:dashboard' %}">
-                    <i class="material-icons">dashboard</i> Dashboard
+            <div class="dashboard-tile-links">
+                <a href="{% url 'client:library:dashboard' %}" class="dashboard-tile-link">
+                    <i class="material-icons">dashboard</i>
+                    Dashboard
                 </a>
-                <a href="{% url 'client:library:document_list' %}">
-                    <i class="material-icons">grid_view</i> Vue Grille
+                <a href="{% url 'client:library:document_list' %}" class="dashboard-tile-link">
+                    <i class="material-icons">grid_view</i>
+                    Vue Grille
                 </a>
             </div>
         </div>
@@ -321,15 +746,16 @@
         </div>
     </form>
 
-    <!-- Results Count -->
-    <div class="mb-5">
-        <h2 class="text-xl font-semibold text-gray-800">
+    <!-- Résultats -->
+    <div class="results-header">
+        <h2>
+            <i class="material-icons">table_view</i>
             {{ documents.paginator.count }} document{{ documents.paginator.count|pluralize }} trouvé{{ documents.paginator.count|pluralize }}
         </h2>
     </div>
 
     {% if documents %}
-    <div class="table-wrap mb-6">
+    <div class="table-wrap">
         <div class="overflow-x-auto">
             <table>
                 <thead>
@@ -348,19 +774,17 @@
                     {% for document in documents %}
                     <tr onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
                         <td>
-                            <div class="flex items-center space-x-3">
-                                <div class="flex-shrink-0">
-                                    <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                                        <i class="material-icons text-red-600">picture_as_pdf</i>
-                                    </div>
+                            <div class="document-icon-container">
+                                <div class="document-table-icon">
+                                    <i class="material-icons">picture_as_pdf</i>
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <span class="doc-title" title="{{ document|document_title }}">
-                                        {{ document|document_title|truncatechars:38 }}
+                                        {{ document|document_title|truncatechars:28 }}
                                     </span>
                                     {% if document.context %}
                                     <div class="doc-context" title="{{ document.context }}">
-                                        {{ document.context|truncatechars:40 }}
+                                        {{ document.context|truncatechars:30 }}
                                     </div>
                                     {% endif %}
                                 </div>
@@ -368,8 +792,8 @@
                         </td>
                         <td>
                             {% if document.doc_type %}
-                            <span class="badge-blue">
-                                {{ document.doc_type|truncatechars:18 }}
+                            <span class="badge-blue" title="{{ document.doc_type }}">
+                                {{ document.doc_type|truncatechars:15 }}
                             </span>
                             {% else %}
                             <span class="badge-gray">-</span>
@@ -377,8 +801,8 @@
                         </td>
                         <td>
                             {% if document.source %}
-                            <span class="badge-green">
-                                {{ document.source|truncatechars:14 }}
+                            <span class="badge-green" title="{{ document.source }}">
+                                {{ document.source|truncatechars:12 }}
                             </span>
                             {% else %}
                             <span class="badge-gray">-</span>
@@ -386,8 +810,8 @@
                         </td>
                         <td>
                             {% if document.country %}
-                            <span class="badge-orange">
-                                {{ document.country|truncatechars:14 }}
+                            <span class="badge-orange" title="{{ document.country }}">
+                                {{ document.country|truncatechars:12 }}
                             </span>
                             {% else %}
                             <span class="badge-gray">-</span>
@@ -395,8 +819,8 @@
                         </td>
                         <td>
                             {% if document.language %}
-                            <span class="badge-purple">
-                                {{ document.language|upper|truncatechars:12 }}
+                            <span class="badge-purple" title="{{ document.language }}">
+                                {{ document.language|upper|truncatechars:10 }}
                             </span>
                             {% else %}
                             <span class="badge-gray">-</span>
@@ -411,11 +835,11 @@
                             </div>
                         </td>
                         <td>
-                            <div>{{ document.created_at|date:"d/m/Y" }}</div>
+                            <div style="font-weight: 600; color: #374151;">{{ document.created_at|date:"d/m/Y" }}</div>
                             <div class="text-xs text-gray-400">{{ document.created_at|date:"H:i" }}</div>
                         </td>
                         <td>
-                            <div class="doc-actions flex items-center gap-1">
+                            <div class="doc-actions">
                                 <a href="{% url 'client:library:document_detail' document.pk %}" class="view" title="Voir le détail"
                                    onclick="event.stopPropagation();">
                                     <i class="material-icons">visibility</i>
@@ -435,35 +859,34 @@
 
     <!-- Pagination -->
     {% if documents.has_other_pages %}
-    <div class="mt-8 flex justify-center">
-        <div class="flex items-center space-x-2">
-            {% if documents.has_previous %}
-                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.previous_page_number }}"
-                   class="p-2 rounded-lg border border-gray-300 hover:bg-green-50 transition-colors">
-                    <i class="material-icons">chevron_left</i>
-                </a>
-            {% endif %}
-            <span class="px-4 py-2 text-sm text-gray-700">
-                Page {{ documents.number }} sur {{ documents.paginator.num_pages }}
-            </span>
-            {% if documents.has_next %}
-                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.next_page_number }}"
-                   class="p-2 rounded-lg border border-gray-300 hover:bg-green-50 transition-colors">
-                    <i class="material-icons">chevron_right</i>
-                </a>
-            {% endif %}
+    <div class="pagination-container">
+        <div class="pagination-wrapper">
+            <div class="flex items-center space-x-2">
+                {% if documents.has_previous %}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.previous_page_number }}">
+                        <i class="material-icons">chevron_left</i>
+                    </a>
+                {% endif %}
+                <span>
+                    Page {{ documents.number }} sur {{ documents.paginator.num_pages }}
+                </span>
+                {% if documents.has_next %}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ documents.next_page_number }}">
+                        <i class="material-icons">chevron_right</i>
+                    </a>
+                {% endif %}
+            </div>
         </div>
     </div>
     {% endif %}
 
     {% else %}
-    <div class="text-center py-12">
-        <i class="material-icons text-6xl text-green-200 mb-4">table_view</i>
-        <h3 class="text-xl font-semibold text-gray-700 mb-2">Aucun document trouvé</h3>
-        <p class="text-gray-500 mb-6">Aucun document ne correspond à vos critères de recherche.</p>
-        <a href="{% url 'client:library:dashboard' %}"
-           class="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors">
-            <i class="material-icons mr-2">dashboard</i>
+    <div class="empty-state">
+        <i class="material-icons">table_view</i>
+        <h3>Aucun document trouvé</h3>
+        <p>Aucun document ne correspond à vos critères de recherche.</p>
+        <a href="{% url 'client:library:dashboard' %}">
+            <i class="material-icons">dashboard</i>
             Retour au Dashboard
         </a>
     </div>

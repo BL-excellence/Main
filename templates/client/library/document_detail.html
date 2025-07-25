@@ -6,348 +6,483 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/library.css' %}">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
-/* Document Detail Specific Styles */
-.document-detail {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 24px;
-}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-.document-header {
-    background: white;
-    border-radius: 12px;
-    padding: 32px;
-    margin-bottom: 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    border: 1px solid #f1f5f9;
-}
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            color: #1e293b;
+        }
 
-.document-title {
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin: 0 0 16px 0;
-    line-height: 1.3;
-}
+        .document-detail {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
 
-.document-description {
-    font-size: 1rem;
-    color: #475569;
-    line-height: 1.6;
-    margin-bottom: 24px;
-}
+        /* Breadcrumb modernisé */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 24px;
+            font-size: 0.9rem;
+            color: #64748b;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
 
-.document-actions {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
-}
+        .breadcrumb a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
 
-.status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-}
+        .breadcrumb a:hover {
+            color: #5a67d8;
+        }
 
-.status-validated {
-    background: #dcfce7;
-    color: #166534;
-}
+        .breadcrumb .separator {
+            color: #cbd5e1;
+            font-weight: 600;
+        }
 
-.status-pending {
-    background: #fef3c7;
-    color: #92400e;
-}
+        /* Header du document amélioré */
+        .document-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 32px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
 
-/* Metadata Horizontal List */
-.metadata-section {
-    background: white;
-    border-radius: 12px;
-    padding: 24px;
-    margin-bottom: 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    border: 1px solid #f1f5f9;
-}
+        .document-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 200px;
+            height: 200px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            transform: translate(50%, -50%);
+        }
 
-.metadata-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #1e293b;
-    margin: 0 0 20px 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
 
-.metadata-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 16px;
-}
+        .document-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            line-height: 1.3;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
 
-.metadata-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
-    background: #f8fafc;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-}
+        .document-description {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 24px;
+            opacity: 0.9;
+        }
 
-.metadata-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    flex-shrink: 0;
-}
+        .document-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
 
-.metadata-icon.blue {
-    background: #dbeafe;
-    color: #1d4ed8;
-}
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
 
-.metadata-icon.green {
-    background: #dcfce7;
-    color: #16a34a;
-}
+        .btn-primary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
 
-.metadata-icon.orange {
-    background: #fed7aa;
-    color: #ea580c;
-}
+        .btn-primary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
 
-.metadata-icon.purple {
-    background: #e9d5ff;
-    color: #7c3aed;
-}
+        .btn-outline {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
 
-.metadata-icon.red {
-    background: #fee2e2;
-    color: #dc2626;
-}
+        .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
 
-.metadata-icon.teal {
-    background: #ccfbf1;
-    color: #0d9488;
-}
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            backdrop-filter: blur(10px);
+        }
 
-.metadata-content {
-    flex: 1;
-    min-width: 0;
-}
+        .status-validated {
+            background: rgba(16, 185, 129, 0.2);
+            color: #dcfce7;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
 
-.metadata-label {
-    font-size: 0.8rem;
-    color: #64748b;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
-}
+        .status-pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fef3c7;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
 
-.metadata-value {
-    font-size: 0.95rem;
-    color: #1e293b;
-    font-weight: 600;
-    word-break: break-word;
-}
+        /* Section métadonnées modernisée */
+        .metadata-section {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
 
-.metadata-value.empty {
-    color: #94a3b8;
-    font-style: italic;
-    font-weight: 400;
-}
+        .metadata-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 24px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #f1f5f9;
+        }
 
-/* Tags */
-.tags-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 4px;
-}
+        .metadata-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 2px;
+        }
 
-.metadata-tag {
-    background: #4f46e5;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
 
-/* Content sections */
-.content-sections {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 24px;
-}
+        .metadata-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px;
+            background: #fafbff;
+            border-radius: 12px;
+            border: 2px solid #f1f5f9;
+            transition: all 0.3s ease;
+        }
 
-.main-content {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-}
+        .metadata-item:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+        }
 
-.sidebar-content {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-}
+        .metadata-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
 
-.content-section {
-    background: white;
-    border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    border: 1px solid #f1f5f9;
-}
+        .metadata-icon.blue {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+        }
 
-.section-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #1e293b;
-    margin: 0 0 16px 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
+        .metadata-icon.green {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
 
-/* Statistics */
-.stats-row {
-    display: flex;
-    gap: 16px;
-}
+        .metadata-icon.orange {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
 
-.stat-item {
-    text-align: center;
-    padding: 16px;
-    background: #f8fafc;
-    border-radius: 8px;
-    flex: 1;
-}
+        .metadata-icon.purple {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+        }
 
-.stat-number {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 4px;
-}
+        .metadata-icon.red {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
 
-.stat-label {
-    font-size: 0.8rem;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
+        .metadata-icon.teal {
+            background: linear-gradient(135deg, #14b8a6, #0d9488);
+            color: white;
+        }
 
-/* Related documents */
-.related-doc {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-decoration: none;
-    color: inherit;
-    margin-bottom: 8px;
-}
+        .metadata-content {
+            flex: 1;
+            min-width: 0;
+        }
 
-.related-doc:hover {
-    border-color: #4f46e5;
-    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
-}
+        .metadata-label {
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
 
-.related-doc-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f1f5f9;
-    color: #4f46e5;
-    font-size: 16px;
-}
+        .metadata-value {
+            font-size: 1rem;
+            color: #1e293b;
+            font-weight: 600;
+            word-break: break-word;
+            line-height: 1.4;
+        }
 
-.related-doc-content h5 {
-    font-size: 0.9rem;
-    margin: 0 0 4px 0;
-    color: #1e293b;
-    font-weight: 500;
-}
+        .metadata-value.empty {
+            color: #94a3b8;
+            font-style: italic;
+            font-weight: 400;
+        }
 
-.related-doc-meta {
-    font-size: 0.75rem;
-    color: #64748b;
-}
+        .metadata-value a {
+            color: #667eea;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
 
-/* Breadcrumb */
-.breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 24px;
-    font-size: 0.9rem;
-    color: #64748b;
-}
+        .metadata-value a:hover {
+            color: #5a67d8;
+            text-decoration: underline;
+        }
 
-.breadcrumb a {
-    color: #4f46e5;
-    text-decoration: none;
-}
+        /* Contexte extrait */
+        .context-section {
+            margin-top: 24px;
+            padding: 24px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+            border-radius: 16px;
+            border-left: 6px solid #667eea;
+        }
 
-.breadcrumb a:hover {
-    text-decoration: underline;
-}
+        .context-label {
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
 
-.breadcrumb .separator {
-    color: #cbd5e1;
-}
+        .context-content {
+            font-size: 1rem;
+            color: #1e293b;
+            line-height: 1.6;
+            font-weight: 500;
+        }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .document-detail {
-        padding: 16px;
-    }
-    
-    .document-header {
-        padding: 20px;
-    }
-    
-    .document-title {
-        font-size: 1.4rem;
-    }
-    
-    .metadata-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .content-sections {
-        grid-template-columns: 1fr;
-    }
-    
-    .document-actions {
-        flex-direction: column;
-    }
-    
-    .stats-row {
-        flex-direction: column;
-    }
-}
+        /* Sections de contenu */
+        .content-sections {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 32px;
+        }
+
+        .main-content, .sidebar-content {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .content-section {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f1f5f9;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 2px;
+        }
+
+        /* Documents similaires */
+        .related-doc {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            border: 2px solid #f1f5f9;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            margin-bottom: 12px;
+            background: #fafbff;
+        }
+
+        .related-doc:hover {
+            border-color: #667eea;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .related-doc-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .related-doc-content h5 {
+            font-size: 1rem;
+            margin: 0 0 6px 0;
+            color: #1e293b;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .related-doc-meta {
+            font-size: 0.85rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+
+        .empty-state .material-icons {
+            font-size: 4rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .document-detail {
+                padding: 16px;
+            }
+            
+            .document-header {
+                padding: 24px;
+            }
+            
+            .document-title {
+                font-size: 1.6rem;
+            }
+            
+            .metadata-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .content-sections {
+                grid-template-columns: 1fr;
+            }
+            
+            .document-actions {
+                flex-direction: column;
+            }
+            
+            .breadcrumb {
+                flex-wrap: wrap;
+                padding: 8px 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .metadata-item {
+                padding: 16px;
+            }
+            
+            .metadata-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+            
+            .document-title {
+                font-size: 1.4rem;
+            }
+        }
 </style>
 {% endblock %}
 
@@ -355,7 +490,10 @@
 <div class="document-detail">
     <!-- Breadcrumb -->
     <nav class="breadcrumb">
-        <a href="{% url 'client:library:dashboard' %}">Library</a>
+        <a href="{% url 'client:library:dashboard' %}">
+            <i class="material-icons" style="font-size: 16px;">home</i>
+            Library
+        </a>
         <span class="separator">›</span>
         <a href="{% url 'client:library:document_list' %}">Documents</a>
         <span class="separator">›</span>
@@ -364,38 +502,40 @@
 
     <!-- Document Header -->
     <div class="document-header">
-        <h1 class="document-title">{{ document|document_title }}</h1>
-        
-        {% if document.context %}
-        <p class="document-description">{{ document.context }}</p>
-        {% endif %}
-        
-        <div class="document-actions">
-            {% if document.is_validated %}
-            <span class="status-badge status-validated">
-                <i class="material-icons">verified</i>
-                Validé
-            </span>
-            {% else %}
-            <span class="status-badge status-pending">
-                <i class="material-icons">schedule</i>
-                En attente de validation
-            </span>
+        <div class="header-content">
+            <h1 class="document-title">{{ document|document_title|truncatechars:80 }}</h1>
+            
+            {% if document.context %}
+            <p class="document-description">{{ document.context }}</p>
             {% endif %}
             
-            {% if document.file and document.is_validated %}
-            <a href="{% url 'client:library:download_document' document.pk %}" class="btn btn-primary">
-                <i class="material-icons">download</i>
-                Télécharger
-            </a>
-            {% endif %}
-            
-            {% if document.url_source or document.url %}
-            <a href="{{ document.url_source|default:document.url }}" target="_blank" class="btn btn-outline">
-                <i class="material-icons">open_in_new</i>
-                Source
-            </a>
-            {% endif %}
+            <div class="document-actions">
+                {% if document.is_validated %}
+                <span class="status-badge status-validated">
+                    <i class="material-icons">verified</i>
+                    Validé
+                </span>
+                {% else %}
+                <span class="status-badge status-pending">
+                    <i class="material-icons">schedule</i>
+                    En attente de validation
+                </span>
+                {% endif %}
+                
+                {% if document.file and document.is_validated %}
+                <a href="{% url 'client:library:download_document' document.pk %}" class="btn btn-primary">
+                    <i class="material-icons">download</i>
+                    Télécharger
+                </a>
+                {% endif %}
+                
+                {% if document.url_source or document.url %}
+                <a href="{{ document.url_source|default:document.url }}" target="_blank" class="btn btn-outline">
+                    <i class="material-icons">open_in_new</i>
+                    Source
+                </a>
+                {% endif %}
+            </div>
         </div>
     </div>
 
@@ -414,7 +554,7 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Titre du Document</div>
-                    <div class="metadata-value">{{ metadata.title }}</div>
+                    <div class="metadata-value">{{ metadata.title|default:"Non spécifié" }}</div>
                 </div>
             </div>
             
@@ -425,7 +565,7 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Type de Document</div>
-                    <div class="metadata-value">{{ metadata.doc_type }}</div>
+                    <div class="metadata-value">{{ metadata.doc_type|default:"Non spécifié" }}</div>
                 </div>
             </div>
             
@@ -436,7 +576,7 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Source/Organisation</div>
-                    <div class="metadata-value">{{ metadata.source }}</div>
+                    <div class="metadata-value">{{ metadata.source|default:"Non spécifiée" }}</div>
                 </div>
             </div>
             
@@ -447,7 +587,7 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Pays</div>
-                    <div class="metadata-value">{{ metadata.country }}</div>
+                    <div class="metadata-value">{{ metadata.country|default:"Non spécifié" }}</div>
                 </div>
             </div>
             
@@ -458,7 +598,7 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Langue</div>
-                    <div class="metadata-value">{{ metadata.language }}</div>
+                    <div class="metadata-value">{{ metadata.language|default:"Non spécifiée" }}</div>
                 </div>
             </div>
             
@@ -469,7 +609,7 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Date de Publication</div>
-                    <div class="metadata-value">{{ metadata.publication_date }}</div>
+                    <div class="metadata-value">{{ metadata.publication_date|default:"Non spécifiée" }}</div>
                 </div>
             </div>
             
@@ -480,7 +620,7 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Version</div>
-                    <div class="metadata-value">{{ metadata.version }}</div>
+                    <div class="metadata-value">{{ metadata.version|default:"Non spécifiée" }}</div>
                 </div>
             </div>
             
@@ -493,7 +633,7 @@
                 <div class="metadata-content">
                     <div class="metadata-label">URL Source</div>
                     <div class="metadata-value">
-                        <a href="{{ metadata.url_source }}" target="_blank" class="text-blue-600 hover:text-blue-800">
+                        <a href="{{ metadata.url_source }}" target="_blank">
                             {{ metadata.url_source|truncatechars:50 }}
                         </a>
                     </div>
@@ -521,7 +661,7 @@
                 </div>
                 <div class="metadata-content">
                     <div class="metadata-label">Uploadé par (Métadonneur)</div>
-                    <div class="metadata-value">{{ metadata.owner }}</div>
+                    <div class="metadata-value">{{ metadata.owner|default:"Anonyme" }}</div>
                 </div>
             </div>
             
@@ -556,11 +696,9 @@
         
         <!-- Contexte extrait -->
         {% if document.context %}
-        <div style="margin-top: 20px;">
-            <div class="metadata-label" style="margin-bottom: 8px;">CONTEXTE EXTRAIT</div>
-            <div class="p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border-l-4 border-blue-400">
-                <p class="text-gray-700 leading-relaxed">{{ document.context }}</p>
-            </div>
+        <div class="context-section">
+            <div class="context-label">Contexte Extrait</div>
+            <div class="context-content">{{ document.context }}</div>
         </div>
         {% endif %}
     </div>
@@ -638,6 +776,18 @@
                 </a>
                 {% endfor %}
             </div>
+            {% else %}
+            <div class="content-section">
+                <h3 class="section-title">
+                    <i class="material-icons">link</i>
+                    Documents Similaires
+                </h3>
+                <div class="empty-state">
+                    <i class="material-icons">link_off</i>
+                    <h3>Aucun document similaire</h3>
+                    <p>Aucun document similaire trouvé pour le moment.</p>
+                </div>
+            </div>
             {% endif %}
         </div>
     </div>
@@ -650,6 +800,20 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Track document view (could be used for analytics)
     console.log('Document viewed: {{ document.title|escapejs }}');
+    
+    // Animation pour les metadata items
+    const metadataItems = document.querySelectorAll('.metadata-item');
+    metadataItems.forEach((item, index) => {
+        item.style.animationDelay = `${index * 0.1}s`;
+        item.style.opacity = '0';
+        item.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            item.style.transition = 'all 0.6s ease';
+            item.style.opacity = '1';
+            item.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
 });
 </script>
 {% endblock %}
