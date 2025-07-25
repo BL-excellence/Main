@@ -1,362 +1,1138 @@
-{% extends 'expert/base.html' %}
+{% extends 'base.html' %}
+{% load static %}
+{% load rawdocs_extras %}
 
-{% block title %}Révision {{ document.file.name }}{% endblock %}
-{% block page_title %}{{ document.file.name|truncatechars:50 }}{% endblock %}
-{% block page_subtitle %}Révision experte - Page {{ page_obj.number }} sur {{ page_obj.paginator.count }}{% endblock %}
+{% block title %}Révision Expert - {{ document.file.name }}{% endblock %}
 
 {% block content %}
 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 
-<!-- Navigation -->
-<div class="row mb-4">
-    <div class="col-md-8">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h6 class="mb-1">Navigation</h6>
-                    <small class="text-muted">Page {{ page_obj.number }} sur {{ page_obj.paginator.count }}</small>
-                </div>
-                <div class="btn-group">
-                    {% if page_obj.has_previous %}
-                        <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-outline-primary">
-                            <i class="fas fa-chevron-left"></i> Précédente
-                        </a>
-                    {% endif %}
-                    {% if page_obj.has_next %}
-                        <a href="?page={{ page_obj.next_page_number }}" class="btn btn-outline-primary">
-                            Suivante <i class="fas fa-chevron-right"></i>
-                        </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="stat-card text-center">
-            <a href="{% url 'expert:document_list' %}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Retour à la liste
-            </a>
-        </div>
-    </div>
-</div>
+<style>
+/* Expert Review Styles - Based on annotate_document.html */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-{% if current_page %}
-<!-- Page Display -->
-<div class="stat-card mb-4">
-    <h6 class="mb-3">Page {{ current_page.page_number }}</h6>
-    <div class="p-3 bg-light rounded" id="page-display" data-page-id="{{ current_page.id }}">
-        {{ current_page.cleaned_text }}
-    </div>
-    
-    <!-- Expert annotation tools -->
-    <div class="mt-3 p-3 bg-primary bg-opacity-10 rounded">
-        <h6 class="text-primary mb-2">🔧 Outils Expert</h6>
-        <div class="document-actions mb-2" style="text-align: left; margin-left: 20px;">
-            <form method="POST" action="{% url 'expert:validate_document' document.id %}" style="display: inline;">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-success btn-sm" style="font-size: 19px; padding: 8px 16px;">
-                    Validate
-                </button>
-            </form>
-        </div>
-        <div class="row align-items-center">
-            <div class="col-md-8">
-                <div class="d-flex flex-wrap gap-2">
-                    {% for annotation_type in all_annotation_types %}
-                    <button class="btn btn-sm btn-outline-primary" 
-                    onclick="selectEntityType('{{ annotation_type.name }}')"
-                    style="border-color: {{ annotation_type.color }}; color: {{ annotation_type.color }};">
-                    {{ annotation_type.display_name }}
-                </button>
-                {% endfor %}
-                <button class="btn btn-sm btn-outline-success" onclick="showAddAnnotationTypeModal()">
-                    <i class="fas fa-plus"></i> Add Type
-                </button>
-            </div>
-        </div>
-        <div class="col-md-4 text-end">
-            <button class="btn btn-outline-info btn-sm me-2" onclick="viewOriginalDocument({{ document.id }})">
-                <i class="fas fa-eye"></i> See Original Doc
-            </button>
-            <div class="mt-1">
-                <small class="text-muted">Sélectionnez un type, puis surlignez du texte</small>
-            </div>
-        </div>
-    </div>
-    
-    <div id="expert-mode-info" class="mt-2 text-primary" style="display: none;">
-        <i class="fas fa-magic"></i> <strong>Mode expert activé:</strong> <span id="selected-entity-type"></span>
-        <br><small>Surlignez du texte pour créer une nouvelle annotation</small>
-    </div>
-</div>
-</div>
+:root {
+  --pharma-primary: #0ea5e9;
+  --pharma-primary-dark: #0284c7;
+  --pharma-primary-light: #38bdf8;
+  --pharma-accent: #10b981;
+  --pharma-accent-light: #34d399;
+  --pharma-success: #059669;
+  --pharma-warn: #f59e0b;
+  --pharma-error: #dc2626;
+  --pharma-text: #1f2937;
+  --pharma-text-soft: #6b7280;
+  --pharma-bg: #f8fafc;
+  --pharma-card: #ffffff;
+  --pharma-border: #e2e8f0;
+  --pharma-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --pharma-radius: 16px;
+  --pharma-radius-sm: 12px;
+  --pharma-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-<!-- Annotations -->
-<div class="stat-card">
-    <h6 class="mb-3">🏷️ Annotations ({{ current_page.annotations.count }})</h6>
-    
-    {% if current_page.annotations.exists %}
-    {% for annotation in current_page.annotations.all %}
-    <div class="border rounded p-3 mb-3">
-        <div class="row align-items-center">
-                        <div class="col-md-6">
-                            <span class="badge bg-info me-2">{{ annotation.annotation_type.display_name }}</span>
-                            <strong class="annotation-text-clickable" 
-                                    onclick="highlightTextInDocument('{{ annotation.selected_text|escapejs }}', {{ annotation.start_pos }}, {{ annotation.end_pos }})"
-                                    style="cursor: pointer; color: #0d6efd; text-decoration: underline;"
-                                    title="Cliquez pour voir dans le texte">"{{ annotation.selected_text }}"</strong>
-                        </div>
-                        <div class="col-md-3 text-center">
-                            {% if annotation.validation_status == 'validated' or annotation.validation_status == 'expert_created' %}
-                                <span class="badge bg-success">Validée</span>
-                            {% elif annotation.validation_status == 'rejected' %}
-                                <span class="badge bg-danger">Rejetée</span>
-                            {% else %}
-                                <span class="badge bg-warning">En attente</span>
-                            {% endif %}
-                        </div>
-                        <div class="col-md-3 text-end">
-                            {% if annotation.validation_status == 'pending' %}
-                                <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-success" onclick="validateAnnotation({{ annotation.id }}, 'validate')">
-                                        Valider
-                                    </button>
-                                    <button class="btn btn-danger" onclick="validateAnnotation({{ annotation.id }}, 'reject')">
-                                        Rejeter
-                                    </button>
-                                </div>
-                            {% elif annotation.validation_status == 'rejected' %}
-                                <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-warning" onclick="showModifyModal({{ annotation.id }}, '{{ annotation.selected_text|escapejs }}', '{{ annotation.annotation_type.name }}')">
-                                        Modifier
-                                    </button>
-                                    <button class="btn btn-danger" onclick="deleteAnnotation({{ annotation.id }})">
-                                        Supprimer
-                                    </button>
-                                </div>
-                            {% elif annotation.validation_status == 'validated' or annotation.validation_status == 'expert_created' %}
-                                <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-warning" onclick="undoValidation({{ annotation.id }})">
-                                        Annuler validation
-                                    </button>
-                                </div>
-                            {% else %}
-                                <small class="text-muted">Déjà traitée</small>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
-        {% else %}
-            <div class="text-center py-4 text-muted">
-                <i class="fas fa-inbox fa-2x mb-2"></i>
-                <p>Aucune annotation pour cette page</p>
-            </div>
-        {% endif %}
-    </div>
+* { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
 
-{% else %}
-    <!-- Document completed -->
-    <div class="stat-card text-center py-5">
-        <i class="fas fa-check-circle fa-4x text-success mb-4"></i>
-        <h3>Document révisé !</h3>
-        <p class="text-muted">Vous avez terminé la révision de ce document.</p>
-        <a href="{% url 'expert:document_list' %}" class="btn btn-primary">
-            Retour aux documents
+body {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  min-height: 100vh;
+  color: var(--pharma-text);
+}
+
+.main-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* Card base styling */
+.card {
+  background: var(--pharma-card);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  border: 1px solid var(--pharma-border);
+  transition: var(--pharma-transition);
+  margin-bottom: 2rem;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Header section */
+.annotation-header {
+  background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
+  color: white;
+  padding: 2rem;
+  border-radius: var(--pharma-radius) var(--pharma-radius) 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.header-info h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  opacity: 0.9;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.btn-outline {
+  padding: 0.6rem 1.2rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: 500;
+  transition: var(--pharma-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+/* Annotation types panel */
+.annotation-types-panel {
+  background: var(--pharma-card);
+  padding: 2rem;
+  border-bottom: 1px solid var(--pharma-border);
+}
+
+.annotation-types-panel h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--pharma-text);
+  margin: 0 0 0.5rem 0;
+}
+
+.instructions {
+  color: var(--pharma-text-soft);
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.annotation-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.annotation-type-btn {
+  padding: 0.5rem 1rem;
+  border: 2px solid;
+  background: transparent;
+  border-radius: 25px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+}
+
+.annotation-type-btn:hover,
+.annotation-type-btn.active {
+  background: currentColor;
+  color: white !important;
+  transform: translateY(-1px);
+}
+
+.annotation-type-btn-add {
+  padding: 0.5rem 1rem;
+  border: 2px dashed var(--pharma-accent);
+  background: transparent;
+  color: var(--pharma-accent);
+  border-radius: 25px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+}
+
+.annotation-type-btn-add:hover {
+  background: var(--pharma-accent);
+  color: white;
+  border-style: solid;
+}
+
+.annotation-mode {
+  background: rgba(14, 165, 233, 0.1);
+  padding: 1rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.mode-label {
+  font-weight: 600;
+  color: var(--pharma-primary);
+}
+
+.current-mode {
+  background: var(--pharma-primary);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.help-text {
+  color: var(--pharma-text-soft);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* Custom Modal Styles */
+.custom-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-modal.show {
+  display: flex;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modal-content-custom {
+  background: white;
+  border-radius: var(--pharma-radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 500px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.modal-header-custom {
+  background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
+  color: white;
+  padding: 1.5rem 2rem;
+  border-radius: var(--pharma-radius) var(--pharma-radius) 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header-custom h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: var(--pharma-transition);
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.modal-body-custom {
+  padding: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--pharma-text);
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--pharma-border);
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: var(--pharma-transition);
+  box-sizing: border-box;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--pharma-primary);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
+.form-control:read-only {
+  background: var(--pharma-bg);
+  color: var(--pharma-text-soft);
+}
+
+.modal-footer-custom {
+  padding: 1.5rem 2rem;
+  border-top: 1px solid var(--pharma-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.btn-secondary {
+  padding: 0.6rem 1.2rem;
+  background: var(--pharma-text-soft);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+}
+
+.btn-secondary:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  padding: 0.6rem 1.2rem;
+  background: var(--pharma-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+}
+
+.btn-primary:hover {
+  background: var(--pharma-primary-dark);
+  transform: translateY(-1px);
+}
+
+/* Page navigation */
+.page-navigation {
+  background: var(--pharma-card);
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--pharma-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-btn {
+  padding: 0.5rem 1rem;
+  background: var(--pharma-primary);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: var(--pharma-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-btn:hover {
+  background: var(--pharma-primary-dark);
+  color: white;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.page-selector select {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--pharma-border);
+  border-radius: 8px;
+  background: white;
+  font-weight: 500;
+}
+
+.expert-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.btn-validate, .btn-reject {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-validate {
+  background: var(--pharma-success);
+  color: white;
+}
+
+.btn-validate:hover {
+  background: #047857;
+  transform: translateY(-1px);
+}
+
+.btn-reject {
+  background: var(--pharma-error);
+  color: white;
+}
+
+.btn-reject:hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+/* Text content */
+.text-content-card {
+  background: var(--pharma-card);
+  padding: 2rem;
+  border-bottom: 1px solid var(--pharma-border);
+}
+
+.text-content-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--pharma-text);
+  margin: 0 0 1.5rem 0;
+}
+
+.page-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.page-status.validated-human {
+  background: rgba(5, 150, 105, 0.1);
+  color: var(--pharma-success);
+}
+
+.page-status.annotated {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--pharma-warn);
+}
+
+.page-status.pending {
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--pharma-text-soft);
+}
+
+.text-content {
+  background: #fafbfc;
+  border: 1px solid var(--pharma-border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  line-height: 1.7;
+  font-size: 1rem;
+  color: var(--pharma-text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  min-height: 300px;
+  cursor: text;
+}
+
+/* Annotations list */
+.annotations-list {
+  background: var(--pharma-card);
+  padding: 2rem;
+  border-radius: 0 0 var(--pharma-radius) var(--pharma-radius);
+}
+
+.annotations-list h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--pharma-text);
+  margin: 0 0 1.5rem 0;
+}
+
+.annotation-item {
+  background: #fafbfc;
+  border: 1px solid var(--pharma-border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  transition: var(--pharma-transition);
+}
+
+.annotation-item:hover {
+  border-color: var(--pharma-primary-light);
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
+}
+
+.annotation-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.annotation-type {
+  background: linear-gradient(90deg, var(--pharma-primary), var(--pharma-accent) 90%);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.24rem 0.8rem;
+}
+
+.annotation-confidence {
+  background: #bae6fd;
+  color: var(--pharma-primary-dark);
+  border-radius: 9px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.19rem 0.6rem;
+}
+
+.validation-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.validate-annotation {
+  background: var(--pharma-success);
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+}
+
+.validate-annotation:hover {
+  background: #047857;
+  transform: translateY(-1px);
+}
+
+.reject-annotation {
+  background: var(--pharma-error);
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+}
+
+.reject-annotation:hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+.annotation-text {
+  font-style: italic;
+  color: var(--pharma-primary-dark);
+  font-size: 1rem;
+  margin-bottom: 0.3rem;
+  cursor: pointer;
+}
+
+.annotation-text:hover {
+  text-decoration: underline;
+}
+
+.annotation-reasoning {
+  font-size: 0.9rem;
+  color: var(--pharma-accent);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Context menu */
+.context-menu {
+  position: absolute;
+  background: white;
+  border: 1px solid var(--pharma-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 180px;
+}
+
+.context-menu.hidden {
+  display: none;
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+  color: var(--pharma-text);
+}
+
+.context-menu-item:hover {
+  background: var(--pharma-bg);
+}
+
+.context-menu-item.danger {
+  color: var(--pharma-error);
+}
+
+.context-menu-item.danger:hover {
+  background: rgba(220, 38, 38, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .main-content { max-width: 99vw; }
+  .annotation-header, .text-content-card, .annotations-list, .annotation-types-panel, .page-navigation {
+    padding: 1.1rem 0.8rem !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .annotation-header, .annotation-types-panel, .page-navigation, .text-content-card, .annotations-list {
+    flex-direction: column !important;
+    gap: 1rem !important;
+  }
+  .header-actions { width: 100%; }
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(40px);}
+  to   { opacity: 1; transform: translateY(0);}
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: scale(0.9) translateY(-20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes highlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
+  50% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+}
+</style>
+
+<div class="main-content">
+  <!-- Annotation Header -->
+  <section class="card">
+    <div class="annotation-header">
+      <div class="header-info">
+        <h2><i class="fas fa-file-pdf"></i> {{ document.file.name|basename }}</h2>
+        <div class="document-meta">
+          <span class="meta-item">
+            <i class="fas fa-user"></i>
+            Annotateur: {{ document.owner.username }}
+          </span>
+          <span class="meta-item">
+            <i class="fas fa-file-alt"></i>
+            Page {{ current_page.page_number }} / {{ total_pages }}
+          </span>
+          <span class="meta-item">
+            <i class="fas fa-calendar"></i>
+            {{ document.expert_ready_at|date:"d/m/Y" }}
+          </span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn-outline" onclick="viewOriginalDocument({{ document.id }})">
+          <i class="fas fa-eye"></i> Voir Document Original
+        </button>
+        <a href="{% url 'expert:dashboard' %}" class="btn-outline">
+          <i class="fas fa-arrow-left"></i> Retour au Dashboard
         </a>
+      </div>
     </div>
-{% endif %}
-<!-- Modal pour modifier annotation -->
-<div class="modal fade" id="modifyAnnotationModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Modifier l'annotation</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Texte</label>
-                    <input type="text" class="form-control" id="modify-text" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Type d'entité</label>
-                    <select class="form-select" id="modify-entity-type">
-                        {% for annotation_type in all_annotation_types %}
-                            <option value="{{ annotation_type.name }}">{{ annotation_type.display_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-primary" onclick="confirmModifyAnnotation()">
-                    Sauvegarder
-                </button>
-            </div>
+
+    <!-- Annotation Types Panel -->
+    <div class="annotation-types-panel">
+      <h3>Types d'annotation disponibles</h3>
+      <p class="instructions">Cliquez sur un type, puis surlignez le texte correspondant pour créer une annotation</p>
+
+      <div class="annotation-types">
+        {% for ann_type in annotation_types %}
+        <button class="annotation-type-btn"
+                data-type="{{ ann_type.name }}"
+                data-color="{{ ann_type.color }}"
+                style="border-color: {{ ann_type.color }}; color: {{ ann_type.color }};">
+          {{ ann_type.display_name }}
+        </button>
+        {% endfor %}
+        <button class="annotation-type-btn-add" onclick="showAddAnnotationTypeModal()" type="button">
+          <i class="fas fa-plus"></i> Ajouter Type
+        </button>
+      </div>
+
+      <div class="annotation-mode">
+        <span class="mode-label">
+          <i class="fas fa-hand-pointer"></i>
+          Mode annotation activé:
+        </span>
+        <span id="current-mode" class="current-mode">Aucun type sélectionné</span>
+      </div>
+
+      <p class="help-text">Surlignez du texte pour créer une annotation automatiquement</p>
+    </div>
+
+    <!-- Page Navigation -->
+    <div class="page-navigation">
+      <div class="page-controls">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}" class="nav-btn">
+            <i class="fas fa-chevron-left"></i> Page Précédente
+          </a>
+        {% endif %}
+
+        <div class="page-selector">
+          <select id="page-select" onchange="goToPage(this.value)">
+            {% for i in page_obj.paginator.page_range %}
+            <option value="{{ i }}" {% if i == page_obj.number %}selected{% endif %}>
+              Page {{ i }}
+            </option>
+            {% endfor %}
+          </select>
         </div>
+
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}" class="nav-btn">
+            Page Suivante <i class="fas fa-chevron-right"></i>
+          </a>
+        {% endif %}
+      </div>
+
+      <div class="expert-controls">
+        <!-- Validation du document complet -->
+        <form method="POST" action="{% url 'expert:validate_document' document.id %}" style="display: inline;" onsubmit="return handleValidation(event)">
+          {% csrf_token %}
+          <button type="submit" class="btn-validate">
+            <i class="fas fa-check-circle"></i> Valider Document
+          </button>
+        </form>
+      </div>
     </div>
-</div>
-<div class="modal fade" id="addAnnotationTypeModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Annotation Type</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Display Name</label>
-                    <input type="text" class="form-control" id="new-annotation-display-name" 
-                           placeholder="e.g., Product, Dosage, Method">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Technical Name (auto-generated)</label>
-                    <input type="text" class="form-control" id="new-annotation-name" readonly>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="createAnnotationType()">
-                    Create Type
+
+    <!-- Main Text Content -->
+    <div class="text-content-card">
+      <h3>
+        <i class="fas fa-file-text"></i>
+        Page {{ current_page.page_number }}
+        {% if current_page.is_validated_by_human %}
+          <span class="page-status validated-human">Validée par humain</span>
+        {% elif current_page.is_annotated %}
+          <span class="page-status annotated">Annotée</span>
+        {% else %}
+          <span class="page-status pending">En attente</span>
+        {% endif %}
+      </h3>
+
+      <div id="text-content" class="text-content" data-page-id="{{ current_page.id }}">
+        {{ current_page.cleaned_text }}
+      </div>
+    </div>
+
+    <!-- Annotations List -->
+    <div class="annotations-list">
+      <h3><i class="fas fa-tags"></i> Annotations ({{ existing_annotations.count }})</h3>
+
+      <div id="annotations-container">
+        {% for annotation in existing_annotations %}
+        <div class="annotation-item" data-annotation-id="{{ annotation.id }}">
+          <div class="annotation-header">
+            <span class="annotation-type" style="background: {{ annotation.annotation_type.color }}">
+              {{ annotation.annotation_type.display_name }}
+            </span>
+            <span class="annotation-confidence">{{ annotation.confidence_score|floatformat:0 }}%</span>
+            
+            <!-- Validation Status Badge -->
+            {% if annotation.validation_status == 'validated' %}
+              <span class="badge bg-success">✓ Validé</span>
+            {% elif annotation.validation_status == 'rejected' %}
+              <span class="badge bg-danger">✗ Rejeté</span>
+            {% elif annotation.validation_status == 'expert_created' %}
+              <span class="badge bg-primary">★ Expert</span>
+            {% else %}
+              <span class="badge bg-warning">⏳ En attente</span>
+            {% endif %}
+
+            <div class="validation-actions">
+              {% if annotation.validation_status == 'pending' %}
+                <button class="validate-annotation" onclick="validateAnnotation({{ annotation.id }})">
+                  <i class="fas fa-check"></i> Valider
                 </button>
+                <button class="reject-annotation" onclick="rejectAnnotation({{ annotation.id }})">
+                  <i class="fas fa-times"></i> Rejeter
+                </button>
+              {% elif annotation.validation_status == 'validated' %}
+                <button class="reject-annotation" onclick="rejectAnnotation({{ annotation.id }})">
+                  <i class="fas fa-times"></i> Rejeter
+                </button>
+              {% elif annotation.validation_status == 'rejected' %}
+                <button class="validate-annotation" onclick="validateAnnotation({{ annotation.id }})">
+                  <i class="fas fa-check"></i> Valider
+                </button>
+              {% endif %}
             </div>
+          </div>
+          
+          <div class="annotation-text" 
+            onclick="highlightTextInDocument('{{ annotation.selected_text|escapejs }}', {{ annotation.start_pos }}, {{ annotation.end_pos }})"
+            title="Cliquez pour voir dans le texte">"{{ annotation.selected_text }}"</div>
+          
+          {% if annotation.ai_reasoning %}
+          <div class="annotation-reasoning">
+            <i class="fas fa-lightbulb"></i> {{ annotation.ai_reasoning }}
+          </div>
+          {% endif %}
         </div>
-        
+        {% endfor %}
+      </div>
     </div>
+  </section>
 </div>
 
-{% endblock %}
+<!-- Context Menu -->
+<div id="context-menu" class="context-menu hidden">
+  <button class="context-menu-item danger" onclick="deleteAnnotationTypeFromMenu()">
+    <i class="fas fa-trash"></i> Supprimer Type d'Annotation
+  </button>
+  <button class="context-menu-item" onclick="hideContextMenu()">
+    <i class="fas fa-times"></i> Annuler
+  </button>
+</div>
 
+<!-- Custom Modal for adding new annotation types -->
+<div id="addAnnotationTypeModal" class="custom-modal">
+  <div class="modal-content-custom">
+    <div class="modal-header-custom">
+      <h3><i class="fas fa-plus-circle"></i> Ajouter un nouveau type d'annotation</h3>
+      <button class="modal-close" onclick="hideAddAnnotationTypeModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body-custom">
+      <div class="form-group">
+        <label for="new-annotation-display-name" class="form-label">
+          <i class="fas fa-tag"></i> Nom d'affichage
+        </label>
+        <input type="text" class="form-control" id="new-annotation-display-name"
+               placeholder="ex: Produit, Dosage, Méthode">
+      </div>
+      <div class="form-group">
+        <label for="new-annotation-name" class="form-label">
+          <i class="fas fa-code"></i> Nom technique (auto-généré)
+        </label>
+        <input type="text" class="form-control" id="new-annotation-name" readonly>
+      </div>
+    </div>
+    <div class="modal-footer-custom">
+      <button type="button" class="btn-secondary" onclick="hideAddAnnotationTypeModal()">
+        <i class="fas fa-times"></i> Annuler
+      </button>
+      <button type="button" class="btn-primary" onclick="createAnnotationType()">
+        <i class="fas fa-plus"></i> Créer le Type
+      </button>
+    </div>
+  </div>
+</div>
 
-
-{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-let selectedEntityType = null;
-let currentSelection = null;
+// Variables globales
+let selectedAnnotationType = null;
+let selectedColor = null;
+let annotationTypeMap = {};
 
-function validateAnnotation(annotationId, action) {
-    const actionText = action === 'validate' ? 'valider' : 'rejeter';
-    if (confirm('Voulez-vous ' + actionText + ' cette annotation ?')) {
-        
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        
-        fetch(`/expert/api/validate/${annotationId}/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
-            },
-            body: JSON.stringify({ action: action })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(data.message);
-                location.reload(); // Reload to see changes
-            } else {
-                alert('Erreur: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Erreur:', error);
-            alert('Erreur lors de la validation');
+// Initialize annotation type mapping
+document.addEventListener('DOMContentLoaded', function() {
+    // Build the type mapping
+    {% for ann_type in annotation_types %}
+    annotationTypeMap['{{ ann_type.name|escapejs }}'] = {{ ann_type.id }};
+    {% endfor %}
+    
+    console.log('📋 Annotation type mapping loaded:', annotationTypeMap);
+    
+    // Initialize annotation type buttons
+    document.querySelectorAll('.annotation-type-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Remove active class from all buttons
+            document.querySelectorAll('.annotation-type-btn').forEach(b => b.classList.remove('active'));
+
+            // Add active class to clicked button
+            this.classList.add('active');
+
+            // Set selected type
+            selectedAnnotationType = this.dataset.type;
+            selectedColor = this.dataset.color;
+
+            // Update current mode display
+            document.getElementById('current-mode').textContent = this.textContent;
+            document.getElementById('current-mode').style.backgroundColor = selectedColor;
         });
-    }
-}
-function selectEntityType(entityType) {
-    selectedEntityType = entityType;
-    
-    // Update button styles - target all annotation type buttons
-    document.querySelectorAll('.btn-outline-primary, .btn-outline-success, .btn-outline-warning, .btn-outline-danger, .btn-outline-info, .btn-outline-secondary').forEach(btn => {
-        btn.classList.remove('active');
     });
+
+    // Auto-generate technical name from display name
+    document.getElementById('new-annotation-display-name').addEventListener('input', function() {
+        const displayName = this.value;
+        const technicalName = displayName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+        document.getElementById('new-annotation-name').value = technicalName;
+    });
+
+    // Close modal when clicking outside
+    document.getElementById('addAnnotationTypeModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            hideAddAnnotationTypeModal();
+        }
+    });
+
+    // Handle ESC key to close modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            hideAddAnnotationTypeModal();
+        }
+    });
+});
+
+// Modal functions
+function showAddAnnotationTypeModal() {
+    document.getElementById('new-annotation-display-name').value = '';
+    document.getElementById('new-annotation-name').value = '';
     
-    // Mark selected button as active
-    event.target.classList.add('active');
+    const modal = document.getElementById('addAnnotationTypeModal');
+    modal.classList.add('show');
     
-    // Show expert mode info with DISPLAY NAME instead of technical name
-    document.getElementById('expert-mode-info').style.display = 'block';
-    document.getElementById('selected-entity-type').textContent = getEntityDisplayName(entityType); // CHANGED THIS LINE
-    
-    console.log('Selected entity type:', entityType); // For debugging
+    // Focus on the input field
+    setTimeout(() => {
+        document.getElementById('new-annotation-display-name').focus();
+    }, 300);
 }
 
-// Handle text selection for creating annotations
-document.addEventListener('mouseup', function(event) {
-    // Only proceed if an entity type is selected
-    if (!selectedEntityType) return;
-    
-    const selection = window.getSelection();
-    const selectedText = selection.toString().trim();
-    
-    // Must have selected text
-    if (selectedText.length === 0) return;
-    
-    // Must be selecting within the page display area
-    const pageElement = document.getElementById('page-display');
-    if (!pageElement || !pageElement.contains(selection.anchorNode)) {
-        console.log('Selection not within page display area');
-        return;
-    }
-    
-    // Minimum text length check
-    if (selectedText.length < 2) {
-        alert('Veuillez sélectionner au moins 2 caractères de texte');
-        window.getSelection().removeAllRanges();
-        return;
-    }
-    
-    // Maximum text length check
-    if (selectedText.length > 500) {
-        alert('Le texte sélectionné est trop long (max 500 caractères)');
-        window.getSelection().removeAllRanges();
-        return;
-    }
-    
-    currentSelection = {
-        text: selectedText,
-        range: selection.getRangeAt(0)
-    };
-    
-    // Show confirmation with better formatting
-    const entityDisplayName = getEntityDisplayName(selectedEntityType);
-    const truncatedText = selectedText.length > 50 ? selectedText.substring(0, 50) + '...' : selectedText;
-    
-    if (confirm(`Créer une annotation "${truncatedText}" de type "${entityDisplayName}" ?`)) {
-        createNewAnnotation();
-    }
-    
-    // Always clear selection after handling
-    window.getSelection().removeAllRanges();
+function hideAddAnnotationTypeModal() {
+    const modal = document.getElementById('addAnnotationTypeModal');
+    modal.classList.remove('show');
+}
+
+// Text selection for manual annotation
+document.getElementById('text-content').addEventListener('mouseup', function() {
+  if (!selectedAnnotationType) {
+    alert('Veuillez d\'abord sélectionner un type d\'annotation');
+    return;
+  }
+
+  const selection = window.getSelection();
+  if (selection.toString().trim().length === 0) return;
+
+  const range = selection.getRangeAt(0);
+  const selectedText = selection.toString().trim();
+
+  // Calculate positions
+  const textContent = this.textContent;
+  const startPos = getTextPosition(this, range.startContainer, range.startOffset);
+  const endPos = startPos + selectedText.length;
+
+  // Save annotation
+  saveManualAnnotation({
+    page_id: this.dataset.pageId,
+    text: selectedText,
+    entity_type: selectedAnnotationType,
+    start_offset: startPos,
+    end_offset: endPos
+  });
+
+  // Clear selection
+  selection.removeAllRanges();
 });
-function getEntityDisplayName(entityType) {
-    const displayNames = {
-        'variation_code': 'Code de Variation',
-        'authority': 'Autorité',
-        'delay': 'Délai',
-        'legal_reference': 'Référence Légale',
-        'country': 'Pays',
-        'required_document': 'Document Requis',
-        'required_condition': 'Condition Requise',
-        'procedure_type': 'Type de Procédure'
-    };
-    return displayNames[entityType] || entityType;
+
+function getTextPosition(container, node, offset) {
+  let position = 0;
+  const walker = document.createTreeWalker(
+    container,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false
+  );
+
+  let currentNode;
+  while (currentNode = walker.nextNode()) {
+    if (currentNode === node) {
+      return position + offset;
+    }
+    position += currentNode.textContent.length;
+  }
+  return position;
+}
+
+function saveManualAnnotation(data) {
+  fetch('{% url "expert:create_annotation" %}', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify(data)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      location.reload(); // Refresh to show new annotation
+    } else {
+      alert('Erreur: ' + data.error);
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Erreur lors de la sauvegarde');
+  });
+}
+
+function validateAnnotation(annotationId) {
+  fetch(`{% url "expert:validate_annotation" 0 %}`.replace('0', annotationId), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({action: 'validate'})
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      location.reload();
+    } else {
+      alert('Erreur: ' + data.error);
+    }
+  });
+}
+
+function rejectAnnotation(annotationId) {
+  fetch(`{% url "expert:validate_annotation" 0 %}`.replace('0', annotationId), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({action: 'reject'})
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      location.reload();
+    } else {
+      alert('Erreur: ' + data.error);
+    }
+  });
+}
+
+function goToPage(pageNumber) {
+  window.location.href = `?page=${pageNumber}`;
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
 }
 
 function createAnnotationType() {
     const displayName = document.getElementById('new-annotation-display-name').value.trim();
     const name = document.getElementById('new-annotation-name').value.trim();
-    
+
     if (!displayName) {
-        alert('Please enter a display name');
+        alert('Veuillez entrer un nom d\'affichage');
         return;
     }
-    
+
+    // Show loading state
+    const createBtn = document.querySelector('.btn-primary');
+    const originalText = createBtn.innerHTML;
+    createBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
+    createBtn.disabled = true;
+
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-    
-    // FIXED: Use the correct URL pattern
-    fetch('/expert/api/create-annotation-type/', {  // <- CHANGED THIS LINE
+
+    fetch('{% url "expert:create_annotation_type" %}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -370,227 +1146,126 @@ function createAnnotationType() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
+            // Success notification
+            showSuccessNotification('✅ Type d\'annotation créé avec succès!');
             
-            // Add new button to the interface immediately
-            addNewAnnotationButtonToExpert(data.annotation_type);
+            annotationTypeMap[data.annotation_type.name] = data.annotation_type.id;
             
-            // Close modal and reset form
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addAnnotationTypeModal'));
-            modal.hide();
+            // Add new button to the interface
+            addNewAnnotationButton(data.annotation_type);
+
+            // Close modal
+            hideAddAnnotationTypeModal();
+            
+            // Clear form
             document.getElementById('new-annotation-display-name').value = '';
             document.getElementById('new-annotation-name').value = '';
         } else {
-            alert('Error: ' + data.error);
+            alert('Erreur: ' + data.error);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error creating annotation type');
+        alert('Erreur lors de la création du type d\'annotation');
+    })
+    .finally(() => {
+        // Restore button state
+        createBtn.innerHTML = originalText;
+        createBtn.disabled = false;
     });
 }
 
-
-function addNewAnnotationButtonToExpert(annotationType) {
-    // Vérifiez si le bouton existe déjà (éviter les doublons)
-    const existingButton = document.querySelector(`button[onclick="selectEntityType('${annotationType.name}')"]`);
-    if (existingButton) {
-        console.log('Button already exists for type:', annotationType.name);
+function addNewAnnotationButton(annotationType) {
+    const existingButton = document.querySelector(`[data-type="${annotationType.name}"]`);
+    if (existingButton && !existingButton.classList.contains('annotation-type-btn-add')) {
         return;
     }
     
-    // Create new button element
     const newButton = document.createElement('button');
-    newButton.className = 'btn btn-sm btn-outline-primary';
-    newButton.textContent = annotationType.display_name;
+    newButton.className = 'annotation-type-btn';
+    newButton.setAttribute('data-type', annotationType.name);
+    newButton.setAttribute('data-color', annotationType.color);
     newButton.style.borderColor = annotationType.color;
     newButton.style.color = annotationType.color;
-    newButton.onclick = function() { selectEntityType(annotationType.name); };
-    
-    // Add to expert tools container (before the "Add Type" button)
-    const container = document.querySelector('.d-flex.flex-wrap.gap-2');
-    const addButton = container.querySelector('button[onclick="showAddAnnotationTypeModal()"]');
-    container.insertBefore(newButton, addButton);
-    
-    // AUSSI ajouter au select de modification
-    const modifySelect = document.getElementById('modify-entity-type');
-    if (modifySelect) {
-        const newOption = document.createElement('option');
-        newOption.value = annotationType.name;
-        newOption.textContent = annotationType.display_name;
-        modifySelect.appendChild(newOption);
+    newButton.textContent = annotationType.display_name;
+
+    newButton.addEventListener('click', function() {
+        document.querySelectorAll('.annotation-type-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        selectedAnnotationType = this.dataset.type;
+        selectedColor = this.dataset.color;
+        document.getElementById('current-mode').textContent = this.textContent;
+        document.getElementById('current-mode').style.backgroundColor = selectedColor;
+    });
+
+    // Add right-click context menu
+    newButton.addEventListener('contextmenu', handleRightClick);
+
+    const container = document.querySelector('.annotation-types');
+    const addButton = document.querySelector('.annotation-type-btn-add');
+    if (container && addButton) {
+        container.insertBefore(newButton, addButton);
     }
 }
 
-let currentModifyingAnnotationId = null;
-
-function showModifyModal(annotationId, currentText, currentEntityType) {
-    currentModifyingAnnotationId = annotationId;
+function showSuccessNotification(message) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, var(--pharma-success), var(--pharma-accent));
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 10000;
+        font-weight: 500;
+        animation: slideInFromRight 0.3s ease-out;
+    `;
+    notification.textContent = message;
     
-    document.getElementById('modify-text').value = currentText;
-    document.getElementById('modify-entity-type').value = currentEntityType;
+    // Add animation styles
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideInFromRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOutToRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
     
-    const modal = new bootstrap.Modal(document.getElementById('modifyAnnotationModal'));
-    modal.show();
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOutToRight 0.3s ease-out';
+        setTimeout(() => {
+            document.body.removeChild(notification);
+            document.head.removeChild(style);
+        }, 300);
+    }, 3000);
 }
 
-function confirmModifyAnnotation() {
-    const newText = document.getElementById('modify-text').value;
-    const newEntityType = document.getElementById('modify-entity-type').value;
-    
-    if (!newText.trim()) {
-        alert('Le texte ne peut pas être vide');
+function viewOriginalDocument(documentId) {
+    if (!documentId) {
+        alert('Document ID non disponible');
         return;
     }
     
-    modifyAnnotation(currentModifyingAnnotationId, newText, newEntityType);
+    const documentUrl = `{% url 'expert:view_original_document' 0 %}`.replace('0', documentId);
+    window.open(documentUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
 }
 
-function modifyAnnotation(annotationId, newText, newEntityType) {
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-    
-    fetch(`/expert/api/modify/${annotationId}/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: JSON.stringify({
-            text: newText,
-            entity_type: newEntityType
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Annotation modifiée avec succès');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modifyAnnotationModal'));
-            modal.hide();
-            location.reload();
-        } else {
-            alert('Erreur: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Erreur:', error);
-        alert('Erreur lors de la modification');
-    });
-}
-
-function deleteAnnotation(annotationId) {
-    if (confirm('Voulez-vous vraiment supprimer cette annotation ? Cette action est irréversible.')) {
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        
-        fetch(`/expert/api/delete/${annotationId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': csrfToken
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Annotation supprimée');
-                location.reload();
-            } else {
-                alert('Erreur: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Erreur:', error);
-            alert('Erreur lors de la suppression');
-        });
-    }
-}
-
-function undoValidation(annotationId) {
-    if (confirm('Voulez-vous annuler la validation de cette annotation ?')) {
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        
-        fetch(`/expert/api/undo/${annotationId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': csrfToken
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Validation annulée');
-                location.reload();
-            } else {
-                alert('Erreur: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Erreur:', error);
-            alert('Erreur lors de l\'annulation');
-        });
-    }
-}
-
-
-
-function showAddAnnotationTypeModal() {
-    const modal = new bootstrap.Modal(document.getElementById('addAnnotationTypeModal'));
-    modal.show();
-}
-
-// Auto-generate technical name from display name
-document.getElementById('new-annotation-display-name').addEventListener('input', function() {
-    const displayName = this.value;
-    const technicalName = displayName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-    document.getElementById('new-annotation-name').value = technicalName;
-});
-
-function createNewAnnotation() {
-    if (!currentSelection || !selectedEntityType) {
-        alert('No text selected or entity type chosen');
-        return;
-    }
-    
-    const pageId = document.getElementById('page-display').dataset.pageId;
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-    
-    // Calculate text positions (simplified for now)
-    const startOffset = 0; // You might want to improve this later
-    const endOffset = currentSelection.text.length;
-    
-    fetch('/expert/api/create-annotation/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: JSON.stringify({
-            page_id: pageId,
-            text: currentSelection.text,
-            entity_type: selectedEntityType,
-            start_offset: startOffset,
-            end_offset: endOffset
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Annotation créée avec succès!');
-            location.reload(); // Reload to show new annotation
-        } else {
-            alert('Erreur: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Erreur lors de la création de l\'annotation');
-    });
-    
-    // Reset selection
-    currentSelection = null;
-}
 function highlightTextInDocument(text, startPos, endPos) {
-    const pageDisplay = document.getElementById('page-display');
+    const pageDisplay = document.getElementById('text-content');
     
-    // Store the clean original text content (not HTML)
+    // Store the clean original text content
     const originalTextContent = pageDisplay.textContent;
     
     // Remove any existing highlights first
@@ -612,42 +1287,6 @@ function highlightTextInDocument(text, startPos, endPos) {
         // Strategy 2: Case insensitive
         if (textIndex === -1) {
             textIndex = content.toLowerCase().indexOf(targetText.toLowerCase());
-        }
-        
-        // Strategy 3: Remove extra whitespace and try again
-        if (textIndex === -1) {
-            const cleanTarget = targetText.replace(/\s+/g, ' ');
-            const cleanContent = content.replace(/\s+/g, ' ');
-            textIndex = cleanContent.indexOf(cleanTarget);
-            if (textIndex !== -1) {
-                content = cleanContent;
-                targetText = cleanTarget;
-                // Update the display with cleaned content
-                pageDisplay.textContent = cleanContent;
-            }
-        }
-        
-        // Strategy 4: Try with partial match (first 20 chars)
-        if (textIndex === -1 && targetText.length > 20) {
-            const partialTarget = targetText.substring(0, 20);
-            textIndex = content.indexOf(partialTarget);
-            if (textIndex !== -1) {
-                let endIndex = textIndex + targetText.length;
-                if (endIndex > content.length) endIndex = content.length;
-                targetText = content.substring(textIndex, endIndex);
-            }
-        }
-        
-        // Strategy 5: Try word-by-word search for long texts
-        if (textIndex === -1 && targetText.length > 30) {
-            const words = targetText.split(/\s+/).slice(0, 3);
-            const searchPattern = words.join('\\s+');
-            const regex = new RegExp(searchPattern, 'i');
-            const match = content.match(regex);
-            if (match) {
-                textIndex = match.index;
-                targetText = match[0];
-            }
         }
         
         if (textIndex !== -1) {
@@ -677,10 +1316,8 @@ function highlightTextInDocument(text, startPos, endPos) {
             
             // Remove highlight after 5 seconds and restore clean text
             window.highlightTimeout = setTimeout(() => {
-                pageDisplay.textContent = originalTextContent; // Restore clean original text
+                pageDisplay.textContent = originalTextContent;
             }, 5000);
-            
-            console.log('Found and highlighted:', highlightedText);
             
         } else {
             console.log('Text not found:', targetText);
@@ -693,88 +1330,143 @@ function highlightTextInDocument(text, startPos, endPos) {
 }
 
 function clearExistingHighlights() {
-    // Clear any existing timeout
     if (window.highlightTimeout) {
         clearTimeout(window.highlightTimeout);
     }
     
-    // Remove any existing highlights
     const existingHighlight = document.getElementById('highlighted-annotation');
     if (existingHighlight) {
         const parent = existingHighlight.parentNode;
         parent.replaceChild(document.createTextNode(existingHighlight.textContent), existingHighlight);
-        parent.normalize(); // Merge adjacent text nodes
+        parent.normalize();
     }
 }
-function viewOriginalDocument(documentId) {
-    if (!documentId) {
-        alert('Document ID non disponible');
+
+// Handle document validation with automatic success message
+function handleValidation(event) {
+    // Don't prevent the form submission, just add success handling
+    const form = event.target;
+    
+    // Show loading state
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validation en cours...';
+    submitBtn.disabled = true;
+    
+    // Let the form submit normally, success message will be handled by Django messages
+    return true;
+}
+
+// Check for success messages and show automatic popup
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if there are any success messages from Django
+    const messages = document.querySelectorAll('.alert-success, .messages .success');
+    if (messages.length > 0) {
+        messages.forEach(function(message) {
+            // Show success popup with the message content
+            setTimeout(() => {
+                showSuccessNotification('✅ ' + message.textContent.trim());
+            }, 500);
+        });
+    }
+});
+
+// Context menu functionality (for consistency with annotate_document.html)
+let contextMenuTarget = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    function addContextMenuToButtons() {
+        document.querySelectorAll('.annotation-type-btn').forEach(btn => {
+            btn.removeEventListener('contextmenu', handleRightClick);
+            btn.addEventListener('contextmenu', handleRightClick);
+        });
+    }
+    
+    addContextMenuToButtons();
+    
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.context-menu')) {
+            hideContextMenu();
+        }
+    });
+    
+    document.addEventListener('contextmenu', function(e) {
+        if (e.target.classList.contains('annotation-type-btn')) {
+            e.preventDefault();
+        }
+    });
+});
+
+function handleRightClick(e) {
+    e.preventDefault();
+    
+    if (e.target.classList.contains('annotation-type-btn-add')) {
         return;
     }
     
-    // Create the URL to view the original document
-    const documentUrl = `/expert/documents/${documentId}/view-original/`;
+    contextMenuTarget = e.target;
     
-    // Open in new window like the products interface
-    window.open(documentUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+    const contextMenu = document.getElementById('context-menu');
+    contextMenu.style.left = (e.pageX) + 'px';
+    contextMenu.style.top = (e.pageY) + 'px';
+    contextMenu.classList.remove('hidden');
 }
 
+function hideContextMenu() {
+    const contextMenu = document.getElementById('context-menu');
+    contextMenu.classList.add('hidden');
+    contextMenuTarget = null;
+}
 
+function deleteAnnotationTypeFromMenu() {
+    if (!contextMenuTarget || !contextMenuTarget.dataset.type) {
+        alert('Aucun type d\'annotation sélectionné');
+        hideContextMenu();
+        return;
+    }
 
+    const annotationType = contextMenuTarget.dataset.type;
+    const displayName = contextMenuTarget.textContent;
+
+    if (confirm(`Êtes-vous sûr de vouloir supprimer le type d'annotation "${displayName}" ?`)) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        fetch('{% url "expert:delete_annotation_type" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                annotation_type_name: annotationType
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccessNotification('✅ ' + data.message);
+                
+                // Remove the button from the interface
+                contextMenuTarget.remove();
+                
+                // Clear selection if this was the selected type
+                if (selectedAnnotationType === annotationType) {
+                    selectedAnnotationType = null;
+                    selectedColor = null;
+                    document.getElementById('current-mode').textContent = 'Aucun type sélectionné';
+                    document.getElementById('current-mode').style.backgroundColor = '';
+                }
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Erreur lors de la suppression du type d\'annotation');
+        });
+    }
+    
+    hideContextMenu();
+}
 </script>
-
-<style>
-/* Active state for annotation type buttons */
-.btn.active {
-    background-color: var(--bs-primary) !important;
-    color: white !important;
-    border-color: var(--bs-primary) !important;
-    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-}
-
-/* Improve selection highlighting */
-#page-display {
-    user-select: text;
-    cursor: text;
-    line-height: 1.6;
-}
-
-#page-display::selection {
-    background-color: rgba(13, 110, 253, 0.3);
-}
-
-/* Expert mode info styling */
-#expert-mode-info {
-    border-left: 4px solid var(--bs-primary);
-    background-color: rgba(13, 110, 253, 0.05);
-    animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Better button spacing */
-.d-flex.flex-wrap.gap-2 .btn {
-    margin-bottom: 0.25rem;
-}
-
-/* Status badges styling */
-.badge.bg-success { background-color: #198754 !important; }
-.badge.bg-danger { background-color: #dc3545 !important; }
-.badge.bg-warning { background-color: #ffc107 !important; color: #000 !important; }
-
-@keyframes highlight-pulse {
-    0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
-    50% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0.3); }
-    100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
-}
-
-.annotation-text-clickable:hover {
-    background-color: #e7f3ff !important;
-    border-radius: 3px;
-    padding: 1px 3px;
-}
-</style>
 {% endblock %}

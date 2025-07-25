@@ -19,6 +19,7 @@ class ExpertLog(models.Model):
         ('document_reviewed', 'Document révisé'),
         ('sentence_reviewed', 'Phrase révisée'),
         ('annotation_type_created', 'Type d\'annotation créé'),
+        ('annotation_type_deleted', 'Type d\'annotation supprimé'),
         ('document_validated_product_created', 'Document validé et produit créé'),
     ]
 

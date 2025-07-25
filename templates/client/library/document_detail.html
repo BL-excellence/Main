@@ -441,27 +441,27 @@
             .document-detail {
                 padding: 16px;
             }
-            
+
             .document-header {
                 padding: 24px;
             }
-            
+
             .document-title {
                 font-size: 1.6rem;
             }
-            
+
             .metadata-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .content-sections {
                 grid-template-columns: 1fr;
             }
-            
+
             .document-actions {
                 flex-direction: column;
             }
-            
+
             .breadcrumb {
                 flex-wrap: wrap;
                 padding: 8px 16px;
@@ -472,13 +472,13 @@
             .metadata-item {
                 padding: 16px;
             }
-            
+
             .metadata-icon {
                 width: 40px;
                 height: 40px;
                 font-size: 20px;
             }
-            
+
             .document-title {
                 font-size: 1.4rem;
             }
@@ -504,11 +504,11 @@
     <div class="document-header">
         <div class="header-content">
             <h1 class="document-title">{{ document|document_title|truncatechars:80 }}</h1>
-            
+
             {% if document.context %}
             <p class="document-description">{{ document.context }}</p>
             {% endif %}
-            
+
             <div class="document-actions">
                 {% if document.is_validated %}
                 <span class="status-badge status-validated">
@@ -521,14 +521,14 @@
                     En attente de validation
                 </span>
                 {% endif %}
-                
+
                 {% if document.file and document.is_validated %}
                 <a href="{% url 'client:library:download_document' document.pk %}" class="btn btn-primary">
                     <i class="material-icons">download</i>
                     Télécharger
                 </a>
                 {% endif %}
-                
+
                 {% if document.url_source or document.url %}
                 <a href="{{ document.url_source|default:document.url }}" target="_blank" class="btn btn-outline">
                     <i class="material-icons">open_in_new</i>
@@ -545,7 +545,7 @@
             <i class="material-icons">info</i>
             Métadonnées Extraites par les Métadonneurs
         </h2>
-        
+
         <div class="metadata-grid">
             <!-- Titre du document -->
             <div class="metadata-item">
@@ -557,7 +557,7 @@
                     <div class="metadata-value">{{ metadata.title|default:"Non spécifié" }}</div>
                 </div>
             </div>
-            
+
             <!-- Type de document -->
             <div class="metadata-item">
                 <div class="metadata-icon blue">
@@ -568,7 +568,7 @@
                     <div class="metadata-value">{{ metadata.doc_type|default:"Non spécifié" }}</div>
                 </div>
             </div>
-            
+
             <!-- Source/Organisation -->
             <div class="metadata-item">
                 <div class="metadata-icon green">
@@ -579,7 +579,7 @@
                     <div class="metadata-value">{{ metadata.source|default:"Non spécifiée" }}</div>
                 </div>
             </div>
-            
+
             <!-- Pays -->
             <div class="metadata-item">
                 <div class="metadata-icon orange">
@@ -590,7 +590,7 @@
                     <div class="metadata-value">{{ metadata.country|default:"Non spécifié" }}</div>
                 </div>
             </div>
-            
+
             <!-- Langue -->
             <div class="metadata-item">
                 <div class="metadata-icon purple">
@@ -601,7 +601,7 @@
                     <div class="metadata-value">{{ metadata.language|default:"Non spécifiée" }}</div>
                 </div>
             </div>
-            
+
             <!-- Date de publication -->
             <div class="metadata-item">
                 <div class="metadata-icon red">
@@ -612,7 +612,7 @@
                     <div class="metadata-value">{{ metadata.publication_date|default:"Non spécifiée" }}</div>
                 </div>
             </div>
-            
+
             <!-- Version -->
             <div class="metadata-item">
                 <div class="metadata-icon teal">
@@ -623,7 +623,7 @@
                     <div class="metadata-value">{{ metadata.version|default:"Non spécifiée" }}</div>
                 </div>
             </div>
-            
+
             <!-- URL Source -->
             {% if metadata.url_source and metadata.url_source != "Non spécifiée" %}
             <div class="metadata-item">
@@ -640,7 +640,7 @@
                 </div>
             </div>
             {% endif %}
-            
+
             <!-- Nombre de pages -->
             {% if metadata.total_pages > 0 %}
             <div class="metadata-item">
@@ -653,7 +653,7 @@
                 </div>
             </div>
             {% endif %}
-            
+
             <!-- Métadonneur -->
             <div class="metadata-item">
                 <div class="metadata-icon green">
@@ -664,7 +664,7 @@
                     <div class="metadata-value">{{ metadata.owner|default:"Anonyme" }}</div>
                 </div>
             </div>
-            
+
             <!-- Date d'ajout -->
             <div class="metadata-item">
                 <div class="metadata-icon purple">
@@ -675,7 +675,7 @@
                     <div class="metadata-value">{{ metadata.created_at|date:"d F Y à H:i" }}</div>
                 </div>
             </div>
-            
+
             <!-- Statut de validation -->
             <div class="metadata-item">
                 <div class="metadata-icon {% if metadata.is_validated %}green{% else %}orange{% endif %}">
@@ -693,7 +693,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Contexte extrait -->
         {% if document.context %}
         <div class="context-section">
@@ -753,7 +753,7 @@
             </div>
             {% endif %}
         </div>
-        
+
         <div class="sidebar-content">
             <!-- Documents Related -->
             {% if related_documents %}
@@ -800,14 +800,14 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Track document view (could be used for analytics)
     console.log('Document viewed: {{ document.title|escapejs }}');
-    
+
     // Animation pour les metadata items
     const metadataItems = document.querySelectorAll('.metadata-item');
     metadataItems.forEach((item, index) => {
         item.style.animationDelay = `${index * 0.1}s`;
         item.style.opacity = '0';
         item.style.transform = 'translateY(20px)';
-        
+
         setTimeout(() => {
             item.style.transition = 'all 0.6s ease';
             item.style.opacity = '1';

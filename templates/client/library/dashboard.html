@@ -554,38 +554,38 @@
             .library-dashboard {
                 padding: 16px;
             }
-            
+
             .page-header {
                 padding: 24px;
             }
-            
+
             .header-content {
                 flex-direction: column;
                 gap: 20px;
                 text-align: center;
             }
-            
+
             .header-info h1 {
                 font-size: 2rem;
             }
-            
+
             .stats-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .source-categories-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .dashboard-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .floating-search {
                 bottom: 16px;
                 right: 16px;
             }
-            
+
             .search-container input {
                 width: 250px;
             }
@@ -622,7 +622,7 @@
                 <p>Documents validés</p>
             </div>
         </div>
-        
+
         <div class="stat-card">
             <div class="stat-icon orange">
                 <i class="material-icons">schedule</i>
@@ -632,7 +632,7 @@
                 <p>En attente de validation</p>
             </div>
         </div>
-        
+
         <div class="stat-card">
             <div class="stat-icon green">
                 <i class="material-icons">person</i>
@@ -642,7 +642,7 @@
                 <p>Métadonneurs actifs</p>
             </div>
         </div>
-        
+
         <div class="stat-card">
             <div class="stat-icon purple">
                 <i class="material-icons">category</i>
@@ -662,14 +662,14 @@
                 <h2>Documents récents</h2>
                 <a href="{% url 'client:library:document_list' %}" class="view-all">Voir tout</a>
             </div>
-            
+
             <div class="documents-list">
                 {% for document in recent_documents %}
                 <div class="document-card" onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
                     <div class="document-icon">
                         <i class="material-icons">picture_as_pdf</i>
                     </div>
-                    
+
                     <div class="document-content">
                         <h4>{{ document|document_title|truncatechars:80 }}</h4>
                         <div class="document-meta">
@@ -688,7 +688,7 @@
                             </span>
                             {% endif %}
                         </div>
-                        
+
                         {% if document.doc_type %}
                         <div class="document-tags">
                             <span class="tag">{{ document.doc_type }}</span>
@@ -698,7 +698,7 @@
                         </div>
                         {% endif %}
                     </div>
-                    
+
                     <div class="document-actions">
                         <span class="status validated">Validé</span>
                     </div>
@@ -719,7 +719,7 @@
                 <div class="section-header">
                     <h2>Par type de document</h2>
                 </div>
-                
+
                 <div class="category-stats">
                     {% for type_stat in document_type_stats %}
                     <div class="category-item">
@@ -732,12 +732,12 @@
                     {% endfor %}
                 </div>
             </div>
-            
+
             <div class="dashboard-section">
                 <div class="section-header">
                     <h2>Par pays</h2>
                 </div>
-                
+
                 <div class="authority-stats">
                     {% for country_stat in country_stats %}
                     <div class="authority-item">
@@ -761,10 +761,10 @@
                     <a href="{% url 'client:library:document_list_horizontal' %}" class="view-all">Vue Liste</a>
                 </div>
             </div>
-            
+
             <div class="source-categories-grid">
                 {% for key, category in source_categories.items %}
-                <div class="source-category-card" 
+                <div class="source-category-card"
                      style="--category-color: {{ category.color }}; --category-color-light: {{ category.color }}20;"
                      onclick="location.href='{% url 'client:library:documents_by_category' key|lower %}'">
                     <div class="category-header">

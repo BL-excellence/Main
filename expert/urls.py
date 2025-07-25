@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/delete/<int:annotation_id>/', views.delete_annotation_ajax, name='delete_annotation'),
     path('api/undo/<int:annotation_id>/', views.undo_validation_ajax, name='undo_validation'),
     path('api/create-annotation-type/', views.create_annotation_type_ajax, name='create_annotation_type'),
+    path('api/delete-annotation-type/', views.delete_annotation_type_ajax, name='delete_annotation_type'),
     path('documents/<int:document_id>/view-original/', views.view_original_document, name='view_original_document'),
 
 

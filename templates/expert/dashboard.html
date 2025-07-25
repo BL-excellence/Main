@@ -368,12 +368,15 @@
                             <td>{{ doc.file.name|truncatechars:30 }}</td>
                             <td>{{ doc.pages.count }}</td>
                             <td>
-                                <i class="fas fa-user"></i> {{ doc.annotator.username }}
+                                <i class="fas fa-user"></i> {{ doc.annotator.username|default:"Non défini" }}
                             </td>
                             <td>
                                 <span class="badge" style="background:rgba(245,158,11,0.11);color:#f59e0b;">
-                                    <i class="fas fa-pen"></i> {{ doc.annotations.count }}
+                                    <i class="fas fa-pen"></i> {{ doc.total_annotations|default:0 }}
                                 </span>
+                                {% if doc.pending_annotations > 0 %}
+                                    <br><small class="text-muted">{{ doc.pending_annotations }} en attente</small>
+                                {% endif %}
                             </td>
                             <td class="date">
                                 <i class="fas fa-calendar"></i>
@@ -444,12 +447,15 @@
                             <td>{{ doc.file.name|truncatechars:30 }}</td>
                             <td>{{ doc.pages.count }}</td>
                             <td>
-                                <i class="fas fa-user"></i> {{ doc.annotator.username }}
+                                <i class="fas fa-user"></i> {{ doc.annotator.username|default:"Non défini" }}
                             </td>
                             <td>
                                 <span class="badge" style="background:rgba(245,158,11,0.11);color:#f59e0b;">
-                                    <i class="fas fa-pen"></i> {{ doc.annotations.count }}
+                                    <i class="fas fa-pen"></i> {{ doc.total_annotations|default:0 }}
                                 </span>
+                                {% if doc.pending_annotations > 0 %}
+                                    <br><small class="text-muted">{{ doc.pending_annotations }} en attente</small>
+                                {% endif %}
                             </td>
                             <td class="date">
                                 <i class="fas fa-calendar"></i>

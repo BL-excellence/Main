@@ -6,6 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import models
 from django.db.models import Q, Count
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -37,20 +38,29 @@ class ExpertDashboardView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Documents ready for expert review
+        # Documents ready for expert review with annotator info
         ready_documents = RawDocument.objects.filter(
             is_ready_for_expert=True
-        )
+        ).select_related('owner').prefetch_related('pages__annotations')
 
         # Count pending annotations across all documents
         pending_annotations = Annotation.objects.filter(
             validation_status='pending'
         ).count()
 
+        # Enrich documents with annotation stats
+        enriched_documents = []
+        for doc in ready_documents.order_by('-expert_ready_at')[:5]:
+            doc.annotator = doc.owner  # Add annotator field
+            doc.total_annotations = sum(page.annotations.count() for page in doc.pages.all())
+            doc.pending_annotations = sum(page.annotations.filter(validation_status='pending').count() for page in doc.pages.all())
+            doc.validated_annotations = sum(page.annotations.filter(validation_status='validated').count() for page in doc.pages.all())
+            enriched_documents.append(doc)
+
         context.update({
             'ready_documents_count': ready_documents.count(),
             'pending_annotations': pending_annotations,
-            'recent_documents': ready_documents.order_by('-expert_ready_at')[:5],
+            'recent_documents': enriched_documents,
         })
         return context
 
@@ -76,13 +86,19 @@ class DocumentReviewView(LoginRequiredMixin, TemplateView):
 
         current_page = page_obj.object_list[0] if page_obj.object_list else None
 
-        all_annotation_types = AnnotationType.objects.all().order_by('display_name')
+        # Get all annotation types for expert interface
+        annotation_types = AnnotationType.objects.all().order_by('display_name')
+        
+        # Get existing annotations for current page
+        existing_annotations = current_page.annotations.all() if current_page else []
 
         context.update({
             'document': document,
             'page_obj': page_obj,
             'current_page': current_page,
-            'all_annotation_types': all_annotation_types,  # NOUVEAU
+            'annotation_types': annotation_types,  # Changed name for consistency with annotate_document.html
+            'existing_annotations': existing_annotations,
+            'total_pages': document.total_pages,
         })
         return context
 
@@ -96,9 +112,19 @@ class DocumentReviewListView(LoginRequiredMixin, TemplateView):
 
         documents = RawDocument.objects.filter(
             is_ready_for_expert=True
-        ).annotate(
+        ).select_related('owner').prefetch_related('pages__annotations').annotate(
             annotation_count=Count('pages__annotations'),
         ).order_by('-expert_ready_at')
+
+        # Enrich documents with additional info
+        for doc in documents:
+            doc.annotator = doc.owner  # Add annotator field for template consistency
+            doc.pending_annotations = doc.pages.aggregate(
+                total=Count('annotations', filter=models.Q(annotations__validation_status='pending'))
+            )['total'] or 0
+            doc.validated_annotations = doc.pages.aggregate(
+                total=Count('annotations', filter=models.Q(annotations__validation_status='validated'))
+            )['total'] or 0
 
         paginator = Paginator(documents, 12)
         page_number = self.request.GET.get('page')
@@ -462,6 +488,60 @@ def create_annotation_type_ajax(request):
     return JsonResponse({'success': False, 'error': 'Method not allowed'})
 
 
+@expert_required
+@csrf_exempt
+def delete_annotation_type_ajax(request):
+    """AJAX endpoint for experts to delete annotation types"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            annotation_type_name = data.get('annotation_type_name', '').strip()
+
+            if not annotation_type_name:
+                return JsonResponse({'success': False, 'error': 'Annotation type name is required'})
+
+            # Check if annotation type exists
+            try:
+                annotation_type = AnnotationType.objects.get(name=annotation_type_name)
+            except AnnotationType.DoesNotExist:
+                return JsonResponse({'success': False, 'error': f'Annotation type "{annotation_type_name}" not found'})
+
+            # Check if this annotation type is being used
+            annotations_count = Annotation.objects.filter(
+                annotation_type=annotation_type
+            ).count()
+
+            if annotations_count > 0:
+                return JsonResponse({
+                    'success': False, 
+                    'error': f'Cannot delete annotation type "{annotation_type.display_name}" as it is used by {annotations_count} annotation(s)'
+                })
+
+            # Store info before deletion for logging
+            display_name = annotation_type.display_name
+
+            # Delete the annotation type
+            annotation_type.delete()
+
+            # LOG ACTION
+            log_expert_action(
+                user=request.user,
+                action='annotation_type_deleted',
+                annotation=None,
+                reason=f"Deleted annotation type: {display_name} ({annotation_type_name})"
+            )
+
+            return JsonResponse({
+                'success': True,
+                'message': f'Annotation type "{display_name}" deleted successfully'
+            })
+
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'})
+
+
 def create_product_from_annotations(document):
     """Create a product in client module from validated annotations"""
     from client.products.models import Product, ProductSpecification, ManufacturingSite
@@ -581,7 +661,7 @@ def validate_document(request, document_id):
                     reason=f"Document validated and product created: {product.name}"
                 )
 
-                return redirect('expert:document_list')
+                return redirect('expert:dashboard')
             else:
                 # Get detailed debug info
                 debug_info = debug_annotations_for_product(document)
@@ -590,7 +670,7 @@ def validate_document(request, document_id):
                     f'❌ Produit non créé. Détails: {debug_info}'
                 )
 
-            return redirect('expert:document_list')
+            return redirect('expert:dashboard')
 
         except Exception as e:
             messages.error(request, f'❌ Erreur lors de la validation: {str(e)}')
