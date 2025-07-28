@@ -523,7 +523,8 @@
         <!-- Stats Grid -->
         <div class="stats-grid">
             <!-- Documents Scrappés -->
-            <div class="card animate-fade-in">
+            <div id="card-scrapped" class="card animate-fade-in cursor-pointer">
+
                 <div class="stat-icon documents">
                     <i class="fas fa-file-medical text-white"></i>
                 </div>
@@ -662,6 +663,11 @@
 
     <!-- Metadata Validation Tab -->
     <div id="metadata-tab" class="tab-content hidden">
+        <div class="flex justify-end mb-2">
+            <a href="{% url 'rawdocs:upload' %}" class="btn btn-primary text-sm px-3 py-2 rounded-md">
+                <i class="fas fa-upload mr-1"></i> Importer
+            </a>
+        </div>    
         <div class="card">
             <h2 class="card-title" style="color: #000000;"> <!-- Noir explicitement défini -->
                 <i class="fas fa-folder-medical text-sky-400"></i>
@@ -972,6 +978,12 @@
     // Initialisation des transitions
     dashboardTab.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
     metadataTab.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+
+    // Redirection en cliquant sur la carte "Documents scrappés"
+document.getElementById('card-scrapped').addEventListener('click', () => {
+    switchTab(metadataTab, btnMetadata, dashboardTab, btnDashboard);
+});
+
 </script>
 
 {% endblock %}

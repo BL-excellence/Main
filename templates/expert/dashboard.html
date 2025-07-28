@@ -250,7 +250,8 @@
     <div id="dashboard-tab" class="tab-content block">
         <h1 class="main-title">Dashboard Expert</h1>
         <div class="stats-grid">
-            <div class="card animate-fade-in">
+           <div class="card animate-fade-in cursor-pointer" onclick="switchToDocumentsTab()">
+
                 <div class="stat-icon review">
                     <i class="fas fa-file-circle-check text-white"></i>
                 </div>
@@ -368,15 +369,12 @@
                             <td>{{ doc.file.name|truncatechars:30 }}</td>
                             <td>{{ doc.pages.count }}</td>
                             <td>
-                                <i class="fas fa-user"></i> {{ doc.annotator.username|default:"Non défini" }}
+                                <i class="fas fa-user"></i> {{ doc.annotator.username }}
                             </td>
                             <td>
                                 <span class="badge" style="background:rgba(245,158,11,0.11);color:#f59e0b;">
-                                    <i class="fas fa-pen"></i> {{ doc.total_annotations|default:0 }}
+                                    <i class="fas fa-pen"></i> {{ doc.annotations.count }}
                                 </span>
-                                {% if doc.pending_annotations > 0 %}
-                                    <br><small class="text-muted">{{ doc.pending_annotations }} en attente</small>
-                                {% endif %}
                             </td>
                             <td class="date">
                                 <i class="fas fa-calendar"></i>
@@ -447,15 +445,12 @@
                             <td>{{ doc.file.name|truncatechars:30 }}</td>
                             <td>{{ doc.pages.count }}</td>
                             <td>
-                                <i class="fas fa-user"></i> {{ doc.annotator.username|default:"Non défini" }}
+                                <i class="fas fa-user"></i> {{ doc.annotator.username }}
                             </td>
                             <td>
                                 <span class="badge" style="background:rgba(245,158,11,0.11);color:#f59e0b;">
-                                    <i class="fas fa-pen"></i> {{ doc.total_annotations|default:0 }}
+                                    <i class="fas fa-pen"></i> {{ doc.annotations.count }}
                                 </span>
-                                {% if doc.pending_annotations > 0 %}
-                                    <br><small class="text-muted">{{ doc.pending_annotations }} en attente</small>
-                                {% endif %}
                             </td>
                             <td class="date">
                                 <i class="fas fa-calendar"></i>
