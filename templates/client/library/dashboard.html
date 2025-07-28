@@ -96,7 +96,7 @@
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         }
 
-        /* Stats grid modernisé */
+        /* Stats grid modernisé - TUILES STATIQUES */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -110,12 +110,12 @@
             padding: 28px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.8);
-            transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
             display: flex;
             align-items: center;
             gap: 20px;
+            /* Suppression des transitions et hover effects */
         }
 
         .stat-card::before {
@@ -128,10 +128,8 @@
             background: linear-gradient(90deg, #667eea, #764ba2);
         }
 
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-        }
+        /* Suppression de l'effet hover */
+        /* .stat-card:hover - SUPPRIMÉ */
 
         .stat-icon {
             width: 60px;
