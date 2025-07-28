@@ -30,6 +30,9 @@ def expert_required(view_func):
     """Decorator to require expert role"""
     return user_passes_test(is_expert, login_url='rawdocs:login')(view_func)
 
+# Ajoutez cet import en haut de votre fichier
+from django.db.models import Max
+
 
 @method_decorator(expert_required, name='dispatch')
 class ExpertDashboardView(LoginRequiredMixin, TemplateView):
@@ -53,8 +56,26 @@ class ExpertDashboardView(LoginRequiredMixin, TemplateView):
         for doc in ready_documents.order_by('-expert_ready_at')[:5]:
             doc.annotator = doc.owner  # Add annotator field
             doc.total_annotations = sum(page.annotations.count() for page in doc.pages.all())
-            doc.pending_annotations = sum(page.annotations.filter(validation_status='pending').count() for page in doc.pages.all())
-            doc.validated_annotations = sum(page.annotations.filter(validation_status='validated').count() for page in doc.pages.all())
+            doc.pending_annotations = sum(
+                page.annotations.filter(validation_status='pending').count() for page in doc.pages.all())
+            doc.validated_annotations = sum(
+                page.annotations.filter(validation_status='validated').count() for page in doc.pages.all())
+
+            # Trouver la date de la dernière annotation de manière optimisée
+            latest_annotation_date = Annotation.objects.filter(
+                page__document=doc
+            ).aggregate(
+                latest_date=Max('created_at')
+            )['latest_date']
+
+            # Utiliser la date de la dernière annotation ou une date de fallback
+            if latest_annotation_date:
+                doc.updated_at = latest_annotation_date
+            elif hasattr(doc, 'expert_ready_at') and doc.expert_ready_at:
+                doc.updated_at = doc.expert_ready_at
+            else:
+                doc.updated_at = doc.created_at
+
             enriched_documents.append(doc)
 
         context.update({
