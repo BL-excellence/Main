@@ -127,12 +127,19 @@ def register(request):
             pwd = form.cleaned_data['password1']
             user = authenticate(username=uname, password=pwd)
             login(request, user)
-
+ 
+            # Redirect to proper dashboard based on role
             grp = form.cleaned_data['role']
             if grp == "Metadonneur":
-                return redirect('rawdocs:upload')
+                return redirect('rawdocs:dashboard')  # Metadonneur dashboard
+            elif grp == "Annotateur":
+                return redirect('rawdocs:annotation_dashboard')  # Annotateur dashboard
+            elif grp == "Expert":
+                return redirect('expert:dashboard')  # Expert dashboard
+            elif grp == "Client":
+                return redirect('/client/')  # Client dashboard
             else:
-                return redirect('rawdocs:annotation_dashboard')
+                return redirect('rawdocs:dashboard')  # Fallback
     else:
         form = RegisterForm()
     return render(request, 'registration/register.html', {'form': form})
