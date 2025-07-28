@@ -1,3 +1,4 @@
+# client/reports/urls.py - COMPLETE WITH ALL ENDPOINTS
 from django.urls import path
 from . import views
 
@@ -6,6 +7,9 @@ app_name = 'client_reports'
 urlpatterns = [
     # Main dashboard
     path('', views.reports_dashboard, name='dashboard'),
+    
+    # Report generation - MAKE SURE THIS IS HERE
+    path('generate/', views.generate_report, name='generate'),
     
     # Export functionality
     path('export/', views.export_data, name='export'),

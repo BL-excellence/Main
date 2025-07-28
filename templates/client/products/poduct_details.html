@@ -619,6 +619,69 @@
         </div>
     </div>
 </div>
+<!-- Add Variation Modal -->
+<div class="modal" id="addVariationModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>📋 Ajouter une Variation</h3>
+            <button class="modal-close" onclick="closeVariationModal()">&times;</button>
+        </div>
+        <form id="addVariationForm" class="modal-form">
+            <div class="form-group">
+                <label>Nom de la soumission *</label>
+                <input type="text" name="title" required placeholder="Ex: EUA">
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Pays/Région *</label>
+                    <select name="country" required>
+                        <option value="">---------</option>
+                        <option value="Union Européenne (EMA)">Union Européenne (EMA)</option>
+                        <option value="États-Unis (FDA)">États-Unis (FDA)</option>
+                        <option value="Canada (Health Canada)">Canada (Health Canada)</option>
+                        <option value="Japon (PMDA)">Japon (PMDA)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Type de variation *</label>
+                    <select name="variation_type" required>
+                        <option value="">---------</option>
+                        <option value="type_ia">Variation Type IA</option>
+                        <option value="type_ib">Variation Type IB</option>
+                        <option value="type_ii">Variation Type II</option>
+                        <option value="maa">Marketing Authorization Application</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>📝 Changement description *</label>
+                <select name="description" required>
+                    <option value="">Ajout de site de fabrication primaire</option>
+                    <option value="Ajout de site de fabrication primaire">Ajout de site de fabrication primaire</option>
+                    <option value="Changement des spécifications">Changement des spécifications</option>
+                    <option value="Modification de l'étiquetage">Modification de l'étiquetage</option>
+                    <option value="Extension d'indication">Extension d'indication</option>
+                    <option value="Nouveau dosage">Nouveau dosage</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Date de soumission *</label>
+                <input type="date" name="submission_date" required>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline" onclick="closeVariationModal()">Annuler</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="material-icons">add</i>
+                    Ajouter la Variation
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 {% endblock %}
 
@@ -732,6 +795,46 @@ document.addEventListener('DOMContentLoaded', function() {
                 showNotification('Erreur de connexion', 'error');
             }
         });
+        
+    }
+    const addVariationForm = document.getElementById('addVariationForm');
+    if (addVariationForm) {
+        addVariationForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const variationData = {
+                title: formData.get('title'),
+                variation_type: formData.get('variation_type'),
+                description: formData.get('description'),
+                submission_date: formData.get('submission_date'),
+                country: formData.get('country')
+            };
+            
+            try {
+                const response = await fetch(`/client/products/api/products/${productId}/variations/add/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify(variationData)
+                });
+                
+                if (response.ok) {
+                    showNotification('✅ Variation ajoutée avec succès', 'success');
+                    closeVariationModal();
+                    // Reload variations tab
+                    if (window.productsApp) {
+                        window.productsApp.loadVariationsTab();
+                    }
+                } else {
+                    showNotification('❌ Erreur lors de l\'ajout', 'error');
+                }
+            } catch (error) {
+                showNotification('❌ Erreur de connexion', 'error');
+            }
+        });
     }
 });
 
@@ -774,5 +877,12 @@ function showNotification(message, type = 'info') {
         notification.remove();
     }, 3000);
 }
+
+function closeVariationModal() {
+    document.getElementById('addVariationModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    document.getElementById('addVariationForm').reset();
+}
+
 </script>
 {% endblock %}

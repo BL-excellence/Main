@@ -7,15 +7,16 @@ from django.http import JsonResponse
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Max
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import user_passes_test
 import uuid
 from django.http import JsonResponse, HttpResponse
-from client.products.models import Product, ProductSpecification, ManufacturingSite
+from client.products.models import Product, ProductSpecification, ManufacturingSite, ProductVariation
 import json
+import re
 
 from .models import ExpertLog
 from rawdocs.models import RawDocument, DocumentPage, Annotation, AnnotationType
@@ -29,10 +30,6 @@ def is_expert(user):
 def expert_required(view_func):
     """Decorator to require expert role"""
     return user_passes_test(is_expert, login_url='rawdocs:login')(view_func)
-
-
-# Ajoutez cet import en haut de votre fichier
-from django.db.models import Max
 
 
 @method_decorator(expert_required, name='dispatch')
@@ -62,14 +59,14 @@ class ExpertDashboardView(LoginRequiredMixin, TemplateView):
             doc.validated_annotations = sum(
                 page.annotations.filter(validation_status='validated').count() for page in doc.pages.all())
 
-            # Trouver la date de la dernière annotation de manière optimisée
+            # Find the latest annotation date in an optimized way
             latest_annotation_date = Annotation.objects.filter(
                 page__document=doc
             ).aggregate(
                 latest_date=Max('created_at')
             )['latest_date']
 
-            # Utiliser la date de la dernière annotation ou une date de fallback
+            # Use the latest annotation date or a fallback date
             if latest_annotation_date:
                 doc.updated_at = latest_annotation_date
             elif hasattr(doc, 'expert_ready_at') and doc.expert_ready_at:
@@ -118,7 +115,7 @@ class DocumentReviewView(LoginRequiredMixin, TemplateView):
             'document': document,
             'page_obj': page_obj,
             'current_page': current_page,
-            'annotation_types': annotation_types,  # Changed name for consistency with annotate_document.html
+            'annotation_types': annotation_types,
             'existing_annotations': existing_annotations,
             'total_pages': document.total_pages,
         })
@@ -470,7 +467,6 @@ def create_annotation_type_ajax(request):
             if not name:
                 name = display_name.lower().replace(' ', '_').replace('-', '_')
                 # Remove any non-alphanumeric characters except underscores
-                import re
                 name = re.sub(r'[^\w]', '', name)
 
             # Check if annotation type already exists
@@ -565,9 +561,7 @@ def delete_annotation_type_ajax(request):
 
 
 def create_product_from_annotations(document):
-    """Create a product in client module from validated annotations"""
-    from client.products.models import Product, ProductSpecification, ManufacturingSite
-
+    """Create a product or update existing one with variations"""
     # Get all validated annotations from this document
     validated_annotations = Annotation.objects.filter(
         page__document=document,
@@ -583,8 +577,10 @@ def create_product_from_annotations(document):
         annotations_by_type[annotation_type].append(annotation.selected_text.strip())
 
     # Extract product information
+    product_name = annotations_by_type.get('product', [''])[0] or 'Unknown Product'
+    
     product_data = {
-        'name': annotations_by_type.get('product', [''])[0] or 'Unknown Product',
+        'name': product_name,
         'dosage': annotations_by_type.get('dosage', [''])[0] or 'N/A',
         'active_ingredient': annotations_by_type.get('substance_active', ['N/A'])[0],
         'form': 'Comprimé',
@@ -608,20 +604,27 @@ def create_product_from_annotations(document):
         sites_data.append({
             'site_name': site_name,
             'country': country,
-            'city': address,  # Using address as city for now
+            'city': address,
             'gmp_certified': False
         })
 
-    print(f"DEBUG: Creating product '{product_data['name']}' with {len(sites_data)} sites")
-    for site in sites_data:
-        print(f"DEBUG: Site - {site['site_name']} in {site['country']}, {site['city']}")
+    print(f"DEBUG: Processing product '{product_name}' with {len(sites_data)} sites")
 
-    # Create product if we have minimum required info
+    # Check if product already exists
+    existing_product = Product.objects.filter(name=product_name).first()
+    
+    if existing_product and product_name != 'Unknown Product':
+        print(f"DEBUG: Found existing product '{product_name}' - checking for changes")
+        return update_existing_product_with_variations(existing_product, sites_data, document)
+    else:
+        print(f"DEBUG: Creating new product '{product_name}'")
+        return create_new_product(product_data, sites_data, document)
+
+
+def create_new_product(product_data, sites_data, document):
+    """Create a completely new product (original logic)"""
     if product_data['name'] and product_data['name'] != 'Unknown Product':
         try:
-            print(f"DEBUG: About to create product with document ID: {document.id}")
-            print(f"DEBUG: Document object: {document}")
-
             product = Product.objects.create(
                 name=product_data['name'],
                 active_ingredient=product_data['active_ingredient'],
@@ -631,8 +634,6 @@ def create_product_from_annotations(document):
                 status=product_data['status'],
                 source_document=document
             )
-
-            print(f"DEBUG: Product created with source_document: {product.source_document}")
 
             # Create manufacturing sites
             for site_data in sites_data:
@@ -654,6 +655,93 @@ def create_product_from_annotations(document):
     return None
 
 
+def update_existing_product_with_variations(existing_product, new_sites_data, document):
+    """Compare existing product with new data and create variations"""
+    # Get existing sites
+    existing_sites = list(ManufacturingSite.objects.filter(product=existing_product).values(
+        'site_name', 'country', 'city'
+    ))
+    
+    print(f"DEBUG: Existing sites: {existing_sites}")
+    print(f"DEBUG: New sites: {new_sites_data}")
+    
+    # Compare sites
+    added_sites = []
+    removed_sites = []
+    
+    # Find new sites
+    for new_site in new_sites_data:
+        site_exists = any(
+            existing_site['site_name'].strip().lower() == new_site['site_name'].strip().lower() and 
+            existing_site['country'].strip().lower() == new_site['country'].strip().lower()
+            for existing_site in existing_sites
+        )
+        if not site_exists:
+            added_sites.append(new_site)
+    
+    # Find removed sites  
+    for existing_site in existing_sites:
+        site_still_exists = any(
+            new_site['site_name'].strip().lower() == existing_site['site_name'].strip().lower() and
+            new_site['country'].strip().lower() == existing_site['country'].strip().lower()
+            for new_site in new_sites_data
+        )
+        if not site_still_exists:
+            removed_sites.append(existing_site)
+    
+    print(f"DEBUG: Sites to add: {added_sites}")
+    print(f"DEBUG: Sites to remove: {removed_sites}")
+    
+    # Create variations for changes
+    variations_created = []
+    
+    # Add variations for new sites
+    for site in added_sites:
+        variation = ProductVariation.objects.create(
+            product=existing_product,
+            variation_type='type_ib',  # Site addition is usually Type IB
+            title=f"Ajout de site - {site['site_name']}",
+            description=f"Ajout du site de fabrication: {site['site_name']} ({site['city']}, {site['country']})",
+            submission_date=timezone.now().date(),
+            status='soumis'
+        )
+        variations_created.append(variation)
+        
+        # Actually add the site to the product
+        ManufacturingSite.objects.create(
+            product=existing_product,
+            site_name=site['site_name'],
+            country=site['country'],
+            city=site['city'],
+            gmp_certified=site.get('gmp_certified', False)
+        )
+        print(f"DEBUG: Added variation and site: {site['site_name']}")
+    
+    # Add variations for removed sites
+    for site in removed_sites:
+        variation = ProductVariation.objects.create(
+            product=existing_product,
+            variation_type='type_ib',
+            title=f"Suppression de site - {site['site_name']}",
+            description=f"Suppression du site de fabrication: {site['site_name']} ({site['city']}, {site['country']})",
+            submission_date=timezone.now().date(),
+            status='soumis'
+        )
+        variations_created.append(variation)
+        
+        # Actually remove the site from the product
+        ManufacturingSite.objects.filter(
+            product=existing_product,
+            site_name=site['site_name'],
+            country=site['country']
+        ).delete()
+        print(f"DEBUG: Added variation and removed site: {site['site_name']}")
+    
+    print(f"🎯 Updated existing product '{existing_product.name}' with {len(variations_created)} variations")
+    
+    return existing_product
+
+
 @expert_required
 def validate_document(request, document_id):
     """Validate entire document and create product if it's a manufacturer document"""
@@ -664,32 +752,33 @@ def validate_document(request, document_id):
             # Debug: Check document type
             print(f"DEBUG: Document type = '{document.doc_type}'")
 
-            # Create product from annotations
+            # Create or update product from annotations
             product = create_product_from_annotations(document)
 
             if product:
-                messages.success(
-                    request,
-                    f'🎉 Document validé avec succès! Le produit "{product.name}" a été créé dans le module client.'
-                )
-
-                # Log the action
-                log_expert_action(
-                    user=request.user,
-                    action='document_validated_product_created',
-                    annotation=None,
-                    document_id=document.id,
-                    document_title=document.file.name,
-                    reason=f"Document validated and product created: {product.name}"
-                )
-
-                return redirect('expert:dashboard')
+                # Check if it was an update or new creation
+                variations_today = ProductVariation.objects.filter(
+                    product=product,
+                    submission_date=timezone.now().date()
+                ).count()
+                
+                if variations_today > 0:
+                    messages.success(
+                        request,
+                        f'🎉 Document validé avec succès! Le produit "{product.name}" a été mis à jour avec {variations_today} nouvelle(s) variation(s). '
+                        f'Consultez l\'onglet "Variations" pour voir les changements.'
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f'🎉 Document validé avec succès! Le produit "{product.name}" a été créé dans le module client.'
+                    )
             else:
-                # Get detailed debug info
                 debug_info = debug_annotations_for_product(document)
                 messages.warning(
                     request,
-                    f'❌ Produit non créé. Détails: {debug_info}'
+                    f'⚠️ Document validé mais aucun produit créé. '
+                    f'Détails: {debug_info}'
                 )
 
             return redirect('expert:dashboard')
@@ -732,6 +821,7 @@ def debug_annotations_for_product(document):
     debug_info.append(f"Has site: {has_site}")
 
     return " | ".join(debug_info)
+
 
 @expert_required
 def view_original_document(request, document_id):

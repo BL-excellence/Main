@@ -42,11 +42,8 @@ class ProductListAPIView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         """Create a new product with all related data"""
         try:
-            # Handle both JSON and form data
-            if request.content_type == 'application/json':
-                data = json.loads(request.body)
-            else:
-                data = request.data
+            
+            data = request.data
                 
             logger.info(f"Creating product with data: {data}")
             
@@ -61,21 +58,35 @@ class ProductListAPIView(generics.ListCreateAPIView):
                 product = product_serializer.save()
                 logger.info(f"Product created with ID: {product.id}")
                 
-                # Create regulatory specification if provided
-                if regulatory_data and any(v for v in regulatory_data.values() if v):
+                # Create regulatory specification only if we have the required fields
+                if (regulatory_data and 
+                    regulatory_data.get('renewal_date') and 
+                    regulatory_data.get('approval_date')):
+                    
+                    from datetime import datetime
+                    
+                    # Parse date strings to date objects
+                    approval_date = None
+                    renewal_date = None
+                    
+                    if regulatory_data.get('approval_date'):
+                        approval_date = datetime.strptime(regulatory_data.get('approval_date'), '%Y-%m-%d').date()
+                    
+                    if regulatory_data.get('renewal_date'):
+                        renewal_date = datetime.strptime(regulatory_data.get('renewal_date'), '%Y-%m-%d').date()
+                    
                     spec = ProductSpecification.objects.create(
                         product=product,
                         country_code=regulatory_data.get('country_code', 'FR'),
                         amm_number=regulatory_data.get('amm_number', ''),
-                        approval_date=regulatory_data.get('approval_date') or None,
-                        renewal_date=regulatory_data.get('renewal_date') or None,
+                        approval_date=approval_date,
+                        renewal_date=renewal_date,
                         ctd_dossier_complete=regulatory_data.get('ctd_dossier_complete', False),
                         gmp_certificate=regulatory_data.get('gmp_certificate', False),
                         inspection_report=regulatory_data.get('inspection_report', False),
                         rcp_etiquetage=regulatory_data.get('rcp_etiquetage', False),
                     )
                     logger.info(f"Regulatory spec created for product {product.id}")
-                
                 # Create manufacturing sites if provided
                 for site_data in sites_data:
                     if site_data.get('country') and site_data.get('city') and site_data.get('site_name'):
@@ -300,4 +311,51 @@ def product_source_document_view(request, pk):
             "<html><body><h2>Aucun document source disponible</h2>"
             "<p>Ce produit n'a pas de document source associé.</p>"
             "<script>window.close();</script></body></html>"
+        )
+    
+@api_view(['POST'])
+def add_product_variation(request, pk):
+    """API pour ajouter une nouvelle variation"""
+    try:
+        product = get_object_or_404(Product, pk=pk)
+        
+        # Get data from request
+        data = request.data
+        
+        # Parse the submission_date string to a date object
+        submission_date = None
+        if data.get('submission_date'):
+            from datetime import datetime
+            submission_date = datetime.strptime(data.get('submission_date'), '%Y-%m-%d').date()
+        
+        # Create the variation
+        variation = ProductVariation.objects.create(
+            product=product,
+            variation_type=data.get('variation_type'),
+            title=data.get('title', ''),
+            description=data.get('description', ''),
+            submission_date=submission_date,  # Now it's a date object
+            status='soumis'  # Default status
+        )
+        
+        logger.info(f"Variation created for product {pk}: {variation.title}")
+        
+        # Return the created variation
+        response_data = {
+            'id': variation.id,
+            'variation_type': variation.variation_type,
+            'title': variation.title,
+            'description': variation.description,
+            'submission_date': variation.submission_date.isoformat() if variation.submission_date else None,
+            'approval_date': variation.approval_date.isoformat() if variation.approval_date else None,
+            'status': variation.status,
+        }
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        logger.error(f"Error creating variation for product {pk}: {str(e)}")
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

@@ -1,353 +1,317 @@
+# client/reports/views.py 
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
-from django.db.models import Count, Avg, Q, Case, When, IntegerField
+from django.db.models import Count, Avg, Q, Max, Min
 from datetime import datetime, timedelta
-from client.products.models import Product
-from .models import ReportSubmission, ReportKPI, ReportHeatmap
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.models import User
 import json
 import csv
 import io
 
+# Import from your existing models
+from rawdocs.models import RawDocument, DocumentPage, Annotation, AnnotationType
+from client.products.models import Product
+from expert.models import ExpertLog
+
+def is_client(user):
+    return user.groups.filter(name="Client").exists()
+
+@login_required(login_url='rawdocs:login')
+@user_passes_test(is_client)
 def reports_dashboard(request):
-    """Vue principale du dashboard des rapports"""
+    """Vue principale du dashboard des rapports avec données réelles"""
     
     # Récupération des filtres
     filters = {
         'period': request.GET.get('period', '30d'),
         'product': request.GET.get('product', ''),
         'status': request.GET.get('status', ''),
-        'team': request.GET.get('team', ''),
+        'authority': request.GET.get('authority', ''),
     }
     
     # Calcul de la période
     period_days = get_period_days(filters['period'])
     start_date = timezone.now().date() - timedelta(days=period_days)
     
-    # Construction du queryset avec filtres
-    submissions_qs = ReportSubmission.objects.filter(
-        submission_date__gte=start_date
-    )
+    # KPIs basés sur vos données réelles
+    kpis = calculate_real_kpis(start_date, filters)
     
-    if filters['product']:
-        submissions_qs = submissions_qs.filter(product_id=filters['product'])
-    if filters['status']:
-        submissions_qs = submissions_qs.filter(status=filters['status'])
-    if filters['team']:
-        submissions_qs = submissions_qs.filter(team=filters['team'])
+    # Données pour les templates de rapports
+    report_templates = get_report_templates()
     
-    # Calcul des KPIs
-    kpis = calculate_kpis(submissions_qs, start_date)
+    # Vues sauvegardées simulées
+    saved_views = get_saved_views()
     
     # Données pour les graphiques
-    chart_data = get_chart_data(submissions_qs, start_date)
+    chart_data = get_real_chart_data(start_date, filters)
     
-    # Données heatmap
-    heatmap_data = get_heatmap_data(filters)
+    # Données récentes d'activité
+    recent_activity = get_recent_activity()
     
-    # Soumissions récentes
-    recent_submissions = submissions_qs.select_related('product').order_by('-submission_date')[:10]
-    
-    # Produits pour le filtre
-    products = Product.objects.all()
-    
-    # Compte des filtres actifs
-    active_filters_count = sum(1 for v in filters.values() if v)
+    # Filtres disponibles
+    available_filters = get_available_filters()
     
     context = {
         'filters': filters,
-        'active_filters_count': active_filters_count,
         'kpis': kpis,
-        'trend_data': json.dumps(chart_data['trend']),
-        'status_data': json.dumps(chart_data['status']),
-        'heatmap_data': heatmap_data,
-        'recent_submissions': recent_submissions,
-        'products': products,
+        'report_templates': report_templates,
+        'saved_views': saved_views,
+        'chart_data': chart_data,
+        'recent_activity': recent_activity,
+        'available_filters': available_filters,
     }
     
     return render(request, 'client/reports/dashboard.html', context)
 
-def calculate_kpis(submissions_qs, start_date):
-    """Calcule les KPIs principaux"""
-    
-    # Période précédente pour les comparaisons
-    period_length = (timezone.now().date() - start_date).days
-    previous_start = start_date - timedelta(days=period_length)
-    previous_submissions = ReportSubmission.objects.filter(
-        submission_date__gte=previous_start,
-        submission_date__lt=start_date
-    )
-    
-    # KPIs actuels
-    total_submissions = submissions_qs.count()
-    
-    # Calcul manuel du délai moyen (puisque days_delay est une propriété)
-    total_delay = 0
-    submission_count = 0
-    for submission in submissions_qs:
-        total_delay += submission.days_delay
-        submission_count += 1
-    
-    average_delay = total_delay / submission_count if submission_count > 0 else 0
-    
-    success_count = submissions_qs.filter(status='approuve').count()
-    success_rate = (success_count / total_submissions * 100) if total_submissions > 0 else 0
-    
-    delayed_count = submissions_qs.filter(
-        estimated_completion__lt=timezone.now().date(),
-        status__in=['en-cours', 'en-attente']
-    ).count()
-    
-    # KPIs précédents pour les tendances
-    previous_total = previous_submissions.count()
-    previous_success = previous_submissions.filter(status='approuve').count()
-    previous_success_rate = (previous_success / previous_total * 100) if previous_total > 0 else 0
-    previous_delayed = previous_submissions.filter(
-        estimated_completion__lt=start_date,
-        status__in=['en-cours', 'en-attente']
-    ).count()
-    
-    # Calcul des tendances
-    submissions_trend = calculate_trend(total_submissions, previous_total)
-    delay_trend = -5  # Simplification pour l'exemple
-    success_trend = success_rate - previous_success_rate
-    delayed_trend = calculate_trend(delayed_count, previous_delayed)
-    
-    return {
-        'total_submissions': total_submissions,
-        'average_delay': int(average_delay),
-        'success_rate': int(success_rate),
-        'delayed_count': delayed_count,
-        'submissions_trend': submissions_trend,
-        'delay_trend': delay_trend,
-        'success_trend': success_trend,
-        'delayed_trend': delayed_trend,
-    }
-
-def calculate_trend(current, previous):
-    """Calcule la tendance en pourcentage"""
-    if previous == 0:
-        return 100 if current > 0 else 0
-    return ((current - previous) / previous) * 100
-
-def get_chart_data(submissions_qs, start_date):
-    """Prépare les données pour les graphiques"""
-    
-    # Données de tendance par mois
-    trend_data = {
-        'labels': ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun'],
-        'datasets': [
-            {
-                'label': 'Total soumissions',
-                'data': [65, 78, 82, 91, 95, 88],
-                'borderColor': '#3498db',
-                'backgroundColor': 'rgba(52, 152, 219, 0.1)',
-                'tension': 0.4,
-                'fill': False
-            },
-            {
-                'label': 'Approuvées',
-                'data': [52, 68, 71, 79, 83, 76],
-                'borderColor': '#27ae60',
-                'backgroundColor': 'rgba(39, 174, 96, 0.1)',
-                'tension': 0.4,
-                'fill': False
-            },
-            {
-                'label': 'Rejetées',
-                'data': [8, 6, 7, 9, 8, 7],
-                'borderColor': '#e74c3c',
-                'backgroundColor': 'rgba(231, 76, 60, 0.1)',
-                'tension': 0.4,
-                'fill': False
-            }
-        ]
-    }
-    
-    # Données de statut (utilise les données réelles si disponibles)
-    status_counts = submissions_qs.values('status').annotate(count=Count('id'))
-    
-    # Préparer les données pour le graphique
-    status_data = {
-        'labels': [],
-        'datasets': [{
-            'data': [],
-            'backgroundColor': ['#27ae60', '#3498db', '#f39c12', '#e74c3c'],
-            'borderWidth': 0,
-            'cutout': '60%'
-        }]
-    }
-    
-    status_labels = {
-        'approuve': 'Approuvé',
-        'en-cours': 'En cours',
-        'en-attente': 'En attente',
-        'rejete': 'Rejeté'
-    }
-    
-    # Si nous avons des données réelles, les utiliser
-    if status_counts.exists():
-        for item in status_counts:
-            status_data['labels'].append(status_labels.get(item['status'], item['status']))
-            status_data['datasets'][0]['data'].append(item['count'])
-    else:
-        # Données par défaut si pas de données
-        status_data['labels'] = ['Approuvé', 'En cours', 'En attente', 'Rejeté']
-        status_data['datasets'][0]['data'] = [156, 67, 18, 6]
-    
-    return {
-        'trend': trend_data,
-        'status': status_data
-    }
-
-def get_heatmap_data(filters):
-    """Prépare les données pour la heatmap"""
-    
-    # Récupération des données heatmap
-    heatmap_qs = ReportHeatmap.objects.select_related('product').all()
-    
-    if filters['product']:
-        heatmap_qs = heatmap_qs.filter(product_id=filters['product'])
-    
-    # Si nous avons des données réelles, les utiliser
-    if heatmap_qs.exists():
-        return [
-            {
-                'product': item.product.name,
-                'authorization_delay': item.authorization_delay,
-                'authorization_status': item.authorization_status,
-                'variation_delay': item.variation_delay,
-                'variation_status': item.variation_status,
-                'renewal_delay': item.renewal_delay,
-                'renewal_status': item.renewal_status,
-            }
-            for item in heatmap_qs
-        ]
-    else:
-        # Données par défaut si pas de données
-        return [
-            {
-                'product': 'Médicament A',
-                'authorization_delay': 25,
-                'authorization_status': 'good',
-                'variation_delay': 45,
-                'variation_status': 'warning',
-                'renewal_delay': 70,
-                'renewal_status': 'critical',
-            },
-            {
-                'product': 'Médicament B',
-                'authorization_delay': 30,
-                'authorization_status': 'good',
-                'variation_delay': 35,
-                'variation_status': 'warning',
-                'renewal_delay': None,
-                'renewal_status': 'good',
-            },
-            {
-                'product': 'Dispositif X',
-                'authorization_delay': 20,
-                'authorization_status': 'good',
-                'variation_delay': 28,
-                'variation_status': 'good',
-                'renewal_delay': None,
-                'renewal_status': 'good',
-            }
-        ]
-
 def get_period_days(period):
-    """Convertit la période en nombre de jours"""
-    period_mapping = {
+    """Convertir période en nombre de jours"""
+    period_map = {
+        '7d': 7,
         '30d': 30,
         '90d': 90,
-        '6m': 180,
         '1y': 365,
     }
-    return period_mapping.get(period, 30)
+    return period_map.get(period, 30)
 
-def export_data(request):
-    """Export des données en différents formats"""
+def calculate_real_kpis(start_date, filters):
+    """Calculer les KPIs basés sur vos données réelles"""
     
-    export_format = request.GET.get('format', 'csv')
+    # Documents traités ce mois
+    documents_count = RawDocument.objects.filter(
+        created_at__gte=start_date,
+        is_validated=True
+    ).count()
     
-    # Récupération des données avec filtres
-    filters = {
-        'period': request.GET.get('period', '30d'),
-        'product': request.GET.get('product', ''),
-        'status': request.GET.get('status', ''),
-        'team': request.GET.get('team', ''),
+    # Annotations créées
+    annotations_count = Annotation.objects.filter(
+        created_at__gte=start_date
+    ).count()
+    
+    # Produits créés
+    products_count = Product.objects.filter(
+        created_at__gte=start_date
+    ).count()
+    
+    # Temps moyen de traitement (en jours)
+    validated_docs = RawDocument.objects.filter(
+        is_validated=True,
+        validated_at__isnull=False,
+        created_at__gte=start_date
+    )
+    
+    avg_processing_time = 0
+    if validated_docs.exists():
+        total_time = 0
+        count = 0
+        for doc in validated_docs:
+            if doc.validated_at and doc.created_at:
+                processing_time = (doc.validated_at.date() - doc.created_at.date()).days
+                total_time += processing_time
+                count += 1
+        avg_processing_time = total_time / count if count > 0 else 0
+    
+    return {
+        'rapports_mois': documents_count,
+        'vues_standard': 3,  # Templates disponibles
+        'exports_pdf': annotations_count,  # Annotations comme proxy pour exports
+        'partages': products_count,  # Produits créés
+        'avg_processing_days': round(avg_processing_time, 1),
+        'total_annotations': annotations_count,
+        'active_users': User.objects.filter(last_login__gte=start_date).count(),
     }
-    
-    period_days = get_period_days(filters['period'])
-    start_date = timezone.now().date() - timedelta(days=period_days)
-    
-    submissions_qs = ReportSubmission.objects.filter(
-        submission_date__gte=start_date
-    ).select_related('product')
-    
-    if filters['product']:
-        submissions_qs = submissions_qs.filter(product_id=filters['product'])
-    if filters['status']:
-        submissions_qs = submissions_qs.filter(status=filters['status'])
-    if filters['team']:
-        submissions_qs = submissions_qs.filter(team=filters['team'])
-    
-    # Export selon le format
-    if export_format == 'csv':
-        return export_csv(submissions_qs)
-    elif export_format == 'excel':
-        return export_excel(submissions_qs)
-    elif export_format == 'pdf':
-        return export_pdf(submissions_qs)
-    
-    return JsonResponse({'error': 'Format non supporté'}, status=400)
 
-def export_csv(submissions_qs):
-    """Export CSV"""
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="regx_report.csv"'
-    
-    writer = csv.writer(response)
-    writer.writerow([
-        'Produit', 'Type', 'Statut', 'Date soumission', 
-        'Date estimée', 'Responsable', 'Progression', 'Retard (jours)'
-    ])
-    
-    for submission in submissions_qs:
-        writer.writerow([
-            submission.product.name,
-            submission.get_type_display(),
-            submission.get_status_display(),
-            submission.submission_date.strftime('%d/%m/%Y'),
-            submission.estimated_completion.strftime('%d/%m/%Y'),
-            submission.responsible,
-            f"{submission.progress}%",
-            submission.days_delay
-        ])
-    
-    return response
+def get_report_templates():
+    """Templates de rapports disponibles"""
+    return [
+        {
+            'name': 'Rapport Mensuel de Conformité',
+            'description': 'Vue d\'ensemble des activités réglementaires du mois',
+            'type': 'Mensuel',
+            'last_generated': '2024-01-15',
+            'icon': 'description',
+        },
+        {
+            'name': 'Tableau de Bord KPI',
+            'description': 'Indicateurs de performance réglementaire',
+            'type': 'Hebdomadaire', 
+            'last_generated': '2024-01-12',
+            'icon': 'dashboard',
+        },
+        {
+            'name': 'Rapport d\'Audit Réglementaire',
+            'description': 'Synthèse des audits et inspections',
+            'type': 'Trimestriel',
+            'last_generated': '2024-01-08', 
+            'icon': 'assessment',
+        },
+        {
+            'name': 'Analyse des Variations',
+            'description': 'Suivi des variations de produit et autorités',
+            'type': 'Mensuel',
+            'last_generated': '2024-01-10',
+            'icon': 'trending_up',
+        },
+    ]
 
-def export_excel(submissions_qs):
-    """Export Excel - Placeholder"""
-    # Pour l'instant, retourne un CSV
-    return export_csv(submissions_qs)
+def get_saved_views():
+    """Vues sauvegardées"""
+    return [
+        {
+            'name': 'Vue Mensuelle Q4 2024',
+            'description': 'Rapport mensuel personnalisé pour Q4',
+            'created_at': '2024-01-15',
+        },
+        {
+            'name': 'Rapport Annuel 2024', 
+            'description': 'Vue d\'ensemble annuelle complète',
+            'created_at': '2024-01-10',
+        },
+        {
+            'name': 'KPI Dashboard Personnalisé',
+            'description': 'Indicateurs spécifiques à l\'équipe',
+            'created_at': '2024-01-08',
+        },
+    ]
 
-def export_pdf(submissions_qs):
-    """Export PDF - Placeholder"""
-    # Pour l'instant, retourne un CSV
-    return export_csv(submissions_qs)
+def get_real_chart_data(start_date, filters):
+    """Données réelles pour les graphiques"""
+    
+    # Documents par jour pour les 30 derniers jours
+    daily_docs = []
+    for i in range(30):
+        date = start_date + timedelta(days=i)
+        count = RawDocument.objects.filter(
+            created_at__date=date,
+            is_validated=True
+        ).count()
+        daily_docs.append({
+            'date': date.strftime('%Y-%m-%d'),
+            'count': count
+        })
+    
+    # Répartition par type de document
+    doc_types = RawDocument.objects.filter(
+        created_at__gte=start_date,
+        is_validated=True
+    ).values('doc_type').annotate(count=Count('id')).order_by('-count')
+    
+    # Répartition par autorité
+    authorities = Annotation.objects.filter(
+        created_at__gte=start_date,
+        annotation_type__name='authority'
+    ).values('selected_text').annotate(count=Count('id')).order_by('-count')[:5]
+    
+    return {
+        'daily_documents': daily_docs,
+        'document_types': list(doc_types),
+        'authorities': list(authorities),
+    }
 
+def get_recent_activity():
+    """Activité récente"""
+    recent_docs = RawDocument.objects.filter(
+        is_validated=True
+    ).order_by('-validated_at')[:10]
+    
+    recent_products = Product.objects.order_by('-created_at')[:5]
+    
+    return {
+        'recent_documents': recent_docs,
+        'recent_products': recent_products,
+    }
+
+def get_available_filters():
+    """Filtres disponibles pour les dropdowns"""
+    
+    # Types de documents uniques
+    doc_types = RawDocument.objects.values_list('doc_type', flat=True).distinct()
+    doc_types = [dt for dt in doc_types if dt]  # Remove empty values
+    
+    # Autorités depuis les annotations
+    authorities = Annotation.objects.filter(
+        annotation_type__name='authority'
+    ).values_list('selected_text', flat=True).distinct()
+    authorities = [auth.strip() for auth in authorities if auth.strip()][:10]
+    
+    # Pays
+    countries = RawDocument.objects.values_list('country', flat=True).distinct()
+    countries = [c for c in countries if c]
+    
+    return {
+        'document_types': list(doc_types),
+        'authorities': list(authorities),
+        'countries': list(countries),
+        'periods': [
+            ('7d', '7 derniers jours'),
+            ('30d', '30 derniers jours'),
+            ('90d', '3 derniers mois'),
+            ('1y', 'Année courante'),
+        ]
+    }
+
+@login_required(login_url='rawdocs:login')
+@user_passes_test(is_client)
+def generate_report(request):
+    """Générer un rapport basé sur les filtres"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            template = data.get('template')
+            period = data.get('period')
+            authority = data.get('authority')
+            
+            # Logique de génération de rapport
+            report_data = {
+                'template': template,
+                'generated_at': timezone.now().isoformat(),
+                'period': period,
+                'authority': authority,
+                'status': 'success'
+            }
+            
+            return JsonResponse(report_data)
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    
+    return JsonResponse({'error': 'POST required'}, status=405)
+
+@login_required(login_url='rawdocs:login') 
+@user_passes_test(is_client)
+def export_data(request):
+    """Export des données en CSV/PDF"""
+    format_type = request.GET.get('format', 'csv')
+    
+    if format_type == 'csv':
+        # Export CSV des documents récents
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="regx_report.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow(['Document', 'Type', 'Status', 'Date', 'Owner'])
+        
+        documents = RawDocument.objects.filter(is_validated=True)[:100]
+        for doc in documents:
+            writer.writerow([
+                f'Document #{doc.id}',
+                doc.doc_type or 'N/A',
+                'Validé' if doc.is_validated else 'En attente',
+                doc.created_at.strftime('%Y-%m-%d'),
+                doc.owner.username if doc.owner else 'N/A'
+            ])
+        
+        return response
+    
+    return JsonResponse({'error': 'Format not supported'}, status=400)
+
+# Placeholder views pour les autres endpoints
 def submission_detail(request, pk):
-    """Détail d'une soumission"""
-    submission = get_object_or_404(ReportSubmission, pk=pk)
-    return render(request, 'reports/submission_detail.html', {
-        'submission': submission
-    })
+    return JsonResponse({'status': 'success', 'message': 'Detail view coming soon'})
 
 def reports_settings(request):
-    """Paramètres des rapports"""
-    return render(request, 'reports/settings.html')
+    return render(request, 'client/reports/settings.html', {'message': 'Settings page'})
 
 def reports_create(request):
-    """Créer un nouveau rapport"""
-    return render(request, 'reports/create.html')
+    return render(request, 'client/reports/create.html', {'message': 'Create page'})

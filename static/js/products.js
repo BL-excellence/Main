@@ -443,63 +443,68 @@ class ProductsApp {
     }
 }
     
-    async loadVariationsTab() {
-        console.log(`Loading variations for product ${this.currentProductId}`);
+async loadVariationsTab() {
+    console.log(`Loading variations for product ${this.currentProductId}`);
+    const variationsHeader = `
+        <div class="sites-header">
+            <h3>Variations du Produit</h3>
+            <button class="btn btn-primary" onclick="document.getElementById('addVariationModal').style.display='flex'; document.body.style.overflow='hidden';">
+                <i class="material-icons">add</i>
+                Nouvelle Variation
+            </button>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch(`/client/products/api/products/${this.currentProductId}/variations/`);
         
-        try {
-            const response = await fetch(`/client/products/api/products/${this.currentProductId}/variations/`);
+        if (response.ok) {
+            const variations = await response.json();
+            console.log('Variations data:', variations);
             
-            if (response.ok) {
-                const variations = await response.json();
-                console.log('Variations data:', variations);
-                
-                if (variations.length === 0) {
-                    this.elements.tabContent.innerHTML = `
-                        <div class="empty-state">
-                            <i class="material-icons">timeline</i>
-                            <h3>Aucune variation</h3>
-                            <p>Aucune variation n'a été soumise pour ce produit</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
+            if (variations.length === 0) {
                 this.elements.tabContent.innerHTML = `
-                    <div class="variations-header">
-                        <h3>Variations (${variations.length})</h3>
-                        <button class="btn btn-primary">
-                            <i class="material-icons">add</i>
-                            Nouvelle Variation
-                        </button>
-                    </div>
-                    <div class="variations-timeline">
-                        ${variations.map(variation => `
-                            <div class="variation-item">
-                                <div class="variation-type">${variation.variation_type?.split('_')[1]?.toUpperCase() || 'N/A'}</div>
-                                <div class="variation-content">
-                                    <div class="variation-title">${variation.title}</div>
-                                    <div class="variation-date">${this.formatDate(variation.submission_date)}</div>
-                                    <div class="variation-description">${variation.description || ''}</div>
-                                    <span class="variation-status status-${variation.status}">${this.getStatusLabel(variation.status)}</span>
-                                </div>
-                            </div>
-                        `).join('')}
+                    ${variationsHeader}
+                    <div class="empty-state">
+                        <i class="material-icons">timeline</i>
+                        <h3>Aucune variation</h3>
+                        <p>Aucune variation n'a été soumise pour ce produit</p>
                     </div>
                 `;
-            } else {
-                throw new Error('Failed to load variations');
+                return;
             }
-        } catch (error) {
-            console.error('Error loading variations:', error);
+
             this.elements.tabContent.innerHTML = `
-                <div class="empty-state">
-                    <i class="material-icons">timeline</i>
-                    <h3>Aucune variation</h3>
-                    <p>Aucune variation n'a été soumise pour ce produit</p>
+                ${variationsHeader}
+                <div class="variations-timeline">
+                    ${variations.map(variation => `
+                        <div class="variation-item">
+                            <div class="variation-type">${variation.variation_type?.split('_')[1]?.toUpperCase() || 'N/A'}</div>
+                            <div class="variation-content">
+                                <div class="variation-title">${variation.title}</div>
+                                <div class="variation-date">${this.formatDate(variation.submission_date)}</div>
+                                <div class="variation-description">${variation.description || ''}</div>
+                                <span class="variation-status status-${variation.status}">${this.getStatusLabel(variation.status)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
             `;
+        } else {
+            throw new Error('Failed to load variations');
         }
+    } catch (error) {
+        console.error('Error loading variations:', error);
+        this.elements.tabContent.innerHTML = `
+            ${variationsHeader}
+            <div class="empty-state">
+                <i class="material-icons">timeline</i>
+                <h3>Aucune variation</h3>
+                <p>Aucune variation n'a été soumise pour ce produit</p>
+            </div>
+        `;
     }
+}
     
     async loadRegulatoryTab() {
         console.log(`Loading regulatory for product ${this.currentProductId}`);

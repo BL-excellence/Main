@@ -16,5 +16,7 @@ urlpatterns = [
     path('api/products/<int:pk>/sites/', views.product_sites, name='api_sites'),
     path('api/products/<int:pk>/variations/', views.product_variations, name='api_variations'),
     path('api/products/<int:pk>/source-document/', views.product_source_document_view, name='source_document'),
+    path('api/products/<int:pk>/variations/add/', views.add_product_variation, name='api_add_variation'),
+
 
 ]
