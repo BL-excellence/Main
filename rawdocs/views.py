@@ -127,7 +127,7 @@ def register(request):
             pwd = form.cleaned_data['password1']
             user = authenticate(username=uname, password=pwd)
             login(request, user)
- 
+
             # Redirect to proper dashboard based on role
             grp = form.cleaned_data['role']
             if grp == "Metadonneur":

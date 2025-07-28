@@ -691,23 +691,60 @@ body {
   color: #92400e;
 }
 
-.text-content {
-  border: 2px dashed var(--pharma-primary);
-  border-radius: var(--pharma-radius-sm);
-  background: #e0f2fe;
-  color: var(--pharma-primary-dark);
-  padding: 1.6rem 1.2rem;
-  font-size: 1.14rem;
-  line-height: 1.7;
-  user-select: text;
-  cursor: text;
-  min-height: 220px;
-  box-shadow: 0 2px 6px rgba(56,189,248,0.05);
-  transition: box-shadow .2s;
-}
-.text-content:focus, .text-content:hover {
-  box-shadow: 0 6px 26px rgba(14,165,233,0.13);
-}
+/* Text content - Enhanced for PDF-like appearance */
+  .text-content {
+    background: #fafbfc;
+    border: 1px solid var(--pharma-border);
+    border-radius: 12px;
+    padding: 2rem;
+    line-height: 1.8;
+    font-size: 1.05rem;
+    color: var(--pharma-text);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    min-height: 400px;
+    cursor: text;
+    font-family: 'Inter', 'Georgia', 'Times New Roman', serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    hyphens: auto;
+    text-align: justify;
+    text-justify: inter-word;
+    letter-spacing: 0.01em;
+    word-spacing: 0.05em;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+    border: 2px solid rgba(59, 130, 246, 0.1);
+    transition: border-color 0.3s ease;
+  }
+
+  .text-content:hover {
+    border-color: rgba(59, 130, 246, 0.2);
+  }
+
+  /* Add visual structure for better readability */
+  .text-content::before {
+    content: "";
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(to right, 
+      transparent, 
+      rgba(59, 130, 246, 0.2), 
+      transparent
+    );
+    margin-bottom: 1.5rem;
+  }
+
+  /* Enhanced paragraph spacing for PDF-like structure */
+  .text-content p {
+    margin-bottom: 1.2rem;
+    text-indent: 1.5rem;
+  }
+
+  .text-content p:first-child {
+    text-indent: 0;
+  }
 
 /* Annotations List (as cards) */
 .annotations-list {
@@ -1669,62 +1706,62 @@ function viewOriginalDocument(documentId) {
 // Highlight text in document function
 function highlightTextInDocument(text, startPos, endPos) {
     const pageDisplay = document.getElementById('text-content');
-    
+
     // Store the clean original text content
     const originalTextContent = pageDisplay.textContent;
-    
+
     // Remove any existing highlights first
     clearExistingHighlights();
-    
+
     try {
         // Reset to clean text content
         pageDisplay.textContent = originalTextContent;
-        
+
         let content = pageDisplay.textContent;
         let targetText = text.trim();
-        
+
         let textIndex = -1;
         let foundText = targetText;
-        
+
         // BULLETPROOF SEARCH STRATEGIES - Try them all!
-        
+
         // Strategy 1: Exact match
         textIndex = content.indexOf(targetText);
-        
+
         // Strategy 2: Case insensitive
         if (textIndex === -1) {
             textIndex = content.toLowerCase().indexOf(targetText.toLowerCase());
         }
-        
+
         // Strategy 3: Flexible whitespace (spaces, line breaks, tabs)
         if (textIndex === -1) {
             const flexiblePattern = targetText.replace(/\s+/g, '\\s+');
             const regex = new RegExp(flexiblePattern, 'i');
             const match = content.match(regex);
-            
+
             if (match) {
                 textIndex = content.search(regex);
                 foundText = match[0];
             }
         }
-        
+
         // Strategy 4: Remove ALL whitespace and punctuation for comparison
         if (textIndex === -1) {
             const cleanTarget = targetText.replace(/[\s\(\)\-\.,;:!?]/g, '').toLowerCase();
             const cleanContent = content.toLowerCase();
-            
+
             // Find position by removing chars progressively
             let bestMatch = '';
             let bestIndex = -1;
             let bestLength = 0;
-            
+
             for (let i = 0; i < content.length - cleanTarget.length + 1; i++) {
                 for (let len = cleanTarget.length; len <= cleanTarget.length + 50; len++) {
                     if (i + len > content.length) break;
-                    
+
                     const candidate = content.substring(i, i + len);
                     const cleanCandidate = candidate.replace(/[\s\(\)\-\.,;:!?]/g, '').toLowerCase();
-                    
+
                     if (cleanCandidate === cleanTarget) {
                         bestMatch = candidate;
                         bestIndex = i;
@@ -1734,18 +1771,18 @@ function highlightTextInDocument(text, startPos, endPos) {
                 }
                 if (bestMatch) break;
             }
-            
+
             if (bestMatch) {
                 textIndex = bestIndex;
                 foundText = bestMatch;
             }
         }
-        
+
         // Strategy 5: Word-by-word fuzzy matching
         if (textIndex === -1) {
             const targetWords = targetText.toLowerCase().split(/\s+/);
             const contentLower = content.toLowerCase();
-            
+
             // Find first word
             const firstWordIndex = contentLower.indexOf(targetWords[0]);
             if (firstWordIndex !== -1) {
@@ -1753,7 +1790,7 @@ function highlightTextInDocument(text, startPos, endPos) {
                 let currentPos = firstWordIndex;
                 let matchedText = '';
                 let allWordsFound = true;
-                
+
                 for (let word of targetWords) {
                     const wordPos = contentLower.indexOf(word, currentPos);
                     if (wordPos !== -1 && wordPos - currentPos < 100) { // Within 100 chars
@@ -1768,42 +1805,42 @@ function highlightTextInDocument(text, startPos, endPos) {
                         break;
                     }
                 }
-                
+
                 if (allWordsFound && matchedText) {
                     textIndex = firstWordIndex;
                     foundText = matchedText;
                 }
             }
         }
-        
+
         // Strategy 6: Character-by-character similarity matching
         if (textIndex === -1) {
             const targetLower = targetText.toLowerCase().replace(/\s+/g, ' ');
             let bestSimilarity = 0;
             let bestIndex = -1;
             let bestMatch = '';
-            
+
             // Try different window sizes around the target length
             const minLen = Math.max(5, targetText.length - 10);
             const maxLen = targetText.length + 20;
-            
+
             for (let i = 0; i < content.length - minLen; i++) {
                 for (let len = minLen; len <= maxLen && i + len <= content.length; len++) {
                     const candidate = content.substring(i, i + len);
                     const candidateLower = candidate.toLowerCase().replace(/\s+/g, ' ');
-                    
+
                     // Calculate similarity (simple character overlap)
                     let similarity = 0;
                     const minLength = Math.min(targetLower.length, candidateLower.length);
-                    
+
                     for (let j = 0; j < minLength; j++) {
                         if (targetLower[j] === candidateLower[j]) {
                             similarity++;
                         }
                     }
-                    
+
                     const similarityRatio = similarity / Math.max(targetLower.length, candidateLower.length);
-                    
+
                     if (similarityRatio > bestSimilarity && similarityRatio > 0.7) {
                         bestSimilarity = similarityRatio;
                         bestIndex = i;
@@ -1811,13 +1848,13 @@ function highlightTextInDocument(text, startPos, endPos) {
                     }
                 }
             }
-            
+
             if (bestIndex !== -1) {
                 textIndex = bestIndex;
                 foundText = bestMatch;
             }
         }
-        
+
         // Strategy 7: Last resort - partial matching
         if (textIndex === -1) {
             const words = targetText.split(/\s+/);
@@ -1834,40 +1871,40 @@ function highlightTextInDocument(text, startPos, endPos) {
                 }
             }
         }
-        
+
         // HIGHLIGHT THE RESULT
         if (textIndex !== -1) {
             console.log(`✅ FOUND: "${foundText}" at position ${textIndex}`);
-            
+
             // Create highlighted version
             const beforeText = content.substring(0, textIndex);
             const highlightedText = content.substring(textIndex, textIndex + foundText.length);
             const afterText = content.substring(textIndex + foundText.length);
-            
+
             // Replace with highlighted version
-            pageDisplay.innerHTML = 
-                beforeText + 
-                '<span id="highlighted-annotation" style="background-color: #fff3cd; padding: 2px 4px; border-radius: 3px; border: 2px solid #ffc107; animation: highlight-pulse 2s ease-in-out;">' + 
-                highlightedText + 
-                '</span>' + 
+            pageDisplay.innerHTML =
+                beforeText +
+                '<span id="highlighted-annotation" style="background-color: #fff3cd; padding: 2px 4px; border-radius: 3px; border: 2px solid #ffc107; animation: highlight-pulse 2s ease-in-out;">' +
+                highlightedText +
+                '</span>' +
                 afterText;
-            
+
             // Scroll to the highlighted text
             document.getElementById('highlighted-annotation').scrollIntoView({
                 behavior: 'smooth',
                 block: 'center'
             });
-            
+
             // Clear any existing timeout
             if (window.highlightTimeout) {
                 clearTimeout(window.highlightTimeout);
             }
-            
+
             // Remove highlight after 5 seconds and restore clean text
             window.highlightTimeout = setTimeout(() => {
                 pageDisplay.textContent = originalTextContent;
             }, 5000);
-            
+
         } else {
             console.log('❌ NO MATCH FOUND with any strategy for:', targetText);
             alert('Texte non trouvé même avec recherche avancée: "' + targetText.substring(0, 50) + (targetText.length > 50 ? '...' : '') + '"');
@@ -1882,7 +1919,7 @@ function clearExistingHighlights() {
     if (window.highlightTimeout) {
         clearTimeout(window.highlightTimeout);
     }
-    
+
     const existingHighlight = document.getElementById('highlighted-annotation');
     if (existingHighlight) {
         const parent = existingHighlight.parentNode;
@@ -1891,7 +1928,7 @@ function clearExistingHighlights() {
     }
 }
 
-    
+
     // Remove any existing highlights
     const existingHighlight = document.getElementById('highlighted-annotation');
     if (existingHighlight) {
