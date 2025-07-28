@@ -30,6 +30,7 @@ def expert_required(view_func):
     """Decorator to require expert role"""
     return user_passes_test(is_expert, login_url='rawdocs:login')(view_func)
 
+
 # Ajoutez cet import en haut de votre fichier
 from django.db.models import Max
 

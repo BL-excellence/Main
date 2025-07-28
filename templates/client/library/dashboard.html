@@ -457,6 +457,13 @@
             border: 1px solid #e2e8f0;
         }
 
+        .category-item:hover, .authority-item:hover {
+            background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
         .category-color {
             width: 12px;
             height: 12px;
@@ -720,7 +727,7 @@
 
                 <div class="category-stats">
                     {% for type_stat in document_type_stats %}
-                    <div class="category-item">
+                    <div class="category-item" onclick="location.href='{% url 'client:library:documents_by_type' type_stat.doc_type %}'" style="cursor: pointer; transition: all 0.3s ease;">
                         <div class="category-color" style="background-color: #3498db;"></div>
                         <span class="category-name">{{ type_stat.doc_type }}</span>
                         <span class="category-count">{{ type_stat.count }}</span>
@@ -738,7 +745,7 @@
 
                 <div class="authority-stats">
                     {% for country_stat in country_stats %}
-                    <div class="authority-item">
+                    <div class="authority-item" onclick="location.href='{% url 'client:library:documents_by_country' country_stat.country %}'" style="cursor: pointer; transition: all 0.3s ease;">
                         <span class="authority-code">{{ country_stat.country|slice:":3"|upper }}</span>
                         <span class="authority-name">{{ country_stat.country }}</span>
                         <span class="authority-count">{{ country_stat.count }}</span>
