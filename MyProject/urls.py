@@ -10,6 +10,7 @@ urlpatterns = [
     path('expert/', include('expert.urls')),
     path('client/', include('client.urls')),
     path('submissions/', include('submissions.urls', namespace='submissions')),
+    path('chatbot/', include('chatbot.urls')),
 ]
 
 if settings.DEBUG:

@@ -13,6 +13,8 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+</body>
+    {% load chatbot_tags %}
     <div class="app-container">
         <!-- Sidebar -->
         {% include 'client/includes/sidebar.html' %}
@@ -26,5 +28,6 @@
     <!-- Scripts -->
     <script src="{% static 'js/main.js' %}"></script>
     {% block extra_js %}{% endblock %}
+    {% chatbot_widget %}
 </body>
 </html>

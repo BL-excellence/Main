@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'expert',
     'client',
     'submissions',
+    'chatbot',
 ]
 
 MIDDLEWARE = [
