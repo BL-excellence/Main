@@ -33,7 +33,7 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
     La clé API est lue depuis la variable d'environnement MISTRAL_API_KEY.
     """
     api_key = os.getenv(
-        "MISTRAL_API_KEY") or "oKdjCl98ACUqpUc4TCyqcfZFMzNNdapl"  # Fallback à la clé hardcodée si .env non disponible
+        "MISTRAL_API_KEY") or "j2wOKpM86nlZhhlvkXXG7rFd4bhM4PN5"  # Fallback à la clé hardcodée si .env non disponible
 
     try:
         url = "https://api.mistral.ai/v1/chat/completions"
@@ -45,8 +45,8 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
         prompt = f"""
         You are an expert document analyzer. Analyze this document and extract metadata with confidence scores.
 
-        DOCUMENT TEXT (first 2000 chars):
-        {text_chunk[:2000]}
+        DOCUMENT TEXT (first 5000 chars):
+        {text_chunk[:5000]}
 
         SOURCE URL: {document_url}
         FILENAME: {filename}
@@ -79,12 +79,12 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
             "extraction_reasoning": {{
                 "title": "Found clear title in document header",
                 "type": "Document explicitly mentions 'guideline' in title",
-                "publication_date": "Date '24 November 2008' found in document text",
+                "publication_date": "Detected header date indicating publication",
                 "version": "No clear version number found",
-                "source": "URL indicates European source, using EMA",
+                "source": "URL or internal org name used",
                 "context": "Multiple pharmaceutical terms detected",
-                "country": "URL domain .eu indicates European Union",
-                "language": "Text is clearly in English"
+                "country": "URL domain or regulatory hints used",
+                "language": "Detected by language model"
             }}
         }}
 
@@ -100,6 +100,30 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
         - "certificate": Certificates, authorizations, approvals
         - "authorization": Marketing authorizations, permits, licenses
         - "other": Any other document type
+
+                
+        RULES FOR PUBLICATION DATE DETECTION:
+                
+        Use the date that appears:
+        - At the top near the agency name (e.g. “EMA/CHMP/ICH/24235/2006 Corr.2 23 January 2025” → use 23 January 2025)
+        - In the format “Published: ...” or “Publication date: ...”
+        - Next to "Official Journal of the European Union" (this is official)
+
+        DO NOT use:
+        - “Adopted by CHMP on …”
+        - “Date of coming into effect …”
+        - “Finalization date”
+        - References to old laws like “Directive 2008/57/EC of 15 July 2008”
+
+        Examples:
+        ✅ GOOD → “23 January 2025” near header  
+        ✅ GOOD → “Published in Official Journal: 2 August 2013”  
+        ❌ BAD → “Directive 2008/123/EC of 24 November 2008”  
+        ❌ BAD → “Date for coming into effect: 26 July 2023”
+
+        Additional Notes:
+        - Prioritize clarity over completeness
+        - Return no extra text outside JSON
 
         TYPE DETECTION KEYWORDS:
         - "SPECIFICATIONS OF" → type: "specifications"
@@ -117,11 +141,36 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
         - Avoid including addresses, company names, or metadata in the title
 
         INSTRUCTIONS FOR VERSION DETECTION:
-        - Look for version numbers in document headers/titles (e.g., "EN_15.0" → version "15.0")
-        - Check for reference numbers that contain versions (DTC_xxx_15.0)
-        - Look for explicit version statements in text ("Version 2.1", "v3.0", etc.)
-        - Extract numerical versions from document codes/identifiers
-        - If multiple version indicators, use the most prominent one
+
+        
+        1. If a regulatory code is present like:
+        - EMA/CHMP/ICH/xxxxx/yyyy
+        - ICH/yyyy/stepX
+        → extract that full code as version
+
+        2. If "Corr.2", "Rev.1", "(R1)", etc. appears after the code or title → append it
+
+        3. If "Step 5", "Step 2b", etc. appears near the header → append it
+
+        4. Accept also formats like:
+        - M4Q(R2) → version = "M4Q(R2)"
+        - CTD_QR_Rev.2 → version = "Rev.2"
+        - EN_15.0 → version = "15.0"
+
+        — EXAMPLES —
+        ✅ EMA/CHMP/ICH/214732/2007 Step 5
+        ✅ EMA/CHMP/ICH/24235/2006 Corr.2 Step 5
+        ✅ M4Q(R2)
+        ✅ Rev. 1
+        ✅ Version 3.0
+
+        — DO NOT EXTRACT —
+        ❌ Directive 2008/57/EC
+        ❌ IDs not linked to versioning
+
+
+        If no clear version is found, return an empty string: `""`
+
 
         INSTRUCTIONS FOR SOURCE DETECTION:
         - Look for explicit organization names in the document
@@ -155,6 +204,7 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
 
         Return ONLY the JSON, no other text.
         """
+
 
         data = {
             "model": "mistral-large-latest",
@@ -217,15 +267,20 @@ def calculate_overall_quality(confidence_scores):
     return int(total_weighted_score / total_weight) if total_weight else 0
 
 
-def extract_full_text(file_path: str) -> str:
-    """Lit tout le PDF, nettoie et enlève les stopwords."""
-    reader = PdfReader(file_path)
-    pages = [p.extract_text() or "" for p in reader.pages]
-    text = " ".join(pages)
-    text = re.sub(r"[^0-9A-Za-zÀ-ÖØ-öø-ÿ\s\.,;:\-'\(\)]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    words = text.split()
-    return " ".join(w for w in words if w.lower() not in STOPWORDS)
+import pdfplumber
+
+def extract_full_text(file_path):
+    text = ""
+    with pdfplumber.open(file_path) as pdf:
+        # extraire en priorité les 1ères pages
+        for page in pdf.pages[:2]:
+            page_text = page.extract_text() or ""
+            text += "\n" + page_text
+    # ensuite le reste si besoin
+    with pdfplumber.open(file_path) as pdf:
+        for page in pdf.pages[2:]:
+            text += "\n" + (page.extract_text() or "")
+    return text
 
 
 def extract_metadonnees(file_path: str, source_url: str) -> dict:
