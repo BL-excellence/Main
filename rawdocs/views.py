@@ -786,3 +786,82 @@ def view_original_document(request, document_id):
             "<p>Ce document n'a ni fichier PDF ni URL source associé.</p>"
             "<script>window.close();</script></body></html>"
         )
+
+
+# ——— Vues pour l'extraction avancée (tableaux & images) ————————————————
+
+@login_required(login_url='rawdocs:login')
+@user_passes_test(is_metadonneur)
+def view_extracted_tables(request, doc_id):
+    """Afficher les tableaux extraits d'un document"""
+    document = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
+    
+    # Extraire les métadonnées avec tableaux
+    metadata = extract_metadonnees(document.file.path, document.url or "")
+    tables_data = metadata.get('tables', {})
+    
+    context = {
+        'document': document,
+        'tables_data': tables_data,
+        'tables_count': tables_data.get('count', 0),
+        'tables': tables_data.get('data', [])
+    }
+    
+    return render(request, 'rawdocs/view_tables.html', context)
+
+
+@login_required(login_url='rawdocs:login')
+@user_passes_test(is_metadonneur)
+def view_extracted_images(request, doc_id):
+    """Afficher les images extraites d'un document"""
+    document = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
+    
+    # Extraire les métadonnées avec images
+    metadata = extract_metadonnees(document.file.path, document.url or "")
+    images_data = metadata.get('images', {})
+    
+    context = {
+        'document': document,
+        'images_data': images_data,
+        'images_count': images_data.get('count', 0),
+        'images': images_data.get('data', [])
+    }
+    
+    return render(request, 'rawdocs/view_images.html', context)
+
+
+@login_required(login_url='rawdocs:login')
+@user_passes_test(is_metadonneur)
+def get_extracted_image(request, doc_id, image_id):
+    """API pour récupérer une image spécifique en base64"""
+    document = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
+    
+    try:
+        # Extraire les métadonnées avec images
+        metadata = extract_metadonnees(document.file.path, document.url or "")
+        images_data = metadata.get('images', {}).get('data', [])
+        
+        # Trouver l'image demandée
+        target_image = None
+        for img in images_data:
+            if img.get('image_id') == image_id:
+                target_image = img
+                break
+        
+        if not target_image:
+            return JsonResponse({'error': 'Image non trouvée'}, status=404)
+        
+        # Retourner les données de l'image
+        return JsonResponse({
+            'success': True,
+            'image_id': target_image['image_id'],
+            'page': target_image['page'],
+            'width': target_image['width'],
+            'height': target_image['height'],
+            'format': target_image['format'],
+            'size_bytes': target_image['size_bytes'],
+            'base64_data': target_image['full_base64']
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Erreur lors de la récupération: {str(e)}'}, status=500)

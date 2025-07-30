@@ -175,6 +175,10 @@
 .action-btn.delete:hover { background: rgba(220,38,38,0.09); color: #fff; border-color: #e11d48;}
 .action-btn.validate { color: var(--accent);}
 .action-btn.validate:hover { background: rgba(16,185,129,0.09); color: #fff; border-color: var(--accent);}
+.action-btn.tables { color: #8b5cf6;}
+.action-btn.tables:hover { background: rgba(139,92,246,0.09); color: #fff; border-color: #8b5cf6;}
+.action-btn.images { color: #f59e0b;}
+.action-btn.images:hover { background: rgba(245,158,11,0.09); color: #fff; border-color: #f59e0b;}
 @media (max-width: 900px) {
     .dashboard-container { padding: 0.5rem;}
     .card { padding: 1rem;}
@@ -240,6 +244,18 @@
                                        aria-label="Voir ou éditer les métadonnées"
                                        title="Voir / éditer les métadonnées">
                                         <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'rawdocs:view_extracted_tables' doc.id %}"
+                                       class="action-btn tables"
+                                       aria-label="Voir les tableaux extraits"
+                                       title="Tableaux extraits">
+                                        <i class="fas fa-table"></i>
+                                    </a>
+                                    <a href="{% url 'rawdocs:view_extracted_images' doc.id %}"
+                                       class="action-btn images"
+                                       aria-label="Voir les images extraites"
+                                       title="Images extraites">
+                                        <i class="fas fa-images"></i>
                                     </a>
                                     <form method="post"
                                           action="{% url 'rawdocs:document_delete' doc.id %}"

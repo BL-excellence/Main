@@ -1,0 +1,820 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Tableaux extraits - {{ document.title|default:"Document" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-color: #2563eb;
+        --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        --secondary-gradient: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --danger-color: #ef4444;
+        --dark-color: #1f2937;
+        --light-bg: #f8fafc;
+        --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --card-shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --border-radius: 12px;
+        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        min-height: 100vh;
+    }
+
+    .tables-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+        min-height: 100vh;
+    }
+
+    /* Header Section */
+    .document-header {
+        background: var(--primary-gradient);
+        color: white;
+        padding: 2rem;
+        border-radius: var(--border-radius);
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .document-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 200px;
+        height: 200px;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        border-radius: 50%;
+        transform: translate(50%, -50%);
+    }
+
+    .document-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .document-title::before {
+        content: '📊';
+        font-size: 2.5rem;
+        animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+        40% { transform: translateY(-10px); }
+        60% { transform: translateY(-5px); }
+    }
+
+    .document-info {
+        opacity: 0.95;
+        font-size: 1rem;
+        line-height: 1.6;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .info-item {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+    }
+
+    /* Action Buttons */
+    .action-buttons {
+        margin-bottom: 2rem;
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: var(--border-radius);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        transition: var(--transition);
+        cursor: pointer;
+        font-size: 0.95rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    .btn:hover::before {
+        left: 100%;
+    }
+
+    .btn-back {
+        background: var(--dark-color);
+        color: white;
+    }
+
+    .btn-back:hover {
+        background: #374151;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: var(--card-shadow-hover);
+    }
+
+    .btn-export {
+        background: var(--success-color);
+        color: white;
+    }
+
+    .btn-export:hover {
+        background: #059669;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: var(--card-shadow-hover);
+    }
+
+    /* Summary Section */
+    .tables-summary {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+
+    .summary-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 2rem;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 1.5rem;
+        border-radius: var(--border-radius);
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid #e2e8f0;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-item::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--primary-gradient);
+        transform: scaleX(0);
+        transition: transform 0.3s ease;
+    }
+
+    .stat-item:hover::before {
+        transform: scaleX(1);
+    }
+
+    .stat-item:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--card-shadow-hover);
+    }
+
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.5rem;
+        line-height: 1;
+    }
+
+    .stat-label {
+        color: #64748b;
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+
+    /* Table Cards */
+    .table-card {
+        background: white;
+        border-radius: var(--border-radius);
+        margin-bottom: 2rem;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        transition: var(--transition);
+    }
+
+    .table-card:hover {
+        box-shadow: var(--card-shadow-hover);
+        transform: translateY(-2px);
+    }
+
+    .table-header {
+        background: var(--secondary-gradient);
+        color: white;
+        padding: 1.5rem 2rem;
+        font-weight: 700;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .table-badge {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .table-info {
+        background: #f8fafc;
+        padding: 1rem 2rem;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.9rem;
+        color: #64748b;
+        display: flex;
+        gap: 2rem;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .info-badge {
+        background: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* Table Styling */
+    .table-container {
+        position: relative;
+        max-height: 70vh;
+        overflow: auto;
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
+    }
+
+    .table-container::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .table-container::-webkit-scrollbar-track {
+        background: #f1f5f9;
+    }
+
+    .table-container::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+
+    .table-container::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+
+    .extracted-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+        font-size: 0.9rem;
+        background: white;
+    }
+
+    .extracted-table th {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        padding: 1rem;
+        text-align: left;
+        font-weight: 700;
+        border-bottom: 3px solid var(--primary-color);
+        border-right: 1px solid #e2e8f0;
+        color: var(--dark-color);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        white-space: nowrap;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .extracted-table th:first-child {
+        border-left: 3px solid var(--primary-color);
+    }
+
+    .extracted-table th:last-child {
+        border-right: 3px solid var(--primary-color);
+    }
+
+    .extracted-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #f1f5f9;
+        border-right: 1px solid #f8fafc;
+        vertical-align: top;
+        word-wrap: break-word;
+        max-width: 250px;
+        line-height: 1.5;
+        transition: background-color 0.2s ease;
+    }
+
+    .extracted-table tr:hover {
+        background: #f8fafc;
+    }
+
+    .extracted-table tr:nth-child(even) {
+        background: #fefefe;
+    }
+
+    .extracted-table tr:nth-child(even):hover {
+        background: #f8fafc;
+    }
+
+    .empty-cell {
+        color: #94a3b8;
+        font-style: italic;
+        opacity: 0.7;
+    }
+
+    /* No Tables State */
+    .no-tables {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #64748b;
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        border: 2px dashed #e2e8f0;
+    }
+
+    .no-tables-icon {
+        font-size: 5rem;
+        margin-bottom: 1.5rem;
+        opacity: 0.3;
+        animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
+
+    .no-tables h3 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--dark-color);
+    }
+
+    .no-tables p {
+        font-size: 1rem;
+        line-height: 1.6;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    /* Loading Animation */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(5px);
+    }
+
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #e2e8f0;
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .tables-container {
+            padding: 1rem;
+        }
+
+        .document-title {
+            font-size: 1.5rem;
+        }
+
+        .summary-stats {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+
+        .table-info {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .extracted-table {
+            font-size: 0.8rem;
+        }
+
+        .extracted-table th,
+        .extracted-table td {
+            padding: 0.75rem 0.5rem;
+        }
+    }
+
+    /* Print Styles */
+    @media print {
+        .action-buttons,
+        .btn {
+            display: none !important;
+        }
+
+        .table-container {
+            max-height: none !important;
+            overflow: visible !important;
+        }
+
+        .table-card {
+            break-inside: avoid;
+            margin-bottom: 2rem;
+        }
+    }
+
+    /* Custom Animations */
+    .fade-in {
+        animation: fadeIn 0.6s ease-out forwards;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .slide-up {
+        animation: slideUp 0.4s ease-out forwards;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+</div>
+
+<div class="tables-container">
+    <div class="document-header fade-in">
+        <div class="document-title">Tableaux extraits</div>
+        <div class="document-info">
+            <div class="info-item">
+                <strong>📄 Document:</strong> {{ document.title|default:"Sans titre" }}
+            </div>
+            <div class="info-item">
+                <strong>📁 Fichier:</strong> {{ document.file.name|default:"N/A" }}
+            </div>
+        </div>
+    </div>
+    
+    <div class="action-buttons slide-up">
+        <a href="{% url 'rawdocs:document_list' %}" class="btn btn-back">
+            ← Retour à la liste
+        </a>
+        {% if tables_count > 0 %}
+        <button class="btn btn-export" onclick="exportTables()">
+            📥 Exporter les tableaux
+        </button>
+        <button class="btn btn-export" onclick="printTables()" style="background: var(--warning-color);">
+            🖨️ Imprimer
+        </button>
+        {% endif %}
+    </div>
+    
+    <div class="tables-summary slide-up">
+        <div class="summary-stats">
+            <div class="stat-item">
+                <div class="stat-number">{{ tables_count }}</div>
+                <div class="stat-label">Tableau{{ tables_count|pluralize:"x" }} trouvé{{ tables_count|pluralize:"s" }}</div>
+            </div>
+            {% if tables_count > 0 %}
+            <div class="stat-item">
+                <div class="stat-number">
+                    {% widthratio tables|length tables|length 0 %}
+                    {% for table in tables %}
+                        {% if forloop.first %}{{ table.total_columns|default:0 }}{% endif %}
+                    {% endfor %}
+                </div>
+                <div class="stat-label">Colonnes (moyenne)</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">
+                    {% for table in tables %}{{ table.total_rows }}{% if not forloop.last %} + {% endif %}{% endfor %} = 
+                    {% widthratio tables|length 1 0 %}
+                    {% for table in tables %}{{ table.total_rows|add:0 }}{% endfor %}
+                </div>
+                <div class="stat-label">Lignes (total)</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ document.file.size|filesizeformat|default:"N/A" }}</div>
+                <div class="stat-label">Taille du fichier</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% if tables_count > 0 %}
+        {% for table in tables %}
+        <div class="table-card slide-up" style="animation-delay: {{ forloop.counter|add:-1|floatformat:1 }}s">
+            <div class="table-header">
+                <span>Tableau {{ forloop.counter }}</span>
+                <span class="table-badge">Page {{ table.page }}</span>
+            </div>
+            <div class="table-info">
+                <div class="info-badge">
+                    🆔 ID: {{ table.table_id }}
+                </div>
+                <div class="info-badge">
+                    📊 {{ table.total_rows }} ligne{{ table.total_rows|pluralize:"s" }}
+                </div>
+                <div class="info-badge">
+                    📋 {{ table.total_columns }} colonne{{ table.total_columns|pluralize:"s" }}
+                </div>
+            </div>
+            <div class="table-container">
+                <table class="extracted-table">
+                    <thead>
+                        <tr>
+                            {% for header in table.headers %}
+                            <th>
+                                {% if header and header|length > 0 %}
+                                    {{ header|truncatechars:50 }}
+                                {% else %}
+                                    Colonne {{ forloop.counter }}
+                                {% endif %}
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in table.rows %}
+                        <tr>
+                            {% for cell in row %}
+                            <td>
+                                {% if cell and cell|length > 0 %}
+                                    {{ cell|truncatechars:150|linebreaksbr }}
+                                {% else %}
+                                    <span class="empty-cell">—</span>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="no-tables slide-up">
+            <div class="no-tables-icon">📋</div>
+            <h3>Aucun tableau détecté</h3>
+            <p>{{ tables_data.summary|default:"Ce document ne contient pas de tableaux extractibles. Vérifiez que le document PDF contient des tableaux structurés et réessayez." }}</p>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Animations au chargement
+document.addEventListener('DOMContentLoaded', function() {
+    // Masquer le loader après le chargement
+    setTimeout(() => {
+        document.getElementById('loadingOverlay').style.display = 'none';
+    }, 500);
+
+    // Ajouter des animations d'apparition séquentielles
+    const cards = document.querySelectorAll('.table-card');
+    cards.forEach((card, index) => {
+        card.style.animationDelay = `${index * 0.2}s`;
+    });
+});
+
+// Fonction d'export des tableaux
+function exportTables() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    loadingOverlay.style.display = 'flex';
+    
+    try {
+        // Simulation d'export - remplacez par votre logique d'export
+        setTimeout(() => {
+            // Créer un CSV simple pour exemple
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            const tables = document.querySelectorAll('.extracted-table');
+            tables.forEach((table, tableIndex) => {
+                csvContent += `\n\nTableau ${tableIndex + 1}\n`;
+                
+                // Headers
+                const headers = table.querySelectorAll('thead th');
+                const headerRow = Array.from(headers).map(th => 
+                    `"${th.textContent.trim().replace(/"/g, '""')}"`
+                ).join(',');
+                csvContent += headerRow + '\n';
+                
+                // Rows
+                const rows = table.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    const rowData = Array.from(cells).map(td => 
+                        `"${td.textContent.trim().replace(/"/g, '""')}"`
+                    ).join(',');
+                    csvContent += rowData + '\n';
+                });
+            });
+            
+            // Télécharger le fichier
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `tableaux_extraits_${new Date().getTime()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            loadingOverlay.style.display = 'none';
+            
+            // Notification de succès
+            showNotification('Tableaux exportés avec succès!', 'success');
+        }, 1500);
+        
+    } catch (error) {
+        loadingOverlay.style.display = 'none';
+        showNotification('Erreur lors de l\'export', 'error');
+        console.error('Export error:', error);
+    }
+}
+
+// Fonction d'impression
+function printTables() {
+    window.print();
+}
+
+// Système de notifications
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 1001;
+            font-weight: 500;
+            animation: slideInRight 0.3s ease-out;
+        ">
+            ${message}
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-out';
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 3000);
+}
+
+// Ajout des animations CSS pour les notifications
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+`;
+document.head.appendChild(style);
+
+// Amélioration de l'accessibilité
+document.addEventListener('keydown', function(e) {
+    // Échapper pour fermer les overlays
+    if (e.key === 'Escape') {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay.style.display === 'flex') {
+            loadingOverlay.style.display = 'none';
+        }
+    }
+});
+
+// Lazy loading pour les grandes tables
+const observerOptions = {
+    root: null,
+    rootMargin: '0px',
+    threshold: 0.1
+};
+
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+        }
+    });
+}, observerOptions);
+
+document.querySelectorAll('.table-card').forEach(card => {
+    observer.observe(card);
+});
+</script>
+{% endblock %}

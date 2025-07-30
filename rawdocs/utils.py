@@ -268,6 +268,110 @@ def calculate_overall_quality(confidence_scores):
 
 
 import pdfplumber
+import fitz  # PyMuPDF pour l'extraction d'images
+from PIL import Image
+import io
+import base64
+
+def extract_tables_from_pdf(file_path):
+    """
+    Extrait tous les tableaux du PDF avec pdfplumber
+    """
+    tables_data = []
+    
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            for page_num, page in enumerate(pdf.pages, 1):
+                # Extraire les tableaux de la page
+                tables = page.extract_tables()
+                
+                for table_num, table in enumerate(tables, 1):
+                    if table and len(table) > 1:  # Au moins un header + une ligne
+                        # Nettoyer le tableau (supprimer les cellules vides)
+                        cleaned_table = []
+                        for row in table:
+                            cleaned_row = [cell.strip() if cell else "" for cell in row]
+                            if any(cleaned_row):  # Garder seulement les lignes non vides
+                                cleaned_table.append(cleaned_row)
+                        
+                        if len(cleaned_table) > 1:
+                            tables_data.append({
+                                'page': page_num,
+                                'table_id': f"table_{page_num}_{table_num}",
+                                'headers': cleaned_table[0],
+                                'rows': cleaned_table[1:],
+                                'total_rows': len(cleaned_table) - 1,
+                                'total_columns': len(cleaned_table[0]) if cleaned_table else 0
+                            })
+    
+    except Exception as e:
+        print(f"❌ Erreur lors de l'extraction des tableaux: {e}")
+    
+    return tables_data
+
+
+def extract_images_from_pdf(file_path):
+    """
+    Extrait toutes les images du PDF avec PyMuPDF
+    """
+    images_data = []
+    
+    try:
+        pdf_document = fitz.open(file_path)
+        
+        for page_num in range(len(pdf_document)):
+            page = pdf_document[page_num]
+            image_list = page.get_images()
+            
+            for img_index, img in enumerate(image_list):
+                try:
+                    # Récupérer l'image
+                    xref = img[0]
+                    pix = fitz.Pixmap(pdf_document, xref)
+                    
+                    # Convertir en format utilisable
+                    if pix.n - pix.alpha < 4:  # GRAY ou RGB
+                        img_data = pix.tobytes("png")
+                        
+                        # Créer un objet PIL pour obtenir les dimensions
+                        pil_image = Image.open(io.BytesIO(img_data))
+                        width, height = pil_image.size
+                        
+                        # Encoder en base64 pour stockage/affichage
+                        img_base64 = base64.b64encode(img_data).decode()
+                        
+                        # Créer une version preview (plus petite pour l'affichage dans la liste)
+                        preview_image = pil_image.copy()
+                        preview_image.thumbnail((300, 200), Image.Resampling.LANCZOS)
+                        preview_buffer = io.BytesIO()
+                        preview_image.save(preview_buffer, format='PNG')
+                        preview_base64 = base64.b64encode(preview_buffer.getvalue()).decode()
+                        
+                        images_data.append({
+                            'page': page_num + 1,
+                            'image_id': f"img_{page_num + 1}_{img_index + 1}",
+                            'width': width,
+                            'height': height,
+                            'format': 'PNG',
+                            'size_bytes': len(img_data),
+                            'base64_data': img_base64[:100] + "..." if len(img_base64) > 100 else img_base64,  # Tronquer pour l'affichage
+                            'preview_base64': preview_base64,  # Version preview pour l'affichage
+                            'full_base64': img_base64  # Données complètes
+                        })
+                    
+                    pix = None  # Libérer la mémoire
+                    
+                except Exception as e:
+                    print(f"❌ Erreur lors de l'extraction de l'image {img_index} page {page_num + 1}: {e}")
+                    continue
+        
+        pdf_document.close()
+    
+    except Exception as e:
+        print(f"❌ Erreur lors de l'extraction des images: {e}")
+    
+    return images_data
+
 
 def extract_full_text(file_path):
     text = ""
@@ -285,12 +389,19 @@ def extract_full_text(file_path):
 
 def extract_metadonnees(file_path: str, source_url: str) -> dict:
     """
-    Main extraction function with REAL LLM confidence metrics
+    Main extraction function with REAL LLM confidence metrics + tables & images
     """
-    print("🔍 Starting LLM extraction with confidence scoring...")
+    print("🔍 Starting enhanced LLM extraction with confidence scoring...")
     full_text = extract_full_text(file_path)
     filename = Path(file_path).name
     llm_result = call_mistral_with_confidence(full_text, source_url, filename)
+
+    # Extraire les tableaux et images
+    print("📊 Extracting tables from PDF...")
+    tables_data = extract_tables_from_pdf(file_path)
+    
+    print("🖼️ Extracting images from PDF...")
+    images_data = extract_images_from_pdf(file_path)
 
     if llm_result and 'metadata' in llm_result and 'confidence_scores' in llm_result:
         print("✅ Using LLM extraction with real confidence scores!")
@@ -300,6 +411,19 @@ def extract_metadonnees(file_path: str, source_url: str) -> dict:
         reasoning = llm_result.get('extraction_reasoning', {})
 
         metadata['url_source'] = source_url
+
+        # Ajouter les données des tableaux et images
+        metadata['tables'] = {
+            'count': len(tables_data),
+            'data': tables_data,
+            'summary': f"{len(tables_data)} tableau(x) trouvé(s)" if tables_data else "Aucun tableau détecté"
+        }
+        
+        metadata['images'] = {
+            'count': len(images_data),
+            'data': images_data,
+            'summary': f"{len(images_data)} image(s) trouvée(s)" if images_data else "Aucune image détectée"
+        }
 
         # Calculate quality metrics
         overall_quality = calculate_overall_quality(conf_scores)
@@ -312,13 +436,46 @@ def extract_metadonnees(file_path: str, source_url: str) -> dict:
             'extraction_reasoning': reasoning,
             'extracted_fields': extracted_fields,
             'total_fields': total_fields,
-            'llm_powered': True
+            'llm_powered': True,
+            'enhanced_features': {
+                'tables_extracted': len(tables_data) > 0,
+                'images_extracted': len(images_data) > 0,
+                'total_tables': len(tables_data),
+                'total_images': len(images_data)
+            }
         }
+        
+        print(f"✅ Extraction complète: {len(tables_data)} tableaux, {len(images_data)} images")
         return metadata
 
-    # Fallback basic extraction
-    print("⚠ LLM extraction failed, using basic fallback")
-    return extract_basic_fallback(file_path, source_url)
+    # Fallback basic extraction with tables/images
+    print("⚠ LLM extraction failed, using basic fallback with tables/images")
+    basic_metadata = extract_basic_fallback(file_path, source_url)
+    
+    # Ajouter les tableaux et images même en mode fallback
+    basic_metadata['tables'] = {
+        'count': len(tables_data),
+        'data': tables_data,
+        'summary': f"{len(tables_data)} tableau(x) trouvé(s)" if tables_data else "Aucun tableau détecté"
+    }
+    
+    basic_metadata['images'] = {
+        'count': len(images_data),
+        'data': images_data,
+        'summary': f"{len(images_data)} image(s) trouvée(s)" if images_data else "Aucune image détectée"
+    }
+    
+    # Mettre à jour les métriques de qualité
+    if 'quality' in basic_metadata:
+        basic_metadata['quality']['enhanced_features'] = {
+            'tables_extracted': len(tables_data) > 0,
+            'images_extracted': len(images_data) > 0,
+            'total_tables': len(tables_data),
+            'total_images': len(images_data)
+        }
+    
+    print(f"✅ Extraction basique complète: {len(tables_data)} tableaux, {len(images_data)} images")
+    return basic_metadata
 
 
 def extract_basic_fallback(file_path: str, source_url: str) -> dict:

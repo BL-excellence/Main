@@ -162,9 +162,32 @@ urlpatterns = [
          name='delete_annotation_type'
     ),
     
-    path('documents/<int:document_id>/view-original/', 
-         views.view_original_document, 
+    path('documents/<int:document_id>/view-original/',
+         views.view_original_document,
          name='view_original_document'
+    ),
+    
+    # ——— URLs Extraction avancée (tableaux & images) ————————————
+    
+    # 22) Visualisation des tableaux extraits
+    path(
+        'documents/<int:doc_id>/tables/',
+        views.view_extracted_tables,
+        name='view_extracted_tables'
+    ),
+    
+    # 23) Visualisation des images extraites
+    path(
+        'documents/<int:doc_id>/images/',
+        views.view_extracted_images,
+        name='view_extracted_images'
+    ),
+    
+    # 24) API pour récupérer une image spécifique
+    path(
+        'documents/<int:doc_id>/images/<str:image_id>/',
+        views.get_extracted_image,
+        name='get_extracted_image'
     ),
 
 ]
