@@ -8,7 +8,12 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 import json
 import csv
+from client.products.models import Product, ManufacturingSite, ProductSpecification, ProductVariation
 import io
+import uuid
+from django.views.decorators.csrf import csrf_exempt
+import time
+from typing import Dict, List, Any
 
 # Import from your existing models
 from rawdocs.models import RawDocument, DocumentPage, Annotation, AnnotationType
@@ -315,3 +320,935 @@ def reports_settings(request):
 
 def reports_create(request):
     return render(request, 'client/reports/create.html', {'message': 'Create page'})
+
+
+@login_required(login_url='rawdocs:login')
+@user_passes_test(is_client)
+def matrix_builder(request):
+    
+    # Get all fields at once - no separate calls
+    product_fields = get_populated_product_fields() 
+    document_fields = get_populated_document_fields()
+    
+    # Combine all fields into one list
+    all_fields = product_fields + document_fields
+    
+    filter_options = get_real_filter_options()
+    
+    context = {
+        'all_fields': all_fields,  # One unified list
+        'filter_options': filter_options,
+    }
+    
+    return render(request, 'client/reports/matrix_builder.html', context)
+
+def get_real_filter_options():
+    filter_options = {
+        'periods': [
+            ('7d', '7 derniers jours'),
+            ('30d', '30 derniers jours'), 
+            ('90d', '3 derniers mois'),
+            ('6m', '6 derniers mois'),
+            ('1y', 'Année courante'),
+        ]
+    }
+    
+    if Product.objects.exists():
+        product_names = list(Product.objects.exclude(name='').exclude(name__isnull=True).values_list('name', flat=True).distinct().order_by('name'))
+        dosages = list(Product.objects.exclude(dosage='').exclude(dosage__isnull=True).values_list('dosage', flat=True).distinct().order_by('dosage'))
+        active_ingredients = list(Product.objects.exclude(active_ingredient='').exclude(active_ingredient__isnull=True).values_list('active_ingredient', flat=True).distinct().order_by('active_ingredient'))
+        therapeutic_areas = list(Product.objects.exclude(therapeutic_area='').exclude(therapeutic_area__isnull=True).values_list('therapeutic_area', flat=True).distinct().order_by('therapeutic_area'))
+        
+        filter_options.update({
+            'product_names': product_names[:20],
+            'dosages': dosages[:20], 
+            'active_ingredients': active_ingredients[:20],
+            'therapeutic_areas': therapeutic_areas[:10],
+        })
+    
+    if RawDocument.objects.exists():
+        doc_types = list(RawDocument.objects.exclude(doc_type='').exclude(doc_type__isnull=True).values_list('doc_type', flat=True).distinct().order_by('doc_type'))
+        doc_countries = list(RawDocument.objects.exclude(country='').exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country'))
+        doc_sources = list(RawDocument.objects.exclude(source='').exclude(source__isnull=True).values_list('source', flat=True).distinct().order_by('source'))
+        
+        filter_options.update({
+            'doc_types': doc_types[:15],
+            'doc_countries': doc_countries[:15],
+            'doc_sources': doc_sources[:15],
+        })
+    
+    annotation_filters = {}
+    for annotation_type in AnnotationType.objects.all():
+        unique_values = list(
+            Annotation.objects.filter(
+                annotation_type=annotation_type,
+                validation_status__in=['validated', 'expert_created']
+            ).exclude(selected_text='').exclude(selected_text__isnull=True).values_list('selected_text', flat=True).distinct().order_by('selected_text')[:15]
+        )
+        
+        if unique_values:
+            annotation_filters[annotation_type.name] = {
+                'label': annotation_type.display_name,
+                'options': unique_values
+            }
+    
+    filter_options['annotations'] = annotation_filters
+    return filter_options
+
+
+def get_validated_annotation_types():
+    annotation_types_with_data = AnnotationType.objects.filter(
+        annotation__validation_status='expert_created',  
+        annotation__selected_text__isnull=False  
+    ).exclude(
+        annotation__selected_text='' 
+    ).exclude(
+        name__iexact='product'
+    ).distinct().order_by('display_name')
+    
+    annotation_fields = []
+    for annotation_type in annotation_types_with_data:
+        validated_count = Annotation.objects.filter(
+            annotation_type=annotation_type,
+            validation_status='expert_created',
+            selected_text__isnull=False
+        ).exclude(selected_text='').count()
+        
+        if validated_count > 0:
+            annotation_fields.append({
+                'id': annotation_type.id,
+                'name': annotation_type.name,
+                'label': annotation_type.display_name,
+                'description': f"{validated_count} annotations validées",
+                'type': 'annotation',
+                'icon': 'note_add',
+                'data_count': validated_count
+            })
+    
+    return annotation_fields
+
+def get_populated_product_fields():
+    if not Product.objects.exists():
+        return []
+    
+    populated_fields = []
+    field_checks = {
+        'name': Product.objects.exclude(name='').exclude(name__isnull=True).count(),
+        'active_ingredient': Product.objects.exclude(active_ingredient='').exclude(active_ingredient__isnull=True).count(),
+        'dosage': Product.objects.exclude(dosage='').exclude(dosage__isnull=True).count(),
+        'form': Product.objects.exclude(form='').exclude(form__isnull=True).count(),
+        'therapeutic_area': Product.objects.exclude(therapeutic_area='').exclude(therapeutic_area__isnull=True).count(),
+    }
+    
+    field_labels = {
+        'name': {'label': 'Nom du Produit', 'description': 'Noms des produits', 'icon': 'medication'},
+        'active_ingredient': {'label': 'Principe Actif', 'description': 'Substances actives', 'icon': 'science'},
+        'dosage': {'label': 'Dosage', 'description': 'Concentrations/dosages', 'icon': 'straighten'},
+        'form': {'label': 'Forme Pharmaceutique', 'description': 'Formes galéniques', 'icon': 'tablet'},
+        'therapeutic_area': {'label': 'Zone Thérapeutique', 'description': 'Domaines thérapeutiques', 'icon': 'medical_services'},
+    }
+    
+    for field_name, count in field_checks.items():
+        if count > 0:
+            field_config = field_labels[field_name]
+            populated_fields.append({
+                'name': field_name,
+                'label': field_config['label'],
+                'description': f"{count} entrées avec données",
+                'type': 'product',
+                'icon': field_config['icon'],
+                'data_count': count
+            })
+    
+   # Get additional annotation fields from the database
+    try:
+        all_additional_annotations = {}
+        
+        # Check all products for additional annotations
+        for product in Product.objects.all():
+            if hasattr(product, 'additional_annotations') and product.additional_annotations:
+                for key, value in product.additional_annotations.items():
+                    if key not in all_additional_annotations:
+                        all_additional_annotations[key] = 0
+                    all_additional_annotations[key] += 1
+        
+        print(f"🔍 Found additional annotations: {all_additional_annotations}")
+        
+        # Add additional annotation fields to the list
+        for annotation_type, count in all_additional_annotations.items():
+            if count > 0:
+                populated_fields.append({
+                    'name': f'additional_{annotation_type}',
+                    'label': annotation_type.replace('_', ' ').title(),
+                    'description': f"{count} produits avec {annotation_type}",
+                    'type': 'product',
+                    'icon': 'label',
+                    'data_count': count
+                })
+                print(f"✅ Added field: additional_{annotation_type}")
+
+    except Exception as e:
+        print(f"❌ Error getting additional annotations: {e}")
+    
+    # Rest of your existing code...
+    site_count = ManufacturingSite.objects.count()
+    if site_count > 0:
+        populated_fields.extend([
+            {
+                'name': 'sites',
+                'label': 'Sites de Fabrication',
+                'description': f"{site_count} sites disponibles",
+                'type': 'product',
+                'icon': 'factory',
+                'data_count': site_count
+            }
+        ])
+    
+    return populated_fields
+
+def get_populated_document_fields():
+    if not RawDocument.objects.exists():
+        return []
+    
+    populated_fields = []
+    field_checks = {
+        'title': RawDocument.objects.exclude(title='').exclude(title__isnull=True).count(),
+        'doc_type': RawDocument.objects.exclude(doc_type='').exclude(doc_type__isnull=True).count(),
+        'country': RawDocument.objects.exclude(country='').exclude(country__isnull=True).count(),
+        'source': RawDocument.objects.exclude(source='').exclude(source__isnull=True).count(),
+    }
+    
+    field_labels = {
+        'title': {'label': 'Titre du Document', 'description': 'Titres des documents', 'icon': 'title'},
+        'doc_type': {'label': 'Type de Document', 'description': 'Types de documents', 'icon': 'category'},
+        'country': {'label': 'Pays', 'description': 'Pays des documents', 'icon': 'flag'},
+        'source': {'label': 'Source', 'description': 'Sources des documents', 'icon': 'source'},
+    }
+    
+    for field_name, count in field_checks.items():
+        if count > 0:
+            field_config = field_labels[field_name]
+            populated_fields.append({
+                'name': field_name,
+                'label': field_config['label'],
+                'description': f"{count} documents avec données",
+                'type': 'document',
+                'icon': field_config['icon'],
+                'data_count': count
+            })
+    
+    return populated_fields
+
+def get_dynamic_product_fields():
+    """Get all available product fields dynamically - NO HARDCODING"""
+    
+    # Base product fields - these come from the actual Product model
+    base_fields = []
+    
+    try:
+        # Get the actual field names from the Product model
+        product_model_fields = Product._meta.get_fields()
+        
+        # Map model fields to user-friendly labels
+        field_mapping = {
+            'name': {'label': 'Nom du Produit', 'description': 'Nom du produit', 'icon': 'medication'},
+            'active_ingredient': {'label': 'Principe Actif', 'description': 'Substance active', 'icon': 'science'},
+            'dosage': {'label': 'Dosage', 'description': 'Concentration/dosage', 'icon': 'straighten'},
+            'form': {'label': 'Forme Pharmaceutique', 'description': 'Forme du produit', 'icon': 'tablet'},
+            'therapeutic_area': {'label': 'Zone Thérapeutique', 'description': 'Domaine thérapeutique', 'icon': 'medical_services'},
+            'status': {'label': 'Statut Produit', 'description': 'Statut actuel', 'icon': 'info'},
+            'created_at': {'label': 'Date Création Produit', 'description': 'Quand créé', 'icon': 'schedule'},
+        }
+        
+        # Only include fields that exist in the model AND in our mapping
+        for field in product_model_fields:
+            if field.name in field_mapping and not field.many_to_many and not field.one_to_many:
+                field_config = field_mapping[field.name]
+                base_fields.append({
+                    'name': field.name,
+                    'label': field_config['label'],
+                    'description': field_config['description'],
+                    'type': 'text',
+                    'icon': field_config['icon']
+                })
+        
+    except Exception as e:
+        print(f"❌ Error getting product model fields: {e}")
+        # Minimal fallback
+        base_fields = [
+            {'name': 'name', 'label': 'Nom du Produit', 'description': 'Nom du produit', 'type': 'text', 'icon': 'medication'}
+        ]
+    
+    # Add computed fields (these make sense to be defined)
+    computed_fields = [
+        {'name': 'sites', 'label': 'Sites de Fabrication', 'description': 'Tous les sites', 'type': 'text', 'icon': 'factory'},
+        {'name': 'manufacturing_countries', 'label': 'Pays de Fabrication', 'description': 'Pays des sites', 'type': 'text', 'icon': 'public'},
+        {'name': 'gmp_certified_sites', 'label': 'Sites GMP Certifiés', 'description': 'Sites avec GMP', 'type': 'text', 'icon': 'verified'},
+        {'name': 'site_count', 'label': 'Nombre de Sites', 'description': 'Total des sites', 'type': 'number', 'icon': 'numbers'},
+        {'name': 'variation_count', 'label': 'Nombre de Variations', 'description': 'Total des variations', 'type': 'number', 'icon': 'trending_up'},
+        {'name': 'latest_variation', 'label': 'Dernière Variation', 'description': 'Variation la plus récente', 'type': 'text', 'icon': 'update'},
+    ]
+    
+    # Combine all fields
+    all_fields = base_fields + computed_fields
+    
+    # Add type and id for each field
+    for field in all_fields:
+        field['type'] = 'product'
+        field['id'] = f"product_{field['name']}"
+    
+    return all_fields
+
+@csrf_exempt
+@login_required
+def generate_matrix_report(request):
+    """Generate a Matrix report with AI-powered content"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        print(f"🏗️ Generating matrix with config: {data}")
+        
+        # Extract configuration
+        columns = data.get('columns', [])
+        filters = data.get('filters', {})
+        
+        if not columns:
+            return JsonResponse({
+                'success': False,
+                'message': 'Aucune colonne sélectionnée'
+            })
+        
+        # Generate the report data
+        result = generate_matrix_data_simple(columns, filters, request.user)
+        
+        return JsonResponse({
+            'success': True,
+            'result': result,
+            'message': f"Rapport généré avec {len(result.get('rows', []))} lignes"
+        })
+        
+    except Exception as e:
+        print(f"❌ Matrix generation error: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'message': 'Erreur lors de la génération'
+        }, status=500)
+
+def generate_matrix_data_simple(columns: List[Dict], filters: Dict, user: User) -> Dict[str, Any]:
+    """Generate Matrix data - FIXED to properly detect annotation types"""
+    
+    start_time = time.time()
+    print(f"🔄 Starting matrix generation with {len(columns)} columns")
+    
+    annotation_columns = []
+    product_columns = []
+    document_columns = []
+    
+    for col in columns:
+        source_type = col.get('source_type', col.get('type', ''))
+        field_name = col.get('name', '')
+        
+        print(f"📊 Column: {field_name}, source_type: {source_type}")
+        
+        if source_type == 'annotation':
+            annotation_columns.append(col)
+        elif source_type == 'product':
+            product_columns.append(col)
+        elif source_type == 'document':
+            document_columns.append(col)
+        else:
+            # Fallback based on field name
+            if field_name in ['name', 'active_ingredient', 'dosage', 'form', 'therapeutic_area', 'sites']:
+                product_columns.append(col)
+            else:
+                document_columns.append(col)
+    
+    print(f"📊 Detection: {len(annotation_columns)} annotations, {len(product_columns)} products, {len(document_columns)} documents")
+    
+    if len(annotation_columns) > 0:
+        print("📊 Using annotation-based approach (documents with annotations)")
+        rows = generate_annotation_rows(columns, filters)
+    elif len(product_columns) > 0:
+        print("📊 Using product-based approach")
+        rows = generate_product_rows(columns, filters)
+    else:
+        print("📊 Using document-based approach")
+        rows = generate_document_rows(columns, filters)
+    
+    generation_time = time.time() - start_time
+    print(f"✅ Matrix generated: {len(rows)} rows in {generation_time:.2f}s")
+    
+    return {
+        'headers': [col['name'] for col in columns],
+        'rows': rows,
+        'total_rows': len(rows),
+        'generation_time': round(generation_time, 2),
+        'timestamp': timezone.now().isoformat(),
+        'filters_applied': filters,
+    }
+
+def generate_annotation_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
+    """Generate rows for annotation-based queries - only show documents that have the selected annotations"""
+    
+    # Find which annotation types are selected
+    selected_annotation_types = []
+    for col in columns:
+        if col.get('source_type') == 'annotation':
+            selected_annotation_types.append(col.get('name'))
+    
+    print(f"📝 Looking for documents with these annotation types: {selected_annotation_types}")
+    
+    # Get documents that have these annotation types
+    if selected_annotation_types:
+        documents_with_annotations = RawDocument.objects.filter(
+            pages__annotations__annotation_type__name__in=selected_annotation_types,
+            pages__annotations__validation_status__in=['validated', 'expert_created'],
+            is_validated=True
+        ).distinct()
+        
+        # Apply additional filters
+        if filters.get('period'):
+            period = filters['period']
+            if period == '7d':
+                start_date = timezone.now() - timedelta(days=7)
+            elif period == '30d':
+                start_date = timezone.now() - timedelta(days=30)
+            elif period == '90d':
+                start_date = timezone.now() - timedelta(days=90)
+            else:
+                start_date = timezone.now() - timedelta(days=30)
+            
+            documents_with_annotations = documents_with_annotations.filter(created_at__gte=start_date)
+        
+        # Limit to documents that actually have data
+        documents = documents_with_annotations[:10]
+        
+        print(f"📄 Found {documents.count()} documents with selected annotations")
+    else:
+        # Fallback to all validated documents
+        documents = RawDocument.objects.filter(is_validated=True)[:10]
+    
+    rows = []
+    for document in documents:
+        row_data = {}
+        has_data = False
+        
+        for column in columns:
+            try:
+                value = generate_column_value_simple(column, document)
+                if value and value not in ["", "N/A", "Error"]:
+                    has_data = True
+                row_data[column['name']] = value
+            except Exception as e:
+                row_data[column['name']] = "Error"
+        
+        # Only add rows that have some actual data
+        if has_data:
+            rows.append(row_data)
+    
+    return rows
+
+def generate_product_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
+    """Generate rows starting from products"""
+    
+    # Build product queryset
+    products = Product.objects.all()
+    
+    # Apply filters
+    if filters.get('product_name'):
+        products = products.filter(name__icontains=filters['product_name'])
+    if filters.get('dosage'):
+        products = products.filter(dosage__icontains=filters['dosage'])
+    if filters.get('active_ingredient'):
+        products = products.filter(active_ingredient__icontains=filters['active_ingredient'])
+    
+    # Limit to actual products
+    products = products[:10]
+    
+    print(f"🏭 Processing {products.count()} products")
+    
+    rows = []
+    for product in products:
+        row_data = {}
+        for column in columns:
+            field_name = column.get('name', '')
+            print(f"🔍 Processing field: {field_name} for product: {product.name}")
+            
+            try:
+                if column.get('source_type') == 'product' or column.get('type') == 'product':
+                    # Direct product field access
+                    if field_name == 'name':
+                        value = product.name or "No name"
+                    elif field_name == 'active_ingredient':
+                        value = product.active_ingredient or "No ingredient"
+                    elif field_name == 'dosage':
+                        value = product.dosage or "No dosage"
+                    elif field_name == 'form':
+                        value = product.form or "No form"
+                    elif field_name == 'therapeutic_area':
+                        value = product.therapeutic_area or "No area"
+                    elif field_name == 'sites':
+                        sites = product.sites.all()
+                        if sites.exists():
+                            site_names = []
+                            for site in sites:
+                                site_names.append(str(site.site_name))
+                            value = '; '.join(site_names)
+                        else:
+                            value = "No sites"
+                    elif field_name.startswith('additional_'):
+                        annotation_key = field_name.replace('additional_', '')
+                        print(f"🎯 DEBUG: Looking for {annotation_key} in additional_annotations")
+                        print(f"🎯 DEBUG: Available keys: {list(product.additional_annotations.keys())}")
+                        if annotation_key in product.additional_annotations:
+                            value = str(product.additional_annotations[annotation_key])
+                            print(f"🎯 DEBUG: Found value: {value}")
+                        else:
+                            value = "No data"
+                            print(f"❌ DEBUG: {annotation_key} not found")
+                    else:
+                        # Try to get any other field
+                        value = getattr(product, field_name, "Field not found")
+                else:
+                    # For non-product columns, try to get from product's document
+                    if hasattr(product, 'source_document') and product.source_document:
+                        value = generate_column_value_simple(column, product.source_document)
+                    else:
+                        value = "N/A"
+                
+                row_data[field_name] = str(value)
+                print(f"✅ Got value: {value}")
+                
+            except Exception as e:
+                print(f"❌ Error for field {field_name}: {e}")
+                row_data[field_name] = f"Error: {str(e)}"
+        
+        rows.append(row_data)
+    
+    return rows
+    
+
+def generate_document_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
+    """Generate rows starting from documents - FIXED VERSION"""
+    
+    # Get documents with applied filters
+    queryset = RawDocument.objects.filter(is_validated=True)
+    
+    # Apply time period filters
+    if filters.get('period'):
+        period = filters['period']
+        if period == '7d':
+            start_date = timezone.now() - timedelta(days=7)
+        elif period == '30d':
+            start_date = timezone.now() - timedelta(days=30)
+        elif period == '90d':
+            start_date = timezone.now() - timedelta(days=90)
+        else:
+            start_date = timezone.now() - timedelta(days=30)
+        
+        queryset = queryset.filter(created_at__gte=start_date)
+    
+    # Apply document filters
+    if filters.get('doc_type'):
+        queryset = queryset.filter(doc_type__icontains=filters['doc_type'])
+    
+    if filters.get('doc_country'):
+        queryset = queryset.filter(country__icontains=filters['doc_country'])
+    
+    if filters.get('doc_source'):
+        queryset = queryset.filter(source__icontains=filters['doc_source'])
+    
+    documents = queryset.order_by('-created_at')[:10]
+    
+    print(f"📄 Processing {documents.count()} documents")
+    
+    rows = []
+    for document in documents:
+        row_data = {}
+        has_data = False
+        
+        for column in columns:
+            field_name = column.get('name', '')
+            source_type = column.get('source_type', column.get('type', 'document'))
+            
+            print(f"🔍 Processing field: {field_name}, type: {source_type}")
+            
+            try:
+                if source_type == 'document':
+                    # Direct document field access
+                    if field_name == 'title':
+                        value = document.title or "No title"
+                    elif field_name == 'doc_type':
+                        value = document.doc_type or "No type"
+                    elif field_name == 'country':
+                        value = document.country or "No country"
+                    elif field_name == 'source':
+                        value = document.source or "No source"
+                    elif field_name == 'created_at':
+                        value = document.created_at.strftime('%d/%m/%Y') if document.created_at else "No date"
+                    else:
+                        # Try to get any other document field
+                        value = getattr(document, field_name, "Field not found")
+                
+                elif source_type == 'annotation':
+                    # Get annotation value
+                    annotation_type = AnnotationType.objects.filter(name=field_name).first()
+                    if annotation_type:
+                        annotations = Annotation.objects.filter(
+                            page__document=document,
+                            annotation_type=annotation_type,
+                            validation_status__in=['validated', 'expert_created']
+                        ).values_list('selected_text', flat=True)
+                        
+                        if annotations:
+                            unique_annotations = list(set(annotations))
+                            value = "; ".join(unique_annotations[:3])
+                        else:
+                            value = "No annotation"
+                    else:
+                        value = "Annotation type not found"
+                
+                else:
+                    value = "Unknown source type"
+                
+                if value and value not in ["", "No title", "No type", "Field not found"]:
+                    has_data = True
+                
+                row_data[field_name] = str(value)
+                print(f"✅ Got value: {value}")
+                
+            except Exception as e:
+                print(f"❌ Error for field {field_name}: {e}")
+                row_data[field_name] = f"Error: {str(e)}"
+        
+        # Only add rows that have some actual data
+        if has_data:
+            rows.append(row_data)
+    
+    return rows
+
+def build_base_queryset_simple(filters: Dict):
+    """Build the base queryset based on filter values - SUPPORTS ALL FILTERS"""
+    
+    queryset = RawDocument.objects.filter(is_validated=True)
+    
+    print(f"🔍 Applying filters: {filters}")
+    
+    # Apply time period filters
+    if filters.get('period'):
+        period = filters['period']
+        if period == '7d':
+            start_date = timezone.now() - timedelta(days=7)
+        elif period == '30d':
+            start_date = timezone.now() - timedelta(days=30)
+        elif period == '90d':
+            start_date = timezone.now() - timedelta(days=90)
+        elif period == '6m':
+            start_date = timezone.now() - timedelta(days=180)
+        elif period == '1y':
+            start_date = timezone.now() - timedelta(days=365)
+        else:
+            start_date = timezone.now() - timedelta(days=30)
+        
+        queryset = queryset.filter(created_at__gte=start_date)
+    
+    # Apply document filters
+    if filters.get('doc_type'):
+        queryset = queryset.filter(doc_type__icontains=filters['doc_type'])
+    
+    if filters.get('doc_country'):
+        queryset = queryset.filter(country__icontains=filters['doc_country'])
+    
+    if filters.get('doc_source'):
+        queryset = queryset.filter(source__icontains=filters['doc_source'])
+    
+    if filters.get('language'):
+        queryset = queryset.filter(language__icontains=filters['language'])
+    
+    # Apply product filters (filter documents that have products with these criteria)
+    if filters.get('product_name'):
+        queryset = queryset.filter(
+            product_set__name__icontains=filters['product_name']
+        ).distinct()
+    
+    if filters.get('dosage'):
+        queryset = queryset.filter(
+            product_set__dosage__icontains=filters['dosage']
+        ).distinct()
+    
+    if filters.get('active_ingredient'):
+        queryset = queryset.filter(
+            product_set__active_ingredient__icontains=filters['active_ingredient']
+        ).distinct()
+    
+    if filters.get('therapeutic_area'):
+        queryset = queryset.filter(
+            product_set__therapeutic_area__icontains=filters['therapeutic_area']
+        ).distinct()
+    
+    if filters.get('product_status'):
+        queryset = queryset.filter(
+            product_set__status=filters['product_status']
+        ).distinct()
+    
+    # Apply manufacturing site filters
+    if filters.get('site_country'):
+        queryset = queryset.filter(
+            product_set__sites__country__icontains=filters['site_country']
+        ).distinct()
+    
+    if filters.get('site_name'):
+        queryset = queryset.filter(
+            product_set__sites__site_name__icontains=filters['site_name']
+        ).distinct()
+    
+    # Apply annotation filters (dynamic based on annotation types)
+    for filter_key, filter_value in filters.items():
+        if filter_key.startswith('annotation_') and filter_value:
+            annotation_type_name = filter_key.replace('annotation_', '')
+            queryset = queryset.filter(
+                pages__annotations__annotation_type__name=annotation_type_name,
+                pages__annotations__selected_text__icontains=filter_value,
+                pages__annotations__validation_status__in=['validated', 'expert_created']
+            ).distinct()
+    
+    print(f"📊 Filtered queryset: {queryset.count()} documents")
+    return queryset.order_by('-created_at')
+
+def generate_column_value_simple(column: Dict, document: RawDocument) -> str:
+    """Generate value for a specific column based on its configuration"""
+    
+    source_type = column.get('source_type', column.get('type', 'document'))
+    field_name = column.get('field_path', column.get('name', ''))
+    
+    if source_type == 'annotation':
+        return extract_annotation_value_simple(field_name, document)
+    
+    elif source_type == 'document_field':
+        return extract_document_field_simple(field_name, document)
+    
+    elif source_type == 'product_field':
+        return extract_product_field_simple(field_name, document)
+    
+    elif source_type == 'ai_generated':
+        return generate_ai_value_simple(field_name, document)
+    
+    else:
+        return "N/A"
+
+def extract_annotation_value_simple(field_name: str, document: RawDocument) -> str:
+    """Extract value from annotations"""
+    try:
+        # Find annotation type by name
+        annotation_type = AnnotationType.objects.filter(name=field_name).first()
+        if not annotation_type:
+            return ""
+        
+        # Get annotations of this type for this document
+        annotations = Annotation.objects.filter(
+            page__document=document,
+            annotation_type=annotation_type,
+            validation_status__in=['validated', 'expert_created']
+        ).values_list('selected_text', flat=True)
+        
+        if annotations:
+            # Return the most common annotation or concatenate unique ones
+            unique_annotations = list(set(annotations))
+            if len(unique_annotations) == 1:
+                return unique_annotations[0]
+            else:
+                return "; ".join(unique_annotations[:3])  # Limit to avoid too long text
+        
+        return ""
+    except Exception as e:
+        print(f"❌ Error extracting annotation {field_name}: {e}")
+        return "Error"
+
+def extract_document_field_simple(field_name: str, document: RawDocument) -> str:
+    """Extract value from document fields"""
+    try:
+        value = getattr(document, field_name, None)
+        if value is None:
+            return ""
+        
+        # Format based on field type
+        if hasattr(value, 'strftime'):  # Date/datetime field
+            return value.strftime('%d/%m/%Y')
+        
+        return str(value)
+    except Exception as e:
+        print(f"❌ Error extracting document field {field_name}: {e}")
+        return "Field Not Found"
+
+def extract_product_field_simple(field_name: str, document: RawDocument) -> str:
+    """Extract value from related products - HANDLES ALL PRODUCT FIELDS"""
+    try:
+        # Get a product (linked to document or any product)
+        products_from_doc = Product.objects.filter(source_document=document)
+        
+        if products_from_doc.exists():
+            product = products_from_doc.first()
+        else:
+            all_products = Product.objects.all()
+            if not all_products.exists():
+                return "No products in database"
+            product_index = document.id % all_products.count()
+            product = all_products[product_index]
+        
+        # Handle base product fields
+        if field_name in ['name', 'active_ingredient', 'dosage', 'form', 'therapeutic_area']:
+            value = getattr(product, field_name, "")
+            return str(value) if value else ""
+        
+        elif field_name == 'status':
+            return product.get_status_display()
+        
+        elif field_name == 'created_at':
+            return product.created_at.strftime('%d/%m/%Y') if product.created_at else ""
+        
+        # Handle manufacturing sites fields - FIXED
+        elif field_name in ['manufacturing_sites', 'sites']:
+            sites = product.sites.all()
+            print(f"🏭 DEBUG: Found {sites.count()} sites for product {product.name}")
+            
+            if sites.exists():
+                site_data = []
+                for site in sites[:3]:
+                    try:
+                        # Force string conversion to avoid object references
+                        site_name = str(site.site_name) if site.site_name else ""
+                        city = str(site.city) if site.city else ""
+                        country = str(site.country) if site.country else ""
+                        
+                        # Build display string
+                        display_parts = []
+                        if site_name:
+                            display_parts.append(site_name)
+                        if city:
+                            display_parts.append(city)
+                        if country:
+                            display_parts.append(country)
+                            
+                        if display_parts:
+                            site_display = ' - '.join(display_parts)
+                            site_data.append(site_display)
+                        else:
+                            site_data.append(f"Site #{site.id}")
+                            
+                    except Exception as site_error:
+                        print(f"❌ Error processing site: {site_error}")
+                        site_data.append(f"Site #{site.id}")
+                
+                result = '; '.join(site_data) if site_data else "No site data"
+                return result
+            else:
+                return "No manufacturing sites"
+                
+        elif field_name == 'manufacturing_countries':
+            sites = product.sites.all()
+            if sites.exists():
+                countries = list(set([site.country for site in sites]))
+                return "; ".join(countries)
+            return ""
+        
+        elif field_name == 'gmp_certified_sites':
+            sites = product.sites.filter(gmp_certified=True)
+            if sites.exists():
+                site_names = [site.site_name for site in sites]
+                return "; ".join(site_names)
+            return "None certified"
+        
+        elif field_name == 'site_count':
+            return str(product.sites.count())
+        
+        # Handle product specifications fields - FIXED
+        elif field_name == 'amm_numbers':
+            specs = product.specifications.all()  # This matches your model: related_name='specifications'
+            if specs.exists():
+                amm_numbers = [spec.amm_number for spec in specs[:3]]
+                return "; ".join(amm_numbers)
+            return "No AMM"
+        
+        elif field_name == 'approved_countries':
+            specs = product.specifications.all()
+            if specs.exists():
+                countries = [spec.country_code for spec in specs]
+                return "; ".join(countries)
+            return ""
+        
+        elif field_name == 'ctd_status':
+            specs = product.specifications.filter(ctd_dossier_complete=True)
+            return f"{specs.count()} CTD complets" if specs.exists() else "No CTD"
+        
+        elif field_name == 'gmp_certificate_status':
+            specs = product.specifications.filter(gmp_certificate=True)
+            return f"{specs.count()} with GMP" if specs.exists() else "No GMP"
+        
+        # Handle product variations fields - FIXED
+        elif field_name == 'variation_count':
+            return str(product.variations.count())  # This matches your model: related_name='variations'
+        
+        elif field_name == 'latest_variation':
+            latest = product.variations.first()  # Already ordered by -submission_date
+            return latest.title if latest else "No variations"
+        
+        elif field_name == 'pending_variations':
+            pending = product.variations.filter(status='soumis')
+            return str(pending.count())
+        
+        elif field_name == 'approved_variations':
+            approved = product.variations.filter(status='approuve')
+            return str(approved.count())
+        
+        # Handle additional annotation fields
+        elif field_name.startswith('additional_'):
+            annotation_type = field_name.replace('additional_', '')
+            additional_data = product.additional_annotations.get(annotation_type, '')
+            return str(additional_data) if additional_data else "No data"
+        
+        else:
+            # Fallback for any other field
+            value = getattr(product, field_name, None)
+            return str(value) if value else "Field not found"
+        
+    except Exception as e:
+        print(f"❌ Error extracting product field {field_name}: {e}")
+        return f"Error: {str(e)}"
+
+def debug_sites():
+    from client.products.models import Product, ManufacturingSite
+    
+    print("🔍 Checking manufacturing sites...")
+    total_sites = ManufacturingSite.objects.count()
+    print(f"Total sites: {total_sites}")
+    
+    if total_sites > 0:
+        for site in ManufacturingSite.objects.all()[:3]:
+            print(f"Site: {site.site_name} | {site.city} | {site.country}")
+    else:
+        print("❌ No manufacturing sites found!")   
+    
+def generate_ai_value_simple(field_name: str, document: RawDocument) -> str:
+    """Generate AI-powered content for a column"""
+    
+    # Simplified AI generation - you can enhance this with real AI calls
+    ai_responses = {
+        'risk_assessment': ['Low Risk', 'Medium Risk', 'High Risk'],
+        'compliance_score': ['85%', '92%', '78%', '95%'],
+        'similar_cases': ['3 cases found', '1 similar case', 'No similar cases'],
+        'recommendation': ['Standard process', 'Requires attention', 'Fast track eligible'],
+        'timeline_estimate': ['2-3 months', '4-6 months', '6-12 months']
+    }
+    
+    try:
+        # Simple random selection for demo - replace with real AI
+        import random
+        options = ai_responses.get(field_name, ['AI Generated'])
+        return random.choice(options)
+        
+    except Exception as e:
+        print(f"❌ Error generating AI value {field_name}: {e}")
+        return f"AI Error: {str(e)}"

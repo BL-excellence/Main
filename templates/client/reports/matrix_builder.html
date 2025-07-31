@@ -1,0 +1,240 @@
+{% extends 'client/base.html' %}
+{% load static %}
+
+{% block title %}Matrix Builder - RegX Platform{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/reports.css' %}">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="matrix-builder">
+    <div class="builder-header">
+        <h1 class="builder-title">
+            <i class="material-icons">auto_awesome</i>
+            Matrix Report Builder
+        </h1>
+        <p class="builder-subtitle">
+            Créez des rapports personnalisés avec filtres avancés
+        </p>
+    </div>
+
+    <div class="builder-grid">
+    <div class="column-selector">
+        <!-- Dynamic fields will be loaded by JavaScript -->
+        <div class="selector-section">
+            <div class="selector-title">
+                <i class="material-icons">view_column</i>
+                Tous les Champs Disponibles
+                <span class="field-count">{{ all_fields|length }} champs</span>
+            </div>
+            
+            <!-- All fields in one container -->
+            <div class="unified-field-list">
+                {% for field in all_fields %}
+                <div class="field-item" 
+                    data-field="{{ field.name }}" 
+                    data-type="{{ field.type }}"
+                    data-count="{{ field.data_count }}">
+                    <div class="field-icon {{ field.type }}">
+                        <i class="material-icons">{{ field.icon }}</i>
+                    </div>
+                    <div class="field-info">
+                        <div class="field-name">{{ field.label }}</div>
+                        <div class="field-description">{{ field.description }}</div>
+                    </div>
+                </div>
+                {% empty %}
+                <p>Aucun champ disponible</p>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- FILTERS SECTION (keep your existing filters) -->
+        <div class="filter-section">
+            <div class="selector-title">
+                <i class="material-icons">tune</i>
+                Filtres Avancés
+            </div>
+            
+            <!-- Time Period Filter -->
+            <div class="filter-group">
+                <label>📅 Période</label>
+                <select name="period" class="filter-select">
+                    <option value="">Toutes les périodes</option>
+                    {% for period_key, period_label in filter_options.periods %}
+                    <option value="{{ period_key }}">{{ period_label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Product Filters - ONLY if products exist -->
+            {% if filter_options.product_names %}
+            <div class="filter-category">
+                <h4>🏥 Filtres Produits</h4>
+                
+                <div class="filter-group">
+                    <label>Nom du Produit</label>
+                    <select name="product_name" class="filter-select">
+                        <option value="">Tous les produits</option>
+                        {% for product_name in filter_options.product_names %}
+                        <option value="{{ product_name }}">{{ product_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                {% if filter_options.dosages %}
+                <div class="filter-group">
+                    <label>Dosage</label>
+                    <select name="dosage" class="filter-select">
+                        <option value="">Tous les dosages</option>
+                        {% for dosage in filter_options.dosages %}
+                        <option value="{{ dosage }}">{{ dosage }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                
+                {% if filter_options.active_ingredients %}
+                <div class="filter-group">
+                    <label>Principe Actif</label>
+                    <select name="active_ingredient" class="filter-select">
+                        <option value="">Tous les principes actifs</option>
+                        {% for ingredient in filter_options.active_ingredients %}
+                        <option value="{{ ingredient }}">{{ ingredient }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                
+                {% if filter_options.therapeutic_areas %}
+                <div class="filter-group">
+                    <label>Zone Thérapeutique</label>
+                    <select name="therapeutic_area" class="filter-select">
+                        <option value="">Toutes les zones</option>
+                        {% for area in filter_options.therapeutic_areas %}
+                        <option value="{{ area }}">{{ area }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            <!-- Document Filters - ONLY if documents exist -->
+            {% if filter_options.doc_types %}
+            <div class="filter-category">
+                <h4>📄 Filtres Documents</h4>
+                
+                <div class="filter-group">
+                    <label>Type de Document</label>
+                    <select name="doc_type" class="filter-select">
+                        <option value="">Tous les types</option>
+                        {% for doc_type in filter_options.doc_types %}
+                        <option value="{{ doc_type }}">{{ doc_type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                {% if filter_options.doc_sources %}
+                <div class="filter-group">
+                    <label>Source</label>
+                    <select name="doc_source" class="filter-select">
+                        <option value="">Toutes les sources</option>
+                        {% for source in filter_options.doc_sources %}
+                        <option value="{{ source }}">{{ source }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                
+                {% if filter_options.doc_countries %}
+                <div class="filter-group">
+                    <label>Pays Document</label>
+                    <select name="doc_country" class="filter-select">
+                        <option value="">Tous les pays</option>
+                        {% for country in filter_options.doc_countries %}
+                        <option value="{{ country }}">{{ country }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            <!-- Dynamic Annotation Filters - ONLY validated annotations -->
+            {% if filter_options.annotations %}
+            <div class="filter-category">
+                <h4>🏷️ Filtres Annotations Validées</h4>
+                {% for annotation_name, annotation_data in filter_options.annotations.items %}
+                <div class="filter-group">
+                    <label>{{ annotation_data.label }}</label>
+                    <select name="annotation_{{ annotation_name }}" class="filter-select">
+                        <option value="">Toutes les {{ annotation_data.label|lower }}</option>
+                        {% for option in annotation_data.options %}
+                        <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            <!-- Clear Filters Button -->
+            <button class="btn btn-secondary" id="clear-filters" style="display: none;">
+                <i class="material-icons">clear_all</i>
+                Effacer Filtres
+            </button>
+        </div>
+    </div>
+    
+    <div class="matrix-preview">
+        <!-- Matrix preview will be loaded by JavaScript -->
+        <div class="preview-header">
+            <div class="preview-title">
+                <i class="material-icons">table_chart</i>
+                Matrix de Données Réelles
+            </div>
+            <div class="preview-actions">
+                <button class="generate-button" disabled>
+                    <i class="material-icons">auto_awesome</i>
+                    Sélectionnez des colonnes
+                </button>
+            </div>
+        </div>
+        
+        <div class="matrix-table-container">
+            <div class="empty-state">
+                <i class="material-icons">view_column</i>
+                <h3>Chargement des colonnes...</h3>
+                <p>Les champs disponibles sont en cours de chargement</p>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- CSRF Token -->
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Pass ALL fields as one unified list - THIS IS THE KEY FIX
+    window.allFields = {{ all_fields|safe }};
+    
+    console.log('🚀 All fields loaded from Django:', window.allFields);
+    
+    // Legacy support for old code
+    window.annotationFields = {{ all_fields|safe }}.filter(f => f.type === 'annotation');
+    window.productFields = {{ all_fields|safe }}.filter(f => f.type === 'product');
+    window.documentFields = {{ all_fields|safe }}.filter(f => f.type === 'document');
+    
+    // Debug check
+    if (!window.allFields || window.allFields.length === 0) {
+        console.error('❌ No fields loaded!');
+    } else {
+        console.log(`✅ ${window.allFields.length} fields loaded successfully`);
+    }
+</script>
+<script src="{% static 'js/reports.js' %}"></script>
+{% endblock %}

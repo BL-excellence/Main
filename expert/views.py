@@ -561,8 +561,7 @@ def delete_annotation_type_ajax(request):
 
 
 def create_product_from_annotations(document):
-    """Create a product or update existing one with variations"""
-    # Get all validated annotations from this document
+    """Create a product with all expert annotations stored"""
     validated_annotations = Annotation.objects.filter(
         page__document=document,
         validation_status__in=['validated', 'expert_created']
@@ -576,7 +575,17 @@ def create_product_from_annotations(document):
             annotations_by_type[annotation_type] = []
         annotations_by_type[annotation_type].append(annotation.selected_text.strip())
 
-    # Extract product information
+    # Core product fields (these go into regular product fields)
+    core_fields = ['product', 'dosage', 'substance_active', 'site', 'adresse', 'address', 'pays', 'country']
+    
+    # Additional annotations (these go into JSON field)
+    additional_annotations = {}
+    for annotation_type, values in annotations_by_type.items():
+        if annotation_type not in core_fields:
+            # Store additional annotations like batch_size, shelf_life, etc.
+            additional_annotations[annotation_type] = values[0] if len(values) == 1 else values
+
+    # Extract core product information
     product_name = annotations_by_type.get('product', [''])[0] or 'Unknown Product'
     
     product_data = {
@@ -585,7 +594,8 @@ def create_product_from_annotations(document):
         'active_ingredient': annotations_by_type.get('substance_active', ['N/A'])[0],
         'form': 'Comprimé',
         'therapeutic_area': 'N/A',
-        'status': 'commercialise'
+        'status': 'commercialise',
+        'additional_annotations': additional_annotations
     }
 
     # Process sites data - match each site with address and country
@@ -609,20 +619,35 @@ def create_product_from_annotations(document):
         })
 
     print(f"DEBUG: Processing product '{product_name}' with {len(sites_data)} sites")
-
-    # Check if product already exists
+    print(f"DEBUG: Additional annotations stored: {additional_annotations}")
+    
+    # Check if product exists
     existing_product = Product.objects.filter(name=product_name).first()
     
     if existing_product and product_name != 'Unknown Product':
-        print(f"DEBUG: Found existing product '{product_name}' - checking for changes")
-        return update_existing_product_with_variations(existing_product, sites_data, document)
+        return update_existing_product_with_variations(existing_product, sites_data, document, additional_annotations)
     else:
-        print(f"DEBUG: Creating new product '{product_name}'")
         return create_new_product(product_data, sites_data, document)
 
 
+def debug_product_annotations():
+    """Debug function to check if products have additional annotations"""
+    from client.products.models import Product
+    
+    print("🔍 DEBUGGING PRODUCT ADDITIONAL ANNOTATIONS")
+    print("=" * 50)
+    
+    for product in Product.objects.all():
+        print(f"📦 Product: {product.name}")
+        if hasattr(product, 'additional_annotations'):
+            print(f"   additional_annotations: {product.additional_annotations}")
+        else:
+            print(f"   ❌ No additional_annotations field")
+        print()
+
+
 def create_new_product(product_data, sites_data, document):
-    """Create a completely new product (original logic)"""
+    """Create a completely new product with additional annotations"""
     if product_data['name'] and product_data['name'] != 'Unknown Product':
         try:
             product = Product.objects.create(
@@ -634,6 +659,15 @@ def create_new_product(product_data, sites_data, document):
                 status=product_data['status'],
                 source_document=document
             )
+            
+            # Try to save additional annotations after creation
+            try:
+                if 'additional_annotations' in product_data:
+                    product.additional_annotations = product_data['additional_annotations']
+                    product.save()
+                    print(f"✅ Saved additional annotations: {product_data['additional_annotations']}")
+            except Exception as e:
+                print(f"⚠️ Additional annotations field not ready yet: {e}")
 
             # Create manufacturing sites
             for site_data in sites_data:
@@ -646,6 +680,7 @@ def create_new_product(product_data, sites_data, document):
                 )
                 print(f"DEBUG: Created site: {site_data['site_name']}")
 
+            print(f"DEBUG: Created product with additional annotations: {product_data['additional_annotations']}")
             return product
 
         except Exception as e:
@@ -655,7 +690,7 @@ def create_new_product(product_data, sites_data, document):
     return None
 
 
-def update_existing_product_with_variations(existing_product, new_sites_data, document):
+def update_existing_product_with_variations(existing_product, new_sites_data, document, additional_annotations=None):
     """Compare existing product with new data and create variations"""
     # Get existing sites
     existing_sites = list(ManufacturingSite.objects.filter(product=existing_product).values(
@@ -737,6 +772,15 @@ def update_existing_product_with_variations(existing_product, new_sites_data, do
         ).delete()
         print(f"DEBUG: Added variation and removed site: {site['site_name']}")
     
+    # Update additional annotations if provided
+    if additional_annotations:
+        try:
+            existing_product.additional_annotations = additional_annotations
+            existing_product.save()
+            print(f"✅ Updated additional annotations: {additional_annotations}")
+        except Exception as e:
+            print(f"⚠️ Could not update additional annotations: {e}")
+    
     print(f"🎯 Updated existing product '{existing_product.name}' with {len(variations_created)} variations")
     
     return existing_product
@@ -756,6 +800,7 @@ def validate_document(request, document_id):
             product = create_product_from_annotations(document)
 
             if product:
+                debug_product_annotations()
                 # Check if it was an update or new creation
                 variations_today = ProductVariation.objects.filter(
                     product=product,

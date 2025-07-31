@@ -22,6 +22,8 @@ class Product(models.Model):
         verbose_name="Document source",
         help_text="Document original ayant généré ce produit"
     )
+    additional_annotations = models.JSONField(default=dict, blank=True, verbose_name="Annotations supplémentaires")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -96,6 +98,7 @@ class ProductVariation(models.Model):
     description = models.TextField(verbose_name="Description")
     submission_date = models.DateField(verbose_name="Date de soumission")
     approval_date = models.DateField(null=True, blank=True, verbose_name="Date d'approbation")
+    additional_annotations = models.JSONField(default=dict, blank=True, verbose_name="Annotations supplémentaires")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='soumis')
     
     class Meta:

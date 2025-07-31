@@ -20,4 +20,6 @@ urlpatterns = [
     # Settings and create pages
     path('settings/', views.reports_settings, name='settings'),
     path('create/', views.reports_create, name='create'),
+    path('matrix-builder/', views.matrix_builder, name='matrix_builder'),
+    path('generate-matrix/', views.generate_matrix_report, name='generate_matrix'),
 ]

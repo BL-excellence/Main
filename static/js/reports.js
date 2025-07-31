@@ -19,31 +19,60 @@ class ReportsApp {
     }
 
     bindEvents() {
-        console.log('🔗 Binding events...');
+    // Store reference to avoid conflicts
+    const matrixBuilder = this;
+    
+    // Remove any existing listeners first
+    document.removeEventListener('click', this.handleClick);
+    document.removeEventListener('change', this.handleChange);
+    
+    // Create bound methods
+    this.handleClick = function(e) {
+        if (e.target.closest('.matrix-builder')) return;
+        
+        const button = e.target.closest('button');
+        if (!button) return;
 
-        // Generator form submission
-        const generateBtn = document.querySelector('.control-button');
-        if (generateBtn) {
-            generateBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.generateReport(e);
-            });
-            console.log('✅ Generator button bound');
+        // Generate button
+        if (e.target.closest('.generate-button')) {
+            e.preventDefault();
+            e.stopPropagation();
+            matrixBuilder.generateMatrix();
+            return;
         }
 
-        // Use event delegation for ALL buttons (existing + future)
-        this.bindAllButtonsWithDelegation();
+        // Remove column chip
+        if (e.target.closest('.column-chip .remove')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const chip = e.target.closest('.column-chip');
+            const fieldName = chip.dataset.field;
+            matrixBuilder.removeColumn(fieldName);
+            return;
+        }
 
-        // Filter dropdowns
-        document.querySelectorAll('.control-select').forEach(select => {
-            select.addEventListener('change', (e) => this.updateFilter(e));
-        });
-
-        // Header buttons
-        this.bindHeaderButtons();
-
-        console.log('🔗 All events bound successfully');
-    }
+        // Clear filters button
+        if (e.target.closest('#clear-filters')) {
+            e.preventDefault();
+            e.stopPropagation();
+            matrixBuilder.clearAllFilters();
+            return;
+        }
+    };
+   
+    this.handleChange = function(e) {
+        if (e.target.closest('.matrix-builder') && 
+           (e.target.closest('.filter-control') || e.target.classList.contains('filter-select'))) {
+            matrixBuilder.updateFilters();
+        }
+    };
+    
+    // Add the event listeners
+    document.addEventListener('change', this.handleChange);
+    
+    console.log('✅ Matrix Builder events bound');
+}
+    
 
     bindAllButtonsWithDelegation() {
         // Use event delegation for ALL buttons in the document
@@ -146,6 +175,7 @@ class ReportsApp {
             });
         });
     }
+    
 
     updateFilter(event) {
         const filterType = event.target.closest('.control-group').querySelector('label').textContent.toLowerCase();
@@ -781,3 +811,417 @@ window.refreshData = () => {
 };
 
 console.log('📊 Reports JavaScript loaded successfully');
+
+// Matrix Builder Class 
+
+    // REPLACE YOUR ENTIRE MatrixBuilder CLASS WITH THIS:
+
+class MatrixBuilder {
+    constructor() {
+        this.selectedColumns = [];
+        this.availableFields = { annotations: [], documents: [], products: [] };
+        this.currentFilters = {};
+        this.generatedData = [];
+        this.init();
+    }
+
+    init() {
+        console.log('🏗️ Initializing Matrix Builder...');
+        this.loadDynamicFields();
+        this.bindEvents();
+        this.setupPerformantFiltering();
+        console.log('✅ Matrix Builder initialized');
+    }
+
+    loadDynamicFields() {
+        if (window.allFields) {
+            console.log('📊 All fields loaded:', window.allFields.length);
+            this.allFields = window.allFields;
+        }
+        // Don't call renderFieldSelector - fields are in template
+    }
+
+    setupPerformantFiltering() {
+        this.debouncedUpdateFilters = this.debounce(() => {
+            this.updateFilters();
+        }, 300);
+    }
+
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    
+
+   
+
+    bindEvents() {
+    document.removeEventListener('click', this.matrixClickHandler);
+    document.removeEventListener('change', this.matrixChangeHandler);
+    
+    this.matrixClickHandler = (e) => {
+        if (!e.target.closest('.matrix-builder')) return;
+        
+        const fieldItem = e.target.closest('.field-item');
+        if (fieldItem) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.toggleField(fieldItem);
+            return;
+        }
+
+        if (e.target.closest('.generate-button')) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.generateMatrix();
+            return;
+        }
+
+        if (e.target.closest('.column-chip .remove')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const chip = e.target.closest('.column-chip');
+            const fieldName = chip.dataset.field;
+            this.removeColumn(fieldName);
+            return;
+        }
+    };
+    
+    this.matrixChangeHandler = (e) => {
+        if (e.target.closest('.matrix-builder') && 
+           (e.target.closest('.filter-control') || e.target.classList.contains('filter-select'))) {
+            this.debouncedUpdateFilters();
+        }
+    };
+    
+    document.addEventListener('click', this.matrixClickHandler);
+    document.addEventListener('change', this.matrixChangeHandler);
+    document.addEventListener('click', this.handleClick);
+    console.log('✅ Matrix Builder events bound');
+}
+    toggleField(fieldItem) {
+        const fieldName = fieldItem.dataset.field;
+        const fieldType = fieldItem.dataset.type;
+        const dataCount = parseInt(fieldItem.dataset.count) || 0;
+        
+        if (fieldItem.classList.contains('selected')) {
+            this.removeColumn(fieldName);
+        } else {
+            if (dataCount === 0) {
+                this.showToast(`⚠️ Ce champ n'a pas de données`, 'warning');
+                return;
+            }
+            this.addColumn(fieldName, fieldType);
+        }
+    }
+
+    addColumn(fieldName, fieldType) {
+        if (this.selectedColumns.find(col => col.name === fieldName)) return;
+
+        const fieldConfig = this.findFieldConfig(fieldName, fieldType);
+        if (!fieldConfig) return;
+
+        this.selectedColumns.push({
+        name: fieldName,
+        label: fieldConfig.label,
+        type: fieldType,
+        source_type: fieldType, 
+        field_path: fieldName
+    });
+
+        this.updateUI();
+        this.showToast(`✅ Colonne "${fieldConfig.label}" ajoutée`, 'success');
+    }
+
+    removeColumn(fieldName) {
+        const removedColumn = this.selectedColumns.find(col => col.name === fieldName);
+        this.selectedColumns = this.selectedColumns.filter(col => col.name !== fieldName);
+        this.updateUI();
+        
+        if (removedColumn) {
+            this.showToast(`🗑️ Colonne "${removedColumn.label}" supprimée`, 'info');
+        }
+    }
+
+    findFieldConfig(fieldName, fieldType) {
+        if (window.allFields) {
+            return window.allFields.find(field => field.name === fieldName);
+        }
+        return null;
+    }
+
+    getSourceType(fieldType) {
+    const mapping = {
+        'annotation': 'annotation',
+        'document': 'document', 
+        'product': 'product'
+    };
+    return mapping[fieldType] || fieldType; // Return fieldType if not in mapping
+}
+
+    updateUI() {
+        this.updateFieldSelection();
+        this.updateMatrixPreview();
+    }
+
+    updateFieldSelection() {
+        document.querySelectorAll('.matrix-builder .field-item').forEach(item => {
+            const fieldName = item.dataset.field;
+            const isSelected = this.selectedColumns.some(col => col.name === fieldName);
+            item.classList.toggle('selected', isSelected);
+        });
+    }
+
+    updateMatrixPreview() {
+        const container = document.querySelector('.matrix-preview');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="preview-header">
+                <div class="preview-title">
+                    <i class="material-icons">table_chart</i>
+                    Matrix de Données Réelles
+                    ${this.selectedColumns.length > 0 ? `<span class="column-count">${this.selectedColumns.length} colonnes</span>` : ''}
+                </div>
+                <div class="preview-actions">
+                    <button class="generate-button" ${this.selectedColumns.length === 0 ? 'disabled' : ''}>
+                        <i class="material-icons">auto_awesome</i>
+                        Générer Matrix
+                    </button>
+                </div>
+            </div>
+            
+            ${this.selectedColumns.length > 0 ? `
+                <div class="selected-columns">
+                    <div class="columns-list">
+                        ${this.selectedColumns.map(col => `
+                            <div class="column-chip" data-field="${col.name}">
+                                <span class="chip-label">${col.label}</span>
+                                <span class="chip-type">${col.type}</span>
+                                <span class="remove">×</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
+            <div class="matrix-table-container">
+                ${this.renderTableContent()}
+            </div>
+        `;
+    }
+
+    renderTableContent() {
+        if (this.selectedColumns.length === 0) {
+            return `
+                <div class="empty-state">
+                    <i class="material-icons">view_column</i>
+                    <h3>Sélectionnez vos données</h3>
+                    <p>Choisissez des champs avec des données réelles validées</p>
+                    <div class="quick-start">
+                        <h4>🚀 Données disponibles:</h4>
+                        <ul>
+                        <li>📝 ${window.allFields ? window.allFields.filter(f => f.source_type === 'annotation').length : 0} types d'annotations validées</li>
+                        <li>🏭 ${window.allFields ? window.allFields.filter(f => f.source_type === 'product').length : 0} champs produits avec données</li>
+                        <li>📄 ${window.allFields ? window.allFields.filter(f => f.source_type === 'document').length : 0} champs documents populés</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (this.generatedData.length === 0) {
+            return `
+                <table class="matrix-table">
+                    <thead>
+                        <tr>
+                            ${this.selectedColumns.map(col => `
+                                <th>
+                                    <div class="header-content">
+                                        <span class="header-label">${col.label}</span>
+                                        <span class="header-type">${col.type}</span>
+                                    </div>
+                                </th>
+                            `).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="${this.selectedColumns.length}" class="generate-prompt">
+                                <div class="prompt-content">
+                                    <i class="material-icons">play_circle</i>
+                                    <p>Cliquez sur "Générer Matrix" pour extraire vos données réelles</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+        }
+
+        return `
+            <div class="table-header">
+                <div class="table-info">
+                    <span class="row-count">${this.generatedData.length} lignes de données réelles</span>
+                    <span class="generation-time">Généré en ${this.lastGenerationTime}s</span>
+                </div>
+            </div>
+            
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        ${this.selectedColumns.map(col => `
+                            <th>
+                                <div class="header-content">
+                                    <span class="header-label">${col.label}</span>
+                                    <span class="header-type">${col.type}</span>
+                                </div>
+                            </th>
+                        `).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${this.generatedData.map((row, index) => `
+                        <tr class="data-row" data-row="${index}">
+                            ${this.selectedColumns.map(col => `
+                                <td>
+                                    <div class="cell-content" title="${row[col.name] || 'N/A'}">
+                                        ${this.formatCellValue(row[col.name])}
+                                    </div>
+                                </td>
+                            `).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    formatCellValue(value) {
+        if (!value || value === '' || value === 'N/A') {
+            return '<span class="empty-value">—</span>';
+        }
+        
+        const maxLength = 100;
+        const sanitized = String(value);
+        
+        if (sanitized.length > maxLength) {
+            return `<span class="truncated-value">${sanitized.substring(0, maxLength)}...</span>`;
+        }
+        
+        return sanitized;
+    }
+
+    updateFilters() {
+        const filterInputs = document.querySelectorAll('.matrix-builder .filter-select');
+        const oldFilters = {...this.currentFilters};
+        this.currentFilters = {};
+        
+        filterInputs.forEach(input => {
+            if (input.value && input.value !== '') {
+                this.currentFilters[input.name] = input.value;
+            }
+        });
+
+        if (JSON.stringify(oldFilters) !== JSON.stringify(this.currentFilters)) {
+            console.log('🔍 Filters updated:', this.currentFilters);
+        }
+    }
+
+    async generateMatrix() {
+        if (this.selectedColumns.length === 0) {
+            this.showToast('⚠️ Sélectionnez au moins une colonne', 'warning');
+            return;
+        }
+
+        this.showGeneratingState();
+
+        try {
+            const matrixConfig = {
+                columns: this.selectedColumns.map((col, index) => ({
+                    name: col.name,
+                    source_type: col.source_type,
+                    field_path: col.field_path,
+                    display_format: 'text',
+                    order: index
+                })),
+                filters: this.currentFilters
+            };
+
+            const response = await fetch('/client/reports/generate-matrix/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken()
+                },
+                body: JSON.stringify(matrixConfig)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.generatedData = result.result.rows || [];
+                this.lastGenerationTime = result.result.generation_time || 0;
+                
+                this.updateMatrixPreview();
+                this.showToast(`✅ Matrix générée avec ${this.generatedData.length} lignes!`, 'success');
+                
+            } else {
+                throw new Error(result.message || result.error || 'Erreur de génération');
+            }
+
+        } catch (error) {
+            console.error('❌ Matrix generation error:', error);
+            this.showToast(`❌ Erreur: ${error.message}`, 'error');
+        } finally {
+            this.hideGeneratingState();
+        }
+    }
+
+    showGeneratingState() {
+        const button = document.querySelector('.generate-button');
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<i class="material-icons">hourglass_empty</i> Génération...';
+        }
+    }
+
+    hideGeneratingState() {
+        const button = document.querySelector('.generate-button');
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = '<i class="material-icons">auto_awesome</i> Générer Matrix';
+        }
+    }
+
+    showToast(message, type = 'info') {
+        if (window.reportsApp && window.reportsApp.showToast) {
+            window.reportsApp.showToast(message, type);
+        } else {
+            console.log(`${type.toUpperCase()}: ${message}`);
+        }
+    }
+
+    getCSRFToken() {
+        if (window.reportsApp && window.reportsApp.getCSRFToken) {
+            return window.reportsApp.getCSRFToken();
+        }
+        
+        const token = document.querySelector('[name=csrfmiddlewaretoken]');
+        return token ? token.value : '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Always initialize MatrixBuilder
+    console.log('🏗️ Initializing Matrix Builder...');
+    window.matrixBuilder = new MatrixBuilder();
+});
