@@ -247,8 +247,8 @@
     /* Images Grid */
     .images-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-        gap: 2rem;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: 2.5rem;
         margin-bottom: 2rem;
     }
 
@@ -257,15 +257,68 @@
         border-radius: var(--border-radius);
         overflow: hidden;
         box-shadow: var(--card-shadow);
-        border: 1px solid rgba(236, 72, 153, 0.1);
+        border: 2px solid transparent;
+        background-clip: padding-box;
         transition: var(--transition);
         position: relative;
     }
 
+    .image-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(245, 87, 108, 0.1) 100%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    .image-card:hover::before {
+        opacity: 1;
+    }
+
     .image-card:hover {
-        transform: translateY(-10px) scale(1.02);
+        transform: translateY(-15px) scale(1.03);
         box-shadow: var(--card-shadow-hover);
-        border-color: rgba(236, 72, 153, 0.3);
+        border-color: rgba(236, 72, 153, 0.4);
+    }
+
+    /* Effet de brillance sur les cartes */
+    .image-card::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+        transform: rotate(45deg);
+        transition: all 0.6s ease;
+        opacity: 0;
+        z-index: 2;
+        pointer-events: none;
+    }
+
+    .image-card:hover::after {
+        animation: shine 0.8s ease-out;
+    }
+
+    @keyframes shine {
+        0% {
+            transform: translateX(-100%) translateY(-100%) rotate(45deg);
+            opacity: 0;
+        }
+        50% {
+            opacity: 1;
+        }
+        100% {
+            transform: translateX(100%) translateY(100%) rotate(45deg);
+            opacity: 0;
+        }
     }
 
     .image-header {
@@ -366,14 +419,16 @@
     }
 
     .image-info {
-        padding: 1.5rem;
-        background: #fafafa;
+        padding: 2rem;
+        background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+        position: relative;
+        z-index: 3;
     }
 
     .image-details {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 1rem;
+        gap: 1.5rem;
         font-size: 0.9rem;
     }
 
@@ -381,10 +436,36 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0.75rem;
+        padding: 1rem;
         background: white;
-        border-radius: 8px;
-        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .detail-item::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--primary-gradient);
+        transform: scaleX(0);
+        transition: transform 0.3s ease;
+    }
+
+    .detail-item:hover::before {
+        transform: scaleX(1);
+    }
+
+    .detail-item:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        border-color: rgba(236, 72, 153, 0.2);
     }
 
     .detail-label {
@@ -392,14 +473,74 @@
         font-weight: 600;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.75rem;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
 
     .detail-value {
         color: #111827;
         font-weight: 700;
         font-family: 'JetBrains Mono', monospace;
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 0.95rem;
     }
+
+    /* Indicateurs de qualité d'image */
+    .quality-indicator {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        z-index: 4;
+        backdrop-filter: blur(10px);
+    }
+
+    .quality-high {
+        background: rgba(16, 185, 129, 0.9);
+        color: white;
+    }
+
+    .quality-medium {
+        background: rgba(245, 158, 11, 0.9);
+        color: white;
+    }
+
+    .quality-low {
+        background: rgba(239, 68, 68, 0.9);
+        color: white;
+    }
+
+    /* Animation des détails */
+    .detail-item {
+        animation: detailFadeIn 0.6s ease-out forwards;
+        opacity: 0;
+    }
+
+    @keyframes detailFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .detail-item:nth-child(1) { animation-delay: 0.1s; }
+    .detail-item:nth-child(2) { animation-delay: 0.2s; }
+    .detail-item:nth-child(3) { animation-delay: 0.3s; }
+    .detail-item:nth-child(4) { animation-delay: 0.4s; }
 
     .image-actions {
         padding: 1.5rem;
@@ -860,7 +1001,253 @@ document.addEventListener('DOMContentLoaded', function() {
     cards.forEach((card, index) => {
         card.style.animationDelay = `${index * 0.15}s`;
     });
+
+    // Initialiser les fonctionnalités avancées
+    initializeImageFeatures();
+    
+    // Ajouter les indicateurs de qualité
+    addQualityIndicators();
+    
+    // Ajouter le système de filtrage
+    addImageFiltering();
 });
+
+// Fonctionnalités avancées des images
+function initializeImageFeatures() {
+    const imageCards = document.querySelectorAll('.image-card');
+    
+    imageCards.forEach((card, index) => {
+        // Ajouter un effet de parallax subtil
+        addParallaxEffect(card);
+        
+        // Ajouter des raccourcis clavier
+        addKeyboardShortcuts(card, index);
+        
+        // Améliorer l'accessibilité
+        enhanceImageAccessibility(card, index);
+    });
+}
+
+// Ajouter les indicateurs de qualité d'image
+function addQualityIndicators() {
+    const imageCards = document.querySelectorAll('.image-card');
+    
+    imageCards.forEach(card => {
+        const dimensionsElement = card.querySelector('.detail-value');
+        if (dimensionsElement) {
+            const dimensionsText = dimensionsElement.textContent;
+            const match = dimensionsText.match(/(\d+)×(\d+)/);
+            
+            if (match) {
+                const width = parseInt(match[1]);
+                const height = parseInt(match[2]);
+                const pixels = width * height;
+                
+                const preview = card.querySelector('.image-preview');
+                const indicator = document.createElement('div');
+                indicator.className = 'quality-indicator';
+                
+                if (pixels >= 2073600) { // >= 1920x1080
+                    indicator.className += ' quality-high';
+                    indicator.textContent = 'HD';
+                } else if (pixels >= 921600) { // >= 1280x720
+                    indicator.className += ' quality-medium';
+                    indicator.textContent = 'SD';
+                } else {
+                    indicator.className += ' quality-low';
+                    indicator.textContent = 'LQ';
+                }
+                
+                preview.appendChild(indicator);
+            }
+        }
+    });
+}
+
+// Ajouter le système de filtrage
+function addImageFiltering() {
+    const summarySection = document.querySelector('.images-summary');
+    
+    if (summarySection) {
+        const filterContainer = document.createElement('div');
+        filterContainer.className = 'filter-container';
+        filterContainer.style.cssText = `
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 12px;
+            border: 2px solid rgba(236, 72, 153, 0.1);
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+        `;
+        
+        filterContainer.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; color: #6b7280;">
+                🔍 Filtrer par:
+            </div>
+            <button class="filter-btn active" data-filter="all">Toutes</button>
+            <button class="filter-btn" data-filter="high">Haute qualité</button>
+            <button class="filter-btn" data-filter="medium">Qualité moyenne</button>
+            <button class="filter-btn" data-filter="low">Basse qualité</button>
+            <button class="filter-btn" data-filter="large">Grandes images</button>
+            <button class="filter-btn" data-filter="small">Petites images</button>
+        `;
+        
+        summarySection.appendChild(filterContainer);
+        
+        // Ajouter les styles pour les boutons de filtre
+        const filterStyle = document.createElement('style');
+        filterStyle.textContent = `
+            .filter-btn {
+                padding: 0.75rem 1.5rem;
+                border: 2px solid #e5e7eb;
+                background: white;
+                border-radius: 25px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 0.9rem;
+                transition: all 0.3s ease;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+            
+            .filter-btn:hover {
+                border-color: #ec4899;
+                background: #fdf2f8;
+                transform: translateY(-2px);
+            }
+            
+            .filter-btn.active {
+                background: linear-gradient(135deg, #ec4899 0%, #f5576c 100%);
+                color: white;
+                border-color: transparent;
+                box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+            }
+        `;
+        document.head.appendChild(filterStyle);
+        
+        // Ajouter les événements de filtrage
+        const filterButtons = filterContainer.querySelectorAll('.filter-btn');
+        filterButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                filterImages(btn.dataset.filter);
+            });
+        });
+    }
+}
+
+// Fonction de filtrage des images
+function filterImages(filter) {
+    const imageCards = document.querySelectorAll('.image-card');
+    let visibleCount = 0;
+    
+    imageCards.forEach(card => {
+        let shouldShow = true;
+        
+        if (filter !== 'all') {
+            const qualityIndicator = card.querySelector('.quality-indicator');
+            const dimensionsElement = card.querySelector('.detail-value');
+            
+            if (dimensionsElement) {
+                const dimensionsText = dimensionsElement.textContent;
+                const match = dimensionsText.match(/(\d+)×(\d+)/);
+                
+                if (match) {
+                    const width = parseInt(match[1]);
+                    const height = parseInt(match[2]);
+                    const pixels = width * height;
+                    
+                    switch (filter) {
+                        case 'high':
+                            shouldShow = pixels >= 2073600;
+                            break;
+                        case 'medium':
+                            shouldShow = pixels >= 921600 && pixels < 2073600;
+                            break;
+                        case 'low':
+                            shouldShow = pixels < 921600;
+                            break;
+                        case 'large':
+                            shouldShow = width >= 1000 || height >= 1000;
+                            break;
+                        case 'small':
+                            shouldShow = width < 500 && height < 500;
+                            break;
+                    }
+                }
+            }
+        }
+        
+        if (shouldShow) {
+            card.style.display = '';
+            card.style.animation = 'fadeInUp 0.5s ease-out forwards';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    showNotification(`${visibleCount} image(s) affichée(s)`, 'info');
+}
+
+// Ajouter un effet de parallax subtil
+function addParallaxEffect(card) {
+    card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        
+        const rotateX = (y - centerY) / 20;
+        const rotateY = (centerX - x) / 20;
+        
+        card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(10px)`;
+    });
+    
+    card.addEventListener('mouseleave', () => {
+        card.style.transform = '';
+    });
+}
+
+// Ajouter des raccourcis clavier
+function addKeyboardShortcuts(card, index) {
+    document.addEventListener('keydown', (e) => {
+        if (e.key === `${index + 1}` && e.ctrlKey) {
+            e.preventDefault();
+            const viewButton = card.querySelector('.btn-view');
+            if (viewButton) {
+                viewButton.click();
+            }
+        }
+    });
+}
+
+// Améliorer l'accessibilité des images
+function enhanceImageAccessibility(card, index) {
+    card.setAttribute('role', 'article');
+    card.setAttribute('aria-label', `Image ${index + 1} extraite du document`);
+    
+    const preview = card.querySelector('.image-preview');
+    if (preview) {
+        preview.setAttribute('tabindex', '0');
+        preview.setAttribute('role', 'button');
+        preview.setAttribute('aria-label', 'Cliquer pour voir l\'image en grand');
+        
+        preview.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                preview.click();
+            }
+        });
+    }
+}
 
 // Fonction pour voir une image en modal
 function viewImage(imageId) {

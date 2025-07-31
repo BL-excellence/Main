@@ -312,20 +312,23 @@
 
     .extracted-table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         margin: 0;
         font-size: 0.9rem;
         background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
     .extracted-table th {
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-        padding: 1rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.2rem 1rem;
         text-align: left;
         font-weight: 700;
-        border-bottom: 3px solid var(--primary-color);
-        border-right: 1px solid #e2e8f0;
-        color: var(--dark-color);
+        border: none;
+        color: white;
         position: sticky;
         top: 0;
         z-index: 10;
@@ -333,43 +336,275 @@
         font-size: 0.85rem;
         text-transform: uppercase;
         letter-spacing: 0.05em;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.2);
     }
 
     .extracted-table th:first-child {
-        border-left: 3px solid var(--primary-color);
+        border-top-left-radius: 12px;
     }
 
     .extracted-table th:last-child {
-        border-right: 3px solid var(--primary-color);
+        border-top-right-radius: 12px;
     }
 
     .extracted-table td {
-        padding: 1rem;
+        padding: 1.2rem 1rem;
+        border: none;
         border-bottom: 1px solid #f1f5f9;
         border-right: 1px solid #f8fafc;
         vertical-align: top;
         word-wrap: break-word;
-        max-width: 250px;
-        line-height: 1.5;
-        transition: background-color 0.2s ease;
+        max-width: 300px;
+        line-height: 1.6;
+        transition: all 0.3s ease;
+        position: relative;
     }
 
-    .extracted-table tr:hover {
-        background: #f8fafc;
+    .extracted-table td:last-child {
+        border-right: none;
     }
 
-    .extracted-table tr:nth-child(even) {
-        background: #fefefe;
+    .extracted-table tbody tr {
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
     }
 
-    .extracted-table tr:nth-child(even):hover {
-        background: #f8fafc;
+    .extracted-table tbody tr:hover {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border-left-color: var(--primary-color);
+        transform: translateX(2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .extracted-table tbody tr:nth-child(even) {
+        background: linear-gradient(135deg, #fefefe 0%, #f9fafb 100%);
+    }
+
+    .extracted-table tbody tr:nth-child(even):hover {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+
+    .extracted-table tbody tr:last-child td:first-child {
+        border-bottom-left-radius: 12px;
+    }
+
+    .extracted-table tbody tr:last-child td:last-child {
+        border-bottom-right-radius: 12px;
+    }
+
+    .extracted-table tbody tr:last-child td {
+        border-bottom: none;
     }
 
     .empty-cell {
         color: #94a3b8;
         font-style: italic;
         opacity: 0.7;
+        position: relative;
+    }
+
+    .empty-cell::before {
+        content: '∅';
+        font-size: 1.2em;
+        margin-right: 0.5rem;
+        opacity: 0.5;
+    }
+
+    /* Amélioration des cellules avec contenu long */
+    .extracted-table td.long-content {
+        max-height: 120px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .extracted-table td.long-content::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 20px;
+        background: linear-gradient(transparent, white);
+        pointer-events: none;
+    }
+
+    /* Indicateurs de type de données */
+    .data-number {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+        color: #059669;
+        background: rgba(16, 185, 129, 0.1);
+        padding: 0.2rem 0.5rem;
+        border-radius: 6px;
+        font-size: 0.85em;
+    }
+
+    .data-date {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+        color: #7c3aed;
+        background: rgba(124, 58, 237, 0.1);
+        padding: 0.2rem 0.5rem;
+        border-radius: 6px;
+        font-size: 0.85em;
+    }
+
+    .data-text {
+        color: #374151;
+    }
+
+    /* Animation d'apparition des cellules */
+    .extracted-table tbody tr {
+        animation: tableRowFadeIn 0.5s ease-out forwards;
+        opacity: 0;
+    }
+
+    @keyframes tableRowFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Styles pour le tri des colonnes */
+    .extracted-table th {
+        user-select: none;
+        transition: all 0.3s ease;
+    }
+
+    .extracted-table th:hover {
+        background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%);
+        transform: translateY(-1px);
+    }
+
+    .extracted-table th.sort-asc,
+    .extracted-table th.sort-desc {
+        background: linear-gradient(135deg, #4c51bf 0%, #5a67d8 100%);
+    }
+
+    .sort-indicator {
+        font-size: 0.8em;
+        margin-left: 0.5rem;
+        opacity: 0.7;
+        transition: all 0.3s ease;
+    }
+
+    .extracted-table th:hover .sort-indicator {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+
+    /* Styles pour la recherche */
+    .search-container {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border: 2px solid #3b82f6;
+        transition: all 0.3s ease;
+    }
+
+    .search-container:focus-within {
+        background: white;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        transform: scale(1.02);
+    }
+
+    .table-search-input::placeholder {
+        color: #9ca3af;
+        font-style: italic;
+    }
+
+    /* Amélioration des cellules avec données typées */
+    .data-number {
+        position: relative;
+    }
+
+    .data-number::before {
+        content: '#';
+        position: absolute;
+        left: -0.5rem;
+        opacity: 0.3;
+        font-size: 0.7em;
+    }
+
+    .data-date {
+        position: relative;
+    }
+
+    .data-date::before {
+        content: '📅';
+        position: absolute;
+        left: -1.2rem;
+        opacity: 0.5;
+        font-size: 0.8em;
+    }
+
+    /* Effets de survol améliorés */
+    .extracted-table tbody tr:hover .data-number {
+        background: rgba(16, 185, 129, 0.2);
+        transform: scale(1.05);
+    }
+
+    .extracted-table tbody tr:hover .data-date {
+        background: rgba(124, 58, 237, 0.2);
+        transform: scale(1.05);
+    }
+
+    .extracted-table tbody tr:hover .data-text {
+        color: #1f2937;
+        font-weight: 500;
+    }
+
+    /* Animation pour les lignes filtrées */
+    .extracted-table tbody tr[style*="display: none"] {
+        animation: fadeOut 0.3s ease-out forwards;
+    }
+
+    .extracted-table tbody tr:not([style*="display: none"]) {
+        animation: fadeIn 0.3s ease-out forwards;
+    }
+
+    @keyframes fadeOut {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        to {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+    }
+
+    /* Indicateur de colonne active */
+    .extracted-table th.active-column {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Styles pour les statistiques de colonnes */
+    .column-stats {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 0 0 8px 8px;
+        opacity: 0;
+        transform: translateY(-10px);
+        transition: all 0.3s ease;
+        z-index: 1000;
+        white-space: pre-line;
+    }
+
+    .extracted-table th:hover .column-stats {
+        opacity: 1;
+        transform: translateY(0);
     }
 
     /* No Tables State */
@@ -627,11 +862,17 @@
                     </thead>
                     <tbody>
                         {% for row in table.rows %}
-                        <tr>
+                        <tr style="animation-delay: {{ forloop.counter|add:-1|floatformat:1 }}s">
                             {% for cell in row %}
-                            <td>
+                            <td class="{% if cell and cell|length > 100 %}long-content{% endif %}" data-cell-content="{{ cell|default:'' }}">
                                 {% if cell and cell|length > 0 %}
-                                    {{ cell|truncatechars:150|linebreaksbr }}
+                                    {% if cell|floatformat:0 == cell and cell|add:0 != 0 %}
+                                        <span class="data-number">{{ cell|truncatechars:150|linebreaksbr }}</span>
+                                    {% elif cell|date:'Y-m-d' and cell|length < 20 %}
+                                        <span class="data-date">{{ cell|truncatechars:150|linebreaksbr }}</span>
+                                    {% else %}
+                                        <span class="data-text">{{ cell|truncatechars:150|linebreaksbr }}</span>
+                                    {% endif %}
                                 {% else %}
                                     <span class="empty-cell">—</span>
                                 {% endif %}
@@ -666,7 +907,208 @@ document.addEventListener('DOMContentLoaded', function() {
     cards.forEach((card, index) => {
         card.style.animationDelay = `${index * 0.2}s`;
     });
+
+    // Initialiser les fonctionnalités avancées des tableaux
+    initializeTableFeatures();
+    
+    // Ajouter des tooltips pour les cellules tronquées
+    addCellTooltips();
+    
+    // Améliorer l'accessibilité
+    enhanceAccessibility();
 });
+
+// Fonctionnalités avancées des tableaux
+function initializeTableFeatures() {
+    const tables = document.querySelectorAll('.extracted-table');
+    
+    tables.forEach((table, tableIndex) => {
+        // Ajouter la fonctionnalité de tri sur les colonnes
+        addColumnSorting(table, tableIndex);
+        
+        // Ajouter la recherche dans le tableau
+        addTableSearch(table, tableIndex);
+        
+        // Ajouter les statistiques de colonnes
+        addColumnStats(table, tableIndex);
+    });
+}
+
+// Ajouter le tri des colonnes
+function addColumnSorting(table, tableIndex) {
+    const headers = table.querySelectorAll('thead th');
+    
+    headers.forEach((header, columnIndex) => {
+        header.style.cursor = 'pointer';
+        header.style.position = 'relative';
+        header.innerHTML += ' <span class="sort-indicator">⇅</span>';
+        
+        header.addEventListener('click', () => {
+            sortTableByColumn(table, columnIndex, tableIndex);
+        });
+    });
+}
+
+// Fonction de tri des colonnes
+function sortTableByColumn(table, columnIndex, tableIndex) {
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const header = table.querySelectorAll('thead th')[columnIndex];
+    const sortIndicator = header.querySelector('.sort-indicator');
+    
+    // Déterminer la direction du tri
+    const isAscending = !header.classList.contains('sort-desc');
+    
+    // Réinitialiser tous les indicateurs de tri
+    table.querySelectorAll('thead th').forEach(h => {
+        h.classList.remove('sort-asc', 'sort-desc');
+        h.querySelector('.sort-indicator').textContent = '⇅';
+    });
+    
+    // Trier les lignes
+    rows.sort((a, b) => {
+        const aValue = a.cells[columnIndex].textContent.trim();
+        const bValue = b.cells[columnIndex].textContent.trim();
+        
+        // Essayer de convertir en nombre
+        const aNum = parseFloat(aValue);
+        const bNum = parseFloat(bValue);
+        
+        let comparison = 0;
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+            comparison = aNum - bNum;
+        } else {
+            comparison = aValue.localeCompare(bValue);
+        }
+        
+        return isAscending ? comparison : -comparison;
+    });
+    
+    // Réappliquer les lignes triées
+    rows.forEach(row => tbody.appendChild(row));
+    
+    // Mettre à jour l'indicateur de tri
+    header.classList.add(isAscending ? 'sort-asc' : 'sort-desc');
+    sortIndicator.textContent = isAscending ? '↑' : '↓';
+    
+    showNotification(`Tableau ${tableIndex + 1} trié par ${header.textContent.replace(/[↑↓⇅]/g, '').trim()}`, 'info');
+}
+
+// Ajouter la recherche dans le tableau
+function addTableSearch(table, tableIndex) {
+    const tableCard = table.closest('.table-card');
+    const tableInfo = tableCard.querySelector('.table-info');
+    
+    // Créer le champ de recherche
+    const searchContainer = document.createElement('div');
+    searchContainer.className = 'info-badge search-container';
+    searchContainer.innerHTML = `
+        <span>🔍</span>
+        <input type="text" placeholder="Rechercher..." class="table-search-input"
+               style="border: none; background: transparent; outline: none; width: 150px; font-size: 0.9rem;">
+    `;
+    
+    tableInfo.appendChild(searchContainer);
+    
+    const searchInput = searchContainer.querySelector('.table-search-input');
+    
+    searchInput.addEventListener('input', (e) => {
+        filterTableRows(table, e.target.value.toLowerCase());
+    });
+}
+
+// Filtrer les lignes du tableau
+function filterTableRows(table, searchTerm) {
+    const rows = table.querySelectorAll('tbody tr');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const rowText = Array.from(cells).map(cell => cell.textContent.toLowerCase()).join(' ');
+        
+        if (rowText.includes(searchTerm)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Afficher le nombre de résultats
+    if (searchTerm) {
+        showNotification(`${visibleCount} ligne(s) trouvée(s)`, 'info');
+    }
+}
+
+// Ajouter les statistiques de colonnes
+function addColumnStats(table, tableIndex) {
+    const headers = table.querySelectorAll('thead th');
+    
+    headers.forEach((header, columnIndex) => {
+        const cells = table.querySelectorAll(`tbody tr td:nth-child(${columnIndex + 1})`);
+        const values = Array.from(cells).map(cell => cell.textContent.trim()).filter(v => v && v !== '—');
+        
+        if (values.length > 0) {
+            // Calculer les statistiques
+            const numbers = values.map(v => parseFloat(v)).filter(n => !isNaN(n));
+            let stats = `${values.length} valeurs`;
+            
+            if (numbers.length > 0) {
+                const sum = numbers.reduce((a, b) => a + b, 0);
+                const avg = sum / numbers.length;
+                const min = Math.min(...numbers);
+                const max = Math.max(...numbers);
+                
+                stats += `\nMoyenne: ${avg.toFixed(2)}\nMin: ${min}\nMax: ${max}`;
+            }
+            
+            header.title = stats;
+        }
+    });
+}
+
+// Ajouter des tooltips pour les cellules tronquées
+function addCellTooltips() {
+    const cells = document.querySelectorAll('.extracted-table td');
+    
+    cells.forEach(cell => {
+        const fullContent = cell.getAttribute('data-cell-content');
+        const displayedContent = cell.textContent.trim();
+        
+        if (fullContent && fullContent.length > displayedContent.length) {
+            cell.title = fullContent;
+            cell.style.cursor = 'help';
+        }
+    });
+}
+
+// Améliorer l'accessibilité
+function enhanceAccessibility() {
+    const tables = document.querySelectorAll('.extracted-table');
+    
+    tables.forEach((table, index) => {
+        // Ajouter des attributs ARIA
+        table.setAttribute('role', 'table');
+        table.setAttribute('aria-label', `Tableau ${index + 1} extrait du document`);
+        
+        // Ajouter des attributs aux en-têtes
+        const headers = table.querySelectorAll('thead th');
+        headers.forEach((header, colIndex) => {
+            header.setAttribute('scope', 'col');
+            header.setAttribute('aria-sort', 'none');
+        });
+        
+        // Ajouter des attributs aux cellules
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach((row, rowIndex) => {
+            const cells = row.querySelectorAll('td');
+            cells.forEach((cell, colIndex) => {
+                cell.setAttribute('role', 'gridcell');
+                cell.setAttribute('aria-describedby', `col-${colIndex}-header`);
+            });
+        });
+    });
+}
 
 // Fonction d'export des tableaux
 function exportTables() {
