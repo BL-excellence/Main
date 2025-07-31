@@ -1007,7 +1007,7 @@ body {
   <div class="page-controls">
     {% if current_page.page_number > 1 %}
       <a href="?page={{ current_page.page_number|add:'-1' }}" class="nav-btn">
-        <i class="fas fa-chevron-left"></i> Page Précédente
+        <i class="fas fa-chevron-left"></i>Précédente
       </a>
     {% endif %}
 
@@ -1025,7 +1025,7 @@ body {
 
     {% if current_page.page_number < total_pages %}
       <a href="?page={{ current_page.page_number|add:'1' }}" class="nav-btn">
-        Page Suivante <i class="fas fa-chevron-right"></i>
+        Suivante <i class="fas fa-chevron-right"></i>
       </a>
     {% endif %}
   </div>
@@ -1051,7 +1051,7 @@ body {
     {% if not document.is_ready_for_expert %}
       <button id="submit-document-expert-btn" class="btn-expert" onclick="submitDocumentForExpert()">
         <i class="fas fa-user-graduate"></i>
-        Soumettre Document pour Expert
+        Soumission a l'Expert
       </button>
     {% else %}
       <button class="btn btn-success" disabled>
