@@ -162,32 +162,32 @@ urlpatterns = [
          name='delete_annotation_type'
     ),
     
-    path('documents/<int:document_id>/view-original/',
-         views.view_original_document,
+    path('documents/<int:document_id>/view-original/', 
+         views.view_original_document, 
          name='view_original_document'
     ),
     
-    # ——— URLs Extraction avancée (tableaux & images) ————————————
-    
-    # 22) Visualisation des tableaux extraits
+    # Document detail view
     path(
-        'documents/<int:doc_id>/tables/',
-        views.view_extracted_tables,
-        name='view_extracted_tables'
+        'documents/<int:document_id>/',
+        views.document_detail,
+        name='document_detail'
     ),
     
-    # 23) Visualisation des images extraites
+    # ——— URLs Extraction Tableaux et Images ——————————————————
+    
+    # 22) Affichage des tableaux et images extraits
     path(
-        'documents/<int:doc_id>/images/',
-        views.view_extracted_images,
-        name='view_extracted_images'
+        'documents/<int:document_id>/tables-images/',
+        views.document_tables_images,
+        name='document_tables_images'
     ),
     
-    # 24) API pour récupérer une image spécifique
+    # 23) Export des tableaux vers Excel
     path(
-        'documents/<int:doc_id>/images/<str:image_id>/',
-        views.get_extracted_image,
-        name='get_extracted_image'
+        'documents/<int:document_id>/export-tables-excel/',
+        views.export_tables_excel,
+        name='export_tables_excel'
     ),
 
 ]

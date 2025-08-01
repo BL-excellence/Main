@@ -1,0 +1,337 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+.document-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.document-title {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+}
+
+.document-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.meta-item {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.summary-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    border-left: 4px solid #007bff;
+}
+
+.summary-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #007bff;
+    margin-bottom: 0.5rem;
+}
+
+.summary-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.btn-action {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary-custom {
+    background: #007bff;
+    color: white;
+    border: none;
+}
+
+.btn-primary-custom:hover {
+    background: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-success-custom {
+    background: #28a745;
+    color: white;
+    border: none;
+}
+
+.btn-success-custom:hover {
+    background: #1e7e34;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-secondary-custom {
+    background: #6c757d;
+    color: white;
+    border: none;
+}
+
+.btn-secondary-custom:hover {
+    background: #545b62;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.content-section {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.no-content {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+
+.no-content i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+    .document-meta {
+        flex-direction: column;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .btn-action {
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- En-tête du document -->
+    <div class="document-header">
+        <h1 class="document-title">
+            <i class="fas fa-file-alt"></i>
+            {{ document.title|default:"Document sans titre" }}
+        </h1>
+        <div class="document-meta">
+            <div class="meta-item">
+                <i class="fas fa-calendar"></i>
+                {{ document.created_at|date:"d/m/Y H:i" }}
+            </div>
+            <div class="meta-item">
+                <i class="fas fa-user"></i>
+                {{ document.owner.username|default:"Anonyme" }}
+            </div>
+            <div class="meta-item">
+                <i class="fas fa-file-pdf"></i>
+                {{ document.total_pages }} page{{ document.total_pages|pluralize }}
+            </div>
+            {% if document.doc_type %}
+            <div class="meta-item">
+                <i class="fas fa-tag"></i>
+                {{ document.doc_type }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Résumé de l'extraction -->
+    <div class="summary-cards">
+        <div class="summary-card">
+            <div class="summary-number">{{ summary.total_tables }}</div>
+            <div class="summary-label">Tableau{{ summary.total_tables|pluralize:"x" }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">{{ summary.total_images }}</div>
+            <div class="summary-label">Image{{ summary.total_images|pluralize }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">{{ total_elements }}</div>
+            <div class="summary-label">Total Éléments</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-number">{{ summary.total_table_rows|default:0 }}</div>
+            <div class="summary-label">Lignes de Données</div>
+        </div>
+    </div>
+
+    <!-- Boutons d'action -->
+    <div class="action-buttons">
+        <a href="{% url 'rawdocs:document_detail' document.id %}" class="btn-action btn-secondary-custom">
+            <i class="fas fa-arrow-left"></i>
+            Retour au document
+        </a>
+        
+        {% if summary.total_tables > 0 %}
+        <a href="{% url 'rawdocs:export_tables_excel' document.id %}" class="btn-action btn-success-custom">
+            <i class="fas fa-file-excel"></i>
+            Exporter les tableaux (Excel)
+        </a>
+        {% endif %}
+        
+        <button class="btn-action btn-primary-custom" onclick="window.print()">
+            <i class="fas fa-print"></i>
+            Imprimer
+        </button>
+    </div>
+
+    <!-- Contenu extrait -->
+    <div class="content-section">
+        {% if total_elements > 0 %}
+            <div class="p-3">
+                {{ combined_html|safe }}
+            </div>
+        {% else %}
+            <div class="no-content">
+                <i class="fas fa-search"></i>
+                <h3>Aucun élément trouvé</h3>
+                <p>Ce document ne contient pas de tableaux ou d'images extractibles.</p>
+                <small class="text-muted">
+                    Les éléments doivent être sous forme de tableaux structurés ou d'images intégrées pour être détectés.
+                </small>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Toast pour les notifications -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="downloadToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="fas fa-download text-success me-2"></i>
+            <strong class="me-auto">Téléchargement</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            Le téléchargement a commencé avec succès.
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestion du téléchargement Excel
+    const excelBtn = document.querySelector('a[href*="export_tables_excel"]');
+    if (excelBtn) {
+        excelBtn.addEventListener('click', function() {
+            // Afficher le toast de téléchargement
+            const toast = new bootstrap.Toast(document.getElementById('downloadToast'));
+            toast.show();
+        });
+    }
+    
+    // Animation d'entrée pour les cartes
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -100px 0px'
+    };
+    
+    const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+    
+    // Observer les conteneurs de tableaux et images
+    document.querySelectorAll('.table-container, .image-container').forEach(el => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(20px)';
+        el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(el);
+    });
+    
+    // Amélioration des boutons de téléchargement d'images
+    document.querySelectorAll('.download-image').forEach(button => {
+        button.addEventListener('click', function() {
+            // Effet visuel
+            this.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                this.style.transform = 'scale(1)';
+            }, 150);
+        });
+    });
+});
+
+// Fonction pour imprimer seulement le contenu
+window.print = function() {
+    const printWindow = window.open('', '_blank');
+    const content = document.querySelector('.content-section').innerHTML;
+    
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Tableaux et Images - {{ document.title|default:"Document" }}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    .table-container, .image-container { margin-bottom: 30px; page-break-inside: avoid; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; font-weight: bold; }
+                    img { max-width: 100%; height: auto; }
+                    .page-section { margin-bottom: 40px; }
+                    .page-title { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+                    @media print { .no-print { display: none; } }
+                </style>
+            </head>
+            <body>${content}</body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.print();
+    printWindow.close();
+};
+</script>
+{% endblock %}
