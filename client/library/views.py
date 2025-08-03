@@ -96,18 +96,32 @@ def library_dashboard(request):
     # Statistiques par source DYNAMIQUE par organisme
     source_categories = cache.get('source_categories')
     if source_categories is None:
+        # Récupérer toutes les sources, y compris les vides
         source_stats = RawDocument.objects.filter(
             is_validated=True
-        ).exclude(source='').values('source').annotate(
+        ).values('source').annotate(
             count=Count('id')
         ).order_by('-count')
 
         categories = {}
+        unspecified_count = 0
+
+        # Termes considérés comme "non spécifié"
+        unspecified_terms = [
+            '', 'NOT EXPLICITLY STATED', 'NON SPÉCIFIÉ', 'NON SPECIFIE',
+            'NOT SPECIFIED', 'UNSPECIFIED', 'UNKNOWN', 'N/A', 'NA',
+            'NOT AVAILABLE', 'NON DISPONIBLE', 'AUTRE', 'OTHER'
+        ]
 
         for stat in source_stats:
             source_raw = stat['source'] or ''
-            source_upper = source_raw.upper()
+            source_upper = source_raw.upper().strip()
             count = stat['count']
+
+            # Vérifier si c'est une source non spécifiée
+            if not source_raw or source_upper in unspecified_terms:
+                unspecified_count += count
+                continue
 
             # Check if the source matches a known source
             matched_key = None
@@ -134,6 +148,14 @@ def library_dashboard(request):
                         'color': random_color(source_upper)
                     }
                 categories[custom_key]['count'] += count
+
+        # Ajouter la catégorie "Non spécifié" si elle contient des documents
+        if unspecified_count > 0:
+            categories['NON_SPECIFIE'] = {
+                'name': 'Non spécifié',
+                'count': unspecified_count,
+                'color': '#95a5a6'  # Couleur grise pour les non spécifiés
+            }
 
         source_categories = categories
         cache.set('source_categories', source_categories, 300)
@@ -208,22 +230,38 @@ def documents_by_category(request, category):
     search = request.GET.get('search', '')
     documents_qs = RawDocument.objects.filter(is_validated=True).select_related('owner')
 
-    # Cherche la clé si le nom donné est un alias ou une clé connue
-    key_found = None
-    for key, meta in KNOWN_SOURCES.items():
-        if filter_name == key or filter_name in [alias.upper() for alias in meta['aliases']]:
-            key_found = key
-            break
-
-    if key_found:
-        source_query = Q()
-        for alias in KNOWN_SOURCES[key_found]['aliases']:
-            source_query |= Q(source__icontains=alias)
-        documents_qs = documents_qs.filter(source_query)
+    # Gestion spéciale pour la catégorie "Non spécifié"
+    if filter_name == 'NON_SPECIFIE':
+        # Termes considérés comme "non spécifié"
+        unspecified_terms = [
+            '', 'NOT EXPLICITLY STATED', 'NON SPÉCIFIÉ', 'NON SPECIFIE',
+            'NOT SPECIFIED', 'UNSPECIFIED', 'UNKNOWN', 'N/A', 'NA',
+            'NOT AVAILABLE', 'NON DISPONIBLE', 'AUTRE', 'OTHER'
+        ]
+        
+        # Créer une requête pour tous les termes non spécifiés
+        unspecified_query = Q(source__isnull=True) | Q(source='')
+        for term in unspecified_terms[1:]:  # Skip empty string as it's already handled
+            unspecified_query |= Q(source__iexact=term)
+        
+        documents_qs = documents_qs.filter(unspecified_query)
     else:
-        # Sinon, filtre sur la source "exacte" vue dans la clé dashboard (replace underscores)
-        raw_name = category.replace('_', ' ')
-        documents_qs = documents_qs.filter(source__iexact=raw_name)
+        # Cherche la clé si le nom donné est un alias ou une clé connue
+        key_found = None
+        for key, meta in KNOWN_SOURCES.items():
+            if filter_name == key or filter_name in [alias.upper() for alias in meta['aliases']]:
+                key_found = key
+                break
+
+        if key_found:
+            source_query = Q()
+            for alias in KNOWN_SOURCES[key_found]['aliases']:
+                source_query |= Q(source__icontains=alias)
+            documents_qs = documents_qs.filter(source_query)
+        else:
+            # Sinon, filtre sur la source "exacte" vue dans la clé dashboard (replace underscores)
+            raw_name = category.replace('_', ' ')
+            documents_qs = documents_qs.filter(source__iexact=raw_name)
     
     if search:
         documents_qs = documents_qs.filter(
@@ -239,7 +277,7 @@ def documents_by_category(request, category):
     context = {
         'documents': documents,
         'category': category.upper(),
-        'category_display': key_found if key_found else category,
+        'category_display': 'Non spécifié' if filter_name == 'NON_SPECIFIE' else (key_found if key_found else category),
     }
     return render(request, 'client/library/documents_by_category.html', context)
 
