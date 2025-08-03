@@ -66,17 +66,32 @@ class TableImageExtractor:
         html = f"""
         <div class="table-container" id="{table_id}">
             <div class="table-header">
-                <h4 class="table-title">
-                    <i class="fas fa-table"></i> Tableau {table_num} (Page {page_num})
-                </h4>
-                <div class="table-info">
-                    <span class="badge badge-info">{len(df)} lignes</span>
-                    <span class="badge badge-secondary">{len(df.columns)} colonnes</span>
+                <div class="header-content">
+                    <div class="title-section">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-table"></i>
+                        </div>
+                        <div class="title-text">
+                            <h3 class="table-title">Tableau {table_num}</h3>
+                            <p class="table-subtitle">Page {page_num} • Extraction automatique</p>
+                        </div>
+                    </div>
+                    <div class="stats-section">
+                        <div class="stat-item">
+                            <div class="stat-number">{len(df)}</div>
+                            <div class="stat-label">Lignes</div>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-item">
+                            <div class="stat-number">{len(df.columns)}</div>
+                            <div class="stat-label">Colonnes</div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table table-bordered table-hover table-striped extracted-table">
-                    <thead class="table-dark">
+                <table class="extracted-table">
+                    <thead>
                         <tr>
         """
         
@@ -186,14 +201,22 @@ class TableImageExtractor:
         html = f"""
         <div class="image-container" id="{image_id}">
             <div class="image-header">
-                <h4 class="image-title">
-                    <i class="fas fa-image"></i> Image {img_num} (Page {page_num})
-                </h4>
-                <div class="image-info">
-                    <span class="badge badge-info">{width}x{height}px</span>
-                    <button class="btn btn-sm btn-outline-primary download-image" data-image="{img_base64}" data-filename="image_p{page_num}_n{img_num}.png">
-                        <i class="fas fa-download"></i> Télécharger
-                    </button>
+                <div class="header-content">
+                    <div class="title-section">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-image"></i>
+                        </div>
+                        <div class="title-text">
+                            <h3 class="image-title">Image {img_num}</h3>
+                            <p class="image-subtitle">Page {page_num} • {width}×{height}px • {len(img_base64)//1024}KB</p>
+                        </div>
+                    </div>
+                    <div class="actions-section">
+                        <button class="download-btn" data-image="{img_base64}" data-filename="image_p{page_num}_n{img_num}.png">
+                            <i class="fas fa-download"></i>
+                            <span>Télécharger</span>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="image-content">
@@ -286,9 +309,15 @@ class TableImageExtractor:
                 current_page = item['page']
                 html_parts.append(f"""
                 <div class="page-section">
-                    <h3 class="page-title">
-                        <i class="fas fa-file-alt"></i> Page {current_page}
-                    </h3>
+                    <div class="page-header">
+                        <div class="page-icon">
+                            <i class="fas fa-file-pdf"></i>
+                        </div>
+                        <div class="page-info">
+                            <h2 class="page-title">Page {current_page}</h2>
+                            <p class="page-subtitle">Contenu extrait automatiquement</p>
+                        </div>
+                    </div>
                 """)
             
             html_parts.append(item['html'])
@@ -307,171 +336,449 @@ class TableImageExtractor:
         """
         return """
         <style>
+        /* Variables CSS pour la cohérence */
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary-color: #64748b;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
+            --light-bg: #f8fafc;
+            --white: #ffffff;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Reset et base */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--gray-800);
+            background: var(--light-bg);
+        }
+
+        /* Page Section */
         .page-section {
-            margin-bottom: 2rem;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #007bff;
-        }
-        
-        .page-title {
-            color: #495057;
-            margin-bottom: 1.5rem;
-            font-size: 1.5rem;
-            border-bottom: 2px solid #dee2e6;
-            padding-bottom: 0.5rem;
-        }
-        
-        .table-container, .image-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 1.5rem;
+            margin-bottom: 3rem;
+            background: var(--white);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
             overflow: hidden;
+            border: 1px solid var(--gray-200);
         }
-        
-        .table-header, .image-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+        .page-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
             color: white;
-            padding: 1rem;
+            padding: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .page-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .page-info h2 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .page-subtitle {
+            margin: 0.5rem 0 0 0;
+            opacity: 0.9;
+            font-size: 1rem;
+            font-weight: 400;
+        }
+
+        /* Container styles */
+        .table-container, .image-container {
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            margin: 2rem;
+            overflow: hidden;
+            border: 1px solid var(--gray-200);
+            transition: all 0.3s ease;
+        }
+
+        .table-container:hover, .image-container:hover {
+            box-shadow: var(--shadow-xl);
+            transform: translateY(-2px);
+        }
+
+        /* Header styles */
+        .table-header, .image-header {
+            background: linear-gradient(135deg, var(--gray-700) 0%, var(--gray-800) 100%);
+            color: white;
+            padding: 1.5rem;
+        }
+
+        .header-content {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 1rem;
         }
-        
-        .table-title, .image-title {
-            margin: 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-        
-        .table-info, .image-info {
+
+        .title-section {
             display: flex;
-            gap: 0.5rem;
+            align-items: center;
+            gap: 1rem;
         }
-        
-        .badge {
-            padding: 0.3rem 0.6rem;
+
+        .icon-wrapper {
+            width: 48px;
+            height: 48px;
+            background: rgba(255, 255, 255, 0.15);
             border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .title-text h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .table-subtitle, .image-subtitle {
+            margin: 0.25rem 0 0 0;
+            opacity: 0.8;
+            font-size: 0.875rem;
+            font-weight: 400;
+        }
+
+        /* Stats section */
+        .stats-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .stat-label {
             font-size: 0.75rem;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.25rem;
+        }
+
+        .stat-divider {
+            width: 1px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Actions section */
+        .actions-section {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .download-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
             font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            backdrop-filter: blur(10px);
         }
-        
-        .badge-info {
-            background-color: #17a2b8;
-            color: white;
+
+        .download-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-1px);
         }
-        
-        .badge-secondary {
-            background-color: #6c757d;
-            color: white;
-        }
-        
+
+        /* Table styles */
         .table-responsive {
-            padding: 1rem;
+            padding: 0;
+            overflow-x: auto;
         }
-        
+
         .extracted-table {
-            margin-bottom: 0;
-            font-size: 0.9rem;
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+            background: var(--white);
         }
-        
+
         .extracted-table th {
-            background-color: #343a40 !important;
+            background: linear-gradient(135deg, var(--gray-700) 0%, var(--gray-800) 100%);
             color: white;
             font-weight: 600;
-            border: 1px solid #454d55;
-            padding: 0.75rem;
-            text-align: center;
-            vertical-align: middle;
+            padding: 1rem 0.75rem;
+            text-align: left;
+            border: none;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
-        
+
         .extracted-table td {
-            border: 1px solid #dee2e6;
-            padding: 0.75rem;
-            vertical-align: middle;
-            background-color: white;
+            padding: 0.875rem 0.75rem;
+            border-bottom: 1px solid var(--gray-200);
+            vertical-align: top;
+            background: var(--white);
+            transition: background-color 0.2s ease;
         }
-        
-        .extracted-table tbody tr:hover {
-            background-color: #f1f3f4;
+
+        .extracted-table tbody tr:hover td {
+            background: var(--gray-50);
         }
-        
-        .extracted-table tbody tr:nth-child(even) {
-            background-color: #f8f9fa;
+
+        .extracted-table tbody tr:nth-child(even) td {
+            background: var(--gray-50);
         }
-        
+
+        .extracted-table tbody tr:nth-child(even):hover td {
+            background: var(--gray-100);
+        }
+
+        /* Image styles */
         .image-content {
-            padding: 1rem;
+            padding: 2rem;
             text-align: center;
+            background: var(--gray-50);
         }
-        
+
         .extracted-image {
             max-width: 100%;
             height: auto;
-            border: 2px solid #dee2e6;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            transition: transform 0.3s ease;
         }
-        
-        .download-image {
-            color: white;
-            border-color: rgba(255,255,255,0.3);
-            transition: all 0.3s ease;
+
+        .extracted-image:hover {
+            transform: scale(1.02);
         }
-        
-        .download-image:hover {
-            background-color: rgba(255,255,255,0.1);
-            border-color: white;
-            color: white;
-        }
-        
+
+        /* Responsive design */
         @media (max-width: 768px) {
-            .table-header, .image-header {
+            .page-header {
+                padding: 1.5rem;
                 flex-direction: column;
-                gap: 0.5rem;
                 text-align: center;
+                gap: 1rem;
             }
-            
-            .table-info, .image-info {
+
+            .page-info h2 {
+                font-size: 1.5rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .title-section {
+                flex-direction: column;
+                text-align: center;
+                gap: 0.75rem;
+            }
+
+            .stats-section {
                 justify-content: center;
             }
+
+            .table-container, .image-container {
+                margin: 1rem;
+            }
+
+            .extracted-table {
+                font-size: 0.75rem;
+            }
+
+            .extracted-table th,
+            .extracted-table td {
+                padding: 0.5rem 0.375rem;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .table-container, .image-container {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        /* Scrollbar styling */
+        .table-responsive::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .table-responsive::-webkit-scrollbar-track {
+            background: var(--gray-100);
+            border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: var(--gray-300);
+            border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: var(--gray-400);
         }
         </style>
         """
     
     def _get_javascript(self) -> str:
         """
-        Retourne le JavaScript pour les fonctionnalités interactives
+        Retourne le JavaScript pour les fonctionnalités interactives modernes
         """
         return """
         <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Fonction de téléchargement d'images
-            document.querySelectorAll('.download-image').forEach(button => {
+            // Fonction de téléchargement d'images (nouveau sélecteur)
+            document.querySelectorAll('.download-btn').forEach(button => {
                 button.addEventListener('click', function() {
                     const imageData = this.getAttribute('data-image');
                     const filename = this.getAttribute('data-filename');
+                    
+                    // Animation du bouton
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = 'scale(1)';
+                    }, 150);
                     
                     // Créer un lien de téléchargement
                     const link = document.createElement('a');
                     link.href = 'data:image/png;base64,' + imageData;
                     link.download = filename;
                     link.click();
+                    
+                    // Feedback visuel
+                    const originalText = this.innerHTML;
+                    this.innerHTML = '<i class="fas fa-check"></i><span>Téléchargé!</span>';
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                    }, 2000);
                 });
             });
             
-            // Ajout d'animations au survol des tableaux
+            // Animation d'apparition progressive des éléments
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+            
+            const observer = new IntersectionObserver(function(entries) {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            }, observerOptions);
+            
+            // Observer tous les containers
+            document.querySelectorAll('.table-container, .image-container').forEach(container => {
+                container.style.opacity = '0';
+                container.style.transform = 'translateY(20px)';
+                container.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                observer.observe(container);
+            });
+            
+            // Amélioration des interactions avec les tableaux
             document.querySelectorAll('.extracted-table tbody tr').forEach(row => {
                 row.addEventListener('mouseenter', function() {
-                    this.style.transform = 'scale(1.01)';
+                    this.style.transform = 'translateX(4px)';
                     this.style.transition = 'transform 0.2s ease';
                 });
                 
                 row.addEventListener('mouseleave', function() {
-                    this.style.transform = 'scale(1)';
+                    this.style.transform = 'translateX(0)';
                 });
+            });
+            
+            // Effet de parallaxe léger sur les en-têtes
+            window.addEventListener('scroll', function() {
+                const scrolled = window.pageYOffset;
+                const headers = document.querySelectorAll('.page-header');
+                
+                headers.forEach(header => {
+                    const rate = scrolled * -0.5;
+                    header.style.transform = `translateY(${rate}px)`;
+                });
+            });
+            
+            // Animation des statistiques au chargement
+            document.querySelectorAll('.stat-number').forEach(stat => {
+                const finalValue = parseInt(stat.textContent);
+                let currentValue = 0;
+                const increment = finalValue / 30;
+                
+                const timer = setInterval(() => {
+                    currentValue += increment;
+                    if (currentValue >= finalValue) {
+                        stat.textContent = finalValue;
+                        clearInterval(timer);
+                    } else {
+                        stat.textContent = Math.floor(currentValue);
+                    }
+                }, 50);
             });
         });
         </script>
