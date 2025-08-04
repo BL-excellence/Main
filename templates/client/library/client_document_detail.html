@@ -1,0 +1,617 @@
+{% extends 'client/base.html' %}
+{% load static %}
+{% load document_filters %}
+
+{% block title %}{{ document.title|default:"Document" }} - Mes Documents{% endblock %}
+
+{% block extra_css %}
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<style>
+.document-detail-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+.document-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 40px;
+    margin-bottom: 32px;
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.document-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 200px;
+    height: 200px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transform: translate(50%, -50%);
+}
+
+.header-content {
+    position: relative;
+    z-index: 1;
+}
+
+.document-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.document-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0 0 20px 0;
+}
+
+.client-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    backdrop-filter: blur(10px);
+}
+
+.document-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-primary:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: white;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.3);
+    transform: translateY(-2px);
+}
+
+.content-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 32px;
+    margin-bottom: 32px;
+}
+
+.metadata-section {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.section-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 24px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.section-title::before {
+    content: '';
+    width: 4px;
+    height: 24px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 2px;
+}
+
+.metadata-grid {
+    display: grid;
+    gap: 20px;
+}
+
+.metadata-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+.metadata-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.metadata-content h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #64748b;
+    margin: 0 0 4px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metadata-content p {
+    font-size: 1rem;
+    color: #1e293b;
+    margin: 0;
+    font-weight: 500;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.4;
+}
+
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.info-card {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.info-card h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.status-validated {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.file-info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f5f9;
+    gap: 12px;
+}
+
+.file-info-item:last-child {
+    border-bottom: none;
+}
+
+.file-info-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    font-weight: 500;
+    flex-shrink: 0;
+    min-width: 40%;
+}
+
+.file-info-value {
+    font-size: 0.9rem;
+    color: #1e293b;
+    font-weight: 600;
+    text-align: right;
+    max-width: 60%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.related-documents {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.document-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.document-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    color: inherit;
+}
+
+.document-item:hover {
+    background: #f0f4ff;
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.doc-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.doc-content h5 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 4px 0;
+}
+
+.doc-meta {
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #64748b;
+}
+
+.empty-state .material-icons {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+    .document-detail-container {
+        padding: 16px;
+    }
+    
+    .document-header {
+        padding: 24px;
+    }
+    
+    .document-title {
+        font-size: 1.6rem;
+    }
+    
+    .content-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+    
+    .document-actions {
+        justify-content: center;
+    }
+    
+    .metadata-section,
+    .info-card,
+    .related-documents {
+        padding: 20px;
+    }
+    
+    .file-info-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+    
+    .file-info-label {
+        min-width: auto;
+    }
+    
+    .file-info-value {
+        text-align: left;
+        max-width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="document-detail-container">
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" style="margin-bottom: 24px; color: #64748b;">
+        <a href="{% url 'client:library:dashboard' %}" style="color: #667eea; text-decoration: none;">Library</a>
+        <span style="margin: 0 8px;">›</span>
+        <a href="{% url 'client:library:client_documents_list' %}" style="color: #667eea; text-decoration: none;">Mes Documents</a>
+        <span style="margin: 0 8px;">›</span>
+        <span>{{ document.title|default:"Document"|truncatechars:50 }}</span>
+    </nav>
+
+    <!-- Document Header -->
+    <div class="document-header">
+        <div class="header-content">
+            <h1 class="document-title">{{ document.title|default:"Document sans titre" }}</h1>
+            <p class="document-subtitle">{{ metadata.context|default:"Document uploadé par vous" }}</p>
+            
+            <div class="client-badge">
+                <i class="material-icons">person</i>
+                <span>Document Client</span>
+            </div>
+            
+            <div class="document-actions">
+                <a href="{% url 'client:library:download_client_document' document.pk %}" class="btn btn-primary">
+                    <i class="material-icons">download</i>
+                    Télécharger
+                </a>
+                <a href="{% url 'client:library:delete_client_document' document.pk %}" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce document ?')">
+                    <i class="material-icons">delete</i>
+                    Supprimer
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Grid -->
+    <div class="content-grid">
+        <!-- Metadata Section -->
+        <div class="metadata-section">
+            <h2 class="section-title">Métadonnées Extraites</h2>
+            
+            <div class="metadata-grid">
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">title</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Titre</h4>
+                        <p>{{ metadata.title }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">category</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Type de Document</h4>
+                        <p>{{ metadata.doc_type }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">calendar_today</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Date de Publication</h4>
+                        <p>{{ metadata.publication_date }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">tag</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Version</h4>
+                        <p>{{ metadata.version }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">business</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Source</h4>
+                        <p>{{ metadata.source }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">public</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Pays</h4>
+                        <p>{{ metadata.country }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">language</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Langue</h4>
+                        <p>{{ metadata.language }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Status Card -->
+            <div class="info-card">
+                <h3>
+                    <i class="material-icons">info</i>
+                    Statut du Document
+                </h3>
+                
+                <div class="status-indicator status-validated">
+                    <i class="material-icons">check_circle</i>
+                    <span>Validé automatiquement</span>
+                </div>
+                
+                <div class="file-info">
+                    <div class="file-info-item">
+                        <span class="file-info-label">Uploadé le</span>
+                        <span class="file-info-value">{{ document.created_at|date:"d/m/Y à H:i" }}</span>
+                    </div>
+                    {% if document.validated_at %}
+                    <div class="file-info-item">
+                        <span class="file-info-label">Validé le</span>
+                        <span class="file-info-value">{{ document.validated_at|date:"d/m/Y à H:i" }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="file-info-item">
+                        <span class="file-info-label">Propriétaire</span>
+                        <span class="file-info-value">{{ metadata.owner }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Info Card -->
+            <div class="info-card">
+                <h3>
+                    <i class="material-icons">description</i>
+                    Informations Fichier
+                </h3>
+                
+                <div class="file-info">
+                    <div class="file-info-item">
+                        <span class="file-info-label">Nom du fichier</span>
+                        <span class="file-info-value" style="word-break: break-all; text-align: right; max-width: 150px;">
+                            {% if document.file.name %}
+                                {{ document.file.name|slice:":50" }}{% if document.file.name|length > 50 %}...{% endif %}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% if document.total_pages %}
+                    <div class="file-info-item">
+                        <span class="file-info-label">Nombre de pages</span>
+                        <span class="file-info-value">{{ document.total_pages }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="file-info-item">
+                        <span class="file-info-label">Type de fichier</span>
+                        <span class="file-info-value">
+                            {% if document.file.name %}
+                                {{ document.file.name|slice:"-4:"|upper }}
+                            {% else %}
+                                PDF
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% if document.file.size %}
+                    <div class="file-info-item">
+                        <span class="file-info-label">Taille</span>
+                        <span class="file-info-value">
+                            {% if document.file.size > 1048576 %}
+                                {{ document.file.size|floatformat:1 }} bytes ({{ document.file.size|floatformat:1 }} MB)
+                            {% elif document.file.size > 1024 %}
+                                {{ document.file.size }} bytes
+                            {% else %}
+                                {{ document.file.size }} bytes
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Related Documents -->
+    {% if related_documents %}
+    <div class="related-documents">
+        <h2 class="section-title">Documents Similaires</h2>
+        
+        <div class="document-list">
+            {% for related_doc in related_documents %}
+            <a href="{% url 'client:library:client_document_detail' related_doc.pk %}" class="document-item">
+                <div class="doc-icon">
+                    <i class="material-icons">description</i>
+                </div>
+                <div class="doc-content">
+                    <h5>{{ related_doc.title|default:"Document sans titre"|truncatechars:60 }}</h5>
+                    <div class="doc-meta">
+                        {{ related_doc.doc_type|default:"Type non spécifié" }} • {{ related_doc.created_at|date:"d/m/Y" }}
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="related-documents">
+        <h2 class="section-title">Documents Similaires</h2>
+        <div class="empty-state">
+            <i class="material-icons">folder_open</i>
+            <h3>Aucun document similaire</h3>
+            <p>Aucun autre document de ce type n'a été trouvé.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

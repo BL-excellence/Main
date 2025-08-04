@@ -608,6 +608,10 @@
                 <p>Documents uploadés et validés par les métadonneurs</p>
             </div>
             <div class="header-actions">
+                <a href="{% url 'client:library:client_upload' %}" class="btn btn-primary" style="margin-right: 12px;">
+                    <i class="material-icons">cloud_upload</i>
+                    Uploader Document
+                </a>
                 <button class="btn btn-primary" onclick="location.href='{% url 'client:library:document_list' %}'">
                     <i class="material-icons">library_books</i>
                     Parcourir Documents
@@ -655,6 +659,57 @@
             <div class="stat-content">
                 <h3>{{ document_type_stats|length }}</h3>
                 <p>Types de documents</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Client Upload -->
+    <div class="dashboard-section" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; margin-bottom: 32px;">
+        <div class="section-header" style="border-bottom: 2px solid rgba(255, 255, 255, 0.2);">
+            <h2 style="color: white; display: flex; align-items: center; gap: 12px; margin: 0;">
+                <i class="material-icons">person</i>
+                Espace Client
+            </h2>
+            <a href="{% url 'client:library:client_documents_list' %}" style="color: white; background: rgba(255, 255, 255, 0.2); padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                Voir mes documents
+            </a>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px;">
+            <div style="text-align: center;">
+                <div style="width: 60px; height: 60px; background: rgba(255, 255, 255, 0.2); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 28px;">
+                    <i class="material-icons">cloud_upload</i>
+                </div>
+                <h3 style="margin: 0 0 8px 0; font-size: 1.1rem;">Upload Intelligent</h3>
+                <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Uploadez vos documents avec extraction automatique des métadonnées</p>
+                <a href="{% url 'client:library:client_upload' %}" style="display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; background: white; color: #059669; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem;">
+                    <i class="material-icons" style="font-size: 18px;">add</i>
+                    Uploader
+                </a>
+            </div>
+            
+            <div style="text-align: center;">
+                <div style="width: 60px; height: 60px; background: rgba(255, 255, 255, 0.2); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 28px;">
+                    <i class="material-icons">folder_special</i>
+                </div>
+                <h3 style="margin: 0 0 8px 0; font-size: 1.1rem;">Mes Documents</h3>
+                <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Gérez et consultez tous vos documents uploadés</p>
+                <a href="{% url 'client:library:client_documents_list' %}" style="display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; background: white; color: #059669; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem;">
+                    <i class="material-icons" style="font-size: 18px;">folder_open</i>
+                    Voir mes docs
+                </a>
+            </div>
+            
+            <div style="text-align: center;">
+                <div style="width: 60px; height: 60px; background: rgba(255, 255, 255, 0.2); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 28px;">
+                    <i class="material-icons">auto_awesome</i>
+                </div>
+                <h3 style="margin: 0 0 8px 0; font-size: 1.1rem;">IA Intégrée</h3>
+                <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Extraction automatique des métadonnées grâce à notre IA</p>
+                <span style="display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; background: rgba(255, 255, 255, 0.2); color: white; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.9rem;">
+                    <i class="material-icons" style="font-size: 18px;">check_circle</i>
+                    Activé
+                </span>
             </div>
         </div>
     </div>
@@ -780,6 +835,7 @@
                                 {% elif key == 'ICH' %}public
                                 {% elif key == 'ANSM' %}flag
                                 {% elif key == 'MHRA' %}location_city
+                                {% elif key == 'CLIENT' %}person
                                 {% else %}folder
                                 {% endif %}
                             </i>

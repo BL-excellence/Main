@@ -93,7 +93,7 @@ def library_dashboard(request):
         ).order_by('-count')[:5]
         cache.set('country_stats', country_stats, 300)
     
-    # Statistiques par source DYNAMIQUE par organisme
+    # Statistiques par source DYNAMIQUE par organisme (incluant les documents clients)
     source_categories = cache.get('source_categories')
     if source_categories is None:
         # Récupérer toutes les sources, y compris les vides
@@ -117,6 +117,15 @@ def library_dashboard(request):
             source_raw = stat['source'] or ''
             source_upper = source_raw.upper().strip()
             count = stat['count']
+
+            # Traitement spécial pour les documents clients
+            if source_upper == 'CLIENT':
+                categories['CLIENT'] = {
+                    'name': 'Client',
+                    'count': count,
+                    'color': '#10b981'  # Couleur verte pour les clients
+                }
+                continue
 
             # Vérifier si c'est une source non spécifiée
             if not source_raw or source_upper in unspecified_terms:
@@ -224,14 +233,17 @@ def document_list(request):
     return render(request, 'client/library/document_list.html', context)
 
 def documents_by_category(request, category):
-    """Documents filtrés par catégorie de source"""
+    """Documents filtrés par catégorie de source (incluant les documents clients)"""
     # Création du mapping dynamique depuis dashboard
     filter_name = category.upper()
     search = request.GET.get('search', '')
     documents_qs = RawDocument.objects.filter(is_validated=True).select_related('owner')
 
+    # Gestion spéciale pour la catégorie "Client"
+    if filter_name == 'CLIENT':
+        documents_qs = documents_qs.filter(source='Client')
     # Gestion spéciale pour la catégorie "Non spécifié"
-    if filter_name == 'NON_SPECIFIE':
+    elif filter_name == 'NON_SPECIFIE':
         # Termes considérés comme "non spécifié"
         unspecified_terms = [
             '', 'NOT EXPLICITLY STATED', 'NON SPÉCIFIÉ', 'NON SPECIFIE',
@@ -265,7 +277,7 @@ def documents_by_category(request, category):
     
     if search:
         documents_qs = documents_qs.filter(
-            Q(title__icontains=search) | 
+            Q(title__icontains=search) |
             Q(source__icontains=search) |
             Q(context__icontains=search)
         )
@@ -274,10 +286,18 @@ def documents_by_category(request, category):
     page_number = request.GET.get('page')
     documents = paginator.get_page(page_number)
 
+    # Déterminer l'affichage de la catégorie
+    if filter_name == 'CLIENT':
+        category_display = 'Client'
+    elif filter_name == 'NON_SPECIFIE':
+        category_display = 'Non spécifié'
+    else:
+        category_display = key_found if 'key_found' in locals() and key_found else category
+
     context = {
         'documents': documents,
         'category': category.upper(),
-        'category_display': 'Non spécifié' if filter_name == 'NON_SPECIFIE' else (key_found if key_found else category),
+        'category_display': category_display,
     }
     return render(request, 'client/library/documents_by_category.html', context)
 

@@ -7,10 +7,17 @@ from django.contrib.auth.models import User
 
 def pdf_upload_to(instance, filename):
     """
-    Place chaque PDF téléchargé dans un sous-dossier horodaté.
-    Ex. "20250626_143502/mon_document.pdf"
+    Place chaque PDF téléchargé dans un sous-dossier organisé par source.
+    Ex. "Client/20250626_143502/mon_document.pdf" pour les clients
+    Ex. "20250626_143502/mon_document.pdf" pour les métadonneurs
     """
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    # Si c'est un document client, le placer dans le dossier Client
+    if hasattr(instance, 'source') and instance.source == 'Client':
+        return join('Client', ts, filename)
+    
+    # Pour les métadonneurs, garder l'ancien système
     return join(ts, filename)
 
 
