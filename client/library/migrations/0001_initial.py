@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 import django.db.models.deletion
-import library.models
+import client.library.models
 
 
 class Migration(migrations.Migration):
@@ -123,7 +123,7 @@ class Migration(migrations.Migration):
                 (
                     "file",
                     models.FileField(
-                        upload_to=library.models.document_upload_path,
+                        upload_to=client.library.models.document_upload_path,
                         verbose_name="Fichier",
                     ),
                 ),
@@ -275,7 +275,7 @@ class Migration(migrations.Migration):
                 (
                     "file",
                     models.FileField(
-                        upload_to=library.models.document_upload_path,
+                        upload_to=client.library.models.document_upload_path,
                         verbose_name="Fichier",
                     ),
                 ),
@@ -344,7 +344,7 @@ class Migration(migrations.Migration):
                 (
                     "file",
                     models.FileField(
-                        upload_to=library.models.document_upload_path,
+                        upload_to=client.library.models.document_upload_path,
                         verbose_name="Fichier traduit",
                     ),
                 ),

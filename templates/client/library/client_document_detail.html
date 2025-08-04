@@ -109,90 +109,11 @@
     transform: translateY(-2px);
 }
 
-.content-grid {
+.info-cards-container {
     display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 32px;
-    margin-bottom: 32px;
-}
-
-.metadata-section {
-    background: white;
-    border-radius: 16px;
-    padding: 32px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-}
-
-.section-title {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin: 0 0 24px 0;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.section-title::before {
-    content: '';
-    width: 4px;
-    height: 24px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    border-radius: 2px;
-}
-
-.metadata-grid {
-    display: grid;
-    gap: 20px;
-}
-
-.metadata-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 16px;
-    padding: 16px;
-    background: #f8fafc;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-}
-
-.metadata-icon {
-    width: 40px;
-    height: 40px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    flex-shrink: 0;
-}
-
-.metadata-content h4 {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #64748b;
-    margin: 0 0 4px 0;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.metadata-content p {
-    font-size: 1rem;
-    color: #1e293b;
-    margin: 0;
-    font-weight: 500;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    line-height: 1.4;
-}
-
-.sidebar {
-    display: flex;
-    flex-direction: column;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 24px;
+    margin-bottom: 32px;
 }
 
 .info-card {
@@ -201,6 +122,12 @@
     padding: 24px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.8);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
 .info-card h3 {
@@ -213,6 +140,11 @@
     gap: 8px;
 }
 
+.info-card h3 .material-icons {
+    color: #667eea;
+    font-size: 20px;
+}
+
 .status-indicator {
     display: inline-flex;
     align-items: center;
@@ -221,6 +153,7 @@
     border-radius: 20px;
     font-size: 0.9rem;
     font-weight: 600;
+    margin-bottom: 16px;
 }
 
 .status-validated {
@@ -263,6 +196,88 @@
     max-width: 60%;
     word-wrap: break-word;
     overflow-wrap: break-word;
+}
+
+.metadata-section {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    margin-bottom: 32px;
+}
+
+.section-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 24px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.section-title::before {
+    content: '';
+    width: 4px;
+    height: 24px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 2px;
+}
+
+.metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.metadata-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.metadata-item:hover {
+    background: #f0f4ff;
+    border-color: #667eea;
+    transform: translateY(-2px);
+}
+
+.metadata-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.metadata-content h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #64748b;
+    margin: 0 0 4px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metadata-content p {
+    font-size: 1rem;
+    color: #1e293b;
+    margin: 0;
+    font-weight: 500;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.4;
 }
 
 .related-documents {
@@ -350,9 +365,9 @@
         font-size: 1.6rem;
     }
     
-    .content-grid {
+    .info-cards-container {
         grid-template-columns: 1fr;
-        gap: 24px;
+        gap: 16px;
     }
     
     .document-actions {
@@ -363,6 +378,10 @@
     .info-card,
     .related-documents {
         padding: 20px;
+    }
+    
+    .metadata-grid {
+        grid-template-columns: 1fr;
     }
     
     .file-info-item {
@@ -418,165 +437,162 @@
         </div>
     </div>
 
-    <!-- Content Grid -->
-    <div class="content-grid">
-        <!-- Metadata Section -->
-        <div class="metadata-section">
-            <h2 class="section-title">Métadonnées Extraites</h2>
+    <!-- Info Cards Section -->
+    <div class="info-cards-container">
+        <!-- Status Card -->
+        <div class="info-card">
+            <h3>
+                <i class="material-icons">info</i>
+                Statut du Document
+            </h3>
             
-            <div class="metadata-grid">
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">title</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Titre</h4>
-                        <p>{{ metadata.title }}</p>
-                    </div>
+            <div class="status-indicator status-validated">
+                <i class="material-icons">check_circle</i>
+                <span>Validé automatiquement</span>
+            </div>
+            
+            <div class="file-info">
+                <div class="file-info-item">
+                    <span class="file-info-label">Uploadé le</span>
+                    <span class="file-info-value">{{ document.created_at|date:"d/m/Y à H:i" }}</span>
                 </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">category</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Type de Document</h4>
-                        <p>{{ metadata.doc_type }}</p>
-                    </div>
+                {% if document.validated_at %}
+                <div class="file-info-item">
+                    <span class="file-info-label">Validé le</span>
+                    <span class="file-info-value">{{ document.validated_at|date:"d/m/Y à H:i" }}</span>
                 </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">calendar_today</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Date de Publication</h4>
-                        <p>{{ metadata.publication_date }}</p>
-                    </div>
-                </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">tag</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Version</h4>
-                        <p>{{ metadata.version }}</p>
-                    </div>
-                </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">business</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Source</h4>
-                        <p>{{ metadata.source }}</p>
-                    </div>
-                </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">public</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Pays</h4>
-                        <p>{{ metadata.country }}</p>
-                    </div>
-                </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">language</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Langue</h4>
-                        <p>{{ metadata.language }}</p>
-                    </div>
+                {% endif %}
+                <div class="file-info-item">
+                    <span class="file-info-label">Propriétaire</span>
+                    <span class="file-info-value">{{ metadata.owner }}</span>
                 </div>
             </div>
         </div>
 
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <!-- Status Card -->
-            <div class="info-card">
-                <h3>
-                    <i class="material-icons">info</i>
-                    Statut du Document
-                </h3>
-                
-                <div class="status-indicator status-validated">
-                    <i class="material-icons">check_circle</i>
-                    <span>Validé automatiquement</span>
+        <!-- File Info Card -->
+        <div class="info-card">
+            <h3>
+                <i class="material-icons">description</i>
+                Informations Fichier
+            </h3>
+            
+            <div class="file-info">
+                <div class="file-info-item">
+                    <span class="file-info-label">Nom du fichier</span>
+                    <span class="file-info-value" style="word-break: break-all; text-align: right; max-width: 150px;">
+                        {% if document.file.name %}
+                            {{ document.file.name|slice:":50" }}{% if document.file.name|length > 50 %}...{% endif %}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </span>
                 </div>
-                
-                <div class="file-info">
-                    <div class="file-info-item">
-                        <span class="file-info-label">Uploadé le</span>
-                        <span class="file-info-value">{{ document.created_at|date:"d/m/Y à H:i" }}</span>
-                    </div>
-                    {% if document.validated_at %}
-                    <div class="file-info-item">
-                        <span class="file-info-label">Validé le</span>
-                        <span class="file-info-value">{{ document.validated_at|date:"d/m/Y à H:i" }}</span>
-                    </div>
-                    {% endif %}
-                    <div class="file-info-item">
-                        <span class="file-info-label">Propriétaire</span>
-                        <span class="file-info-value">{{ metadata.owner }}</span>
-                    </div>
+                {% if document.total_pages %}
+                <div class="file-info-item">
+                    <span class="file-info-label">Nombre de pages</span>
+                    <span class="file-info-value">{{ document.total_pages }}</span>
+                </div>
+                {% endif %}
+                <div class="file-info-item">
+                    <span class="file-info-label">Type de fichier</span>
+                    <span class="file-info-value">
+                        {% if document.file.name %}
+                            {{ document.file.name|slice:"-4:"|upper }}
+                        {% else %}
+                            PDF
+                        {% endif %}
+                    </span>
+                </div>
+                {% if document.file.size %}
+                <div class="file-info-item">
+                    <span class="file-info-label">Taille</span>
+                    <span class="file-info-value">
+                        {% if document.file.size > 1048576 %}
+                            {{ document.file.size|floatformat:1 }} bytes ({{ document.file.size|floatformat:1 }} MB)
+                        {% elif document.file.size > 1024 %}
+                            {{ document.file.size }} bytes
+                        {% else %}
+                            {{ document.file.size }} bytes
+                        {% endif %}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadata Section -->
+    <div class="metadata-section">
+        <h2 class="section-title">Métadonnées Extraites</h2>
+        
+        <div class="metadata-grid">
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">title</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Titre</h4>
+                    <p>{{ metadata.title }}</p>
                 </div>
             </div>
-
-            <!-- File Info Card -->
-            <div class="info-card">
-                <h3>
-                    <i class="material-icons">description</i>
-                    Informations Fichier
-                </h3>
-                
-                <div class="file-info">
-                    <div class="file-info-item">
-                        <span class="file-info-label">Nom du fichier</span>
-                        <span class="file-info-value" style="word-break: break-all; text-align: right; max-width: 150px;">
-                            {% if document.file.name %}
-                                {{ document.file.name|slice:":50" }}{% if document.file.name|length > 50 %}...{% endif %}
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </span>
-                    </div>
-                    {% if document.total_pages %}
-                    <div class="file-info-item">
-                        <span class="file-info-label">Nombre de pages</span>
-                        <span class="file-info-value">{{ document.total_pages }}</span>
-                    </div>
-                    {% endif %}
-                    <div class="file-info-item">
-                        <span class="file-info-label">Type de fichier</span>
-                        <span class="file-info-value">
-                            {% if document.file.name %}
-                                {{ document.file.name|slice:"-4:"|upper }}
-                            {% else %}
-                                PDF
-                            {% endif %}
-                        </span>
-                    </div>
-                    {% if document.file.size %}
-                    <div class="file-info-item">
-                        <span class="file-info-label">Taille</span>
-                        <span class="file-info-value">
-                            {% if document.file.size > 1048576 %}
-                                {{ document.file.size|floatformat:1 }} bytes ({{ document.file.size|floatformat:1 }} MB)
-                            {% elif document.file.size > 1024 %}
-                                {{ document.file.size }} bytes
-                            {% else %}
-                                {{ document.file.size }} bytes
-                            {% endif %}
-                        </span>
-                    </div>
-                    {% endif %}
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">category</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Type de Document</h4>
+                    <p>{{ metadata.doc_type }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">calendar_today</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Date de Publication</h4>
+                    <p>{{ metadata.publication_date }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">tag</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Version</h4>
+                    <p>{{ metadata.version }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">business</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Source</h4>
+                    <p>{{ metadata.source }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">public</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Pays</h4>
+                    <p>{{ metadata.country }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">language</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Langue</h4>
+                    <p>{{ metadata.language }}</p>
                 </div>
             </div>
         </div>

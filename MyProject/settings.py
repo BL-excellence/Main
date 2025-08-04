@@ -47,6 +47,9 @@ INSTALLED_APPS = [
     'rawdocs',
     'expert',
     'client',
+    'client.library',
+    'client.products',
+    'client.reports',
     'submissions',
     'chatbot',
 ]
