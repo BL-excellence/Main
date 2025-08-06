@@ -26,7 +26,7 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'myprojectiablcoklabs.onrender.com',
     'iablocklabs-zh6i.onrender.com',
-    '.replit.dev'
+    '.replit.dev',
 ]
 
 # Si vous déployez sur HTTPS (Render l’est), ajoutez-le ici :
