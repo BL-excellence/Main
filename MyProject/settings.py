@@ -26,12 +26,14 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'myprojectiablcoklabs.onrender.com',
     'iablocklabs-zh6i.onrender.com',
+    '.replit.dev'
 ]
 
 # Si vous déployez sur HTTPS (Render l’est), ajoutez-le ici :
 CSRF_TRUSTED_ORIGINS = [
     'https://myprojectiablcoklabs.onrender.com',
-    'https://iablocklabs-zh6i.onrender.com'
+    'https://iablocklabs-zh6i.onrender.com',
+    'https://*.replit.dev'
 ]
 
 
