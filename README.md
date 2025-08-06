@@ -4,6 +4,9 @@ Bienvenue sur **IABlockLabs**, la plateforme collaborative dédiée à la gestio
 
 Selon votre rôle (_Métadonneur_, _Annotateur_, _Expert_, ou _Client_), vous bénéficiez de fonctionnalités spécifiques qui optimisent l'ensemble du cycle de vie documentaire.
 
+> **Nouveauté :**  
+> Les clients peuvent désormais uploader leurs propres documents PDF dans la Library, avec extraction automatique des métadonnées et gestion dédiée.
+
 ---
 
 ## 🚀 Accès à la Plateforme
@@ -104,7 +107,7 @@ Le document apparaît dans la section **Product** côté Client (dossier "ctd"),
 
 ---
 
-## 4. Parcours Client (Consultation)
+## 4. Parcours Client (Consultation & Upload)
 
 ### Accès & Fonctionnalités
 
@@ -120,6 +123,19 @@ Le document apparaît dans la section **Product** côté Client (dossier "ctd"),
 - Le client peut :  
   - Consulter toutes les métadonnées (titre, type, pays, langue, contexte, etc.)
   - Télécharger les PDF associés (recherche/filtrage)
+
+#### **Upload de documents par le Client** 🆕
+
+- Les clients peuvent uploader leurs propres documents PDF via une interface moderne (drag & drop)
+- Extraction automatique des métadonnées via IA (pipeline Mistral AI)
+- Source du document forcée à "Client" pour une séparation claire
+- Validation automatique des documents uploadés
+- Stockage organisé dans un dossier dédié :  
+  `media/Client/YYYYMMDD_HHMMSS/document.pdf`
+- Catégorie "Client" ajoutée au dashboard, avec icône et couleur spécifique
+- Gestion complète : liste, détail, téléchargement et suppression sécurisée
+- Filtrage et tri par organisation dans la vue Library
+- Sécurité : chaque client ne voit que ses propres documents
 
 #### Products
 
@@ -254,4 +270,4 @@ Contactez l'équipe IABlockLabs — _réponse rapide assurée_ !
 
 ---
 
-**Bon usage de la plateforme IABlockLabs !** 🚀
+**Bon usage de la plateforme IABlockLabs
