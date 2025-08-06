@@ -484,7 +484,7 @@
       transform: translateX(4px);
     }
 
-    /* Carte d'authentification moderne */
+    /* Carte d'authentification moderne - CONTAINER ÉLARGI */
     .auth-card {
       position: relative;
       display: flex;
@@ -508,7 +508,7 @@
 
     .card-container {
       width: 100%;
-      max-width: 440px;
+      max-width: 540px; /* Augmenté de 440px à 540px pour plus de largeur */
       position: relative;
     }
 
@@ -711,6 +711,10 @@
         max-width: 100%;
       }
 
+      .card-container {
+        max-width: 600px; /* Encore plus large sur tablette */
+      }
+
       .footer-main {
         grid-template-columns: repeat(2, 1fr);
         gap: 2.5rem;
@@ -739,6 +743,10 @@
         padding: 2rem 1rem;
       }
 
+      .card-container {
+        max-width: 500px; /* Ajusté pour mobile mais toujours plus large */
+      }
+
       .footer-main {
         grid-template-columns: 1fr;
         gap: 2rem;
@@ -759,6 +767,10 @@
     @media (max-width: 480px) {
       .auth-container {
         padding: 1.5rem 1rem;
+      }
+
+      .card-container {
+        max-width: 100%; /* Full width sur très petit écran */
       }
 
       .hero-features {
