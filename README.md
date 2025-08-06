@@ -1,6 +1,6 @@
-# IABlockLabs – Plateforme Documentaire Réglementaire
+# PharmaLabs – Plateforme Documentaire Réglementaire
 
-Bienvenue sur **IABlockLabs**, la plateforme collaborative dédiée à la gestion, à l'extraction, à l'annotation et à la révision de documents réglementaires (PDF).
+Bienvenue sur **PharmaLabs**, la plateforme collaborative dédiée à la gestion, à l'extraction, à l'annotation et à la révision de documents réglementaires (PDF).
 
 Selon votre rôle (_Métadonneur_, _Annotateur_, _Expert_, ou _Client_), vous bénéficiez de fonctionnalités spécifiques qui optimisent l'ensemble du cycle de vie documentaire.
 
@@ -266,8 +266,8 @@ Visualisation en temps réel des indicateurs de performance :
 ## 📞 Support & Documentation
 
 Pour toute question, suggestion ou bug :  
-Contactez l'équipe IABlockLabs — _réponse rapide assurée_ !
+Contactez l'équipe PharmaLabs — _réponse rapide assurée_ !
 
 ---
 
-**Bon usage de la plateforme IABlockLabs
+**Bon usage de la plateforme PharmaLabs
