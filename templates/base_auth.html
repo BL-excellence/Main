@@ -484,7 +484,7 @@
       transform: translateX(4px);
     }
 
-    /* Carte d'authentification moderne - CONTAINER ÉLARGI */
+    /* Carte d'authentification FIXE - TOUTES LES ANIMATIONS SUPPRIMÉES */
     .auth-card {
       position: relative;
       display: flex;
@@ -492,24 +492,14 @@
       justify-content: center;
       padding: 3rem;
       z-index: 5;
-      animation: slideInRight 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    @keyframes slideInRight {
-      from {
-        opacity: 0;
-        transform: translateX(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
+      /* SUPPRESSION DE L'ANIMATION slideInRight */
     }
 
     .card-container {
       width: 100%;
-      max-width: 540px; /* Augmenté de 440px à 540px pour plus de largeur */
+      max-width: 540px;
       position: relative;
+      /* SUPPRESSION DE TOUTES LES ANIMATIONS ET TRANSFORMATIONS */
     }
 
     .card-glow {
@@ -524,7 +514,7 @@
       border: 1px solid var(--border);
       box-shadow: var(--shadow-2xl);
       z-index: -1;
-      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      /* SUPPRESSION DE LA TRANSITION */
     }
 
     .card-glow::before {
@@ -537,21 +527,13 @@
       background: linear-gradient(135deg, var(--primary-lighter), var(--secondary-light), var(--accent-light));
       opacity: 0;
       border-radius: inherit;
-      transition: opacity 0.4s ease;
+      /* SUPPRESSION DE LA TRANSITION */
       z-index: -1;
     }
 
-    .auth-card:hover .card-glow {
-      transform: scale(1.02);
-      box-shadow: 
-        var(--shadow-2xl),
-        0 0 0 1px rgba(14, 165, 233, 0.1),
-        0 0 40px rgba(14, 165, 233, 0.15);
-    }
-
-    .auth-card:hover .card-glow::before {
-      opacity: 0.05;
-    }
+    /* SUPPRESSION DE TOUS LES EFFETS DE HOVER SUR LA CARTE */
+    /* .auth-card:hover .card-glow - SUPPRIMÉ */
+    /* .auth-card:hover .card-glow::before - SUPPRIMÉ */
 
     /* Pied de page moderne */
     .auth-footer {
@@ -712,7 +694,7 @@
       }
 
       .card-container {
-        max-width: 600px; /* Encore plus large sur tablette */
+        max-width: 600px;
       }
 
       .footer-main {
@@ -744,7 +726,7 @@
       }
 
       .card-container {
-        max-width: 500px; /* Ajusté pour mobile mais toujours plus large */
+        max-width: 500px;
       }
 
       .footer-main {
@@ -770,7 +752,7 @@
       }
 
       .card-container {
-        max-width: 100%; /* Full width sur très petit écran */
+        max-width: 100%;
       }
 
       .hero-features {
@@ -972,7 +954,7 @@
     </div>
   </footer>
 
-  <!-- Scripts pour animations avancées -->
+  <!-- Scripts pour animations avancées - MODIFIÉ POUR EXCLURE LA CARTE -->
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       // Animation des éléments flottants
@@ -997,7 +979,7 @@
         }
       });
 
-      // Animation d'apparition progressive des éléments
+      // Animation d'apparition progressive des éléments (EXCLUANT LA CARTE D'AUTH)
       const observerOptions = {
         threshold: 0.1,
         rootMargin: '0px 0px -50px 0px'
@@ -1012,7 +994,7 @@
         });
       }, observerOptions);
 
-      // Observer les éléments du footer
+      // Observer les éléments du footer seulement (pas la carte d'auth)
       document.querySelectorAll('.footer-col').forEach(col => {
         col.style.opacity = '0';
         col.style.transform = 'translateY(20px)';
@@ -1020,27 +1002,8 @@
         observer.observe(col);
       });
 
-      // Effet de survol avancé pour les cartes
-      const authCard = document.querySelector('.auth-card');
-      if (authCard) {
-        authCard.addEventListener('mousemove', (e) => {
-          const rect = authCard.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          
-          const centerX = rect.width / 2;
-          const centerY = rect.height / 2;
-          
-          const rotateX = (y - centerY) / 10;
-          const rotateY = (centerX - x) / 10;
-          
-          authCard.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-        });
-
-        authCard.addEventListener('mouseleave', () => {
-          authCard.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
-        });
-      }
+      // SUPPRESSION COMPLÈTE DE L'EFFET DE SURVOL POUR LA CARTE D'AUTH
+      // Le code pour les effets de survol de la carte a été complètement supprimé
 
       // Amélioration de l'accessibilité
       const focusableElements = document.querySelectorAll('a, button, input, select, textarea');
@@ -1071,7 +1034,7 @@
         }
       };
 
-      // Initialisation des micro-interactions
+      // Initialisation des micro-interactions pour les features (PAS la carte d'auth)
       document.querySelectorAll('.feature-item').forEach((item, index) => {
         item.style.animationDelay = `${index * 0.1}s`;
         
