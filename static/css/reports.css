@@ -1296,7 +1296,41 @@
     justify-content: center;
 }
 
-/* ===== GENERATION STATES ===== */
+.column-filter {
+    background: #f0f9ff;
+    border-left: 3px solid #3b82f6;
+    padding: 1rem;
+    margin: 0.5rem 0;
+    border-radius: 0 6px 6px 0;
+    transition: all 0.3s ease;
+}
+
+.column-filter:hover {
+    background: #e0f2fe;
+}
+
+.filter-count {
+    background: #eff6ff;
+    color: #1d4ed8;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: auto;
+}
+
+#column-specific-filters {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-top: 1rem;
+}
+
+#clear-filters {
+    width: 100%;
+    margin-top: 1rem;
+    justify-content: center;
+}
+
 .generating {
     position: relative;
     overflow: hidden;

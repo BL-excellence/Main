@@ -59,15 +59,13 @@ class ReportsApp {
             return;
         }
     };
-   
+    
     this.handleChange = function(e) {
         if (e.target.closest('.matrix-builder') && 
-           (e.target.closest('.filter-control') || e.target.classList.contains('filter-select'))) {
-            matrixBuilder.updateFilters();
+        (e.target.closest('.filter-control') || e.target.classList.contains('filter-select'))) {
+            return;
         }
     };
-    
-    // Add the event listeners
     document.addEventListener('change', this.handleChange);
     
     console.log('✅ Matrix Builder events bound');
@@ -864,48 +862,68 @@ class MatrixBuilder {
    
 
     bindEvents() {
-    document.removeEventListener('click', this.matrixClickHandler);
-    document.removeEventListener('change', this.matrixChangeHandler);
-    
-    this.matrixClickHandler = (e) => {
-        if (!e.target.closest('.matrix-builder')) return;
+        const self = this; 
         
-        const fieldItem = e.target.closest('.field-item');
-        if (fieldItem) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.toggleField(fieldItem);
-            return;
-        }
+        // Use different event handler names to avoid conflicts with ReportsApp
+        document.removeEventListener('click', this.matrixClickHandler);
+        document.removeEventListener('change', this.matrixChangeHandler);
+        
+        // Create bound methods with unique names
+        this.matrixClickHandler = function(e) {
+            // Only handle clicks inside matrix-builder, but NOT return early
+            if (!e.target.closest('.matrix-builder')) return;
+            
+            const button = e.target.closest('button');
+            if (button) {
+                // Generate button
+                if (e.target.closest('.generate-button')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    self.generateMatrix(); 
+                    return;
+                }
 
-        if (e.target.closest('.generate-button')) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.generateMatrix();
-            return;
-        }
+                // Remove column chip
+                if (e.target.closest('.column-chip .remove')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const chip = e.target.closest('.column-chip');
+                    const fieldName = chip.dataset.field;
+                    self.removeColumn(fieldName);
+                    return;
+                }
 
-        if (e.target.closest('.column-chip .remove')) {
-            e.preventDefault();
-            e.stopPropagation();
-            const chip = e.target.closest('.column-chip');
-            const fieldName = chip.dataset.field;
-            this.removeColumn(fieldName);
-            return;
-        }
-    };
-    
-    this.matrixChangeHandler = (e) => {
-        if (e.target.closest('.matrix-builder') && 
-           (e.target.closest('.filter-control') || e.target.classList.contains('filter-select'))) {
-            this.debouncedUpdateFilters();
-        }
-    };
-    
-    document.addEventListener('click', this.matrixClickHandler);
-    document.addEventListener('change', this.matrixChangeHandler);
-    document.addEventListener('click', this.handleClick);
-    console.log('✅ Matrix Builder events bound');
+                // Clear filters button
+                if (e.target.closest('#clear-filters')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    self.clearAllFilters(); 
+                    return;
+                }
+            }
+            
+            // Handle field item clicks
+            const fieldItem = e.target.closest('.field-item');
+            if (fieldItem) {
+                e.preventDefault();
+                e.stopPropagation();
+                self.toggleField(fieldItem);
+                return;
+            }
+        };
+
+        this.matrixChangeHandler = function(e) {
+            if (e.target.closest('.matrix-builder') && 
+            (e.target.closest('.filter-control') || e.target.classList.contains('filter-select'))) {
+                self.updateFilters(); 
+            }
+        };
+        
+        // Add the event listeners with unique handler names
+        document.addEventListener('click', this.matrixClickHandler);
+        document.addEventListener('change', this.matrixChangeHandler);
+        
+        console.log('✅ Matrix Builder events bound');
 }
     toggleField(fieldItem) {
         const fieldName = fieldItem.dataset.field;
@@ -940,7 +958,23 @@ class MatrixBuilder {
         this.updateUI();
         this.showToast(`✅ Colonne "${fieldConfig.label}" ajoutée`, 'success');
     }
-
+    clearAllFilters() {
+        // Clear all filter select elements
+        const filterInputs = document.querySelectorAll('.matrix-builder .filter-select');
+        filterInputs.forEach(input => {
+            input.value = '';
+        });
+        
+        // Clear internal filters state
+        this.currentFilters = {};
+        
+        // Regenerate matrix without filters
+        if (this.selectedColumns.length > 0) {
+            this.generateMatrix();
+        }
+        
+        this.showToast('🧹 Tous les filtres ont été effacés', 'info');
+    }
     removeColumn(fieldName) {
         const removedColumn = this.selectedColumns.find(col => col.name === fieldName);
         this.selectedColumns = this.selectedColumns.filter(col => col.name !== fieldName);
@@ -1121,20 +1155,32 @@ class MatrixBuilder {
     }
 
     updateFilters() {
-        const filterInputs = document.querySelectorAll('.matrix-builder .filter-select');
-        const oldFilters = {...this.currentFilters};
-        this.currentFilters = {};
+    const filterInputs = document.querySelectorAll('.matrix-builder .filter-select');
+    const oldFilters = {...this.currentFilters};
+    this.currentFilters = {};
+    
+    console.log('🔍 Found filter inputs:', filterInputs.length);
+    
+    filterInputs.forEach(input => {
+        console.log(`🔍 Processing input: ${input.name} = '${input.value}'`);
         
-        filterInputs.forEach(input => {
-            if (input.value && input.value !== '') {
-                this.currentFilters[input.name] = input.value;
-            }
-        });
+        if (input.value && input.value !== '') {
+            const filterName = input.name.replace('filter_', '');
+            this.currentFilters[filterName] = input.value;
+            console.log(`✅ Added filter: ${filterName} = '${input.value}'`);
+        }
+    });
 
-        if (JSON.stringify(oldFilters) !== JSON.stringify(this.currentFilters)) {
-            console.log('🔍 Filters updated:', this.currentFilters);
+    console.log('🔍 Final filters to send to backend:', this.currentFilters);
+    
+    if (JSON.stringify(oldFilters) !== JSON.stringify(this.currentFilters)) {
+        if (this.selectedColumns.length > 0) {
+            console.log('🔄 Calling generateMatrix with filters...');
+            this.generateMatrix();
         }
     }
+}
+    
 
     async generateMatrix() {
         if (this.selectedColumns.length === 0) {
@@ -1207,6 +1253,190 @@ class MatrixBuilder {
             window.reportsApp.showToast(message, type);
         } else {
             console.log(`${type.toUpperCase()}: ${message}`);
+        }
+    }
+
+    updateUI() {
+        this.updateFieldSelection();
+        this.updateMatrixPreview();
+        this.updateDynamicFilters(); 
+    }
+
+    updateDynamicFilters() {
+        const filtersContainer = document.getElementById('column-specific-filters');
+        const filterCount = document.getElementById('filter-count');
+        
+        if (!filtersContainer) return;
+        
+        // Clear existing filters
+        filtersContainer.innerHTML = '';
+        
+        let filterHtml = '';
+        let filterCounter = 0;
+        
+        console.log('🔍 Updating filters for columns:', this.selectedColumns);
+        console.log('🔍 Available window.filterOptions:', window.filterOptions);
+
+        // Generate filters for selected columns
+        this.selectedColumns.forEach(column => {
+            const fieldName = column.name;
+            const fieldType = column.type;
+            const fieldLabel = column.label;
+            
+            console.log(`🔍 Processing column: ${fieldName} (${fieldType}) - ${fieldLabel}`);
+            const filterOptions = this.getFilterOptionsForField(fieldName, fieldType);
+            
+            console.log(`🔍 Filter options for ${fieldName}:`, filterOptions);
+            
+            if (filterOptions && filterOptions.length > 0) {
+                filterCounter++;
+                filterHtml += `
+                    <div class="filter-group column-filter" data-column="${fieldName}">
+                        <label>${this.getFilterIcon(fieldType)} ${fieldLabel}</label>
+                        <select name="filter_${fieldName}" class="filter-select">
+                            <option value="">Tous les ${fieldLabel.toLowerCase()}</option>
+                            ${filterOptions.map(option => `
+                                <option value="${option}">${option}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                `;
+            } else {
+                console.log(`❌ No filter options found for ${fieldName}`);
+            }   
+        });
+        
+        filtersContainer.innerHTML = filterHtml;
+        const newFilterSelects = filtersContainer.querySelectorAll('.filter-select');
+        newFilterSelects.forEach(select => {
+            select.addEventListener('change', () => {
+                console.log(`🔍 Filter changed: ${select.name} = ${select.value}`);
+                this.debouncedUpdateFilters();
+            });
+        });
+        // Update filter count
+        if (filterCount) {
+            filterCount.textContent = filterCounter > 0 ? `${filterCounter} filtres` : '0 filtres';
+        }
+        
+        // Show/hide clear button
+        const clearButton = document.getElementById('clear-filters');
+        if (clearButton) {
+            clearButton.style.display = filterCounter > 0 ? 'block' : 'none';
+        }
+    }
+
+    getFilterOptionsForField(fieldName, fieldType) {
+        console.log(`🔍 Looking for filter options for: ${fieldName} (type: ${fieldType})`);
+        
+        if (typeof window.filterOptions === 'undefined') {
+            console.log('❌ window.filterOptions not found');
+            return [];
+        }
+        
+        const options = window.filterOptions;
+        console.log('🔍 Available filter option keys:', Object.keys(options));
+        
+        let foundOptions = [];
+        
+        // 1. EXACT MATCH
+        if (options[fieldName] && Array.isArray(options[fieldName]) && options[fieldName].length > 0) {
+            foundOptions = options[fieldName];
+            console.log(`✅ EXACT match: ${fieldName}`);
+            return foundOptions;
+        }
+        
+        // 2. GENERATE ALL POSSIBLE VARIATIONS
+        const variations = [
+            fieldName + 's',                        // name -> names
+            fieldName + 'es',                       // dosage -> dosages  
+            fieldType + '_' + fieldName,            // product_name
+            fieldType + '_' + fieldName + 's',      // product_names
+            'doc_' + fieldName,                     // doc_title
+            'doc_' + fieldName + 's',               // doc_titles
+            fieldName.replace('_', ''),             // active_ingredient -> activeingredient
+            fieldName.replace('_', '') + 's',       // activeingredients
+            fieldName + '_type',                    // name_type
+            fieldName + '_types',                   // name_types
+            fieldName + '_name',                    // field_name
+            fieldName + '_names',                   // field_names
+        ];
+        
+        // Try all variations
+        for (const variation of variations) {
+            if (options[variation] && Array.isArray(options[variation]) && options[variation].length > 0) {
+                foundOptions = options[variation];
+                console.log(`✅ VARIATION match: ${fieldName} -> ${variation}`);
+                return foundOptions;
+            }
+        }
+        
+        // 3. HANDLE ADDITIONAL ANNOTATION FIELDS
+        if (fieldName.startsWith('additional_') && options.annotations) {
+            const annotationType = fieldName.replace('additional_', '');
+            console.log(`🔍 Checking annotation type: ${annotationType}`);
+            
+            if (options.annotations[annotationType] && options.annotations[annotationType].options) {
+                foundOptions = options.annotations[annotationType].options;
+                console.log(`✅ Found annotation options for ${annotationType}`);
+                return foundOptions;
+            }
+        }
+        
+        // 4. FUZZY SEARCH - Search through ALL keys
+        const allKeys = Object.keys(options);
+        for (const key of allKeys) {
+            // Skip non-array values
+            if (!Array.isArray(options[key]) || options[key].length === 0) continue;
+            
+            // Check if key contains field name (either direction)
+            if (key.toLowerCase().includes(fieldName.toLowerCase()) || 
+                fieldName.toLowerCase().includes(key.toLowerCase())) {
+                foundOptions = options[key];
+                console.log(`✅ FUZZY match: ${fieldName} -> ${key}`);
+                return foundOptions;
+            }
+        }
+        
+        // 5. LAST RESORT - Check for partial word matches
+        const fieldWords = fieldName.split('_');
+        for (const key of allKeys) {
+            if (!Array.isArray(options[key]) || options[key].length === 0) continue;
+            
+            const keyWords = key.split('_');
+            const hasCommonWord = fieldWords.some(word => 
+                keyWords.some(keyWord => 
+                    word.toLowerCase() === keyWord.toLowerCase() && word.length > 2
+                )
+            );
+            
+            if (hasCommonWord) {
+                foundOptions = options[key];
+                console.log(`✅ WORD match: ${fieldName} -> ${key}`);
+                return foundOptions;
+            }
+        }
+        
+        console.log(`❌ NO FILTER OPTIONS found for field: ${fieldName}`);
+        console.log(`🔍 Available keys were:`, Object.keys(options));
+        return [];
+    }
+    getFilterIcon(fieldType) {
+        const icons = {
+            'product': '🏥',
+            'document': '📄',
+            'annotation': '🏷️'
+        };
+        return icons[fieldType] || '🔍';
+    }
+
+    removeColumn(fieldName) {
+        const removedColumn = this.selectedColumns.find(col => col.name === fieldName);
+        this.selectedColumns = this.selectedColumns.filter(col => col.name !== fieldName);
+        this.updateUI(); // This will call updateDynamicFilters
+        
+        if (removedColumn) {
+            this.showToast(`🗑️ Colonne "${removedColumn.label}" supprimée`, 'info');
         }
     }
 

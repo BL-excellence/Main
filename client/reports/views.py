@@ -343,6 +343,7 @@ def matrix_builder(request):
     return render(request, 'client/reports/matrix_builder.html', context)
 
 def get_real_filter_options():
+    """Generate filter options with EXACT field name matching - SIMPLE"""
     filter_options = {
         'periods': [
             ('7d', '7 derniers jours'),
@@ -353,37 +354,140 @@ def get_real_filter_options():
         ]
     }
     
+    # AUTO-GENERATE for Product fields
     if Product.objects.exists():
-        product_names = list(Product.objects.exclude(name='').exclude(name__isnull=True).values_list('name', flat=True).distinct().order_by('name'))
-        dosages = list(Product.objects.exclude(dosage='').exclude(dosage__isnull=True).values_list('dosage', flat=True).distinct().order_by('dosage'))
-        active_ingredients = list(Product.objects.exclude(active_ingredient='').exclude(active_ingredient__isnull=True).values_list('active_ingredient', flat=True).distinct().order_by('active_ingredient'))
-        therapeutic_areas = list(Product.objects.exclude(therapeutic_area='').exclude(therapeutic_area__isnull=True).values_list('therapeutic_area', flat=True).distinct().order_by('therapeutic_area'))
+        print("🔍 Processing Product fields...")
         
-        filter_options.update({
-            'product_names': product_names[:20],
-            'dosages': dosages[:20], 
-            'active_ingredients': active_ingredients[:20],
-            'therapeutic_areas': therapeutic_areas[:10],
-        })
+        for field in Product._meta.get_fields():
+            if (hasattr(field, 'get_internal_type') and 
+                field.get_internal_type() in ['CharField', 'TextField'] and
+                not field.many_to_many and not field.one_to_many):
+                
+                field_name = field.name
+                
+                try:
+                    values = list(
+                        Product.objects
+                        .exclude(**{f'{field_name}__isnull': True})
+                        .exclude(**{f'{field_name}': ''})
+                        .values_list(field_name, flat=True)
+                        .distinct()
+                        .order_by(field_name)[:20]
+                    )
+                    
+                    if values:
+                        filter_options[field_name] = values
+                        print(f"✅ Added Product filter: {field_name} ({len(values)} options)")
+                        
+                except Exception as e:
+                    print(f"❌ Error with Product.{field_name}: {e}")
     
+    # AUTO-GENERATE for RawDocument fields  
     if RawDocument.objects.exists():
-        doc_types = list(RawDocument.objects.exclude(doc_type='').exclude(doc_type__isnull=True).values_list('doc_type', flat=True).distinct().order_by('doc_type'))
-        doc_countries = list(RawDocument.objects.exclude(country='').exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country'))
-        doc_sources = list(RawDocument.objects.exclude(source='').exclude(source__isnull=True).values_list('source', flat=True).distinct().order_by('source'))
+        print("🔍 Processing RawDocument fields...")
         
-        filter_options.update({
-            'doc_types': doc_types[:15],
-            'doc_countries': doc_countries[:15],
-            'doc_sources': doc_sources[:15],
-        })
+        for field in RawDocument._meta.get_fields():
+            if (hasattr(field, 'get_internal_type') and 
+                field.get_internal_type() in ['CharField', 'TextField'] and
+                not field.many_to_many and not field.one_to_many):
+                
+                field_name = field.name
+                
+                try:
+                    values = list(
+                        RawDocument.objects
+                        .exclude(**{f'{field_name}__isnull': True})
+                        .exclude(**{f'{field_name}': ''})
+                        .values_list(field_name, flat=True)
+                        .distinct()
+                        .order_by(field_name)[:20]
+                    )
+                    
+                    if values:
+                        filter_options[field_name] = values
+                        print(f"✅ Added RawDocument filter: {field_name} ({len(values)} options)")
+                        
+                except Exception as e:
+                    print(f"❌ Error with RawDocument.{field_name}: {e}")
     
+    # SPECIAL HANDLING for sites (relationship field)
+    if ManufacturingSite.objects.exists():
+        print("🔍 Processing ManufacturingSite fields...")
+        
+        # Handle sites field specially
+        site_names = list(
+            ManufacturingSite.objects
+            .exclude(site_name__isnull=True)
+            .exclude(site_name='')
+            .values_list('site_name', flat=True)
+            .distinct()
+            .order_by('site_name')[:20]
+        )
+        if site_names:
+            filter_options['sites'] = site_names  # Match your JavaScript field name
+            print(f"✅ Added sites filter: {len(site_names)} options")
+        
+        # Also handle other site fields
+        for field in ManufacturingSite._meta.get_fields():
+            if (hasattr(field, 'get_internal_type') and 
+                field.get_internal_type() in ['CharField', 'TextField'] and
+                not field.many_to_many and not field.one_to_many):
+                
+                field_name = field.name
+                
+                try:
+                    values = list(
+                        ManufacturingSite.objects
+                        .exclude(**{f'{field_name}__isnull': True})
+                        .exclude(**{f'{field_name}': ''})
+                        .values_list(field_name, flat=True)
+                        .distinct()
+                        .order_by(field_name)[:20]
+                    )
+                    
+                    if values:
+                        filter_options[field_name] = values
+                        print(f"✅ Added ManufacturingSite filter: {field_name} ({len(values)} options)")
+                        
+                except Exception as e:
+                    print(f"❌ Error with ManufacturingSite.{field_name}: {e}")
+    
+    # Handle additional annotations from Product JSONField
+    if Product.objects.exists():
+        print("🔍 Processing additional annotations...")
+        
+        all_annotation_keys = set()
+        for product in Product.objects.exclude(additional_annotations__isnull=True):
+            if product.additional_annotations:
+                all_annotation_keys.update(product.additional_annotations.keys())
+        
+        for annotation_key in all_annotation_keys:
+            try:
+                values = []
+                for product in Product.objects.exclude(additional_annotations__isnull=True):
+                    if (product.additional_annotations and 
+                        annotation_key in product.additional_annotations and 
+                        product.additional_annotations[annotation_key]):
+                        values.append(str(product.additional_annotations[annotation_key]))
+                
+                unique_values = list(set(values))[:20]
+                if unique_values:
+                    filter_options[f'additional_{annotation_key}'] = unique_values
+                    print(f"✅ Added additional annotation filter: additional_{annotation_key}")
+                    
+            except Exception as e:
+                print(f"❌ Error with additional_{annotation_key}: {e}")
+    
+    # Handle database annotations
     annotation_filters = {}
     for annotation_type in AnnotationType.objects.all():
         unique_values = list(
             Annotation.objects.filter(
                 annotation_type=annotation_type,
                 validation_status__in=['validated', 'expert_created']
-            ).exclude(selected_text='').exclude(selected_text__isnull=True).values_list('selected_text', flat=True).distinct().order_by('selected_text')[:15]
+            ).exclude(selected_text='').exclude(selected_text__isnull=True)
+            .values_list('selected_text', flat=True)
+            .distinct().order_by('selected_text')[:15]
         )
         
         if unique_values:
@@ -393,8 +497,9 @@ def get_real_filter_options():
             }
     
     filter_options['annotations'] = annotation_filters
+    
+    print(f"🎉 Total filter options generated: {len(filter_options)} keys")
     return filter_options
-
 
 def get_validated_annotation_types():
     annotation_types_with_data = AnnotationType.objects.filter(
@@ -752,183 +857,132 @@ def generate_annotation_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
     return rows
 
 def generate_product_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
-    """Generate rows starting from products"""
+    """Generate rows starting from products - COMPLETELY DYNAMIC"""
     
-    # Build product queryset
+    # Start with all products
     products = Product.objects.all()
     
-    # Apply filters
-    if filters.get('product_name'):
-        products = products.filter(name__icontains=filters['product_name'])
-    if filters.get('dosage'):
-        products = products.filter(dosage__icontains=filters['dosage'])
-    if filters.get('active_ingredient'):
-        products = products.filter(active_ingredient__icontains=filters['active_ingredient'])
+    # Apply filters dynamically - NO HARDCODING
+    products = apply_filters_dynamically(products, Product, filters)
     
-    # Limit to actual products
+    # Handle period filter separately (applies to created_at)
+    if filters.get('period'):
+        products = apply_period_filter(products, filters['period'])
+    
+    # Limit results
     products = products[:10]
     
-    print(f"🏭 Processing {products.count()} products")
+    print(f"🏭 Final filtered products count: {products.count()}")
     
+    # Generate rows (this part stays the same)
     rows = []
     for product in products:
         row_data = {}
         for column in columns:
             field_name = column.get('name', '')
-            print(f"🔍 Processing field: {field_name} for product: {product.name}")
-            
             try:
-                if column.get('source_type') == 'product' or column.get('type') == 'product':
-                    # Direct product field access
-                    if field_name == 'name':
-                        value = product.name or "No name"
-                    elif field_name == 'active_ingredient':
-                        value = product.active_ingredient or "No ingredient"
-                    elif field_name == 'dosage':
-                        value = product.dosage or "No dosage"
-                    elif field_name == 'form':
-                        value = product.form or "No form"
-                    elif field_name == 'therapeutic_area':
-                        value = product.therapeutic_area or "No area"
-                    elif field_name == 'sites':
-                        sites = product.sites.all()
-                        if sites.exists():
-                            site_names = []
-                            for site in sites:
-                                site_names.append(str(site.site_name))
-                            value = '; '.join(site_names)
-                        else:
-                            value = "No sites"
-                    elif field_name.startswith('additional_'):
-                        annotation_key = field_name.replace('additional_', '')
-                        print(f"🎯 DEBUG: Looking for {annotation_key} in additional_annotations")
-                        print(f"🎯 DEBUG: Available keys: {list(product.additional_annotations.keys())}")
-                        if annotation_key in product.additional_annotations:
-                            value = str(product.additional_annotations[annotation_key])
-                            print(f"🎯 DEBUG: Found value: {value}")
-                        else:
-                            value = "No data"
-                            print(f"❌ DEBUG: {annotation_key} not found")
-                    else:
-                        # Try to get any other field
-                        value = getattr(product, field_name, "Field not found")
-                else:
-                    # For non-product columns, try to get from product's document
-                    if hasattr(product, 'source_document') and product.source_document:
-                        value = generate_column_value_simple(column, product.source_document)
-                    else:
-                        value = "N/A"
-                
+                value = get_field_value_dynamically(product, field_name)
                 row_data[field_name] = str(value)
-                print(f"✅ Got value: {value}")
-                
             except Exception as e:
-                print(f"❌ Error for field {field_name}: {e}")
                 row_data[field_name] = f"Error: {str(e)}"
-        
         rows.append(row_data)
     
     return rows
-    
 
 def generate_document_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
-    """Generate rows starting from documents - FIXED VERSION"""
+    """Generate rows starting from documents - COMPLETELY DYNAMIC"""
     
-    # Get documents with applied filters
-    queryset = RawDocument.objects.filter(is_validated=True)
+    # Start with all documents
+    documents = RawDocument.objects.filter(is_validated=True)
     
-    # Apply time period filters
+    # Apply filters dynamically - NO HARDCODING
+    documents = apply_filters_dynamically(documents, RawDocument, filters)
+    
+    # Handle period filter
     if filters.get('period'):
-        period = filters['period']
-        if period == '7d':
-            start_date = timezone.now() - timedelta(days=7)
-        elif period == '30d':
-            start_date = timezone.now() - timedelta(days=30)
-        elif period == '90d':
-            start_date = timezone.now() - timedelta(days=90)
-        else:
-            start_date = timezone.now() - timedelta(days=30)
-        
-        queryset = queryset.filter(created_at__gte=start_date)
+        documents = apply_period_filter(documents, filters['period'])
     
-    # Apply document filters
-    if filters.get('doc_type'):
-        queryset = queryset.filter(doc_type__icontains=filters['doc_type'])
+    # Limit results
+    documents = documents.order_by('-created_at')[:10]
     
-    if filters.get('doc_country'):
-        queryset = queryset.filter(country__icontains=filters['doc_country'])
+    print(f"📄 Final filtered documents count: {documents.count()}")
     
-    if filters.get('doc_source'):
-        queryset = queryset.filter(source__icontains=filters['doc_source'])
-    
-    documents = queryset.order_by('-created_at')[:10]
-    
-    print(f"📄 Processing {documents.count()} documents")
-    
+    # Generate rows dynamically
     rows = []
     for document in documents:
         row_data = {}
-        has_data = False
-        
         for column in columns:
             field_name = column.get('name', '')
-            source_type = column.get('source_type', column.get('type', 'document'))
-            
-            print(f"🔍 Processing field: {field_name}, type: {source_type}")
-            
             try:
-                if source_type == 'document':
-                    # Direct document field access
-                    if field_name == 'title':
-                        value = document.title or "No title"
-                    elif field_name == 'doc_type':
-                        value = document.doc_type or "No type"
-                    elif field_name == 'country':
-                        value = document.country or "No country"
-                    elif field_name == 'source':
-                        value = document.source or "No source"
-                    elif field_name == 'created_at':
-                        value = document.created_at.strftime('%d/%m/%Y') if document.created_at else "No date"
-                    else:
-                        # Try to get any other document field
-                        value = getattr(document, field_name, "Field not found")
-                
-                elif source_type == 'annotation':
-                    # Get annotation value
-                    annotation_type = AnnotationType.objects.filter(name=field_name).first()
-                    if annotation_type:
-                        annotations = Annotation.objects.filter(
-                            page__document=document,
-                            annotation_type=annotation_type,
-                            validation_status__in=['validated', 'expert_created']
-                        ).values_list('selected_text', flat=True)
-                        
-                        if annotations:
-                            unique_annotations = list(set(annotations))
-                            value = "; ".join(unique_annotations[:3])
-                        else:
-                            value = "No annotation"
-                    else:
-                        value = "Annotation type not found"
-                
-                else:
-                    value = "Unknown source type"
-                
-                if value and value not in ["", "No title", "No type", "Field not found"]:
-                    has_data = True
-                
+                value = get_field_value_dynamically(document, field_name)
                 row_data[field_name] = str(value)
-                print(f"✅ Got value: {value}")
-                
             except Exception as e:
-                print(f"❌ Error for field {field_name}: {e}")
                 row_data[field_name] = f"Error: {str(e)}"
-        
-        # Only add rows that have some actual data
-        if has_data:
-            rows.append(row_data)
+        rows.append(row_data)
     
     return rows
+def apply_period_filter(queryset, period):
+    """Apply period filter dynamically"""
+    period_days = {
+        '7d': 7, '30d': 30, '90d': 90, 
+        '6m': 180, '1y': 365
+    }.get(period, 30)
+    
+    start_date = timezone.now() - timedelta(days=period_days)
+    return queryset.filter(created_at__gte=start_date)
+
+def get_field_value_dynamically(obj, field_name):
+    """Get field value from any object dynamically - ZERO HARDCODING"""
+    
+    # SPECIAL HANDLING for sites field
+    if field_name == 'sites' and hasattr(obj, 'sites'):
+        sites = obj.sites.all()
+        if sites.exists():
+            # Get site names, not object references
+            site_names = []
+            for site in sites[:3]:  # Limit to 3 sites
+                if hasattr(site, 'site_name') and site.site_name:
+                    site_names.append(str(site.site_name))
+                else:
+                    site_names.append(f"Site #{site.id}")
+            return '; '.join(site_names) if site_names else "No site names"
+        else:
+            return "No manufacturing sites"
+    
+    # Try direct attribute access
+    if hasattr(obj, field_name):
+        value = getattr(obj, field_name)
+        if value is not None:
+            # Handle datetime fields
+            if hasattr(value, 'strftime'):
+                return value.strftime('%d/%m/%Y')
+            return str(value)
+    
+    # Handle additional_ prefixed fields
+    if field_name.startswith('additional_') and hasattr(obj, 'additional_annotations'):
+        annotation_key = field_name.replace('additional_', '')
+        return obj.additional_annotations.get(annotation_key, 'No data')
+    
+    # Handle other related fields (but NOT sites - we handled that above)
+    if hasattr(obj, field_name) and field_name != 'sites':
+        related_obj = getattr(obj, field_name)
+        if hasattr(related_obj, 'all'):  # QuerySet
+            items = related_obj.all()[:3]
+            # Try to get meaningful string representation
+            item_strs = []
+            for item in items:
+                if hasattr(item, 'name'):
+                    item_strs.append(str(item.name))
+                elif hasattr(item, 'title'):
+                    item_strs.append(str(item.title))
+                elif hasattr(item, '__str__'):
+                    item_strs.append(str(item))
+                else:
+                    item_strs.append(f"Item #{item.id}")
+            return '; '.join(item_strs) if item_strs else "No items"
+        return str(related_obj)
+    
+    return 'Field not found'
 
 def build_base_queryset_simple(filters: Dict):
     """Build the base queryset based on filter values - SUPPORTS ALL FILTERS"""
@@ -1252,3 +1306,111 @@ def generate_ai_value_simple(field_name: str, document: RawDocument) -> str:
     except Exception as e:
         print(f"❌ Error generating AI value {field_name}: {e}")
         return f"AI Error: {str(e)}"
+    
+def apply_filters_dynamically(queryset, model_class, filters: Dict):
+    """Apply filters dynamically to any model - ZERO HARDCODING"""
+    
+    if not filters:
+        return queryset
+        
+    print(f"🔍 Applying filters dynamically to {model_class.__name__}: {filters}")
+    
+    for filter_key, filter_value in filters.items():
+        if not filter_value or filter_value == '':
+            continue
+            
+        print(f"🔍 Processing filter: {filter_key} = {filter_value}")
+        
+        # Skip period filter (handled separately)
+        if filter_key == 'period':
+            continue
+            
+        try:
+            # Get all field names from the model
+            field_names = [f.name for f in model_class._meta.get_fields()]
+            
+            # SPECIAL HANDLING for specific relationship fields we know about
+            if filter_key == 'sites' and model_class == Product:
+                # Filter products by their related manufacturing sites
+                queryset = queryset.filter(sites__site_name__icontains=filter_value)
+                print(f"✅ Applied sites relationship filter: {filter_value}")
+                continue
+            
+            # Try exact field match first
+            if filter_key in field_names:
+                field = model_class._meta.get_field(filter_key)
+                
+                # Check if it's a REAL relationship field (not just any field with related_model)
+                is_relationship = (
+                    hasattr(field, 'related_model') and 
+                    field.get_internal_type() in ['ForeignKey', 'ManyToManyField', 'OneToOneField']
+                )
+                
+                if is_relationship:
+                    print(f"⚠️ Skipping relationship field: {filter_key} (type: {field.get_internal_type()})")
+                    continue
+                else:
+                    # Regular field - apply icontains
+                    filter_kwargs = {f"{filter_key}__icontains": filter_value}
+                    queryset = queryset.filter(**filter_kwargs)
+                    print(f"✅ Applied exact field filter: {filter_key} (type: {field.get_internal_type()})")
+                    continue
+            
+            # Try removing prefixes (additional_authority -> authority)
+            if filter_key.startswith('additional_'):
+                clean_key = filter_key.replace('additional_', '')
+                if clean_key in field_names:
+                    field = model_class._meta.get_field(clean_key)
+                    is_relationship = (
+                        hasattr(field, 'related_model') and 
+                        field.get_internal_type() in ['ForeignKey', 'ManyToManyField', 'OneToOneField']
+                    )
+                    
+                    if not is_relationship:
+                        filter_kwargs = {f"{clean_key}__icontains": filter_value}
+                        queryset = queryset.filter(**filter_kwargs)
+                        print(f"✅ Applied cleaned field filter: {clean_key}")
+                        continue
+                    
+                # Handle JSONField additional_annotations
+                if hasattr(model_class, 'additional_annotations'):
+                    annotation_key = clean_key
+                    filter_kwargs = {
+                        'additional_annotations__has_key': annotation_key,
+                        f'additional_annotations__{annotation_key}__icontains': filter_value
+                    }
+                    queryset = queryset.filter(**filter_kwargs)
+                    print(f"✅ Applied additional annotation filter: {annotation_key}")
+                    continue
+            
+            # Try common variations (but only for non-relationship fields)
+            variations = [
+                filter_key.replace('_', ''),  # remove underscores
+                filter_key.replace('-', '_'), # dash to underscore
+                filter_key + '_type',         # add _type suffix
+                filter_key + '_name',         # add _name suffix
+            ]
+            
+            found_match = False
+            for variation in variations:
+                if variation in field_names:
+                    field = model_class._meta.get_field(variation)
+                    is_relationship = (
+                        hasattr(field, 'related_model') and 
+                        field.get_internal_type() in ['ForeignKey', 'ManyToManyField', 'OneToOneField']
+                    )
+                    
+                    if not is_relationship:
+                        filter_kwargs = {f"{variation}__icontains": filter_value}
+                        queryset = queryset.filter(**filter_kwargs)
+                        print(f"✅ Applied variation filter: {filter_key} -> {variation}")
+                        found_match = True
+                        break
+            
+            if not found_match:
+                print(f"⚠️ No matching field found for filter: {filter_key}")
+                
+        except Exception as e:
+            print(f"❌ Error applying filter {filter_key}: {e}")
+    
+    return queryset
