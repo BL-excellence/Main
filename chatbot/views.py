@@ -8,7 +8,7 @@ import datetime
 import unicodedata
 import logging
 import requests
-
+from chatbot.utils.matching import find_best_product,find_best_document,extract_product_name
 
 
 
@@ -18,7 +18,163 @@ logger = logging.getLogger(__name__)
 def strip_accents(s: str) -> str:
     return ''.join(c for c in unicodedata.normalize('NFD', s or '') if unicodedata.category(c) != 'Mn')
 
+LIST_WORDS = ("tous", "toutes", "liste", "affiche", "montre", "montrez")  # PAS 'donner'
+STOP_TAIL = r"(?:\s+(?:dans|en)\s+(?:la\s+)?base(?:\s+de\s+donn[ée]es)?\b|[?,.;]|$)"
 
+DOC_FIELD_MAP = {
+    "type": "doc_type",
+    "source": "source",
+    "autorité": "source",
+    "authority": "source",
+    "langue": "language",
+    "language": "language",
+    "version": "version",
+    "pays": "country",
+    "date de publication": "publication_date",
+    "publication": "publication_date",
+    "date": "publication_date",
+    "url": "url_source",
+    "lien": "url_source",
+}
+
+PROD_FIELD_MAP = {
+    "type": "form",
+    "forme": "form",
+    "statut": "status",                # pour détail; pour les filtres on pourra mapper le texte → code si besoin
+    "principe actif": "active_ingredient",
+    "dosage": "dosage",
+    "nom": "name",
+}
+
+def normalize_filter_value(field: str, value: str) -> str:
+    v = strip_accents((value or "")).lower().strip()
+    if field == "source":
+        if v in {"fda", "food and drug administration", "u.s. food and drug administration"}:
+            return "Food and Drug Administration"
+        if v in {"ema", "european medicines agency", "agence europeenne des medicaments"}:
+            return "European Medicines Agency"
+    if field == "doc_type":
+        alias = {"guidelines": "guideline", "guidline": "guideline", "guidance": "guideline"}
+        return alias.get(v, value)
+    return value
+
+
+def parse_request(question: str, intent: str):
+    q = question
+    ql = q.lower()
+
+    # 1) list vs detail (sans 'donner')
+    wants_list = any(w in ql for w in LIST_WORDS) and ("document" in ql or "documents" in ql or "produit" in ql or "produits" in ql)
+
+    # 2) entity
+    entity = "library" if intent == "library" else ("product" if intent == "product" else None)
+
+    # 3) si LISTE → extraire les filtres alias: valeur
+    filters = []
+    field_map = DOC_FIELD_MAP if entity == "library" else PROD_FIELD_MAP if entity == "product" else {}
+    for alias, field in field_map.items():
+        if alias in ql:
+            m = re.search(
+                rf"\b{re.escape(alias)}\b(?:\s+de\s+(?:document|produit))?\s*[:=]?\s*(.+?){STOP_TAIL}",
+                q, flags=re.IGNORECASE
+            )
+            if m:
+                value = m.group(1).strip()
+                if value:
+                    filters.append((field, value))
+
+    # 4) si DÉTAIL → récupérer titre/nom et champs demandés
+    fields = []
+    title = name = None
+    if not wants_list:
+        if entity == "library" and re.search(r"\bde\s+document\b", ql):
+            title = re.split(r"\bde\s+document\b", q, flags=re.IGNORECASE, maxsplit=1)[1].strip()
+            for alias, field in DOC_FIELD_MAP.items():
+                if re.search(rf"\b{re.escape(alias)}\b", ql):
+                    fields.append(field)
+        if entity == "product" and re.search(r"\bde\s+produit\b", ql):
+            name = re.split(r"\bde\s+produit\b", q, flags=re.IGNORECASE, maxsplit=1)[1].strip()
+            for alias, field in PROD_FIELD_MAP.items():
+                if re.search(rf"\b{re.escape(alias)}\b", ql):
+                    fields.append(field)
+
+    mode = "list" if wants_list else "detail"
+    return {"entity": entity, "mode": mode, "filters": filters, "fields": fields, "title": title, "name": name}
+
+def list_documents(qs, filters, clean, format_date, as_md):
+    for field, value in filters:
+        q1 = qs.filter(**{f"{field}__iexact": value})
+        qs = q1 if q1.exists() else qs.filter(**{f"{field}__icontains": value})
+    cols = ["Titre","Type","Langue","Version","Source","Date de publication","Pays"]
+    rows = [{
+        "Titre": clean(d.title),
+        "Type": clean(getattr(d,"doc_type","")),
+        "Langue": clean(d.language or ""),
+        "Version": clean(d.version or ""),
+        "Source": clean(d.source or ""),
+        "Date de publication": format_date(d.publication_date),
+        "Pays": clean(d.country or ""),
+    } for d in qs]
+    return as_md(rows, cols)
+
+def detail_document(qs, fields, title_hint, raw_q, clean, format_date):
+    doc = find_best_document(title_hint or raw_q, qs)
+    if not doc:
+        return "Je n’ai pas trouvé ce document. Peux-tu préciser le titre ?"
+    if not fields:
+        return (
+            f"Titre : {clean(doc.title)}\n"
+            f"Type : {clean(getattr(doc,'doc_type',''))}\n"
+            f"Langue : {clean(getattr(doc,'language',''))}\n"
+            f"Version : {clean(getattr(doc,'version',''))}\n"
+            f"Source : {clean(getattr(doc,'source',''))}\n"
+            f"Date de publication : {format_date(getattr(doc,'publication_date',''))}\n"
+            f"Pays : {clean(getattr(doc,'country',''))}"
+        )
+    parts=[]
+    for f in fields:
+        val = getattr(doc, f, "")
+        if f in ("publication_date","validated_at","created_at"):
+            val = format_date(val)
+        parts.append(f"{f.replace('_',' ').title()} : {clean(val)}")
+    return f"{' ; '.join(parts)} du document « {doc.title} »."
+
+def list_products(qs, filters, clean, as_md):
+    for field, value in filters:
+        q1 = qs.filter(**{f"{field}__iexact": value})
+        qs = q1 if q1.exists() else qs.filter(**{f"{field}__icontains": value})
+    cols = ["Nom","Type","Principe actif","Dosage","Statut"]
+    rows = [{
+        "Nom": clean(p.name),
+        "Type": clean(p.form),
+        "Principe actif": clean(p.active_ingredient or ""),
+        "Dosage": clean(p.dosage or ""),
+        "Statut": clean(p.get_status_display()),
+    } for p in qs]
+    return as_md(rows, cols)
+
+def detail_product(qs, fields, name_hint, raw_q, clean):
+    prod = find_best_product(name_hint or raw_q, qs)
+    if not prod:
+        return "Je n’ai pas trouvé ce produit. Peux-tu préciser le nom ?"
+    if not fields:
+        return (
+            f"Nom : {clean(prod.name)}\n"
+            f"Type : {clean(prod.form)}\n"
+            f"Principe actif : {clean(prod.active_ingredient)}\n"
+            f"Dosage : {clean(prod.dosage)}\n"
+            f"Statut : {clean(prod.get_status_display())}"
+        )
+    parts=[]
+    for f in fields:
+        if f=="status":
+            val = prod.get_status_display()
+        elif f=="sites":
+            val = "; ".join(f"{s.site_name} ({s.country})" for s in prod.sites.all()) or "non spécifié"
+        else:
+            val = getattr(prod, f, "")
+        parts.append(f"{f.replace('_',' ').title()} : {clean(val)}")
+    return f"{' ; '.join(parts)} du produit « {prod.name} »."
 
 @csrf_exempt
 def chatbot_api(request):
@@ -127,7 +283,6 @@ def chatbot_api(request):
  
         
     
-
     # ---------- Détection du type de question via Mistral ----------
     from chatbot.utils.intents import detect_full_intent_type
                 
@@ -145,196 +300,32 @@ def chatbot_api(request):
     
     from chatbot.utils.relations import get_products_linked_to_document, get_document_linked_to_product
     
-
+    # ... après detection intent & relations ...
+    parsed = parse_request(question, question_type)
+    logger.debug(f"[PARSED] {parsed}")
     if question_type == "prod_to_doc":
-        logger.info(f"[DEBUG] ➡️ Envoi dans get_document_linked_to_product()")
         response = get_document_linked_to_product(question, produits_qs)
-        logger.info(f"[DEBUG] Réponse prod_to_doc : {response}")
         return JsonResponse({'response': response})
-
 
     elif question_type == "doc_to_prod":
         response = get_products_linked_to_document(question, docs_qs)
         return JsonResponse({'response': response})
 
+    if parsed["entity"] == "library":
+        if parsed["mode"] == "list":
+            table = list_documents(docs_qs, parsed["filters"], clean, format_date, as_md)
+            return JsonResponse({"response": table})
+        else:
+            txt = detail_document(docs_qs, parsed["fields"], parsed["title"], question, clean, format_date)
+            return JsonResponse({"response": txt})
 
-    # ---------- Intent "library/documents" ----------
-    # doc_keywords = ("document", "documents", "bibliothèque", "library", "notice", "fichier")
-    is_doc_question = question_type == 'library'
-
-
-    # mots-clés -> (champ RawDocument, label)
-    attr_map = {
-        "source": ("source", "Source"),
-        "autorité": ("source", "Source"),
-        "authority": ("source", "Source"),
-        "contexte": ("context", "Contexte"),
-        "context": ("context", "Contexte"),
-        "langue": ("language", "Langue"),
-        "language": ("language", "Langue"),
-        "version": ("version", "Version"),
-        "type": ("doc_type", "Type"),
-        "pays": ("country", "Pays"),
-        "date": ("publication_date", "Date de publication"),
-        "url": ("url_source", "URL"),
-        "lien": ("url_source", "URL"),
-        "publication": ("publication_date", "Date de publication"),
-        "date de publication": ("publication_date", "Date de publication"),
-        "ajout": ("created_at", "Date d'ajout"),
-        "date d'ajout": ("created_at", "Date d'ajout"),
-        "validation": ("validated_at", "Statut de validation"),
-        "validé": ("validated_at", "Statut de validation"),
-        "statut de validation": ("validated_at", "Statut de validation"),
-        "date de validation": ("validated_at", "Statut de validation"),
-        "uploadé par": ("owner_username", "Uploadé par (Métadonneur)"),
-        "qui a uploadé": ("owner_username", "Uploadé par (Métadonneur)"),
-        "métadonneur": ("owner_username", "Uploadé par (Métadonneur)"),
-    }
-
-    # Mapping attributs produits
-    attr_map_products = {
-        "nom": ("name", "Nom du produit"),
-        "type": ("form", "Type"),
-        "forme": ("form", "Forme"),
-        "principe actif": ("active_ingredient", "Principe actif"),
-        "dosage": ("dosage", "Dosage"),
-        "statut": ("get_status_display", "Statut"),
-        "zone thérapeutique": ("therapeutic_area", "Zone thérapeutique"),
-        "site": ("sites", "Sites de production"),
-    }
-
-    # ---- 1) Liste demandée -> tableau Markdown ----
-    if is_doc_question and any(k in q_lower for k in ("liste", "tous", "toutes", "affiche", "montre", "montrez")):
-        rows = []
-        for d in docs_qs:
-            rows.append({
-                "Titre": clean(d.title),
-                "Type": clean(getattr(d, 'doc_type', '')),
-                "Langue": clean(getattr(d, 'language', '')),
-                "Version": clean(getattr(d, 'version', '')),
-                "Source": clean(getattr(d, 'source', '')),
-                "Date de publication": format_date(getattr(d, 'publication_date', '')),
-                "Pays": clean(getattr(d, 'country', '')),
-            })
-        cols = ["Titre", "Type", "Langue", "Version", "Source", "Date de publication", "Pays"]
-        response = as_md(rows, cols)
-        logger.info(f"Liste de documents retournée pour la question: '{question}'")
-        return JsonResponse({"response": response})
-
-    # ---- 2) Question sur un document ----
-    if is_doc_question:
-        asked_doc_keys = [k for k in attr_map if k in q_lower]
-        # Trouver le document
-        doc = find_best_doc(question, docs_qs)
-        if not doc:
-            logger.warning(f"Aucun document trouvé pour la question: '{question}'")
-            return JsonResponse({'response': "Je n’ai pas trouvé ce document. Peux-tu préciser le titre ?"})
-
-        # Si la question demande spécifiquement qui a uploadé
-        if any(k in q_lower for k in ("uploadé par", "qui a uploadé", "métadonneur")):
-            owner = getattr(getattr(doc, "owner", None), "username", "non spécifié")
-            response = f"Uploadé par : {clean(owner)}"
-            logger.info(f"Réponse pour métadonneur: '{response}' | Document: '{doc.title}'")
-            return JsonResponse({'response': response})
-
-        # Construire la liste (champ,label) sans doublons pour d'autres attributs
-        asked_fields = []
-        seen = set()
-        for k in asked_doc_keys:
-            field, label = attr_map[k]
-            if field not in seen and field != "owner_username":
-                asked_fields.append((field, label))
-                seen.add(field)
-
-        # Si aucun attribut n'est explicitement demandé -> fiche courte
-        if not asked_fields:
-            txt = (
-                f"Titre : {clean(doc.title)}\n"
-                f"Type : {clean(getattr(doc, 'doc_type', ''))}\n"
-                f"Langue : {clean(getattr(doc, 'language', ''))}\n"
-                f"Version : {clean(getattr(doc, 'version', ''))}\n"
-                f"Source : {clean(getattr(doc, 'source', ''))}\n"
-                f"Date de publication : {format_date(getattr(doc, 'publication_date', ''))}\n"
-                f"Date d'ajout : {format_date(getattr(doc, 'created_at', ''))}\n"
-                f"Date de validation : {format_date(getattr(doc, 'validated_at', ''))}\n"
-                f"Pays : {clean(getattr(doc, 'country', ''))}\n"
-                f"Uploadé par : {clean(getattr(getattr(doc, 'owner', None), 'username', None))}\n"
-                f"URL : {clean(getattr(doc, 'url_source', ''))}"
-            )
-            logger.info(f"Fiche courte retournée pour le document: '{doc.title}'")
-            return JsonResponse({'response': txt})
-
-        # Normalisation simple des sources (EMA/FDA)
-        def normalize_source(val: str) -> str:
-            v = (val or "").strip().lower()
-            if v in {"european medicines agency", "agence européenne des médicaments", "ema"}:
-                return "EMA"
-            if v in {"food and drug administration", "u.s. food and drug administration", "fda"}:
-                return "FDA"
-            return val or "non spécifié"
-
-        parts = []
-        for field, label in asked_fields:
-            if field == "owner_username":
-                value = getattr(getattr(doc, "owner", None), "username", None)
-                value = clean(value)
-            else:
-                value = getattr(doc, field, "")
-                if field in ("publication_date", "validated_at", "created_at"):
-                    value = format_date(value)
-                else:
-                    value = clean(value)
-            parts.append(f"{label} : {value}")
-
-        response = f"{' ; '.join(parts)} du document « {doc.title} »."
-        logger.info(f"Attributs retournés: '{response}' | Document: '{doc.title}'")
-        return JsonResponse({'response': response})
-
-    # ---- 3) Question sur un produit ----
-    # product_keywords = ("produit", "principe actif", "forme", "dosage", "zone thérapeutique", "site", "statut")
-    is_product_question = question_type == 'product'
-
-    if is_product_question:
-        asked_product_keys = [k for k in attr_map_products if k in q_lower]
-        prod = find_best_product(question, produits_qs)
-        if not prod:
-            logger.warning(f"Aucun produit trouvé pour la question: '{question}'")
-            return JsonResponse({'response': "Je n’ai pas trouvé ce produit. Peux-tu préciser le nom ?"})
-
-        parts = []
-        seen = set()
-        for k in asked_product_keys:
-            field, label = attr_map_products[k]
-            if field not in seen:
-                if field == "sites":
-                    sites = prod.sites.all()
-                    value = ', '.join([f"{s.site_name} ({s.city}, {s.country})" for s in sites]) if sites else "non spécifié"
-                elif field == "get_status_display":
-                    value = prod.get_status_display()
-                else:
-                    value = getattr(prod, field, "")
-                parts.append(f"{label} : {clean(value)}")
-                seen.add(field)
-
-        # Si aucun attribut demandé → fiche courte
-        if not parts:
-            txt = (
-                f"Nom du produit : {clean(prod.name)}\n"
-                f"Type : {clean(getattr(prod, 'form', ''))}\n"
-                f"Principe actif : {clean(getattr(prod, 'active_ingredient', ''))}\n"
-                f"Dosage : {clean(getattr(prod, 'dosage', ''))}\n"
-                f"Statut : {clean(prod.get_status_display())}\n"
-                f"Zone thérapeutique : {clean(getattr(prod, 'therapeutic_area', ''))}\n"
-            )
-            sites = prod.sites.all()
-            if sites:
-                txt += f"Sites : " + ', '.join([f"{s.site_name} ({s.city}, {s.country})" for s in sites])
-            logger.info(f"Fiche courte retournée pour le produit: '{prod.name}'")
-            return JsonResponse({'response': txt})
-
-        response = f"{' ; '.join(parts)} du produit « {prod.name} »."
-        logger.info(f"Attributs retournés: '{response}' | Produit: '{prod.name}'")
-        return JsonResponse({'response': response})
+    elif parsed["entity"] == "product":
+        if parsed["mode"] == "list":
+            table = list_products(produits_qs, parsed["filters"], clean, as_md)
+            return JsonResponse({"response": table})
+        else:
+            txt = detail_product(produits_qs, parsed["fields"], parsed["name"], question, clean)
+            return JsonResponse({"response": txt})   
 
     # ---------- Fallback: contexte + Mistral ----------
     produits_str = ''
