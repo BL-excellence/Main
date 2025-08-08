@@ -57,8 +57,6 @@ def find_best_product(product_name: str, produits_qs) -> object:
     return best if best_score >= 0.45 else None
 
 
-
-
 def find_best_document(title_query: str, queryset):
     q_norm = normalize(title_query)
     best, best_score = None, 0
