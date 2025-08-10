@@ -67,42 +67,15 @@ class RegisterForm(UserCreationForm):
 
 
 class MetadataEditForm(forms.Form):
-    """
-    Formulaire d'édition manuelle des métadonnées.
-    """
-    title             = forms.CharField(
-        label="Titre du document", required=False,
-        widget=forms.TextInput(attrs={"placeholder": "Titre…"})
-    )
-    document_type     = forms.CharField(
-        label="Type de document", required=False,
-        widget=forms.TextInput(attrs={"placeholder": "guideline, rapport…"})
-    )
-    document_context  = forms.CharField(
-        label="Contexte du document", required=False,
-        widget=forms.TextInput(attrs={"placeholder": "Pharmaceutique, légal…"})
-    )
-    language          = forms.CharField(
-        label="Langue", required=False,
-        widget=forms.TextInput(attrs={"placeholder": "en, fr, es…"})
-    )
-    publication_date  = forms.DateField(
-        label="Date de publication", required=False,
+    title = forms.CharField(required=False)
+    type = forms.CharField(required=False)
+    publication_date = forms.DateField(
+        required=False,
         widget=forms.DateInput(attrs={'type': 'date'})
     )
-    version           = forms.CharField(
-        label="Version", required=False,
-        widget=forms.TextInput(attrs={"placeholder": "v1.0, 2025-05-06…"})
-    )
-    source            = forms.CharField(
-        label="Source", required=False,
-        widget=forms.TextInput(attrs={"placeholder": "EMA, FDA, ANSM…"})
-    )
-    country           = forms.CharField(
-        label="Pays", required=False,
-        widget=forms.TextInput(attrs={"placeholder": "EU, FR, US…"})
-    )
-    url_source        = forms.URLField(
-        label="URL source", required=False,
-        widget=forms.URLInput(attrs={"placeholder": "https://…"})
-    )
+    version = forms.CharField(required=False)
+    source = forms.CharField(required=False)
+    context = forms.CharField(required=False)
+    country = forms.CharField(required=False)
+    language = forms.CharField(required=False)
+    url_source = forms.URLField(required=False)

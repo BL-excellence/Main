@@ -287,3 +287,24 @@ class PromptOptimization(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
+
+class CustomField(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    field_type = models.CharField(max_length=20, choices=[
+        ('text', 'Text'),
+        ('textarea', 'Long Text'),
+        ('date', 'Date'),
+        ('number', 'Number'),
+    ], default='text')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return self.name
+
+class CustomFieldValue(models.Model):
+    document = models.ForeignKey(RawDocument, on_delete=models.CASCADE)
+    field = models.ForeignKey(CustomField, on_delete=models.CASCADE)
+    value = models.TextField(blank=True)
+    
+    class Meta:
+        unique_together = ['document', 'field']

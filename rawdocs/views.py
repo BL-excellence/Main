@@ -3,7 +3,7 @@ import json
 import requests
 from datetime import datetime
 from PyPDF2 import PdfReader
-
+from client.products.models import Product
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.files.base import ContentFile
 from django.http import JsonResponse
@@ -255,30 +255,74 @@ def edit_metadata(request, doc_id):
     metadata = extract_metadonnees(rd.file.path, rd.url or "")
 
     if request.method == 'POST':
-        form = MetadataEditForm(request.POST)
+        form = MetadataEditForm(request.POST)        
         if form.is_valid():
-            for f, v in form.cleaned_data.items():
-                old = metadata.get(f)
-                if str(old) != str(v):
-                    MetadataLog.objects.create(
-                        document=rd, field_name=f,
-                        old_value=old, new_value=v,
-                        modified_by=request.user
-                    )
-                    metadata[f] = v
+            # Handle standard fields (your existing code)
+            standard_fields = ['title', 'type', 'publication_date', 'version', 'source', 'context', 'country', 'language', 'url_source']
+            
+            for field_name in standard_fields:
+                if field_name in form.cleaned_data:
+                    new_value = form.cleaned_data[field_name]
+                    old_value = metadata.get(field_name)
+                    if str(old_value) != str(new_value):
+                        MetadataLog.objects.create(
+                            document=rd, field_name=field_name,
+                            old_value=old_value, new_value=new_value,
+                            modified_by=request.user
+                        )
+                        metadata[field_name] = new_value
+            
+            from .models import CustomField, CustomFieldValue
+            for key, value in request.POST.items():
+                if key.startswith('custom_'):
+                    field_name = key.replace('custom_', '')
+                    try:
+                        custom_field = CustomField.objects.get(name=field_name)
+                        custom_value, created = CustomFieldValue.objects.get_or_create(
+                            document=rd,
+                            field=custom_field,
+                            defaults={'value': value}
+                        )
+                        if not created:
+                            # Log the change
+                            old_val = custom_value.value
+                            custom_value.value = value
+                            custom_value.save()
+                            
+                            MetadataLog.objects.create(
+                                document=rd, 
+                                field_name=f"Custom: {field_name}",
+                                old_value=old_val, 
+                                new_value=value,
+                                modified_by=request.user
+                            )
+                    except CustomField.DoesNotExist:
+                        pass
+            
             messages.success(request, "Métadonnées mises à jour")
             return redirect('rawdocs:document_list')
     else:
         form = MetadataEditForm(initial=metadata)
 
     logs = MetadataLog.objects.filter(document=rd).order_by('-modified_at')
+    
+    # Load existing custom fields fo this document ONLY
+    from .models import CustomField, CustomFieldValue
+    custom_fields_data = []
+    for custom_value in CustomFieldValue.objects.filter(document=rd):
+        custom_fields_data.append({
+            'name': custom_value.field.name,
+            'type': custom_value.field.field_type,
+            'value': custom_value.value
+        })
+    
     return render(request, 'rawdocs/edit_metadata.html', {
         'form': form,
         'metadata': metadata,
         'doc': rd,
-        'logs': logs
+        'logs': logs,
+        'custom_fields_data': custom_fields_data  # ADD THIS LINE
     })
-
 
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_metadonneur)
@@ -327,8 +371,8 @@ def validate_document(request, doc_id):
                     document.save()
 
                     messages.success(request, f"Document validé ({document.total_pages} pages)")
+                    create_product_from_metadata(document)
                     return redirect('rawdocs:document_list')
-
             except Exception as e:
                 messages.error(request, f"Erreur lors de l'extraction: {str(e)}")
                 return redirect('rawdocs:document_list')
@@ -912,3 +956,122 @@ def document_detail(request, document_id):
     except Exception as e:
         messages.error(request, f"Erreur lors de l'affichage du document: {str(e)}")
         return redirect('rawdocs:document_list')
+    
+@login_required
+def add_field_ajax(request):
+    if request.method == 'POST':
+        import json
+        data = json.loads(request.body)
+        name = data.get('name')
+        field_type = data.get('type', 'text')
+        doc_id = data.get('doc_id')  # Get document ID
+        
+        from .models import CustomField, CustomFieldValue, RawDocument
+        
+        # Get the document
+        document = get_object_or_404(RawDocument, id=doc_id)
+        
+        # Get or create the field type globally (for field type reference)
+        field, created = CustomField.objects.get_or_create(
+            name=name,
+            defaults={'field_type': field_type}
+        )
+        
+        # Create the field value ONLY for this specific document
+        custom_value, value_created = CustomFieldValue.objects.get_or_create(
+            document=document,
+            field=field,
+            defaults={'value': ''}  # Empty value initially
+        )
+        
+        if value_created:
+            return JsonResponse({
+                'success': True, 
+                'message': f'Field "{name}" added to this document only!'
+            })
+        else:
+            return JsonResponse({
+                'success': False, 
+                'message': f'Field "{name}" already exists for this document!'
+            })
+    
+    return JsonResponse({'success': False})
+
+@login_required  
+def save_custom_field(request):
+    if request.method == 'POST':
+        doc_id = request.POST.get('doc_id')
+        field_name = request.POST.get('field_name')
+        value = request.POST.get('value', '')
+        
+        from .models import RawDocument, CustomField, CustomFieldValue
+        document = get_object_or_404(RawDocument, id=doc_id)
+        field = get_object_or_404(CustomField, name=field_name)
+        
+        custom_value, created = CustomFieldValue.objects.get_or_create(
+            document=document,
+            field=field,
+            defaults={'value': value}
+        )
+        if not created:
+            custom_value.value = value
+            custom_value.save()
+            
+        return JsonResponse({'success': True})
+    
+    return JsonResponse({'success': False})
+
+
+def create_product_from_metadata(document):
+    """Create product from custom metadata fields"""
+    from .models import CustomFieldValue
+    from client.products.models import Product
+    
+    # Find Product/Produit field (case insensitive)
+    custom_values = CustomFieldValue.objects.filter(document=document)
+    
+    product_field = None
+    product_name = None
+    
+    for custom_value in custom_values:
+        field_name = custom_value.field.name.lower()
+        if field_name in ['product', 'produit']:
+            product_name = custom_value.value.strip()
+            break
+    
+    if not product_name:
+        return None
+    
+    # Create product with metadata fields
+    product_data = {'name': product_name}
+    
+    # Auto-map matching fields
+    field_mapping = {
+        'dosage': 'dosage',
+        'dose': 'dosage', 
+        'active_ingredient': 'active_ingredient',
+        'substance_active': 'active_ingredient',
+        'form': 'form',
+        'forme': 'form',
+        'therapeutic_area': 'therapeutic_area',
+        'zone_therapeutique': 'therapeutic_area'
+    }
+    
+    for custom_value in custom_values:
+        field_name = custom_value.field.name.lower()
+        if field_name in field_mapping and custom_value.value:
+            product_data[field_mapping[field_name]] = custom_value.value
+    
+    # Create the product
+    product = Product.objects.create(
+        name=product_data['name'],
+        dosage=product_data.get('dosage', ''),
+        active_ingredient=product_data.get('active_ingredient', ''),
+        form=product_data.get('form', ''),
+        therapeutic_area=product_data.get('therapeutic_area', ''),
+        status='commercialise',
+        source_document=document
+    )
+    
+    print(f"✅ Product '{product.name}' created from metadata!")
+    return product

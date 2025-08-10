@@ -189,5 +189,7 @@ urlpatterns = [
         views.export_tables_excel,
         name='export_tables_excel'
     ),
+    path('add-field/', views.add_field_ajax, name='add_field_ajax'),
+    path('save-custom/', views.save_custom_field, name='save_custom_field'),
 
 ]

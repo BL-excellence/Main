@@ -40,4 +40,3 @@ attr_map_library = {
     "métadonneur": ("owner_username", "Uploadé par (Métadonneur)"),
 }    
         
-

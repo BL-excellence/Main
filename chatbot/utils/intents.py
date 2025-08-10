@@ -5,19 +5,35 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# intents.py
 def fallback_full_intent(question: str) -> str:
-        q = question.lower()
+    q = (question or "").lower()
 
-        has_doc = any(k in q for k in ["document", "notice", "rapport", "fichier", "titre", "langue"])
-        has_prod = any(k in q for k in ["produit", "médicament", "principe actif", "forme", "dosage", "statut"])
+    # Indices "liste"
+    list_words = ("tous", "toutes", "liste", "affiche", "afficher", "montre", "montrez", "voir", "montrez-moi", "lister")
 
-        if has_doc and has_prod:
-            return "doc_to_prod" if "document" in q else "prod_to_doc"
-        if has_doc:
-            return "library"
-        if has_prod:
-            return "product"
-        return "autre"
+    # Indices d'attributs (doc/prod) sans exiger les mots "document/produit"
+    doc_attr = ("titre", "langue", "version", "source", "pays", "publication", "url", "lien", "métadonneur", "uploadé")
+    prod_attr = ("forme", "type", "dosage", "statut", "principe actif", "pa", "site", "zone thérapeutique")
+
+    has_doc_attr = any(k in q for k in doc_attr)
+    has_prod_attr = any(k in q for k in prod_attr)
+    asks_list = any(w in q for w in list_words)
+
+    if has_doc_attr and not has_prod_attr:
+        return "library"
+    if has_prod_attr and not has_doc_attr:
+        return "product"
+
+    # Relations implicites
+    if "lié" in q or "associé" in q or "rattaché" in q:
+        # essaie de deviner le sens de la flèche
+        # heuristique simple : si on cite un nom de produit connu on ira vers prod_to_doc, sinon doc_to_prod
+        return "prod_to_doc"  # on affinera côté parseur
+
+    # Sinon on reste générique
+    return "autre"
+
 
 def detect_full_intent_type(question: str) -> str:
         mistral_key = os.getenv("MISTRAL_API_KEY")
