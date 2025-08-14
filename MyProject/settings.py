@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'client.reports',
     'submissions',
     'chatbot',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
@@ -103,6 +104,12 @@ AUTH_PASSWORD_VALIDATORS = [
     { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -147,3 +154,21 @@ LOGGING = {
         },
     },
 }
+# OAuth2 Configuration - Chargé depuis .env
+GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+
+MICROSOFT_CLIENT_ID = 'votre_microsoft_client_id'
+MICROSOFT_CLIENT_SECRET = 'votre_microsoft_client_secret'
+
+DROPBOX_CLIENT_ID = 'votre_dropbox_client_id'
+DROPBOX_CLIENT_SECRET = 'votre_dropbox_client_secret'
+
+BOX_CLIENT_ID = 'votre_box_client_id'
+BOX_CLIENT_SECRET = 'votre_box_client_secret'
+
+OAUTH_REDIRECT_URI = 'http://127.0.0.1:8000/client/products/api/oauth/callback/'
+
+# Sécurité
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True

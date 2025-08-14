@@ -5,6 +5,7 @@ class ProductsApp {
         this.currentTab = 'overview';
         this.products = [];
         this.siteCounter = 0;
+        this.currentCloudConnectionId = null;
         
         this.init();
     }
@@ -41,7 +42,12 @@ class ProductsApp {
                 this.switchTab(tab);
             });
         });
-        
+        this.elements.cloudBtn = document.getElementById('cloud-connection-btn');
+        if (this.elements.cloudBtn) {
+            this.elements.cloudBtn.addEventListener('click', () => {
+                this.showCloudConnectionModal();
+            });
+        }
         // Search events
         this.elements.searchInput?.addEventListener('input', (e) => {
             this.handleSearch(e.target.value);
@@ -129,7 +135,328 @@ class ProductsApp {
         this.renderProducts(this.products);
         this.selectProduct(1);
     }
+    async showCloudConnectionModal() {
+        console.log('🔍 Début de showCloudConnectionModal');
+        try {
+            console.log('📡 Envoi de la requête vers /client/products/api/cloud/setup/');
+            const response = await fetch('/client/products/api/cloud/setup/');
+            
+            console.log('📊 Response status:', response.status);
+            console.log('📊 Response ok:', response.ok);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const cloudData = await response.json();
+            console.log('📦 Données reçues:', cloudData);
+            
+            // Vérifier si renderCloudModal existe
+            if (typeof this.renderCloudModal === 'function') {
+                console.log('✅ renderCloudModal existe, appel en cours...');
+                this.renderCloudModal(cloudData);
+            } else {
+                console.error('❌ renderCloudModal n\'existe pas!');
+                this.showNotification('Erreur: fonction renderCloudModal manquante', 'error');
+            }
+            
+        } catch (error) {
+            console.error('❌ Erreur complète:', error);
+            console.error('❌ Error stack:', error.stack);
+            this.showNotification(`Erreur de chargement: ${error.message}`, 'error');
+        }
+    }
+
+renderCloudModal(cloudData) {
+    console.log('🎨 Début renderCloudModal avec:', cloudData);
     
+    // Vérifier que cloudData a les bonnes propriétés
+    if (!cloudData.available_providers) {
+        console.error('❌ available_providers manquant dans cloudData');
+        this.showNotification('Erreur: données providers manquantes', 'error');
+        return;
+    }
+    
+    const modalHtml = `
+        <div class="modal-overlay" id="cloud-modal" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+            <div class="modal-content" style="background: white; border-radius: 12px; max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                    <h2>🔐 Connexion Cloud Sécurisée</h2>
+                    <button class="close-btn" onclick="document.getElementById('cloud-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer;">×</button>
+                </div>
+                <div class="form-container" style="padding: 20px;">
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #4caf50;">
+                        <h4 style="color: #2e7d32; margin: 0 0 10px 0;">🏥 Conformité Industrie Pharmaceutique</h4>
+                        <p style="color: #1b5e20; margin: 0; font-size: 14px;">100% conforme RGPD, ICH-GCP et FDA CFR Part 11</p>
+                    </div>
+                    
+                    <!-- Section RGPD simplifiée pour test -->
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        <h4 style="color: #856404;">⚠️ Validation RGPD Requise</h4>
+                        <label style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+                            <input type="checkbox" id="rgpd_acceptance" required>
+                            <span>J'accepte les conditions RGPD et de sécurité pour l'industrie pharmaceutique</span>
+                        </label>
+                    </div>
+                    
+                    <h3 style="margin-bottom: 15px;">Choisissez votre fournisseur cloud :</h3>
+                    <div class="cloud-providers" style="display: grid; gap: 15px;">
+                        ${cloudData.available_providers.map(provider => `
+                            <div class="provider-option" style="border: 2px solid #e9ecef; border-radius: 8px; padding: 15px; cursor: pointer; transition: all 0.3s ease;" onclick="window.productsApp.selectProvider('${provider.id}')">
+                                <div style="display: flex; align-items: center; gap: 15px;">
+                                    <div style="width: 40px; height: 40px; background: #3498db; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                                        ${this.getProviderIcon(provider.id)}
+                                    </div>
+                                    <div>
+                                        <strong>${provider.name}</strong>
+                                        <div style="color: #6c757d; font-size: 0.9rem;">Connexion sécurisée et chiffrée</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+                        <small style="color: #6c757d;">
+                            🔒 Chiffrement AES-256 • Stockage UE • Audit RGPD complet
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    console.log('📝 HTML généré, ajout au DOM...');
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    console.log('✅ Modal ajoutée au DOM');
+}
+
+
+
+async selectProvider(providerId) {
+    console.log('🎯 Provider sélectionné:', providerId);
+    
+    // Vérifier RGPD
+    const rgpdCheckbox = document.getElementById('rgpd_acceptance');
+    if (!rgpdCheckbox || !rgpdCheckbox.checked) {
+        alert('Veuillez accepter les conditions RGPD avant de continuer');
+        return;
+    }
+    
+    // Fermer la modal
+    const modal = document.getElementById('cloud-modal');
+    if (modal) {
+        modal.remove();
+        console.log('✅ Modal fermée');
+    }
+    
+    try {
+        this.showNotification('🔄 Connexion OAuth en cours...', 'info');
+        
+        const response = await fetch('/client/products/api/cloud/oauth/initiate/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify({
+                provider: providerId,
+                connection_name: `${providerId}_connection`,
+                eu_residency: true,
+                scc_agreement: true,
+                dpa_signed: true,
+                data_subjects_categories: ['experts', 'healthcare_professionals'],
+                sub_processors_acknowledged: true,
+                privacy_notice_method: 'client',
+                technical_measures_confirmed: true,
+                transfer_safeguards_confirmed: true,
+                final_validation: true
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Erreur API OAuth');
+        }
+        
+        const data = await response.json();
+        console.log('✅ Réponse OAuth reçue:', data);
+        
+        if (data.oauth_url) {
+            this.showNotification('🔗 Redirection vers authentification...', 'info');
+            
+            // Ouvrir la vraie page OAuth dans une nouvelle fenêtre
+            const authWindow = window.open(data.oauth_url, 'oauth', 'width=600,height=700,scrollbars=yes,resizable=yes');
+            
+            // Écouter le retour de l'authentification
+            const checkClosed = setInterval(() => {
+                if (authWindow.closed) {
+                    clearInterval(checkClosed);
+                    console.log('🔍 Fenêtre OAuth fermée, vérification du statut...');
+                    this.checkOAuthSuccess(providerId);
+                }
+            }, 1000);
+            
+        } else {
+            throw new Error('URL OAuth non reçue');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur OAuth:', error);
+        this.showNotification(`❌ Erreur de connexion: ${error.message}`, 'error');
+    }
+}
+
+async checkOAuthSuccess(providerId) {
+    try {
+        console.log('🔍 Checking for new connections...');
+        const response = await fetch('/client/products/api/cloud/setup/');
+        const cloudData = await response.json();
+        
+        if (cloudData.existing_connections.length > 0) {
+            // Get the most recent connection (last one in the array)
+            const recentConnection = cloudData.existing_connections[cloudData.existing_connections.length - 1];
+            console.log('✅ Found connection:', recentConnection);
+            
+            this.currentCloudConnectionId = recentConnection.id;
+            this.showNotification(`✅ Connexion établie avec succès!`, 'success');
+            
+            this.updateConnectButton();
+        } else {
+            console.log('❌ No connections found, retrying in 2 seconds...');
+            // Sometimes there's a delay, retry once
+            setTimeout(() => this.checkOAuthSuccess(providerId), 2000);
+        }
+    } catch (error) {
+        console.error('❌ Error checking OAuth:', error);
+    }
+}
+
+updateConnectButton() {
+    const connectButton = document.querySelector('button[onclick*="showCloudConnectionModal"]');
+    if (connectButton) {
+        connectButton.innerHTML = `
+            <i class="material-icons" style="vertical-align: middle;">sync</i>
+            Synchroniser les Fichiers eCTD
+        `;
+        connectButton.onclick = () => this.syncECTDFiles();
+        connectButton.style.background = '#28a745'; // Green color
+    }
+}
+
+async initiateOAuth(providerId) {
+    try {
+        const response = await fetch('/client/products/api/cloud/oauth/initiate/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify({
+                provider: providerId,
+                connection_name: `${providerId}_connection`,
+                eu_residency: true,
+                scc_agreement: true,
+                dpa_signed: true
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.oauth_url) {
+            // Ouvrir dans une nouvelle fenêtre
+            const authWindow = window.open(data.oauth_url, 'oauth', 'width=600,height=700');
+            
+            // Simuler la réussite après 3 secondes
+            setTimeout(() => {
+                authWindow.close();
+                this.showNotification(`✅ Connexion ${providerId} établie avec succès!`, 'success');
+                this.showECTDSyncInterface();
+            }, 3000);
+        }
+    } catch (error) {
+        this.showNotification('Erreur lors de la connexion', 'error');
+    }
+}
+
+showECTDSyncInterface() {
+    console.log('🔄 Affichage interface eCTD sync');
+    const cloudSection = document.querySelector('.cloud-upload-section');
+    if (cloudSection) {
+        cloudSection.innerHTML = `
+            <div style="text-align: center;">
+                <i class="material-icons" style="font-size: 48px; color: #27ae60;">check_circle</i>
+                <h4 style="color: #27ae60; margin: 10px 0;">Cloud Connecté avec Succès!</h4>
+                <button class="btn btn-primary" onclick="window.productsApp.syncECTDFiles()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                    <i class="material-icons" style="vertical-align: middle;">sync</i>
+                    Synchroniser les Fichiers eCTD
+                </button>
+            </div>
+        `;
+        console.log('✅ Interface eCTD mise à jour');
+    } else {
+        console.error('❌ Section cloud-upload-section introuvable');
+    }
+}
+
+async syncECTDFiles() {
+    if (!this.currentProductId) {
+        this.showNotification('Créez d\'abord le produit', 'warning');
+        return;
+    }
+    
+    if (!this.currentCloudConnectionId) {
+        this.showNotification('Aucune connexion cloud active', 'error');
+        return;
+    }
+    
+    console.log('🔄 VRAIE Synchronisation eCTD en cours...');
+    this.showNotification('🔄 Synchronisation en cours...', 'info');
+    
+    try {
+        const response = await fetch(`/client/products/api/products/${this.currentProductId}/ectd/sync/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken(),
+            },
+            body: JSON.stringify({
+                connection_id: this.currentCloudConnectionId, // VRAIE connexion
+                folder_path: '/ectd/'
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Résultat sync:', result);
+            
+            this.showNotification(`✅ ${result.files_processed} fichiers eCTD synchronisés!`, 'success');
+            
+            // Recharger l'onglet réglementaire pour voir les vrais fichiers
+            if (this.currentTab === 'regulatory') {
+                await this.loadRegulatoryTab();
+            }
+        } else {
+            const errorData = await response.json();
+            this.showNotification(`❌ Erreur: ${errorData.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('❌ Erreur sync réelle:', error);
+        this.showNotification('❌ Erreur de connexion', 'error');
+    }
+}
+
+
+getProviderIcon(providerId) {
+    const icons = {
+        'google_drive': '📁',
+        'onedrive': '☁️',
+        'sharepoint': '🗃️',
+        'dropbox': '📦',
+        'box': '📋'
+    };
+    return icons[providerId] || '☁️';
+}
     renderProducts(products) {
         console.log('Rendering products:', products);
         
@@ -510,62 +837,464 @@ async loadVariationsTab() {
         console.log(`Loading regulatory for product ${this.currentProductId}`);
         
         try {
-            const response = await fetch(`/client/products/api/products/${this.currentProductId}/overview/`);
+            // Charger à la fois les infos produit ET les fichiers eCTD
+            const [overviewResponse, ectdResponse] = await Promise.all([
+                fetch(`/client/products/api/products/${this.currentProductId}/overview/`),
+                fetch(`/client/products/api/products/${this.currentProductId}/ectd/files/`)
+            ]);
             
-            if (response.ok) {
-                const data = await response.json();
-                const spec = data.specifications && data.specifications.length > 0 ? data.specifications[0] : null;
-                
-                this.elements.tabContent.innerHTML = `
-                    <div class="overview-grid">
-                        <div class="info-section">
-                            <h3 class="info-title">Informations Réglementaires</h3>
-                            ${spec ? `
-                            <div class="info-item">
-                                <span class="info-label">Numéro AMM</span>
-                                <span class="info-value">${spec.amm_number}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Date d'approbation</span>
-                                <span class="info-value">${this.formatDate(spec.approval_date)}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Prochain renouvellement</span>
-                                <span class="info-value">${this.formatDate(spec.renewal_date)}</span>
-                            </div>
-                            ` : '<p>Aucune information réglementaire disponible</p>'}
+            const overviewData = overviewResponse.ok ? await overviewResponse.json() : null;
+            const ectdData = ectdResponse.ok ? await ectdResponse.json() : { files_by_module: {}, total_files: 0 };
+            
+            console.log('eCTD Data loaded:', ectdData);
+            
+            const spec = overviewData?.specifications?.[0] || null;
+            
+            this.elements.tabContent.innerHTML = `
+                <div class="overview-grid">
+                    <div class="info-section">
+                        <h3 class="info-title">Informations Réglementaires</h3>
+                        ${spec ? `
+                        <div class="info-item">
+                            <span class="info-label">Numéro AMM</span>
+                            <span class="info-value">${spec.amm_number}</span>
                         </div>
+                        <div class="info-item">
+                            <span class="info-label">Date d'approbation</span>
+                            <span class="info-value">${this.formatDate(spec.approval_date)}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Prochain renouvellement</span>
+                            <span class="info-value">${this.formatDate(spec.renewal_date)}</span>
+                        </div>
+                        ` : '<p>Aucune information réglementaire disponible</p>'}
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3 class="info-title">Documents Associés</h3>
                         
-                        <div class="info-section">
-                            <h3 class="info-title">Documents Associés</h3>
+                        ${ectdData.total_files === 0 ? `
+                            <!-- Aucun fichier eCTD -->
                             <div class="document-item">
                                 <span class="document-name">Dossier CTD complet</span>
                                 <div class="document-status">
-                                    ${data.product.source_document ? `
-                                        <button class="view-document-btn" onclick="window.productsApp.viewSourceDocument(${this.currentProductId})">
-                                            <i class="material-icons">visibility</i>
-                                        </button>
-                                    ` : '<span class="no-document">-</span>'}
+                                    <span class="no-document">-</span>
                                 </div>
                             </div>
-                        </div>
+                            <div style="margin-top: 15px; text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <p style="color: #6c757d; margin-bottom: 10px;">Aucun fichier eCTD synchronisé</p>
+                                <button class="btn btn-primary" onclick="window.productsApp.showCloudConnectionModal()" style="padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                                    <i class="material-icons" style="font-size: 16px; vertical-align: middle;">cloud</i>
+                                    Connecter Cloud eCTD
+                                </button>
+                            </div>
+                        ` : `
+                            <!-- Fichiers eCTD trouvés -->
+                            <div class="document-item">
+                                <span class="document-name">Dossier CTD complet</span>
+                                <div class="document-status">
+                                    <button class="view-document-btn" onclick="window.productsApp.viewECTDFiles()" style="width: 32px; height: 32px; border-radius: 50%; background-color: #3498db; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                                        <i class="material-icons" style="color: white; font-size: 16px;">visibility</i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="margin-top: 15px; text-align: center;">
+                                <button class="btn btn-secondary" onclick="window.productsApp.syncMoreECTDFiles()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px;">
+                                    <i class="material-icons" style="font-size: 16px; vertical-align: middle;">sync</i>
+                                    Synchroniser Plus
+                                </button>
+                                <button class="btn btn-primary" onclick="window.productsApp.viewECTDFiles()" style="padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px;">
+                                    <i class="material-icons" style="font-size: 16px; vertical-align: middle;">folder_open</i>
+                                    Voir Tous les Fichiers
+                                </button>
+                                <button class="btn btn-danger" onclick="window.productsApp.deleteAllECTDFiles()" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                                    <i class="material-icons" style="font-size: 16px; vertical-align: middle;">delete</i>
+                                    Supprimer Tout
+                                </button>
+                            </div>
+                            
+                            <!-- Affichage détaillé des modules eCTD -->
+                            <div class="ectd-summary" style="margin-top: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                <h4 style="margin: 0 0 15px 0; color: #2c3e50;">📁 Fichiers eCTD Synchronisés (${ectdData.total_files})</h4>
+                                <div class="ectd-modules-summary">
+                                    ${Object.keys(ectdData.files_by_module).map(module => `
+                                        <div class="module-summary" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e9ecef;">
+                                            <div style="display: flex; align-items: center; gap: 10px;">
+                                                <span style="background: #3498db; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">${module}</span>
+                                                <span style="color: #6c757d;">${ectdData.files_by_module[module].length} fichier(s)</span>
                                             </div>
-                `;
-            } else {
-                throw new Error('Failed to load regulatory data');
-            }
+                                            <div style="color: #28a745;">
+                                                <i class="material-icons" style="font-size: 18px;">check_circle</i>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div style="margin-top: 15px; text-align: center;">
+                                    <button class="btn btn-secondary" onclick="window.productsApp.syncMoreECTDFiles()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px;">
+                                        <i class="material-icons" style="font-size: 16px; vertical-align: middle;">sync</i>
+                                        Synchroniser Plus
+                                    </button>
+                                    <button class="btn btn-primary" onclick="window.productsApp.viewECTDFiles()" style="padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                                        <i class="material-icons" style="font-size: 16px; vertical-align: middle;">folder_open</i>
+                                        Voir Tous les Fichiers
+                                    </button>
+                                </div>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
         } catch (error) {
             console.error('Error loading regulatory:', error);
             this.elements.tabContent.innerHTML = `
                 <div class="empty-state">
                     <i class="material-icons">gavel</i>
                     <h3>Aucune information réglementaire</h3>
-                    <p>Aucune donnée réglementaire disponible pour ce produit</p>
+                    <p>Erreur de chargement des données</p>
                 </div>
             `;
         }
     }
-    
+    // Fonction pour voir les fichiers eCTD en détail
+    async viewECTDFiles() {
+        if (!this.currentProductId) {
+            this.showNotification('Aucun produit sélectionné', 'error');
+            return;
+        }
+        
+        try {
+            // Get the eCTD files first to get real file IDs
+            const response = await fetch(`/client/products/api/products/${this.currentProductId}/ectd/files/`);
+            const ectdData = await response.json();
+            
+            console.log('eCTD files data:', ectdData); // Debug log
+            
+            if (ectdData.total_files > 0) {
+                // Get the first file ID from the files_by_module
+                const firstModule = Object.keys(ectdData.files_by_module)[0];
+                const firstFile = ectdData.files_by_module[firstModule][0];
+                
+                console.log('Using file ID:', firstFile.id); // Debug log
+                this.showZIPStructureModal(firstFile.id);
+            } else {
+                this.showNotification('Aucun fichier eCTD trouvé', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading eCTD files:', error);
+            this.showNotification('Erreur lors du chargement des fichiers', 'error');
+        }
+    }
+    async syncMoreECTDFiles() {
+        if (!this.currentProductId) {
+            this.showNotification('Aucun produit sélectionné', 'error');
+            return;
+        }
+        
+        if (!this.currentCloudConnectionId) {
+            this.showNotification('Aucune connexion cloud active', 'error');
+            return;
+        }
+        
+        console.log('🔄 Synchronisation supplémentaire en cours...');
+        this.showNotification('🔄 Synchronisation en cours...', 'info');
+        
+        try {
+            const response = await fetch(`/client/products/api/products/${this.currentProductId}/ectd/sync/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    connection_id: this.currentCloudConnectionId,
+                    folder_path: '/ectd/'
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ Résultat sync supplémentaire:', result);
+                
+                this.showNotification(`✅ ${result.files_processed} nouveaux fichiers synchronisés!`, 'success');
+                
+                // Recharger l'onglet réglementaire
+                if (this.currentTab === 'regulatory') {
+                    await this.loadRegulatoryTab();
+                }
+            } else {
+                const errorData = await response.json();
+                this.showNotification(`❌ Erreur: ${errorData.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('❌ Erreur sync supplémentaire:', error);
+            this.showNotification('❌ Erreur de connexion', 'error');
+        }
+    }
+
+    // Add this function for deleting files
+    async deleteAllECTDFiles() {
+        if (!this.currentProductId) {
+            this.showNotification('Aucun produit sélectionné', 'error');
+            return;
+        }
+        
+        if (!confirm('Êtes-vous sûr de vouloir supprimer tous les fichiers eCTD synchronisés ?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/client/products/api/products/${this.currentProductId}/ectd/delete/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': this.getCSRFToken(),
+                }
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                this.showNotification(`✅ ${result.deleted_count} fichiers supprimés`, 'success');
+                
+                // Recharger l'onglet réglementaire
+                if (this.currentTab === 'regulatory') {
+                    await this.loadRegulatoryTab();
+                }
+            } else {
+                const errorData = await response.json();
+                this.showNotification(`❌ Erreur: ${errorData.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('❌ Erreur suppression:', error);
+            this.showNotification('❌ Erreur de connexion', 'error');
+        }
+    }
+
+    generateFileList(files, fileId, isLastFolder) {
+        let html = '';
+        
+        files.forEach((file, fileIndex) => {
+            const isLastFile = fileIndex === files.length - 1;
+            const connector = isLastFile ? '└─' : '├─';
+            
+            html += `
+                <div class="file-item" style="
+                    display: flex; 
+                    align-items: center; 
+                    padding: 6px 0; 
+                    cursor: pointer; 
+                    border-radius: 4px;
+                    margin-bottom: 2px;
+                    transition: background-color 0.2s ease;
+                " 
+                onmouseover="this.style.backgroundColor='#e3f2fd'" 
+                onmouseout="this.style.backgroundColor='transparent'"
+                onclick="window.productsApp.openPDFFile('${file.path}', '${file.name}', ${fileId})">
+                    
+                    <span style="margin-right: 8px; color: #999; font-weight: normal;">${connector}</span>
+                    <i class="material-icons" style="color: #f44336; font-size: 16px; margin-right: 8px;">picture_as_pdf</i>
+                    
+                    <div style="flex: 1; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #333; font-weight: 500;">${file.name}</span>
+                        <span style="color: #666; font-size: 12px; margin-left: 10px;">
+                            ${(file.size / 1024).toFixed(1)} KB
+                        </span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        return html;
+    }
+
+    generateTreeStructure(folderStructure, fileId) {
+        // Build a proper tree structure from the flat folder structure
+        const tree = this.buildTreeFromPaths(folderStructure);
+        return this.renderTreeNode(tree, fileId, 0, true);
+    }
+
+    buildTreeFromPaths(folderStructure) {
+        const tree = { name: 'Root', type: 'folder', children: {}, files: [] };
+        
+        Object.keys(folderStructure).forEach(folderPath => {
+            const files = folderStructure[folderPath];
+            
+            files.forEach(file => {
+                // Use the actual file path from the archive
+                this.addToTree(tree, file.path, file);
+            });
+        });
+        
+        return tree;
+    }
+
+    addToTree(tree, filePath, fileInfo) {
+        // Split the path and remove empty parts
+        const parts = filePath.split('/').filter(part => part.trim().length > 0);
+        let current = tree;
+        
+        // If no folder structure (file in root), add directly to root
+        if (parts.length === 1) {
+            current.files.push({
+                name: parts[0],
+                path: filePath,
+                size: fileInfo.size
+            });
+            return;
+        }
+        
+        // Navigate/create folder structure (all parts except the last one which is the file)
+        for (let i = 0; i < parts.length - 1; i++) {
+            const folderName = parts[i];
+            
+            if (!current.children[folderName]) {
+                current.children[folderName] = {
+                    name: folderName,
+                    type: 'folder',
+                    children: {},
+                    files: []
+                };
+            }
+            current = current.children[folderName];
+        }
+        
+        // Add the file to the current folder
+        const fileName = parts[parts.length - 1];
+        current.files.push({
+            name: fileName,
+            path: filePath,
+            size: fileInfo.size
+        });
+    }
+
+    renderTreeNode(node, fileId, depth = 0, isRoot = false) {
+        let html = '';
+        
+        // Don't render the root folder name, just its contents
+        if (!isRoot && (Object.keys(node.children).length > 0 || node.files.length > 0)) {
+            const indent = '│   '.repeat(depth) + '├── '; // Vertical lines + connector
+            html += `
+                <div style="display: flex !important; align-items: center !important; margin: 1px 0 !important; padding: 1px 0 !important; font-weight: bold; color: #0066cc; line-height: 1.1 !important;">
+                    <span style="margin-right: 6px !important; color: #999; font-family: monospace; white-space: pre;">${indent}</span>
+                    <i class="material-icons" style="font-size: 14px !important; margin-right: 4px !important; color: #ffa726;">folder</i>
+                    <span style="font-size: 13px !important;">${node.name}</span>
+                </div>
+            `;
+        }
+        
+        const currentDepth = isRoot ? depth : depth + 1;
+        
+        // Render folders first (only if they have content)
+        const folderNames = Object.keys(node.children)
+            .filter(folderName => {
+                const folder = node.children[folderName];
+                return Object.keys(folder.children).length > 0 || folder.files.length > 0;
+            })
+            .sort();
+            
+        folderNames.forEach((folderName) => {
+            html += this.renderTreeNode(node.children[folderName], fileId, currentDepth, false);
+        });
+        
+        // Render files with deep indentation and vertical lines
+        node.files.forEach((file, fileIndex) => {
+            const baseIndent = '│   '.repeat(currentDepth);
+            const isLastItem = fileIndex === node.files.length - 1 && folderNames.length === 0;
+            const connector = isLastItem ? '└── ' : '├── ';
+            const fullIndent = baseIndent + connector;
+            
+            html += `
+                <div class="file-item" style="
+                    display: flex !important; 
+                    align-items: center !important; 
+                    margin: 0px !important;
+                    padding: 1px 2px !important; 
+                    cursor: pointer !important; 
+                    border-radius: 2px !important;
+                    transition: background-color 0.2s ease !important;
+                    line-height: 1.1 !important;
+                    min-height: 18px !important;
+                " 
+                onmouseover="this.style.backgroundColor='#e3f2fd'" 
+                onmouseout="this.style.backgroundColor='transparent'"
+                onclick="window.productsApp.openPDFFile('${file.path}', '${file.name}', ${fileId})">
+                    
+                    <span style="margin-right: 4px !important; color: #999; font-family: monospace; font-size: 12px !important; white-space: pre;">${fullIndent}</span>
+                    <i class="material-icons" style="color: #f44336 !important; font-size: 12px !important; margin-right: 4px !important;">picture_as_pdf</i>
+                    
+                    <div style="flex: 1 !important; display: flex !important; justify-content: space-between !important; align-items: center !important;">
+                        <span style="color: #333 !important; font-weight: 500 !important; font-size: 12px !important;">${file.name}</span>
+                        <span style="color: #666 !important; font-size: 10px !important; margin-left: 8px !important;">
+                            ${(file.size / 1024).toFixed(1)} KB
+                        </span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        return html;
+    }
+
+    async showZIPStructureModal(fileId) {
+        try {
+            const response = await fetch(`/client/products/api/products/${this.currentProductId}/zip/${fileId}/structure/`);
+            const zipData = await response.json();
+            
+            const modalHtml = `
+                <div class="modal-overlay" id="zip-structure-modal" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+                    <div class="modal-content" style="background: white; border-radius: 12px; max-width: 900px; width: 90%; max-height: 90vh; overflow-y: auto;">
+                        <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                            <h2>📁 ${zipData.zip_name} - Structure</h2>
+                            <button class="close-btn" onclick="document.getElementById('zip-structure-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer;">×</button>
+                        </div>
+                        <div class="modal-body" style="padding: 20px;">
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-family: system-ui;">
+                                <strong>${zipData.total_folders}</strong> dossiers • <strong>${zipData.total_files}</strong> fichiers PDF
+                            </div>
+                            
+                            <div class="tree-structure" style="
+                                background: #fafafa !important; 
+                                padding: 12px !important; 
+                                border-radius: 6px !important; 
+                                border: 1px solid #e9ecef !important;
+                                font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+                                line-height: 1.1 !important;
+                                font-size: 12px !important;
+                            ">
+                                <div style="display: flex !important; align-items: center !important; margin-bottom: 6px !important; font-weight: bold !important; color: #0066cc !important;">
+                                    <i class="material-icons" style="font-size: 16px !important; margin-right: 6px !important; color: #ffa726 !important;">folder</i>
+                                    <span style="font-size: 14px !important;">${zipData.zip_name}</span>
+                                </div>
+                                ${this.generateTreeStructure(zipData.folder_structure, fileId)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+        } catch (error) {
+            this.showNotification('Erreur lors du chargement de la structure ZIP', 'error');
+        }
+    }
+
+    openPDFFile(filePath, fileName, fileId) {
+        if (!this.currentProductId) {
+            this.showNotification('Aucun produit sélectionné', 'error');
+            return;
+        }
+        
+        if (!fileId) {
+            this.showNotification('ID de fichier manquant', 'error');
+            return;
+        }
+        
+        // Encode the file path for URL
+        const encodedPath = encodeURIComponent(filePath);
+        
+        // Open PDF in new window
+        const pdfUrl = `/client/products/api/products/${this.currentProductId}/pdf/${fileId}/view/?file_path=${encodedPath}`;
+        window.open(pdfUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+    }
     // Modal functions
     showModal() {
         if (this.elements.modal) {

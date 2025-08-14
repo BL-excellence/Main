@@ -1,5 +1,8 @@
 from django.db import models
 from django.urls import reverse
+from django.contrib.auth.models import User 
+import json
+from datetime import datetime, timedelta
 
 class Product(models.Model):
     STATUS_CHOICES = [
@@ -108,3 +111,61 @@ class ProductVariation(models.Model):
     
     def __str__(self):
         return f"{self.title} - {self.variation_type}"
+    
+class CloudProvider(models.TextChoices):
+    GOOGLE_DRIVE = 'google_drive', 'Google Drive'
+    ONEDRIVE = 'onedrive', 'Microsoft OneDrive'
+    SHAREPOINT = 'sharepoint', 'SharePoint'
+    DROPBOX = 'dropbox', 'Dropbox'
+    BOX = 'box', 'Box'
+
+class CloudConnection(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cloud_connections')
+    provider = models.CharField(max_length=20, choices=CloudProvider.choices)
+    connection_name = models.CharField(max_length=100)
+    encrypted_access_token = models.BinaryField()
+    data_residency_eu = models.BooleanField(default=False)
+    scc_agreement = models.BooleanField(default=False)
+    dpa_signed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    audit_log = models.JSONField(default=dict)
+    data_subjects_categories = models.JSONField(default=list, help_text="Catégories de personnes concernées")
+    sub_processors = models.JSONField(default=list, help_text="Liste des sous-traitants de second rang")
+    expires_at = models.DateTimeField(null=True, blank=True)
+    encrypted_refresh_token = models.BinaryField(null=True, blank=True)
+    last_used = models.DateTimeField(null=True, blank=True)
+    
+    data_subject_information_method = models.CharField(max_length=200, blank=True)
+    privacy_notice_provider = models.CharField(max_length=100, choices=[
+        ('client', 'Client LFB'),
+        ('provider', 'Fournisseur Cloud'),
+        ('both', 'Les deux')
+    ], default='client')
+    
+    # RGPD - Mesures techniques et organisationnelles
+    technical_measures = models.JSONField(default=dict, help_text="Mesures techniques de sécurité")
+    organizational_measures = models.JSONField(default=dict, help_text="Mesures organisationnelles")
+    
+    # RGPD - Transferts hors UE
+    transfers_outside_eu = models.BooleanField(default=False)
+    transfer_countries = models.JSONField(default=list, help_text="Pays de transfert")
+    transfer_safeguards = models.CharField(max_length=100, choices=[
+        ('adequacy_decision', 'Décision d\'adéquation'),
+        ('scc', 'Clauses Contractuelles Types'),
+        ('bcr', 'Binding Corporate Rules'),
+        ('derogation', 'Dérogation')
+    ], blank=True)
+    
+    # Validation obligatoire
+    rgpd_compliance_validated = models.BooleanField(default=False)
+    rgpd_validation_date = models.DateTimeField(null=True, blank=True)
+    rgpd_validator = models.CharField(max_length=200, blank=True)
+
+class ProductECTDFile(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='ectd_files')
+    cloud_connection = models.ForeignKey(CloudConnection, on_delete=models.CASCADE)
+    file_name = models.CharField(max_length=255)
+    file_path = models.CharField(max_length=500)
+    ectd_section = models.CharField(max_length=10, blank=True)
+    uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
