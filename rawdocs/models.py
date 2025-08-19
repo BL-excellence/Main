@@ -1,3 +1,4 @@
+# rawdocs/models.py
 from os.path import join
 from datetime import datetime
 from django.db import models
@@ -58,11 +59,47 @@ class RawDocument(models.Model):
     country = models.CharField(max_length=100, blank=True, help_text="Pays détecté (GPE ou TLD)")
     language = models.CharField(max_length=10, blank=True, help_text="Langue détectée (fr, en…)")
     url_source = models.URLField(blank=True, help_text="URL d'origine pour référence")
+    # JSON global de toutes les annotations du document
+    global_annotations_json = models.JSONField(
+        null=True, blank=True,
+        help_text="JSON global consolidé de toutes les annotations du document"
+    )
+
+    # Résumé global en langage naturel des annotations du document
+    global_annotations_summary = models.TextField(
+        blank=True,
+        help_text="Résumé global en langage naturel des annotations du document"
+    )
+
+    # Date de génération du résumé global
+    global_annotations_summary_generated_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Date de génération du résumé global d'annotations"
+    )
 
     def __str__(self):
         owner_name = self.owner.username if self.owner else "–"
         status = "✅ Validé" if self.is_validated else "⏳ En attente"
         return f"PDF #{self.pk} ({status}) – par {owner_name}"
+
+    def get_total_annotations_count(self):
+        """Retourne le nombre total d'annotations dans le document"""
+        return sum(page.annotations.count() for page in self.pages.all())
+
+    def get_annotations_by_type(self):
+        """Retourne un dictionnaire des annotations groupées par type"""
+        annotations_by_type = {}
+        for page in self.pages.all():
+            for annotation in page.annotations.all():
+                ann_type = annotation.annotation_type.display_name
+                if ann_type not in annotations_by_type:
+                    annotations_by_type[ann_type] = 0
+                annotations_by_type[ann_type] += 1
+        return annotations_by_type
+
+    def has_annotations(self):
+        """Vérifie si le document contient des annotations"""
+        return self.get_total_annotations_count() > 0
 
 
 class MetadataLog(models.Model):
@@ -77,6 +114,41 @@ class MetadataLog(models.Model):
         return f"{self.field_name}: {self.old_value} → {self.new_value}"
 
 
+# class DocumentPage(models.Model):
+#     """Pages individuelles extraites du PDF."""
+#     document = models.ForeignKey(RawDocument, on_delete=models.CASCADE, related_name='pages')
+#     page_number = models.IntegerField(help_text="Numéro de page (1-indexé)")
+#     raw_text = models.TextField(help_text="Texte brut extrait de la page")
+#     cleaned_text = models.TextField(help_text="Texte nettoyé pour annotation")
+#
+#     # Statut d'annotation
+#     is_annotated = models.BooleanField(default=False)
+#     annotated_at = models.DateTimeField(null=True, blank=True)
+#     annotated_by = models.ForeignKey(
+#         settings.AUTH_USER_MODEL,
+#         on_delete=models.SET_NULL,
+#         null=True, blank=True,
+#         related_name='annotated_pages'
+#     )
+#
+#     # Validation humaine
+#     is_validated_by_human = models.BooleanField(default=False)
+#     human_validated_at = models.DateTimeField(null=True, blank=True)
+#     validated_by = models.ForeignKey(
+#         settings.AUTH_USER_MODEL,
+#         on_delete=models.SET_NULL,
+#         null=True, blank=True,
+#         related_name='validated_pages'
+#     )
+#
+#     created_at = models.DateTimeField(auto_now_add=True)
+#
+#     class Meta:
+#         unique_together = ['document', 'page_number']
+#         ordering = ['page_number']
+#
+#     def __str__(self):
+#         return f"Page {self.page_number} – Doc #{self.document.pk}"
 class DocumentPage(models.Model):
     """Pages individuelles extraites du PDF."""
     document = models.ForeignKey(RawDocument, on_delete=models.CASCADE, related_name='pages')
@@ -84,7 +156,7 @@ class DocumentPage(models.Model):
     raw_text = models.TextField(help_text="Texte brut extrait de la page")
     cleaned_text = models.TextField(help_text="Texte nettoyé pour annotation")
 
-    # Statut d'annotation
+    # Statut d'annotation (existant)
     is_annotated = models.BooleanField(default=False)
     annotated_at = models.DateTimeField(null=True, blank=True)
     annotated_by = models.ForeignKey(
@@ -94,7 +166,58 @@ class DocumentPage(models.Model):
         related_name='annotated_pages'
     )
 
-    # Validation humaine
+    # =================== NOUVEAUX CHAMPS POUR L'ANALYSE RÉGLEMENTAIRE ===================
+
+    # Analyse réglementaire par IA
+    regulatory_analysis = models.JSONField(
+        null=True, blank=True,
+        help_text="Analyse réglementaire complète de la page par IA"
+    )
+
+    # Résumé de la page
+    page_summary = models.TextField(
+        blank=True,
+        help_text="Résumé concis du contenu de la page"
+    )
+
+    # Obligations réglementaires identifiées
+    regulatory_obligations = models.JSONField(
+        default=list,
+        help_text="Liste des obligations réglementaires trouvées sur cette page"
+    )
+
+    # Délais critiques
+    critical_deadlines = models.JSONField(
+        default=list,
+        help_text="Délais critiques identifiés sur cette page"
+    )
+
+    # Score d'importance réglementaire (0-100)
+    regulatory_importance_score = models.IntegerField(
+        default=0,
+        help_text="Score d'importance réglementaire de cette page (0-100)"
+    )
+
+    # Statut d'analyse réglementaire
+    is_regulatory_analyzed = models.BooleanField(
+        default=False,
+        help_text="Page analysée par l'IA pour les aspects réglementaires"
+    )
+
+    regulatory_analyzed_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Date d'analyse réglementaire"
+    )
+
+    regulatory_analyzed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='regulatory_analyzed_pages',
+        help_text="Utilisateur qui a lancé l'analyse réglementaire"
+    )
+
+    # Validation humaine (existant)
     is_validated_by_human = models.BooleanField(default=False)
     human_validated_at = models.DateTimeField(null=True, blank=True)
     validated_by = models.ForeignKey(
@@ -102,6 +225,23 @@ class DocumentPage(models.Model):
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='validated_pages'
+    )
+    # JSON des annotations de la page
+    annotations_json = models.JSONField(
+        null=True, blank=True,
+        help_text="JSON structuré de toutes les annotations de cette page"
+    )
+
+    # Résumé en langage naturel des annotations de la page
+    annotations_summary = models.TextField(
+        blank=True,
+        help_text="Résumé en langage naturel des annotations de cette page"
+    )
+
+    # Date de génération du résumé
+    annotations_summary_generated_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Date de génération du résumé d'annotations"
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -113,7 +253,96 @@ class DocumentPage(models.Model):
     def __str__(self):
         return f"Page {self.page_number} – Doc #{self.document.pk}"
 
+    def get_regulatory_summary(self):
+        """Retourne un résumé des points réglementaires de la page"""
+        if not self.regulatory_analysis:
+            return "Aucune analyse réglementaire disponible"
 
+        analysis = self.regulatory_analysis
+        summary_parts = []
+
+        if analysis.get('obligations'):
+            summary_parts.append(f"📋 {len(analysis['obligations'])} obligation(s)")
+
+        if analysis.get('deadlines'):
+            summary_parts.append(f"⏰ {len(analysis['deadlines'])} délai(s)")
+
+        if analysis.get('authorities'):
+            summary_parts.append(f"🏛️ {len(analysis['authorities'])} autorité(s)")
+
+        return " • ".join(summary_parts) if summary_parts else "Aucun élément réglementaire majeur"
+
+
+class DocumentRegulatoryAnalysis(models.Model):
+    """Analyse réglementaire globale d'un document"""
+    document = models.OneToOneField(
+        RawDocument,
+        on_delete=models.CASCADE,
+        related_name='regulatory_analysis'
+    )
+
+    # Résumé global du document
+    global_summary = models.TextField(
+        blank=True,
+        help_text="Résumé global du document complet"
+    )
+
+    # Analyse réglementaire consolidée
+    consolidated_analysis = models.JSONField(
+        default=dict,
+        help_text="Analyse réglementaire consolidée de tout le document"
+    )
+
+    # Obligations principales du document
+    main_obligations = models.JSONField(
+        default=list,
+        help_text="Principales obligations réglementaires du document"
+    )
+
+    # Délais critiques consolidés
+    critical_deadlines_summary = models.JSONField(
+        default=list,
+        help_text="Résumé des délais critiques du document"
+    )
+
+    # Autorités concernées
+    relevant_authorities = models.JSONField(
+        default=list,
+        help_text="Autorités réglementaires mentionnées dans le document"
+    )
+
+    # Score global d'importance réglementaire
+    global_regulatory_score = models.IntegerField(
+        default=0,
+        help_text="Score global d'importance réglementaire (0-100)"
+    )
+
+    # Métadonnées d'analyse
+    analyzed_at = models.DateTimeField(auto_now_add=True)
+    analyzed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True
+    )
+
+    # Pages analysées
+    total_pages_analyzed = models.IntegerField(default=0)
+    pages_with_regulatory_content = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"Analyse réglementaire - Doc #{self.document.pk}"
+
+    def get_completion_percentage(self):
+        """Pourcentage de pages analysées"""
+        if self.document.total_pages == 0:
+            return 0
+        return int((self.total_pages_analyzed / self.document.total_pages) * 100)
+
+    def get_regulatory_density(self):
+        """Densité du contenu réglementaire"""
+        if self.total_pages_analyzed == 0:
+            return 0
+        return int((self.pages_with_regulatory_content / self.total_pages_analyzed) * 100)
 class AnnotationType(models.Model):
     """Types d'annotations possibles."""
     name = models.CharField(max_length=100, unique=True)

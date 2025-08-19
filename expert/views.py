@@ -1,4 +1,5 @@
 # expert/views.py
+import os
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import TemplateView
@@ -20,6 +21,19 @@ import re
 
 from .models import ExpertLog
 from rawdocs.models import RawDocument, DocumentPage, Annotation, AnnotationType
+
+from pymongo import MongoClient
+from django.conf import settings
+
+# Connexion MongoDB (ajuste ton URI si besoin)
+MONGO_URI = getattr(settings, "MONGO_URI", "mongodb://localhost:27017/")
+MONGO_DB = getattr(settings, "MONGO_DB", "annotations_db")
+MONGO_COLLECTION = getattr(settings, "MONGO_COLLECTION", "documents")
+
+mongo_client = MongoClient(MONGO_URI)
+mongo_db = mongo_client[MONGO_DB]
+mongo_collection = mongo_db[MONGO_COLLECTION]
+
 
 
 def is_expert(user):
@@ -317,9 +331,64 @@ def modify_annotation_ajax(request, annotation_id):
                 reason=f"Modification by expert. Status: {old_status} → validated"
             )
 
+            try:
+                # Mise à jour du JSON de la page
+                page = annotation.page
+                document = page.document
+                page_annotations = page.annotations.all().select_related('annotation_type').order_by('start_pos')
+                
+                from rawdocs.views import _build_entities_map, generate_entities_based_page_summary
+                page_entities = _build_entities_map(page_annotations, use_display_name=True)
+                
+                page_json = {
+                    'document': {
+                        'id': str(document.id),
+                        'title': document.title,
+                        'doc_type': getattr(document, 'doc_type', None),
+                        'source': getattr(document, 'source', None),
+                    },
+                    'page': {
+                        'number': page.page_number,
+                        'annotations_count': page_annotations.count(),
+                    },
+                    'entities': page_entities,
+                    'generated_at': datetime.utcnow().isoformat() + 'Z',
+                }
+                
+                page.annotations_json = page_json
+                page.save(update_fields=['annotations_json'])
+                
+                # Mise à jour du JSON du document
+                all_annotations = Annotation.objects.filter(
+                    page__document=document
+                ).select_related('annotation_type', 'page').order_by('page__page_number', 'start_pos')
+                
+                document_entities = _build_entities_map(all_annotations, use_display_name=True)
+                
+                document_json = {
+                    'document': {
+                        'id': str(document.id),
+                        'title': document.title,
+                        'doc_type': getattr(document, 'doc_type', None),
+                        'source': getattr(document, 'source', None),
+                        'total_pages': document.total_pages,
+                        'total_annotations': all_annotations.count(),
+                    },
+                    'entities': document_entities,
+                    'generated_at': datetime.utcnow().isoformat() + 'Z',
+                }
+                
+                document.global_annotations_json = document_json
+                document.save(update_fields=['global_annotations_json'])
+                
+                print(f"✅ JSON mis à jour après modification pour la page {page.page_number} et le document")
+                
+            except Exception as e:
+                print(f"❌ Erreur lors de la mise à jour du JSON après modification: {str(e)}")
+
             return JsonResponse({
                 'success': True,
-                'message': 'Annotation modifiée et validée'
+                'message': 'Annotation modifiée, validée et JSON mis à jour'
             })
 
         except Exception as e:
@@ -786,6 +855,10 @@ def update_existing_product_with_variations(existing_product, new_sites_data, do
     return existing_product
 
 
+# expert/views.py - Modifier la fonction validate_document
+
+# expert/views.py - Corriger la fonction validate_document
+
 @expert_required
 def validate_document(request, document_id):
     """Validate entire document and create product if it's a manufacturer document"""
@@ -799,6 +872,71 @@ def validate_document(request, document_id):
             # Create or update product from annotations
             product = create_product_from_annotations(document)
 
+            # Fonction helper pour gérer les dates
+            def safe_isoformat(date_value):
+                if date_value is None:
+                    return None
+                if isinstance(date_value, str):
+                    return date_value
+                if hasattr(date_value, 'isoformat'):
+                    return date_value.isoformat()
+                return str(date_value)
+
+            # Sauvegarder dans MongoDB avec toutes les métadonnées lors de la validation
+            from rawdocs.models import CustomFieldValue
+
+            # Construire les métadonnées complètes
+            metadata = {
+                'title': document.title,
+                'doc_type': document.doc_type,
+                'publication_date': safe_isoformat(document.publication_date),
+                'version': document.version,
+                'source': document.source,
+                'context': document.context,
+                'country': document.country,
+                'language': document.language,
+                'url_source': document.url_source,
+                'url': document.url,
+                'created_at': safe_isoformat(document.created_at),
+                'validated_at': timezone.now().isoformat(),
+                'validated_by': request.user.username,
+                'owner': document.owner.username if document.owner else None,
+                'total_pages': document.total_pages,
+                'file_name': os.path.basename(document.file.name) if document.file else None,
+            }
+
+            # Ajouter les champs personnalisés
+            custom_fields = {}
+            for custom_value in CustomFieldValue.objects.filter(document=document):
+                custom_fields[custom_value.field.name] = custom_value.value
+
+            if custom_fields:
+                metadata['custom_fields'] = custom_fields
+
+            # Récupérer les entités du JSON global si elles existent
+            entities = {}
+            if hasattr(document, 'global_annotations_json') and document.global_annotations_json:
+                entities = document.global_annotations_json.get('entities', {})
+
+            # Sauvegarder dans MongoDB
+            mongo_collection.update_one(
+                {"document_id": str(document.id)},
+                {
+                    "$set": {
+                        "document_id": str(document.id),
+                        "title": document.title,
+                        "metadata": metadata,
+                        "entities": entities,
+                        "validated": True,
+                        "validated_at": timezone.now().isoformat(),
+                        "validated_by": request.user.username,
+                        "product_created": product.name if product else None,
+                        "updated_at": timezone.now().isoformat()
+                    }
+                },
+                upsert=True
+            )
+
             if product:
                 debug_product_annotations()
                 # Check if it was an update or new creation
@@ -806,7 +944,7 @@ def validate_document(request, document_id):
                     product=product,
                     submission_date=timezone.now().date()
                 ).count()
-                
+
                 if variations_today > 0:
                     messages.success(
                         request,
@@ -833,8 +971,6 @@ def validate_document(request, document_id):
             return redirect('expert:review_document', document_id=document_id)
 
     return redirect('expert:review_document', document_id=document_id)
-
-
 def debug_annotations_for_product(document):
     """Debug function to show what annotations are available"""
     validated_annotations = Annotation.objects.filter(
@@ -893,3 +1029,780 @@ def view_original_document(request, document_id):
             "<p>Ce document n'a pas de fichier PDF associé.</p>"
             "<script>window.close();</script></body></html>"
         )
+
+
+@expert_required
+@csrf_exempt
+def save_page_json(request, page_id):
+    """Sauvegarde du JSON modifié d'une page"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        data = json.loads(request.body)
+        json_content = data.get('json_content')
+
+        if not json_content:
+            return JsonResponse({'error': 'JSON content is required'}, status=400)
+
+        # Valider que le JSON est bien formaté
+        try:
+            parsed_json = json.loads(json_content)
+        except json.JSONDecodeError as e:
+            return JsonResponse({'error': f'Invalid JSON format: {str(e)}'}, status=400)
+
+        # Sauvegarder le nouveau JSON
+        page.annotations_json = parsed_json
+        page.annotations_summary_generated_at = timezone.now()
+        page.save(update_fields=['annotations_json', 'annotations_summary_generated_at'])
+
+        # Mise à jour du JSON global du document
+        document = page.document
+        all_annotations = Annotation.objects.filter(
+            page__document=document
+        ).select_related('annotation_type', 'page').order_by('page__page_number', 'start_pos')
+        
+        from rawdocs.views import _build_entities_map
+        document_entities = _build_entities_map(all_annotations, use_display_name=True)
+        
+        document_json = {
+            'document': {
+                'id': str(document.id),
+                'title': document.title,
+                'doc_type': getattr(document, 'doc_type', None),
+                'source': getattr(document, 'source', None),
+                'total_pages': document.total_pages,
+                'total_annotations': all_annotations.count(),
+            },
+            'entities': document_entities,
+            'generated_at': datetime.utcnow().isoformat() + 'Z',
+        }
+        
+        document.global_annotations_json = document_json
+        document.save(update_fields=['global_annotations_json'])
+
+        # LOG ACTION
+        log_expert_action(
+            user=request.user,
+            action='page_json_edited',
+            annotation=None,
+            document_id=document.id,
+            document_title=document.title,
+            reason=f"Page {page.page_number} JSON manually edited by expert"
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'JSON sauvegardé avec succès'
+        })
+
+    except Exception as e:
+        print(f"❌ Erreur lors de la sauvegarde du JSON de la page: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# expert/views.py - Modifier uniquement la fonction save_document_json
+
+# expert/views.py - Corriger la fonction save_document_json
+
+@expert_required
+@csrf_exempt
+def save_document_json(request, doc_id):
+    """Sauvegarde du JSON global modifié d'un document (et stockage MongoDB avec métadonnées complètes)"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id)
+        data = json.loads(request.body)
+        json_content = data.get('json_content')
+
+        if not json_content:
+            return JsonResponse({'error': 'JSON content is required'}, status=400)
+
+        # Valider que le JSON est bien formaté
+        try:
+            parsed_json = json.loads(json_content)
+        except json.JSONDecodeError as e:
+            return JsonResponse({'error': f'Invalid JSON format: {str(e)}'}, status=400)
+
+        # Fonction helper pour gérer les dates
+        def safe_isoformat(date_value):
+            if date_value is None:
+                return None
+            if isinstance(date_value, str):
+                return date_value
+            if hasattr(date_value, 'isoformat'):
+                return date_value.isoformat()
+            return str(date_value)
+
+        # Enrichir le JSON avec TOUTES les métadonnées du document
+        parsed_json['document']['metadata'] = {
+            'title': document.title,
+            'doc_type': document.doc_type,
+            'publication_date': safe_isoformat(document.publication_date),
+            'version': document.version,
+            'source': document.source,
+            'context': document.context,
+            'country': document.country,
+            'language': document.language,
+            'url_source': document.url_source,
+            'url': document.url,
+            'created_at': safe_isoformat(document.created_at),
+            'validated_at': safe_isoformat(document.validated_at),
+            'owner': document.owner.username if document.owner else None,
+            'total_pages': document.total_pages,
+            'file_name': os.path.basename(document.file.name) if document.file else None,
+        }
+
+        # Ajouter les champs personnalisés s'ils existent
+        from rawdocs.models import CustomFieldValue
+        custom_fields = {}
+        for custom_value in CustomFieldValue.objects.filter(document=document):
+            custom_fields[custom_value.field.name] = custom_value.value
+
+        if custom_fields:
+            parsed_json['document']['metadata']['custom_fields'] = custom_fields
+
+        # Sauvegarder en base SQL
+        document.global_annotations_json = parsed_json
+        document.global_annotations_summary_generated_at = timezone.now()
+        document.save(update_fields=['global_annotations_json', 'global_annotations_summary_generated_at'])
+
+        # Sauvegarder dans MongoDB avec toutes les métadonnées
+        mongo_collection.update_one(
+            {"document_id": str(document.id)},
+            {
+                "$set": {
+                    "document_id": str(document.id),
+                    "title": document.title,
+                    "metadata": parsed_json['document']['metadata'],  # Toutes les métadonnées
+                    "json": parsed_json,
+                    "entities": parsed_json.get('entities', {}),
+                    "updated_at": timezone.now().isoformat(),
+                    "updated_by": request.user.username
+                }
+            },
+            upsert=True
+        )
+
+        # LOG ACTION
+        log_expert_action(
+            user=request.user,
+            action='json_edited',
+            annotation=None,
+            document_id=document.id,
+            document_title=document.title,
+            reason=f"Global JSON manually edited by expert with full metadata"
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'JSON sauvegardé avec succès (SQL + MongoDB avec métadonnées complètes)'
+        })
+
+    except Exception as e:
+        print(f"❌ Erreur lors de la sauvegarde du JSON: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+# ——— NOUVELLES VUES ANNOTATION EXPERT (copiées et adaptées de rawdocs) —————————————————————————————————
+
+from django.contrib.auth.decorators import login_required
+from datetime import datetime
+from rawdocs.groq_annotation_system import GroqAnnotator
+
+
+@expert_required
+def expert_annotation_dashboard(request):
+    """Dashboard annotation pour Expert - copie de rawdocs.views.annotation_dashboard"""
+    # Récupérer tous les documents validés (prêts pour annotation)
+    documents = RawDocument.objects.filter(is_validated=True).select_related('owner').order_by('-created_at')
+    
+    # Statistiques
+    total_documents = documents.count()
+    total_pages = sum(doc.total_pages for doc in documents)
+    
+    # Pages avec au moins une annotation
+    annotated_pages = DocumentPage.objects.filter(
+        document__in=documents,
+        annotations__isnull=False
+    ).distinct().count()
+    
+    # Documents en cours d'annotation (au moins une page annotée mais pas toutes)
+    in_progress_docs = []
+    completed_docs = []
+    
+    for doc in documents:
+        doc_pages = doc.pages.all()
+        annotated_doc_pages = doc_pages.filter(annotations__isnull=False).distinct().count()
+        
+        if annotated_doc_pages > 0:
+            if annotated_doc_pages == doc.total_pages:
+                completed_docs.append(doc)
+            else:
+                in_progress_docs.append(doc)
+    
+    context = {
+        'documents': documents,
+        'total_documents': total_documents,
+        'total_pages': total_pages,
+        'total_annotated_pages': annotated_pages,
+        'in_progress_count': len(in_progress_docs),
+        'completed_count': len(completed_docs),
+    }
+    
+    return render(request, 'expert/annotation_dashboard.html', context)
+
+
+@expert_required
+def expert_annotate_document(request, doc_id):
+    """Interface d'annotation pour Expert - copie de rawdocs.views.annotate_document"""
+    document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+    
+    # Pagination par page
+    pages = document.pages.order_by('page_number')
+    paginator = Paginator(pages, 1)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    current_page = page_obj.object_list[0] if page_obj.object_list else None
+    
+    # Types d'annotations disponibles
+    annotation_types = AnnotationType.objects.all().order_by('display_name')
+    
+    # Annotations existantes pour la page courante
+    existing_annotations = current_page.annotations.all() if current_page else []
+    
+    context = {
+        'document': document,
+        'page_obj': page_obj,
+        'current_page': current_page,
+        'annotation_types': annotation_types,
+        'existing_annotations': existing_annotations,
+        'total_pages': document.total_pages,
+    }
+    
+    return render(request, 'expert/annotate_document.html', context)
+
+
+@expert_required
+@csrf_exempt
+def expert_ai_annotate_page_groq(request, page_id):
+    """Annotation automatique avec Groq pour Expert - copie de rawdocs.views.ai_annotate_page_groq"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        
+        # Initialiser le système Groq
+        groq_annotator = GroqAnnotator()
+        
+        # Créer les données de page
+        page_data = {
+            'page_num': page.page_number,
+            'text': page.text_content,
+            'char_count': len(page.text_content)
+        }
+        
+        # Extraire les entités avec Groq
+        entities = groq_annotator.annotate_page_with_groq(page_data)
+        
+        # Sauvegarder les annotations
+        saved_annotations = []
+        for entity in entities:
+            # Créer ou récupérer le type d'annotation
+            annotation_type, created = AnnotationType.objects.get_or_create(
+                name=entity['type'],
+                defaults={
+                    'display_name': entity['type'].replace('_', ' ').title(),
+                    'color': '#3b82f6',
+                    'description': f"Expert AI type: {entity['type']}"
+                }
+            )
+            
+            # Créer l'annotation (pré-validée par l'expert)
+            annotation = Annotation.objects.create(
+                page=page,
+                selected_text=entity['text'],
+                annotation_type=annotation_type,
+                start_pos=entity.get('start_pos', 0),
+                end_pos=entity.get('end_pos', len(entity['text'])),
+                validation_status='expert_created',
+                validated_by=request.user,
+                validated_at=timezone.now(),
+                created_by=request.user,
+                source='expert_ai'
+            )
+            
+            saved_annotations.append({
+                'id': annotation.id,
+                'text': annotation.selected_text,
+                'type': annotation.annotation_type.display_name,
+                'start_pos': annotation.start_pos,
+                'end_pos': annotation.end_pos
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'annotations': saved_annotations,
+            'message': f'{len(saved_annotations)} annotations créées automatiquement'
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@expert_required
+@csrf_exempt
+def expert_save_manual_annotation(request):
+    """Sauvegarde d'annotation manuelle pour Expert - copie de rawdocs.views.save_manual_annotation"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        page_id = data.get('page_id')
+        selected_text = data.get('selected_text')
+        entity_type = data.get('entity_type')
+        start_pos = data.get('start_pos', 0)
+        end_pos = data.get('end_pos', 0)
+        
+        page = get_object_or_404(DocumentPage, id=page_id)
+        
+        # Créer ou récupérer le type d'annotation
+        annotation_type, created = AnnotationType.objects.get_or_create(
+            name=entity_type,
+            defaults={
+                'display_name': entity_type.replace('_', ' ').title(),
+                'color': '#3b82f6',
+                'description': f"Expert manual type: {entity_type}"
+            }
+        )
+        
+        # Créer l'annotation (pré-validée par l'expert)
+        annotation = Annotation.objects.create(
+            page=page,
+            selected_text=selected_text,
+            annotation_type=annotation_type,
+            start_pos=start_pos,
+            end_pos=end_pos,
+            validation_status='expert_created',
+            validated_by=request.user,
+            validated_at=timezone.now(),
+            created_by=request.user,
+            source='expert_manual'
+        )
+        
+        # LOG ACTION
+        log_expert_action(
+            user=request.user,
+            action='annotation_created',
+            annotation=annotation,
+            reason=f"Manual annotation created by expert in page {page.page_number}"
+        )
+        
+        # Mise à jour automatique des JSON après création
+        try:
+            # Récupérer les annotations de la page
+            annotations = page.annotations.all().select_related('annotation_type').order_by('start_pos')
+            
+            # Construire entities -> [valeurs]
+            from rawdocs.views import _build_entities_map, generate_entities_based_page_summary
+            entities = _build_entities_map(annotations, use_display_name=True)
+            
+            # JSON minimaliste pour la page
+            page_json = {
+                'document': {
+                    'id': str(page.document.id),
+                    'title': page.document.title,
+                    'doc_type': getattr(page.document, 'doc_type', None),
+                    'source': getattr(page.document, 'source', None),
+                },
+                'page': {
+                    'number': page.page_number,
+                    'annotations_count': annotations.count(),
+                },
+                'entities': entities,
+                'generated_at': datetime.utcnow().isoformat() + 'Z',
+            }
+            
+            # Mise à jour du JSON de la page
+            page.annotations_json = page_json
+            page.save(update_fields=['annotations_json'])
+            
+            # Mise à jour du JSON du document
+            all_annotations = Annotation.objects.filter(
+                page__document=page.document
+            ).select_related('annotation_type', 'page').order_by('page__page_number', 'start_pos')
+            
+            document_entities = _build_entities_map(all_annotations, use_display_name=True)
+            
+            document_json = {
+                'document': {
+                    'id': str(page.document.id),
+                    'title': page.document.title,
+                    'doc_type': getattr(page.document, 'doc_type', None),
+                    'source': getattr(page.document, 'source', None),
+                    'total_pages': page.document.total_pages,
+                    'total_annotations': all_annotations.count(),
+                },
+                'entities': document_entities,
+                'generated_at': datetime.utcnow().isoformat() + 'Z',
+            }
+            
+            page.document.global_annotations_json = document_json
+            page.document.save(update_fields=['global_annotations_json'])
+            
+            print(f"✅ JSON mis à jour pour la page {page.page_number} et le document")
+            
+        except Exception as e:
+            print(f"❌ Erreur lors de la mise à jour du JSON: {str(e)}")
+        
+        return JsonResponse({
+            'success': True,
+            'annotation_id': annotation.id,
+            'message': 'Annotation sauvegardée avec succès et JSON mis à jour'
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@expert_required
+def expert_get_page_annotations(request, page_id):
+    """Récupération des annotations d'une page pour Expert - copie de rawdocs.views.get_page_annotations"""
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        annotations = page.annotations.select_related('annotation_type').order_by('start_pos')
+        
+        annotations_data = []
+        for annotation in annotations:
+            annotations_data.append({
+                'id': annotation.id,
+                'text': annotation.selected_text,
+                'type': annotation.annotation_type.display_name,
+                'type_name': annotation.annotation_type.name,
+                'start_pos': annotation.start_pos,
+                'end_pos': annotation.end_pos,
+                'validation_status': annotation.validation_status,
+                'created_at': annotation.created_at.isoformat() if annotation.created_at else None,
+                'validated_at': annotation.validated_at.isoformat() if annotation.validated_at else None,
+                'validated_by': annotation.validated_by.username if annotation.validated_by else None,
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'annotations': annotations_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@expert_required
+@csrf_exempt
+def expert_delete_annotation(request, annotation_id):
+    """Suppression d'annotation pour Expert - copie de rawdocs.views.delete_annotation"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        annotation = get_object_or_404(Annotation, id=annotation_id)
+        
+        # LOG ACTION BEFORE DELETION
+        log_expert_action(
+            user=request.user,
+            action='annotation_deleted',
+            annotation=annotation,
+            reason=f"Manual deletion by expert. Annotation was: {annotation.validation_status}"
+        )
+        
+        # Sauvegarder les références avant la suppression
+        page = annotation.page
+        document = page.document
+        
+        # Supprimer l'annotation
+        annotation.delete()
+        
+        try:
+            # Mise à jour du JSON de la page
+            page_annotations = page.annotations.all().select_related('annotation_type').order_by('start_pos')
+            from rawdocs.views import _build_entities_map, generate_entities_based_page_summary
+            
+            page_entities = _build_entities_map(page_annotations, use_display_name=True)
+            
+            page_json = {
+                'document': {
+                    'id': str(document.id),
+                    'title': document.title,
+                    'doc_type': getattr(document, 'doc_type', None),
+                    'source': getattr(document, 'source', None),
+                },
+                'page': {
+                    'number': page.page_number,
+                    'annotations_count': page_annotations.count(),
+                },
+                'entities': page_entities,
+                'generated_at': datetime.utcnow().isoformat() + 'Z',
+            }
+            
+            page.annotations_json = page_json
+            page.save(update_fields=['annotations_json'])
+            
+            # Mise à jour du JSON du document
+            all_annotations = Annotation.objects.filter(
+                page__document=document
+            ).select_related('annotation_type', 'page').order_by('page__page_number', 'start_pos')
+            
+            document_entities = _build_entities_map(all_annotations, use_display_name=True)
+            
+            document_json = {
+                'document': {
+                    'id': str(document.id),
+                    'title': document.title,
+                    'doc_type': getattr(document, 'doc_type', None),
+                    'source': getattr(document, 'source', None),
+                    'total_pages': document.total_pages,
+                    'total_annotations': all_annotations.count(),
+                },
+                'entities': document_entities,
+                'generated_at': datetime.utcnow().isoformat() + 'Z',
+            }
+            
+            document.global_annotations_json = document_json
+            document.save(update_fields=['global_annotations_json'])
+            
+            print(f"✅ JSON mis à jour après suppression pour la page {page.page_number} et le document")
+            
+        except Exception as e:
+            print(f"❌ Erreur lors de la mise à jour du JSON après suppression: {str(e)}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Annotation supprimée avec succès et JSON mis à jour'
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@expert_required
+@csrf_exempt
+def expert_validate_page_annotations(request, page_id):
+    """Validation des annotations d'une page pour Expert - copie de rawdocs.views.validate_page_annotations"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        
+        # Valider toutes les annotations de la page
+        annotations = page.annotations.filter(validation_status='pending')
+        validated_count = 0
+        
+        for annotation in annotations:
+            annotation.validation_status = 'validated'
+            annotation.validated_by = request.user
+            annotation.validated_at = timezone.now()
+            annotation.save()
+            validated_count += 1
+            
+            # LOG ACTION
+            log_expert_action(
+                user=request.user,
+                action='annotation_validated',
+                annotation=annotation,
+                reason=f"Bulk validation by expert for page {page.page_number}"
+            )
+        
+        return JsonResponse({
+            'success': True,
+            'validated_count': validated_count,
+            'message': f'{validated_count} annotations validées'
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@expert_required
+@csrf_exempt
+def expert_generate_page_annotation_summary(request, page_id):
+    """Génération du JSON et résumé pour une page - Expert - copie de rawdocs.views.generate_page_annotation_summary"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+
+        # Récupérer les annotations de la page
+        annotations = page.annotations.all().select_related('annotation_type').order_by('start_pos')
+
+        # Construire entities -> [valeurs] (utiliser la fonction de rawdocs)
+        from rawdocs.views import _build_entities_map, generate_entities_based_page_summary
+        entities = _build_entities_map(annotations, use_display_name=True)
+
+        # JSON minimaliste
+        page_json = {
+            'document': {
+                'id': str(page.document.id),
+                'title': page.document.title,
+                'doc_type': getattr(page.document, 'doc_type', None),
+                'source': getattr(page.document, 'source', None),
+            },
+            'page': {
+                'number': page.page_number,
+                'annotations_count': annotations.count(),
+            },
+            'entities': entities,
+            'generated_at': datetime.utcnow().isoformat() + 'Z',
+        }
+
+        # Résumé à partir des seules entités/valeurs
+        summary = generate_entities_based_page_summary(
+            entities=entities,
+            page_number=page.page_number,
+            document_title=page.document.title
+        )
+
+        # Sauvegarde
+        page.annotations_json = page_json
+        page.annotations_summary = summary
+        page.annotations_summary_generated_at = timezone.now()
+        page.save(update_fields=['annotations_json', 'annotations_summary', 'annotations_summary_generated_at'])
+
+        return JsonResponse({
+            'success': True,
+            'page_json': page_json,
+            'summary': summary,
+            'message': f'JSON et résumé générés pour la page {page.page_number}'
+        })
+    except Exception as e:
+        print(f"❌ Erreur génération résumé page {page_id}: {e}")
+        return JsonResponse({'error': f'Erreur lors de la génération: {str(e)}'}, status=500)
+
+
+@expert_required
+@csrf_exempt
+def expert_generate_document_annotation_summary(request, doc_id):
+    """Génération du JSON et résumé global pour un document - Expert - copie de rawdocs.views.generate_document_annotation_summary"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+
+        # Récupérer toutes les annotations du document
+        all_annotations = Annotation.objects.filter(
+            page__document=document
+        ).select_related('annotation_type', 'page').order_by('page__page_number', 'start_pos')
+
+        # Construire entities -> [valeurs] (utiliser la fonction de rawdocs)
+        from rawdocs.views import _build_entities_map, generate_entities_based_document_summary
+        entities = _build_entities_map(all_annotations, use_display_name=True)
+
+        # JSON global minimaliste
+        document_json = {
+            'document': {
+                'id': str(document.id),
+                'title': document.title,
+                'doc_type': getattr(document, 'doc_type', None),
+                'source': getattr(document, 'source', None),
+                'total_pages': document.total_pages,
+                'total_annotations': all_annotations.count(),
+            },
+            'entities': entities,
+            'generated_at': datetime.utcnow().isoformat() + 'Z',
+        }
+
+        # Résumé à partir des seules entités/valeurs
+        summary = generate_entities_based_document_summary(
+            entities=entities,
+            document_title=document.title,
+            total_pages=document.total_pages
+        )
+
+        # Sauvegarde
+        document.global_annotations_json = document_json
+        document.global_annotations_summary = summary
+        document.global_annotations_summary_generated_at = timezone.now()
+        document.save(update_fields=['global_annotations_json', 'global_annotations_summary', 'global_annotations_summary_generated_at'])
+
+        return JsonResponse({
+            'success': True,
+            'document_json': document_json,
+            'summary': summary,
+            'message': f'JSON et résumé globaux générés pour le document'
+        })
+    except Exception as e:
+        print(f"❌ Erreur génération résumé document {doc_id}: {e}")
+        return JsonResponse({'error': f'Erreur lors de la génération: {str(e)}'}, status=500)
+
+
+@expert_required
+def expert_view_page_annotation_json(request, page_id):
+    """Visualisation du JSON et résumé d'une page - Expert - copie de rawdocs.views.view_page_annotation_json"""
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+
+        # Si pas encore généré, le générer
+        if not hasattr(page, 'annotations_json') or not page.annotations_json:
+            # Déclencher la génération
+            from django.test import RequestFactory
+            factory = RequestFactory()
+            fake_request = factory.post(f'/expert/annotation/page/{page_id}/generate-summary/')
+            fake_request.user = request.user
+            expert_generate_page_annotation_summary(fake_request, page_id)
+            page.refresh_from_db()
+
+        context = {
+            'page': page,
+            'document': page.document,
+            'annotations_json': page.annotations_json if hasattr(page, 'annotations_json') else None,
+            'annotations_summary': page.annotations_summary if hasattr(page, 'annotations_summary') else None,
+            'total_annotations': page.annotations.count()
+        }
+
+        return render(request, 'expert/view_page_annotation_json.html', context)
+
+    except Exception as e:
+        messages.error(request, f"Erreur: {str(e)}")
+        return redirect('expert:annotation_dashboard')
+
+
+@expert_required
+def expert_view_document_annotation_json(request, doc_id):
+    """Visualisation du JSON et résumé global d'un document - Expert - copie de rawdocs.views.view_document_annotation_json"""
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+
+        # Si pas encore généré, le générer
+        if not hasattr(document, 'global_annotations_json') or not document.global_annotations_json:
+            # Déclencher la génération
+            from django.test import RequestFactory
+            factory = RequestFactory()
+            fake_request = factory.post(f'/expert/annotation/document/{doc_id}/generate-summary/')
+            fake_request.user = request.user
+            expert_generate_document_annotation_summary(fake_request, doc_id)
+            document.refresh_from_db()
+
+        # Statistiques
+        total_annotations = sum(page.annotations.count() for page in document.pages.all())
+        annotated_pages = document.pages.filter(annotations__isnull=False).distinct().count()
+
+        context = {
+            'document': document,
+            'global_annotations_json': document.global_annotations_json if hasattr(document, 'global_annotations_json') else None,
+            'global_annotations_summary': document.global_annotations_summary if hasattr(document, 'global_annotations_summary') else None,
+            'total_annotations': total_annotations,
+            'annotated_pages': annotated_pages,
+            'total_pages': document.total_pages
+        }
+
+        return render(request, 'expert/view_document_annotation_json.html', context)
+
+    except Exception as e:
+        messages.error(request, f"Erreur: {str(e)}")
+        return redirect('expert:annotation_dashboard')

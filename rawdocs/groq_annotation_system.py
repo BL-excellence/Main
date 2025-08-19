@@ -1,10 +1,11 @@
-# groq_annotation_system.py
+# rawdocs/groq_annotation_system.py
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from datetime import datetime
+from .models import DocumentPage, Annotation, AnnotationType
 
 import requests
 import json

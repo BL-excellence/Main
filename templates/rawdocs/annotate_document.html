@@ -7,8 +7,8 @@
 <link rel="stylesheet" href="{% static 'rawdocs/css/rlhf_styles.css' %}">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
-<!-- ADD THIS TO THE TOP OF YOUR annotate_document.html AFTER THE BOOTSTRAP CSS LINK -->
 
+<!-- Tous les styles CSS existants restent identiques -->
 <style>
 /* NUCLEAR OPTION: Override ALL modal conflicts */
 .context-menu {
@@ -216,135 +216,209 @@ body {
     border-radius: 3px;
     padding: 1px 3px;
 }
+
+/* Styles pour l'analyse réglementaire */
+.regulatory-analysis-panel {
+  background: linear-gradient(120deg, #f0f9ff 70%, #e0f2fe 100%);
+  border: 1.5px solid var(--pharma-info);
+  border-radius: var(--pharma-radius);
+  margin-bottom: 2rem;
+  box-shadow: var(--pharma-shadow);
+  padding: 2rem;
+}
+
+.regulatory-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.regulatory-stat {
+  background: var(--pharma-bg-card);
+  border: 1px solid var(--pharma-border);
+  border-radius: var(--pharma-radius-sm);
+  padding: 1rem 1.2rem;
+  text-align: center;
+  flex: 1;
+  box-shadow: 0 2px 8px rgba(56,189,248,0.08);
+}
+
+.regulatory-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--pharma-info);
+  display: block;
+}
+
+.regulatory-stat-label {
+  font-size: 0.85rem;
+  color: var(--pharma-text-soft);
+  margin-top: 0.2rem;
+}
+
+.btn-regulatory {
+  background: linear-gradient(90deg, var(--pharma-info), #0ea5e9);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 0.65rem 1.4rem;
+  font-weight: 700;
+  font-size: 1.04rem;
+  box-shadow: 0 4px 12px rgba(56,189,248,0.13);
+  transition: var(--pharma-transition);
+}
+
+.btn-regulatory:hover {
+  background: linear-gradient(90deg, #0ea5e9, var(--pharma-primary));
+  color: #fff;
+}
+
+.btn-regulatory:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.regulatory-progress {
+  background: var(--pharma-bg-card);
+  border-radius: 8px;
+  padding: 0.5rem;
+  margin: 1rem 0;
+}
+
+.progress-bar-regulatory {
+  background: linear-gradient(90deg, var(--pharma-info), var(--pharma-accent));
+  height: 8px;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.page-regulatory-analysis {
+  background: var(--pharma-glass);
+  border: 1.5px solid var(--pharma-info);
+  border-radius: var(--pharma-radius-sm);
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.importance-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.importance-score.critical {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+  color: #fff;
+}
+
+.importance-score.high {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+  color: #fff;
+}
+
+.importance-score.medium {
+  background: linear-gradient(90deg, var(--pharma-info), var(--pharma-primary));
+  color: #fff;
+}
+
+.importance-score.low {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.regulatory-obligations {
+  margin-top: 1rem;
+}
+
+.obligation-item {
+  background: var(--pharma-bg-card);
+  border: 1px solid var(--pharma-border);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.8rem;
+  border-left: 4px solid var(--pharma-warn);
+}
+
+.obligation-severity.high {
+  border-left-color: var(--pharma-error);
+}
+
+.obligation-severity.medium {
+  border-left-color: var(--pharma-warn);
+}
+
+.obligation-severity.low {
+  border-left-color: var(--pharma-info);
+}
+
+.regulatory-loading {
+  color: var(--pharma-info);
+  font-weight: 500;
+  margin-left: 1rem;
+  display: none;
+}
+
+.key-points-list {
+  margin-top: 1rem;
+}
+
+.key-point {
+  background: #f0f9ff;
+  border: 1px solid #e0f2fe;
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--pharma-text);
+}
+
+.authorities-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.authority-tag {
+  background: linear-gradient(90deg, #8b5cf6, #7c3aed);
+  color: #fff;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.deadlines-list {
+  margin-top: 1rem;
+}
+
+.deadline-item {
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.deadline-timeframe {
+  background: var(--pharma-warn);
+  color: #fff;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
 </style>
 
-<!-- ALSO ADD THIS JAVASCRIPT AFTER YOUR EXISTING SCRIPTS -->
-<script>
-// NUCLEAR JAVASCRIPT FIX
-document.addEventListener('DOMContentLoaded', function() {
-    
-    // Force remove any conflicting event listeners
-    function showAddAnnotationTypeModalFixed() {
-        console.log('🚀 Opening modal...');
-        
-        // Clear form
-        document.getElementById('new-annotation-display-name').value = '';
-        document.getElementById('new-annotation-name').value = '';
-        
-        // Get modal element
-        const modalElement = document.getElementById('addAnnotationTypeModal');
-        
-        if (!modalElement) {
-            console.error('Modal element not found!');
-            return;
-        }
-        
-        // Destroy any existing modal instance
-        const existingModal = bootstrap.Modal.getInstance(modalElement);
-        if (existingModal) {
-            existingModal.dispose();
-        }
-        
-        // Create fresh modal instance
-        const modal = new bootstrap.Modal(modalElement, {
-            backdrop: true,
-            keyboard: true,
-            focus: true
-        });
-        
-        // Force show
-        modal.show();
-        
-        // Ensure it's clickable after showing
-        setTimeout(() => {
-            const dialog = modalElement.querySelector('.modal-dialog');
-            const content = modalElement.querySelector('.modal-content');
-            
-            if (dialog) {
-                dialog.style.pointerEvents = 'auto';
-                dialog.style.zIndex = '1000000';
-            }
-            
-            if (content) {
-                content.style.pointerEvents = 'auto';
-                content.style.zIndex = '1000001';
-            }
-            
-            // Force focus on first input
-            const firstInput = modalElement.querySelector('input[type="text"]');
-            if (firstInput) {
-                firstInput.focus();
-            }
-        }, 100);
-        
-        console.log('✅ Modal should be open and clickable now');
-    }
-    
-    // Replace the existing function
-    window.showAddAnnotationTypeModal = showAddAnnotationTypeModalFixed;
-    
-    // Also fix the create function
-    window.createAnnotationTypeFixed = function() {
-        console.log('🎯 Creating annotation type...');
-        
-        const displayName = document.getElementById('new-annotation-display-name').value.trim();
-        const name = document.getElementById('new-annotation-name').value.trim();
-
-        if (!displayName) {
-            alert('Please enter a display name');
-            return;
-        }
-
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-        fetch('/create-annotation-type/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
-            },
-            body: JSON.stringify({
-                display_name: displayName,
-                name: name
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(data.message);
-
-                // Add new button
-                addNewAnnotationButtonToAnnotateur(data.annotation_type);
-
-                // Force close modal
-                const modalElement = document.getElementById('addAnnotationTypeModal');
-                const modal = bootstrap.Modal.getInstance(modalElement);
-                if (modal) {
-                    modal.hide();
-                }
-                
-                // Clear form
-                document.getElementById('new-annotation-display-name').value = '';
-                document.getElementById('new-annotation-name').value = '';
-                
-                console.log('✅ Annotation type created successfully');
-            } else {
-                alert('Error: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error creating annotation type');
-        });
-    };
-    
-    // Replace the create function
-    window.createAnnotationType = window.createAnnotationTypeFixed;
-    
-    console.log('🔧 Modal fixes applied');
-});
-</script>
-
+<!-- Styles CSS pharma existants conservés identiques -->
 <style>
 /* Pharma color variables */
 :root {
@@ -376,7 +450,8 @@ body {
 }
 
 .main-content {
-  max-width: 850px;
+  width: 100%;
+  max-width: none;
   margin: auto;
 }
 
@@ -546,11 +621,86 @@ body {
   border: 1px solid var(--pharma-border);
   border-radius: var(--pharma-radius);
   box-shadow: var(--pharma-shadow);
-  padding: 1.1rem 1.9rem;
+  padding: 1.5rem 2rem;
   margin-bottom: 2.1rem;
+}
+
+/* Actions Container */
+.actions-container {
+  margin-top: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--pharma-border);
+}
+
+.action-group {
+  background: var(--pharma-glass);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+  border-radius: var(--pharma-radius-sm);
+  padding: 1.2rem;
+  transition: var(--pharma-transition);
+}
+
+.action-group:hover {
+  border-color: rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+}
+
+.group-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--pharma-primary-dark);
+  margin-bottom: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
+}
+
+.group-title::before {
+  content: '';
+  width: 3px;
+  height: 16px;
+  background: linear-gradient(to bottom, var(--pharma-primary), var(--pharma-accent));
+  border-radius: 2px;
+}
+
+.buttons-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+/* Ajustements des boutons pour la nouvelle disposition */
+.buttons-row .btn-groq,
+.buttons-row .btn-validate,
+.buttons-row .btn-json-page,
+.buttons-row .btn-json-document,
+.buttons-row .btn-view-json,
+.buttons-row .btn-expert {
+  font-size: 0.9rem;
+  padding: 0.6rem 1.2rem;
+  flex: 1;
+  min-width: 140px;
+  justify-content: center;
+}
+
+/* Loading indicators container */
+.loading-indicators {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: var(--pharma-radius-sm);
+  border: 1px dashed rgba(59, 130, 246, 0.2);
 }
 
 .page-controls { display: flex; align-items: center; gap: 1.5rem; }
@@ -580,15 +730,58 @@ body {
   transition: var(--pharma-transition);
   box-shadow: 0 3px 10px rgba(14,165,233,0.11);
   outline: none;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
+
 .nav-btn:hover {
   background: var(--pharma-primary);
   color: #fff;
   transform: scale(1.04) translateY(-1px);
+  text-decoration: none;
+}
+
+.nav-btn-icon {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, var(--pharma-primary-dark), var(--pharma-primary));
+  box-shadow: 0 4px 15px rgba(14,165,233,0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-btn-icon:hover {
+  background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
+  transform: scale(1.1) translateY(-2px);
+  box-shadow: 0 6px 20px rgba(14,165,233,0.25);
+}
+
+.nav-btn-icon:active {
+  transform: scale(0.95) translateY(0);
+}
+
+.nav-btn-icon i {
+  font-size: 1.3rem;
+  transition: var(--pharma-transition);
+}
+
+.nav-btn-icon:hover i {
+  transform: scale(1.1);
 }
 
 /* AI, Validate, Expert Buttons */
-.ai-controls { display: flex; align-items: center; gap: 1.1rem; }
+.ai-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+}
+
 .btn-groq {
   background: linear-gradient(90deg, var(--pharma-primary), var(--pharma-info));
   color: #fff;
@@ -622,6 +815,110 @@ body {
   background: #059669;
 }
 
+/* NOUVEAUX STYLES POUR LES BOUTONS JSON */
+.btn-json-page {
+  background: linear-gradient(90deg, #10b981, #059669);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 0.65rem 1.4rem;
+  font-weight: 700;
+  font-size: 1.04rem;
+  box-shadow: 0 4px 12px rgba(16,185,129,0.13);
+  transition: var(--pharma-transition);
+}
+
+.btn-json-page:hover {
+  background: linear-gradient(90deg, #059669, #047857);
+  color: #fff;
+}
+
+.btn-json-document {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 0.65rem 1.4rem;
+  font-weight: 700;
+  font-size: 1.04rem;
+  box-shadow: 0 4px 12px rgba(245,158,11,0.13);
+  transition: var(--pharma-transition);
+}
+
+.btn-json-document:hover {
+  background: linear-gradient(90deg, #d97706, #b45309);
+  color: #fff;
+}
+
+/* Groupement des actions JSON par paires */
+.json-action-pair {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+/* Boutons JSON icônes stylisés */
+.btn-view-json-page,
+.btn-view-json-global {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-size: 1.2rem;
+  transition: var(--pharma-transition);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-view-json-page {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  border: 2px solid #059669;
+}
+
+.btn-view-json-page:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #fff;
+  transform: scale(1.1) translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16,185,129,0.25);
+  text-decoration: none;
+}
+
+.btn-view-json-global {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  border: 2px solid #d97706;
+}
+
+.btn-view-json-global:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  color: #fff;
+  transform: scale(1.1) translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245,158,11,0.25);
+  text-decoration: none;
+}
+
+.btn-view-json-page:active,
+.btn-view-json-global:active {
+  transform: scale(0.95) translateY(0);
+}
+
+.btn-view-json-page i,
+.btn-view-json-global i {
+  font-size: 1.3rem;
+  transition: var(--pharma-transition);
+}
+
+.btn-view-json-page:hover i,
+.btn-view-json-global:hover i {
+  transform: scale(1.1);
+}
+
 .btn-expert {
   background: linear-gradient(90deg, #6d28d9, #4c1d95 90%);
   color: #fff;
@@ -643,13 +940,19 @@ body {
   padding: 0.65rem 1.4rem;
 }
 
-.ai-loading, .learning-progress {
+.ai-loading, .learning-progress, .regulatory-loading, .json-loading {
   color: var(--pharma-primary-dark);
   font-weight: 500;
   margin-left: 1rem;
 }
 
-/* Text Content (Zone principale d’annotation) */
+.json-loading {
+  color: var(--pharma-accent);
+  font-weight: 500;
+  margin-left: 1rem;
+}
+
+/* Text Content (Zone principale d'annotation) */
 .text-content-card {
   background: var(--pharma-bg-card);
   border-radius: var(--pharma-radius);
@@ -692,7 +995,7 @@ body {
 }
 
 /* Text content - Enhanced for PDF-like appearance */
-  .text-content {
+.text-content {
     background: #fafbfc;
     border: 1px solid var(--pharma-border);
     border-radius: 12px;
@@ -703,6 +1006,8 @@ body {
     white-space: pre-wrap;
     word-wrap: break-word;
     min-height: 400px;
+    width: 100%;
+    max-width: 100%;
     cursor: text;
     font-family: 'Inter', 'Georgia', 'Times New Roman', serif;
     text-rendering: optimizeLegibility;
@@ -728,9 +1033,9 @@ body {
     display: block;
     width: 100%;
     height: 2px;
-    background: linear-gradient(to right, 
-      transparent, 
-      rgba(59, 130, 246, 0.2), 
+    background: linear-gradient(to right,
+      transparent,
+      rgba(59, 130, 246, 0.2),
       transparent
     );
     margin-bottom: 1.5rem;
@@ -910,19 +1215,76 @@ body {
 }
 .btn-primary:hover { background: var(--pharma-primary); color: #fff; }
 
-/* Responsive */
+/* Responsive pour la nouvelle disposition */
 @media (max-width: 900px) {
   .main-content { max-width: 99vw; }
-  .annotation-header, .text-content-card, .annotations-list, .learning-dashboard-widget, .annotation-types-panel, .page-navigation {
+  .annotation-header, .text-content-card, .annotations-list, .learning-dashboard-widget, .annotation-types-panel, .page-navigation, .regulatory-analysis-panel {
     padding: 1.1rem 0.8rem !important;
   }
+
+  .actions-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .buttons-row {
+    flex-direction: column;
+  }
+
+  .buttons-row .btn-groq,
+  .buttons-row .btn-validate,
+  .buttons-row .btn-expert {
+    font-size: 0.9rem !important;
+    padding: 0.7rem 1rem !important;
+    min-width: 100%;
+  }
+
+  .json-action-pair {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  .json-action-pair .btn-json-page,
+  .json-action-pair .btn-json-document {
+    font-size: 0.9rem !important;
+    padding: 0.7rem 1rem !important;
+    min-width: 100%;
+  }
+
+  .btn-view-json-page,
+  .btn-view-json-global {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
 }
+
 @media (max-width: 700px) {
-  .annotation-header, .annotation-types-panel, .page-navigation, .text-content-card, .annotations-list, .learning-dashboard-widget {
+  .annotation-header, .annotation-types-panel, .text-content-card, .annotations-list, .learning-dashboard-widget, .regulatory-analysis-panel {
     flex-direction: column !important;
     gap: 1rem !important;
   }
+
+  .page-navigation {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-controls {
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
   .header-actions { width: 100%; }
+  .regulatory-stats { flex-direction: column; }
+
+  .action-group {
+    padding: 1rem;
+  }
+
+  .group-title {
+    font-size: 0.85rem;
+  }
 }
 
 /* Animations */
@@ -931,7 +1293,6 @@ body {
   to   { opacity: 1; transform: translateY(0);}
 }
 </style>
-
 
 <!-- Annotation Header -->
 <section class="annotation-header">
@@ -954,16 +1315,117 @@ body {
   </div>
 
     <div class="header-actions">
-      <button class="btn-outline me-2" onclick="viewOriginalDocument({{ document.id }})">
-        <i class="fas fa-eye"></i> See Original Doc
+      <button class="nav-btn nav-btn-icon me-2" onclick="viewOriginalDocument({{ document.id }})" title="Voir le document original">
+        <i class="fas fa-eye"></i>
       </button>
-      <a href="{% url 'rawdocs:annotation_dashboard' %}" class="btn-outline">
-        <i class="fas fa-arrow-left"></i> Retour
+      <a href="{% url 'rawdocs:annotation_dashboard' %}" class="nav-btn nav-btn-icon" title="Retour au dashboard">
+        <i class="fas fa-arrow-left"></i>
       </a>
     </div>
 </section>
 
-<!-- Annotation Types Panel -->
+<!-- NOUVELLE SECTION: Analyse Réglementaire Panel -->
+<section class="regulatory-analysis-panel">
+  <h3><i class="fas fa-balance-scale"></i> Analyse Réglementaire du Document</h3>
+  <p class="instructions">Analysez automatiquement le contenu réglementaire de chaque page et du document complet</p>
+
+  <!-- Statistiques réglementaires -->
+  <div class="regulatory-stats">
+    <div class="regulatory-stat">
+      <span class="regulatory-stat-value">{{ regulatory_stats.analyzed_pages }}</span>
+      <span class="regulatory-stat-label">Pages analysées</span>
+    </div>
+    <div class="regulatory-stat">
+      <span class="regulatory-stat-value">{{ regulatory_stats.completion_percentage }}%</span>
+      <span class="regulatory-stat-label">Progression</span>
+    </div>
+    <div class="regulatory-stat">
+      <span class="regulatory-stat-value">{{ regulatory_stats.high_importance_pages }}</span>
+      <span class="regulatory-stat-label">Pages critiques</span>
+    </div>
+    <div class="regulatory-stat">
+      <span class="regulatory-stat-value">{% if global_analysis %}{{ global_analysis.global_regulatory_score }}{% else %}0{% endif %}</span>
+      <span class="regulatory-stat-label">Score global</span>
+    </div>
+  </div>
+
+  <!-- Barre de progression -->
+  <div class="regulatory-progress">
+    <div class="progress-bar-regulatory" style="width: {{ regulatory_stats.completion_percentage }}%"></div>
+  </div>
+
+  <!-- Boutons d'action réglementaire -->
+  <div class="regulatory-actions" style="display: flex; gap: 1rem; align-items: center;">
+    <button id="analyze-page-regulatory-btn" class="btn-regulatory" onclick="analyzePageRegulatory()">
+      <i class="fas fa-gavel"></i> Analyser cette Page
+    </button>
+
+    <button id="analyze-document-regulatory-btn" class="btn-regulatory" onclick="analyzeDocumentRegulatory()">
+      <i class="fas fa-book-open"></i> Analyser tout le Document
+    </button>
+
+    <div id="regulatory-loading" class="regulatory-loading" style="display: none;">
+      <i class="fas fa-spinner fa-spin"></i> Analyse réglementaire en cours...
+    </div>
+  </div>
+
+  <!-- Résumé global du document si disponible -->
+  {% if global_analysis %}
+  <div class="document-global-summary" style="margin-top: 1.5rem; padding: 1rem; background: var(--pharma-bg-card); border-radius: 8px; border: 1px solid var(--pharma-border);">
+    <h4 style="color: var(--pharma-primary-dark); margin-bottom: 0.8rem;">
+      <i class="fas fa-file-contract"></i> Résumé Réglementaire Global
+    </h4>
+    <p style="margin-bottom: 1rem; line-height: 1.6;">{{ global_analysis.global_summary }}</p>
+
+    {% if global_analysis.consolidated_analysis.main_regulatory_themes %}
+    <div class="regulatory-themes" style="margin-top: 1rem;">
+      <strong style="color: var(--pharma-primary-dark);">Thèmes principaux:</strong>
+      <ul style="margin-top: 0.5rem; padding-left: 1.2rem;">
+        {% for theme in global_analysis.consolidated_analysis.main_regulatory_themes %}
+        <li style="margin-bottom: 0.3rem;">{{ theme }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+
+<!-- SÉPARATEUR VISUEL CLAIR -->
+<div style="
+  margin: 3rem 0; 
+  height: 60px; 
+  background: linear-gradient(135deg, rgba(14,165,233,0.1) 0%, rgba(16,185,129,0.1) 50%, rgba(14,165,233,0.1) 100%); 
+  border-radius: 16px; 
+  border: 2px solid rgba(14,165,233,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+">
+  <div style="
+    background: white; 
+    padding: 8px 20px; 
+    border-radius: 25px; 
+    border: 1px solid rgba(14,165,233,0.3);
+    box-shadow: 0 4px 12px rgba(14,165,233,0.1);
+    font-weight: 600;
+    color: var(--pharma-primary-dark);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  ">
+    <span>⚖️</span>
+    <span>Analyse Réglementaire</span>
+    <span style="margin: 0 8px;">→</span>
+    <span>📝</span>
+    <span>Annotation</span>
+  </div>
+</div>
+
+<!-- Annotation Types Panel (identique) -->
 <section class="annotation-types-panel">
   <h3>Sélectionnez un type d'entité</h3>
   <p class="instructions">Cliquez sur un type, puis surlignez le texte correspondant</p>
@@ -1002,12 +1464,13 @@ body {
 </div>
 </section>
 
-<!-- Page Navigation -->
+<!-- Page Navigation avec disposition améliorée des boutons -->
 <section class="page-navigation">
+  <!-- Navigation des pages -->
   <div class="page-controls">
     {% if current_page.page_number > 1 %}
-      <a href="?page={{ current_page.page_number|add:'-1' }}" class="nav-btn">
-        <i class="fas fa-chevron-left"></i>Précédente
+      <a href="?page={{ current_page.page_number|add:'-1' }}" class="nav-btn nav-btn-icon" title="Page précédente">
+        <i class="fas fa-angle-left"></i>
       </a>
     {% endif %}
 
@@ -1018,64 +1481,215 @@ body {
                 {% if page.page_number == current_page.page_number %}selected{% endif %}>
           Page {{ page.page_number }}
           {% if page.is_validated_by_human %}🎓{% elif page.is_annotated %}✅{% endif %}
+          {% if page.is_regulatory_analyzed %}⚖️{% endif %}
         </option>
         {% endfor %}
       </select>
     </div>
 
     {% if current_page.page_number < total_pages %}
-      <a href="?page={{ current_page.page_number|add:'1' }}" class="nav-btn">
-        Suivante <i class="fas fa-chevron-right"></i>
+      <a href="?page={{ current_page.page_number|add:'1' }}" class="nav-btn nav-btn-icon" title="Page suivante">
+        <i class="fas fa-angle-right"></i>
       </a>
     {% endif %}
   </div>
 
-  <div class="ai-controls">
-    <!-- Enhanced AI Button -->
-    <button id="groq-annotate-btn" class="btn-groq" onclick="annotateWithGroq()">
-      <i class="fas fa-rocket"></i> Annotate with AI 🧠
-    </button>
+  <!-- Actions organisées par catégories -->
+  <div class="actions-container">
+    <!-- Groupe 1: Actions IA et Validation -->
+    <div class="action-group">
+      <h4 class="group-title">IA & Validation</h4>
+      <div class="buttons-row">
+        <button id="groq-annotate-btn" class="btn-groq" onclick="annotateWithGroq()">
+          <i class="fas fa-rocket"></i> Annotation AI
+        </button>
 
-    <!-- Validate Page Button -->
-    <button id="validate-page-btn" class="btn-validate" onclick="validatePage()"
-            {% if current_page.is_validated_by_human %}disabled{% endif %}>
-      <i class="fas fa-graduation-cap"></i>
-      {% if current_page.is_validated_by_human %}
-        Page Validée 🎓
-      {% else %}
-        Validate Page
-      {% endif %}
-    </button>
-
-    <!-- Expert Review Button -->
-    {% if not document.is_ready_for_expert %}
-      <button id="submit-document-expert-btn" class="btn-expert" onclick="submitDocumentForExpert()">
-        <i class="fas fa-user-graduate"></i>
-        Soumission a l'Expert
-      </button>
-    {% else %}
-      <button class="btn btn-success" disabled>
-        <i class="fas fa-check-circle"></i>
-        Document Soumis ✓
-      </button>
-    {% endif %}
-
-    <div id="ai-loading" class="ai-loading" style="display: none;">
-      <i class="fas fa-spinner fa-spin"></i> IA en cours...
+        <button id="validate-page-btn" class="btn-validate" onclick="validatePage()"
+                {% if current_page.is_validated_by_human %}disabled{% endif %}>
+          <i class="fas fa-graduation-cap"></i>
+          {% if current_page.is_validated_by_human %}Page Validée{% else %}Validate Page{% endif %}
+        </button>
+      </div>
     </div>
 
-    <!-- Learning Progress Indicator -->
-    <div id="learning-progress" class="learning-progress" style="display: none;">
-      <i class="fas fa-brain"></i> IA en apprentissage...
+    <!-- Groupe 2: Actions JSON -->
+    <div class="action-group">
+      <h4 class="group-title">Export JSON</h4>
+      <div class="buttons-row">
+        <div class="json-action-pair">
+          <button id="generate-page-json-btn" class="btn-json-page" onclick="generatePageJson()">
+            <i class="fas fa-code"></i> Générer JSON Page
+          </button>
+
+          <a href="{% url 'rawdocs:view_page_annotation_json' current_page.id %}"
+             class="btn-view-json-page" target="_blank" title="Voir le JSON de cette page">
+            <i class="fas fa-file-code"></i>
+          </a>
+        </div>
+
+        <div class="json-action-pair">
+          <button id="generate-document-json-btn" class="btn-json-document" onclick="generateDocumentJson()">
+            <i class="fas fa-file-contract"></i> Générer JSON Global
+          </button>
+
+          <a href="{% url 'rawdocs:view_document_annotation_json' document.id %}"
+             class="btn-view-json-global" target="_blank" title="Voir le JSON du document complet">
+            <i class="fas fa-book-open"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Groupe 3: Révision Expert -->
+    <div class="action-group">
+      <h4 class="group-title">Révision Expert</h4>
+      <div class="buttons-row">
+        {% if not document.is_ready_for_expert %}
+          <button id="submit-document-expert-btn" class="btn-expert" onclick="submitDocumentForExpert()">
+            <i class="fas fa-user-graduate"></i>
+            Soumission à l'Expert
+          </button>
+        {% else %}
+          <button class="btn btn-success" disabled>
+            <i class="fas fa-check-circle"></i>
+            Document Soumis ✓
+          </button>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Indicateurs de chargement -->
+    <div class="loading-indicators">
+      <div id="ai-loading" class="ai-loading" style="display: none;">
+        <i class="fas fa-spinner fa-spin"></i> IA en cours...
+      </div>
+
+      <div id="learning-progress" class="learning-progress" style="display: none;">
+        <i class="fas fa-brain"></i> IA en apprentissage...
+      </div>
+
+      <div id="json-loading" class="json-loading" style="display: none;">
+        <i class="fas fa-spinner fa-spin"></i> Génération JSON...
+      </div>
     </div>
   </div>
 </section>
 
-<!-- Learning Dashboard Widget -->
+<!-- Learning Dashboard Widget (identique) -->
 <section class="learning-dashboard-widget" id="learning-widget" style="display: none;"></section>
 
-<!-- Main Text Content -->
-<section class="text-content-card main-content">
+<!-- NOUVELLE SECTION: Analyse Réglementaire de la Page Courante -->
+{% if current_page.is_regulatory_analyzed %}
+<section class="page-regulatory-analysis">
+  <h3 style="color: var(--pharma-info); margin-bottom: 1rem;">
+    <i class="fas fa-gavel"></i>
+    Analyse Réglementaire - Page {{ current_page.page_number }}
+    <span class="importance-score {% if current_page.regulatory_importance_score >= 90 %}critical{% elif current_page.regulatory_importance_score >= 70 %}high{% elif current_page.regulatory_importance_score >= 50 %}medium{% else %}low{% endif %}">
+      <i class="fas fa-chart-line"></i>
+      Score: {{ current_page.regulatory_importance_score }}/100
+    </span>
+  </h3>
+
+  <!-- Résumé de la page -->
+  {% if page_summary %}
+  <div class="page-summary" style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+    <h4 style="color: var(--pharma-info); margin-bottom: 0.5rem;">
+      <i class="fas fa-file-text"></i> Résumé de la Page
+    </h4>
+    <p style="margin: 0; line-height: 1.6;">{{ page_summary }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Points clés réglementaires -->
+  {% if page_analysis.key_regulatory_points %}
+  <div class="key-points-list">
+    <h4 style="color: var(--pharma-primary-dark); margin-bottom: 0.8rem;">
+      <i class="fas fa-list-ul"></i> Points Clés Réglementaires
+    </h4>
+    {% for point in page_analysis.key_regulatory_points %}
+    <div class="key-point">{{ point }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Obligations réglementaires -->
+  {% if page_analysis.regulatory_obligations %}
+  <div class="regulatory-obligations">
+    <h4 style="color: var(--pharma-warn); margin-bottom: 0.8rem;">
+      <i class="fas fa-exclamation-triangle"></i> Obligations Réglementaires
+    </h4>
+    {% for obligation in page_analysis.regulatory_obligations %}
+    <div class="obligation-item obligation-severity {{ obligation.severity }}">
+      <strong>{{ obligation.obligation }}</strong>
+      {% if obligation.authority %}
+      <div style="margin-top: 0.3rem; font-size: 0.9rem; color: var(--pharma-text-soft);">
+        <i class="fas fa-building"></i> {{ obligation.authority }}
+      </div>
+      {% endif %}
+      {% if obligation.deadline %}
+      <div style="margin-top: 0.3rem; font-size: 0.9rem; color: var(--pharma-warn);">
+        <i class="fas fa-clock"></i> {{ obligation.deadline }}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Délais critiques -->
+  {% if page_analysis.critical_deadlines %}
+  <div class="deadlines-list">
+    <h4 style="color: var(--pharma-error); margin-bottom: 0.8rem;">
+      <i class="fas fa-hourglass-half"></i> Délais Critiques
+    </h4>
+    {% for deadline in page_analysis.critical_deadlines %}
+    <div class="deadline-item">
+      <div>
+        <strong>{{ deadline.deadline }}</strong>
+        {% if deadline.trigger_event %}
+        <div style="font-size: 0.9rem; color: var(--pharma-text-soft);">
+          Déclencheur: {{ deadline.trigger_event }}
+        </div>
+        {% endif %}
+      </div>
+      <span class="deadline-timeframe">{{ deadline.timeframe }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Autorités mentionnées -->
+  {% if page_analysis.authorities_mentioned %}
+  <div class="authorities-list">
+    <h4 style="color: var(--pharma-primary-dark); margin-bottom: 0.8rem;">
+      <i class="fas fa-university"></i> Autorités Réglementaires
+    </h4>
+    {% for authority in page_analysis.authorities_mentioned %}
+    <span class="authority-tag">{{ authority.name }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Documents requis -->
+  {% if page_analysis.documents_required %}
+  <div class="documents-required" style="margin-top: 1rem;">
+    <h4 style="color: var(--pharma-accent); margin-bottom: 0.8rem;">
+      <i class="fas fa-folder-open"></i> Documents Requis
+    </h4>
+    {% for doc in page_analysis.documents_required %}
+    <div class="key-point">
+      <strong>{{ doc.document }}</strong>
+      {% if doc.when %} - À fournir: {{ doc.when }}{% endif %}
+      {% if doc.to_whom %} - À: {{ doc.to_whom }}{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<!-- Main Text Content avec espacement -->
+<section class="text-content-card main-content" style="margin-top: 3rem;">
   <h3>
     <i class="fas fa-file-text"></i>
     Page {{ current_page.page_number }}
@@ -1086,6 +1700,9 @@ body {
     {% else %}
       <span class="page-status pending">En attente</span>
     {% endif %}
+    {% if current_page.is_regulatory_analyzed %}
+      <span class="page-status" style="background: #e0f2fe; color: var(--pharma-info);">Analysée réglementairement</span>
+    {% endif %}
   </h3>
 
   <div id="text-content" class="text-content" data-page-id="{{ current_page.id }}">
@@ -1093,7 +1710,7 @@ body {
   </div>
 </section>
 
-<!-- Annotations List -->
+<!-- Annotations List (identique) -->
 <section class="annotations-list">
   <h3><i class="fas fa-tags"></i> Annotations ({{ existing_annotations.count }})</h3>
 
@@ -1109,7 +1726,7 @@ body {
           <i class="fas fa-trash"></i>
         </button>
       </div>
-      <div class="annotation-text annotation-text-clickable" 
+      <div class="annotation-text annotation-text-clickable"
         onclick="highlightTextInDocument('{{ annotation.selected_text|escapejs }}', {{ annotation.start_pos }}, {{ annotation.end_pos }})"
         style="cursor: pointer; color: var(--pharma-primary-dark); text-decoration: underline;"
         title="Cliquez pour voir dans le texte">"{{ annotation.selected_text }}"</div>
@@ -1123,7 +1740,7 @@ body {
   </div>
 </section>
 
-<!-- FIXED Modal for adding new annotation types - Expert style -->
+<!-- Modal pour ajouter des types d'annotation (identique) -->
 <div class="modal fade" id="addAnnotationTypeModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -1154,78 +1771,263 @@ body {
 
 <script src="{% static 'rawdocs/js/rlhf_annotation.js' %}"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- JavaScript existant + nouvelles fonctions JSON -->
 <script>
-// MISSING VARIABLE - This is what's causing the error!
+// EXISTING JAVASCRIPT CODE (conservé identique)
 let annotationTypeMap = {};
 
 // Initialize the type mapping when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // BUILD THE TYPE MAPPING FIRST - This was missing!
+    // BUILD THE TYPE MAPPING FIRST
     {% for ann_type in annotation_types %}
     annotationTypeMap['{{ ann_type.name|escapejs }}'] = {{ ann_type.id }};
     {% endfor %}
-    
+
     console.log('📋 Annotation type mapping loaded:', annotationTypeMap);
 });
 
-// ALSO UPDATE your createAnnotationType function to add new types to the map
-function createAnnotationType() {
-    const displayName = document.getElementById('new-annotation-display-name').value.trim();
-    const name = document.getElementById('new-annotation-name').value.trim();
+// NOUVELLES FONCTIONS POUR L'ANALYSE RÉGLEMENTAIRE
 
-    if (!displayName) {
-        alert('Please enter a display name');
-        return;
-    }
+function analyzePageRegulatory() {
+    const btn = document.getElementById('analyze-page-regulatory-btn');
+    const loading = document.getElementById('regulatory-loading');
 
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    // Désactiver le bouton et afficher le loading
+    btn.disabled = true;
+    loading.style.display = 'inline-flex';
 
-    fetch('/create-annotation-type/', {
+    const pageId = document.getElementById('text-content').dataset.pageId;
+
+    fetch(`/regulatory/analyze-page/${pageId}/`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: JSON.stringify({
-            display_name: displayName,
-            name: name
-        })
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
+            // Afficher le succès
+            showRegulatorySuccess(data.message, data.importance_score);
 
-            // CRITICAL: Add the new type to our mapping!
-            annotationTypeMap[data.annotation_type.name] = data.annotation_type.id;
-            console.log('📋 Updated type mapping:', annotationTypeMap);
-
-            // Add new button to the interface immediately
-            addNewAnnotationButtonToAnnotateur(data.annotation_type);
-
-            // Close modal properly
-            const modalElement = document.getElementById('addAnnotationTypeModal');
-            const modal = bootstrap.Modal.getInstance(modalElement);
-            if (modal) {
-                modal.hide();
-            }
-            
-            // Clear form
-            document.getElementById('new-annotation-display-name').value = '';
-            document.getElementById('new-annotation-name').value = '';
+            // Recharger la page pour afficher l'analyse
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
         } else {
-            alert('Error: ' + data.error);
+            alert('Erreur: ' + data.error);
         }
     })
     .catch(error => {
-        console.error('Error:', error);
-        alert('Error creating annotation type');
+        console.error('Erreur analyse réglementaire:', error);
+        alert('Erreur lors de l\'analyse réglementaire');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        loading.style.display = 'none';
     });
 }
-</script>
 
-<script>
+function analyzeDocumentRegulatory() {
+    if (!confirm('Analyser tout le document peut prendre plusieurs minutes. Continuer ?')) {
+        return;
+    }
+
+    const btn = document.getElementById('analyze-document-regulatory-btn');
+    const loading = document.getElementById('regulatory-loading');
+
+    btn.disabled = true;
+    loading.style.display = 'inline-flex';
+    loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyse complète en cours...';
+
+    const documentId = {{ document.id }};
+
+    fetch(`/regulatory/analyze-document/${documentId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showRegulatorySuccess(data.message, data.global_score);
+
+            // Recharger la page pour afficher l'analyse
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur analyse document:', error);
+        alert('Erreur lors de l\'analyse du document');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        loading.style.display = 'none';
+        loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyse réglementaire en cours...';
+    });
+}
+
+function showRegulatorySuccess(message, score) {
+    // Créer et afficher un message de succès
+    const successDiv = document.createElement('div');
+    successDiv.className = 'validation-success';
+    successDiv.innerHTML = `
+        <i class="fas fa-balance-scale" style="font-size: 1.5rem;"></i>
+        <div>
+            <strong>✅ ${message}</strong>
+            <div style="font-size: 0.9rem; opacity: 0.9;">Score d'importance: ${score}/100</div>
+        </div>
+    `;
+
+    // Insérer avant le contenu principal
+    const mainContent = document.querySelector('.text-content-card');
+    mainContent.parentNode.insertBefore(successDiv, mainContent);
+
+    // Supprimer après 5 secondes
+    setTimeout(() => {
+        successDiv.remove();
+    }, 5000);
+}
+
+// NOUVELLES FONCTIONS POUR GÉNÉRATION JSON ET RÉSUMÉS
+
+function generatePageJson() {
+    const btn = document.getElementById('generate-page-json-btn');
+    const loading = document.getElementById('json-loading');
+
+    // Vérifier qu'il y a des annotations
+    const annotationsCount = document.querySelectorAll('.annotation-item').length;
+    if (annotationsCount === 0) {
+        alert('Aucune annotation trouvée sur cette page. Annotez d\'abord la page.');
+        return;
+    }
+
+    // Désactiver le bouton et afficher le loading
+    btn.disabled = true;
+    loading.style.display = 'inline-flex';
+
+    const pageId = document.getElementById('text-content').dataset.pageId;
+
+    fetch(`/annotation/page/${pageId}/generate-summary/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Afficher le succès
+            showJsonSuccess(data.message, 'page');
+
+            // Optionnel : ouvrir automatiquement la vue JSON
+            setTimeout(() => {
+                window.open(`/annotation/page/${pageId}/view-json/`, '_blank');
+            }, 1000);
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur génération JSON page:', error);
+        alert('Erreur lors de la génération du JSON');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        loading.style.display = 'none';
+    });
+}
+
+function generateDocumentJson() {
+    // Vérifier qu'il y a des annotations dans le document
+    const documentId = {{ document.id }};
+
+    if (!confirm('Générer le JSON global et le résumé de tout le document ? Cela peut prendre quelques minutes selon la taille du document.')) {
+        return;
+    }
+
+    const btn = document.getElementById('generate-document-json-btn');
+    const loading = document.getElementById('json-loading');
+
+    btn.disabled = true;
+    loading.style.display = 'inline-flex';
+    loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération JSON global...';
+
+    fetch(`/annotation/document/${documentId}/generate-summary/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Afficher le succès avec statistiques
+            showJsonSuccess(data.message, 'document', data.stats);
+
+            // Optionnel : ouvrir automatiquement la vue JSON globale
+            setTimeout(() => {
+                window.open(`/annotation/document/${documentId}/view-json/`, '_blank');
+            }, 1000);
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur génération JSON document:', error);
+        alert('Erreur lors de la génération du JSON global');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        loading.style.display = 'none';
+        loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération JSON...';
+    });
+}
+
+function showJsonSuccess(message, type, stats = null) {
+    // Créer et afficher un message de succès
+    const successDiv = document.createElement('div');
+    successDiv.className = 'validation-success';
+
+    let statsText = '';
+    if (stats) {
+        statsText = `<div style="font-size: 0.9rem; opacity: 0.9; margin-top: 0.5rem;">
+            ${stats.total_annotations} annotations • ${stats.total_pages} pages
+        </div>`;
+    }
+
+    const icon = type === 'document' ? 'fas fa-file-contract' : 'fas fa-code';
+
+    successDiv.innerHTML = `
+        <i class="${icon}" style="font-size: 1.5rem;"></i>
+        <div>
+            <strong>✅ ${message}</strong>
+            ${statsText}
+        </div>
+    `;
+
+    // Insérer avant le contenu principal
+    const mainContent = document.querySelector('.text-content-card');
+    mainContent.parentNode.insertBefore(successDiv, mainContent);
+
+    // Supprimer après 5 secondes
+    setTimeout(() => {
+        successDiv.remove();
+    }, 5000);
+}
+
+// RESTE DU JAVASCRIPT EXISTANT (conservé identique)
+
 let selectedAnnotationType = null;
 let selectedColor = null;
 
@@ -1274,6 +2076,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// TOUTES LES AUTRES FONCTIONS JAVASCRIPT EXISTANTES (conservées identiques)
+// Text selection for manual annotation, deletion, etc.
 
 // Text selection for manual annotation
 document.getElementById('text-content').addEventListener('mouseup', function() {
@@ -1328,14 +2133,14 @@ function getTextPosition(container, node, offset) {
 function getAnnotationTypeId(typeName) {
     console.log('🔍 Looking for type:', typeName);
     console.log('📋 Available types:', annotationTypeMap);
-    
+
     const typeId = annotationTypeMap[typeName];
     if (!typeId) {
         console.error('❌ Type ID not found for:', typeName);
         console.error('Available types:', Object.keys(annotationTypeMap));
         return null;
     }
-    
+
     console.log('✅ Found type ID:', typeId, 'for type:', typeName);
     return typeId;
 }
@@ -1427,7 +2232,7 @@ function showAddAnnotationTypeModal() {
     // Clear previous values
     document.getElementById('new-annotation-display-name').value = '';
     document.getElementById('new-annotation-name').value = '';
-    
+
     // Show modal with proper Bootstrap 5 method
     const modal = new bootstrap.Modal(document.getElementById('addAnnotationTypeModal'), {
         backdrop: true,
@@ -1437,6 +2242,59 @@ function showAddAnnotationTypeModal() {
     modal.show();
 }
 
+function createAnnotationType() {
+    const displayName = document.getElementById('new-annotation-display-name').value.trim();
+    const name = document.getElementById('new-annotation-name').value.trim();
+
+    if (!displayName) {
+        alert('Please enter a display name');
+        return;
+    }
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    fetch('/create-annotation-type/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            display_name: displayName,
+            name: name
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+
+            // CRITICAL: Add the new type to our mapping!
+            annotationTypeMap[data.annotation_type.name] = data.annotation_type.id;
+            console.log('📋 Updated type mapping:', annotationTypeMap);
+
+            // Add new button to the interface immediately
+            addNewAnnotationButtonToAnnotateur(data.annotation_type);
+
+            // Close modal properly
+            const modalElement = document.getElementById('addAnnotationTypeModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
+
+            // Clear form
+            document.getElementById('new-annotation-display-name').value = '';
+            document.getElementById('new-annotation-name').value = '';
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating annotation type');
+    });
+}
 
 function addNewAnnotationButtonToAnnotateur(annotationType) {
     // Check if button already exists to avoid duplicates
@@ -1447,7 +2305,7 @@ function addNewAnnotationButtonToAnnotateur(annotationType) {
     }
     annotationTypeMap[annotationType.name] = annotationType.id;
     console.log('📋 Updated type mapping:', annotationTypeMap);
-    
+
     // Create new button element
     const newButton = document.createElement('button');
     newButton.className = 'annotation-type-btn';
@@ -1546,7 +2404,7 @@ let contextMenuTarget = null;
 
 // Context menu functionality
 document.addEventListener('DOMContentLoaded', function() {
-    
+
     // Add right-click event listeners to all annotation type buttons
     function addContextMenuToButtons() {
         document.querySelectorAll('.annotation-type-btn').forEach(btn => {
@@ -1556,29 +2414,29 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.addEventListener('contextmenu', handleRightClick);
         });
     }
-    
+
     // Initial setup
     addContextMenuToButtons();
-    
+
     // Update the addNewAnnotationButtonToAnnotateur function to include context menu
     const originalAddFunction = window.addNewAnnotationButtonToAnnotateur;
     window.addNewAnnotationButtonToAnnotateur = function(annotationType) {
         // Call original function
         originalAddFunction(annotationType);
-        
+
         // Add context menu to new button
         setTimeout(() => {
             addContextMenuToButtons();
         }, 100);
     };
-    
+
     // Hide context menu when clicking elsewhere
     document.addEventListener('click', function(e) {
         if (!e.target.closest('.context-menu')) {
             hideContextMenu();
         }
     });
-    
+
     // Prevent default context menu on annotation buttons
     document.addEventListener('contextmenu', function(e) {
         if (e.target.classList.contains('annotation-type-btn')) {
@@ -1589,24 +2447,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function handleRightClick(e) {
     e.preventDefault();
-    
+
     // Don't show context menu for the "Add Custom Type" button
     if (e.target.classList.contains('annotation-type-btn-add')) {
         return;
     }
-    
+
     contextMenuTarget = e.target;
-    
+
     const contextMenu = document.getElementById('context-menu');
     const rect = e.target.getBoundingClientRect();
-    
+
     // Position the context menu
     contextMenu.style.left = (e.pageX) + 'px';
     contextMenu.style.top = (e.pageY) + 'px';
-    
+
     // Show the menu
     contextMenu.classList.remove('hidden');
-    
+
     console.log('🖱️ Right-clicked on:', e.target.textContent);
 }
 
@@ -1621,18 +2479,18 @@ function deleteAnnotationTypeFromMenu() {
         hideContextMenu();
         return;
     }
-    
+
     const typeName = contextMenuTarget.dataset.type;
     const displayName = contextMenuTarget.textContent;
-    
+
     // Confirm deletion
     if (!confirm(`Are you sure you want to delete the annotation type "${displayName}"?\n\nThis action cannot be undone.`)) {
         hideContextMenu();
         return;
     }
-    
+
     console.log('🗑️ Deleting annotation type:', typeName);
-    
+
     // Get the annotation type ID
     const typeId = annotationTypeMap[typeName];
     if (!typeId) {
@@ -1640,10 +2498,10 @@ function deleteAnnotationTypeFromMenu() {
         hideContextMenu();
         return;
     }
-    
+
     // Call backend to delete the annotation type
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-    
+
     fetch('/delete-annotation-type/', {
         method: 'POST',
         headers: {
@@ -1659,14 +2517,14 @@ function deleteAnnotationTypeFromMenu() {
     .then(data => {
         if (data.success) {
             alert(data.message);
-            
+
             // Remove from mapping
             delete annotationTypeMap[typeName];
             console.log('📋 Updated type mapping after deletion:', annotationTypeMap);
-            
+
             // Remove the button from interface
             contextMenuTarget.remove();
-            
+
             // Clear selection if this type was selected
             if (selectedAnnotationType === typeName) {
                 selectedAnnotationType = null;
@@ -1674,7 +2532,7 @@ function deleteAnnotationTypeFromMenu() {
                 document.getElementById('current-mode').textContent = 'Aucun type sélectionné';
                 document.getElementById('current-mode').style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
             }
-            
+
             console.log('✅ Annotation type deleted successfully');
         } else {
             alert('Error: ' + data.error);
@@ -1688,17 +2546,17 @@ function deleteAnnotationTypeFromMenu() {
         hideContextMenu();
     });
 }
-// View original document function
 
+// View original document function
 function viewOriginalDocument(documentId) {
     if (!documentId) {
         alert('Document ID non disponible');
         return;
     }
-    
+
     // Create the URL to view the original document - SAME AS EXPERT
     const documentUrl = `/documents/${documentId}/view-original/`;
-    
+
     // Open in new window like the expert interface
     window.open(documentUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
 }
@@ -1928,14 +2786,127 @@ function clearExistingHighlights() {
     }
 }
 
+// Fonction pour valider la page avec RLHF
+function validatePage() {
+    const btn = document.getElementById('validate-page-btn');
+    const pageId = document.getElementById('text-content').dataset.pageId;
 
-    // Remove any existing highlights
-    const existingHighlight = document.getElementById('highlighted-annotation');
-    if (existingHighlight) {
-        const parent = existingHighlight.parentNode;
-        parent.replaceChild(document.createTextNode(existingHighlight.textContent), existingHighlight);
-        parent.normalize(); // Merge adjacent text nodes
+    if (confirm('Valider cette page ? Cela confirmera que les annotations sont correctes.')) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validation...';
+
+        fetch(`/annotation/validate-page/${pageId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Afficher le succès avec les métriques d'apprentissage
+                const successDiv = document.createElement('div');
+                successDiv.className = 'validation-success';
+                successDiv.innerHTML = `
+                    <i class="fas fa-graduation-cap" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <strong>✅ ${data.message}</strong>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">
+                            L'IA s'améliore grâce à votre validation !
+                        </div>
+                    </div>
+                `;
+
+                // Insérer avant le contenu principal
+                const mainContent = document.querySelector('.text-content-card');
+                mainContent.parentNode.insertBefore(successDiv, mainContent);
+
+                // Afficher le widget d'apprentissage
+                if (data.ai_improved) {
+                    showLearningWidget(data);
+                }
+
+                // Mettre à jour le bouton
+                btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Page Validée 🎓';
+                btn.disabled = true;
+
+                // Supprimer le message après 5 secondes
+                setTimeout(() => {
+                    successDiv.remove();
+                }, 5000);
+
+            } else {
+                alert('Erreur: ' + data.error);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Validate Page';
+            }
+        })
+        .catch(error => {
+            console.error('Erreur validation:', error);
+            alert('Erreur lors de la validation');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Validate Page';
+        });
     }
+}
+
+// Fonction pour l'annotation IA avec GROQ
+function annotateWithGroq() {
+    const btn = document.getElementById('groq-annotate-btn');
+    const loading = document.getElementById('ai-loading');
+    const pageId = document.getElementById('text-content').dataset.pageId;
+
+    if (confirm('Lancer l\'annotation automatique avec IA ? Cela remplacera les annotations existantes.')) {
+        btn.disabled = true;
+        loading.style.display = 'inline-flex';
+
+        fetch(`/annotation/groq/${pageId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Afficher le succès
+                const successDiv = document.createElement('div');
+                successDiv.className = 'validation-success';
+                successDiv.innerHTML = `
+                    <i class="fas fa-rocket" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <strong>✅ ${data.message}</strong>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">
+                            IA améliorée par l'apprentissage RLHF
+                        </div>
+                    </div>
+                `;
+
+                // Insérer avant le contenu principal
+                const mainContent = document.querySelector('.text-content-card');
+                mainContent.parentNode.insertBefore(successDiv, mainContent);
+
+                // Recharger pour afficher les nouvelles annotations
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur annotation IA:', error);
+            alert('Erreur lors de l\'annotation IA');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            loading.style.display = 'none';
+        });
+    }
+}
 
 </script>
 {% endblock %}

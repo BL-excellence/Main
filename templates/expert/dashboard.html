@@ -149,25 +149,41 @@
         font-weight: 600;
         line-height: 1.1;
     }
-    .badge.success {
-        background: rgba(16,185,129,0.15);
-        color: #10b981;
+    .badge.validated {
+        background: rgba(16, 185, 129, 0.15);
+        color: #059669;
     }
-    .badge.warning {
-        background: rgba(245,158,11,0.15);
+    .badge.in-progress {
+        background: rgba(245, 158, 11, 0.15);
         color: #f59e0b;
     }
-    .badge.danger {
-        background: rgba(220,38,38,0.15);
-        color: #ef4444;
+    .badge.completed {
+        background: rgba(139, 92, 246, 0.18);
+        color: #8b5cf6;
     }
     .badge.pending {
-        background: rgba(14,165,233,0.13);
+        background: rgba(14, 165, 233, 0.13);
         color: #0ea5e9;
+    }
+    .badge.rejected {
+        background: rgba(220, 38, 38, 0.15);
+        color: #dc2626;
+    }
+    .badge.warning {
+        background: rgba(245, 158, 11, 0.15);
+        color: #f59e0b;
+    }
+    .badge.success {
+        background: rgba(16, 185, 129, 0.15);
+        color: #059669;
+    }
+    .badge.danger {
+        background: rgba(220, 38, 38, 0.15);
+        color: #dc2626;
     }
 
     /* Table documents style ligne */
-    .review-table {
+    .annotation-table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 1.5rem;
@@ -176,14 +192,14 @@
         overflow: hidden;
         box-shadow: 0 2px 6px rgba(14, 165, 233, 0.04);
     }
-    .review-table th, .review-table td {
+    .annotation-table th, .annotation-table td {
         padding: 1rem 1.2rem;
         text-align: left;
         border-bottom: 1px solid rgba(14, 165, 233, 0.06);
         font-size: 0.95rem;
         vertical-align: middle;
     }
-    .review-table th {
+    .annotation-table th {
         background: rgba(14, 165, 233, 0.08);
         font-weight: 600;
         color: var(--text-secondary);
@@ -191,14 +207,14 @@
         letter-spacing: 0.03em;
         font-size: 0.85rem;
     }
-    .review-table tr:hover td {
+    .annotation-table tr:hover td {
         background: var(--hover-bg);
         transition: all 0.2s;
     }
-    .review-table .action-cell {
+    .annotation-table .action-cell {
         min-width: 130px;
     }
-    .review-table .action-btn {
+    .annotation-table .action-btn {
         padding: 0.5rem 1rem;
         font-size: 0.95em;
         border-radius: 8px;
@@ -212,14 +228,36 @@
         align-items: center;
         gap: 0.35em;
     }
-    .review-table .action-btn:hover {
+    .annotation-table .action-btn:hover {
         box-shadow: 0 2px 12px rgba(14, 165, 233, 0.15);
         transform: translateY(-2px);
     }
-    .review-table .date {
+    .annotation-table .date {
         font-size: 0.92em;
         color: var(--text-secondary);
         white-space: nowrap;
+    }
+    .annotation-table .font-medium {
+        font-weight: 500;
+    }
+    .annotation-table .text-gray-900 {
+        color: #111827;
+    }
+    .annotation-table .text-gray-500 {
+        color: #6b7280;
+    }
+    .annotation-table .text-sm {
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+    /* Responsive */
+    @media (max-width: 900px) {
+        .annotation-table th, .annotation-table td { padding: 0.7rem 0.5rem; }
+    }
+    @media (max-width: 640px) {
+        .annotation-table { font-size: 0.95em; }
+        .annotation-table th, .annotation-table td { padding: 0.55rem 0.3rem; }
+        .annotation-table .action-cell { min-width: 90px;}
     }
     @media (max-width: 900px) {
         .review-table th, .review-table td { padding: 0.7rem 0.5rem; }
@@ -233,6 +271,189 @@
     @keyframes fadeIn { from { opacity: 0;} to { opacity: 1;} }
     .animate-fade-in { animation: fadeIn 0.6s ease-out;}
     .animate-slide-up { animation: fadeInUp 0.5s ease-out;}
+
+    /* Action Cards Styles */
+    .action-card {
+        background: var(--card-bg);
+        backdrop-filter: blur(15px);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .action-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--primary-light), transparent);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .action-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 40px rgba(14, 165, 233, 0.15);
+        border-color: var(--primary-light);
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .action-card:hover::before {
+        opacity: 1;
+    }
+
+    .action-icon {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .action-content {
+        flex: 1;
+    }
+
+    .action-content h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 0.25rem;
+    }
+
+    .action-content p {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin: 0;
+    }
+
+    .action-arrow {
+        color: var(--text-muted);
+        transition: all 0.3s ease;
+        flex-shrink: 0;
+    }
+
+    .action-card:hover .action-arrow {
+        color: var(--primary);
+        transform: translateX(4px);
+    }
+
+    /* Grid utilities */
+    .grid {
+        display: grid;
+    }
+    .grid-cols-1 {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+    .gap-4 {
+        gap: 1rem;
+    }
+    .space-y-4 > * + * {
+        margin-top: 1rem;
+    }
+
+    @media (min-width: 768px) {
+        .md\:grid-cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .lg\:grid-cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    /* Utility classes */
+    .cursor-pointer {
+        cursor: pointer;
+    }
+    .text-center {
+        text-align: center;
+    }
+    .mt-4 {
+        margin-top: 1rem;
+    }
+    .mt-6 {
+        margin-top: 1.5rem;
+    }
+    .flex {
+        display: flex;
+    }
+    .items-center {
+        align-items: center;
+    }
+    .justify-between {
+        justify-content: space-between;
+    }
+    .space-x-2 > * + * {
+        margin-left: 0.5rem;
+    }
+    .space-x-3 > * + * {
+        margin-left: 0.75rem;
+    }
+    .w-10 {
+        width: 2.5rem;
+    }
+    .h-10 {
+        height: 2.5rem;
+    }
+    .rounded-full {
+        border-radius: 9999px;
+    }
+    .rounded-lg {
+        border-radius: 0.5rem;
+    }
+    .p-4 {
+        padding: 1rem;
+    }
+    .bg-gray-50 {
+        background-color: #f9fafb;
+    }
+    .bg-blue-100 {
+        background-color: #dbeafe;
+    }
+    .bg-amber-100 {
+        background-color: #fef3c7;
+    }
+    .text-blue-600 {
+        color: #2563eb;
+    }
+    .text-amber-600 {
+        color: #d97706;
+    }
+    .text-blue-800 {
+        color: #1e40af;
+    }
+    .hover\:text-blue-800:hover {
+        color: #1e40af;
+    }
+    .text-gray-900 {
+        color: #111827;
+    }
+    .text-gray-500 {
+        color: #6b7280;
+    }
+    .text-sm {
+        font-size: 0.875rem;
+    }
+    .font-medium {
+        font-weight: 500;
+    }
 </style>
 
 <div class="dashboard-container">
@@ -243,6 +464,9 @@
         </button>
         <button id="tab-documents" class="nav-tab">
             <i class="fas fa-file-alt"></i> Documents à Réviser
+        </button>
+        <button id="tab-annotation" class="nav-tab">
+            <i class="fas fa-highlighter"></i> Annotation Expert
         </button>
     </div>
 
@@ -294,6 +518,23 @@
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-500/10 text-purple-400">
                         <i class="fas fa-chart-line mr-2"></i>
                         Performance
+                    </span>
+                </div>
+            </div>
+            <div class="card animate-fade-in cursor-pointer" style="animation-delay: 0.4s" onclick="switchToAnnotationTab()">
+                <div class="stat-icon annotated">
+                    <i class="fas fa-highlighter text-white"></i>
+                </div>
+                <div class="stat-value" style="color:#10b981">{{ validated_documents_count|default:0 }}</div>
+                <div class="stat-label">documents prêts pour annotation expert</div>
+                <div class="progress-container">
+                    <div class="progress-bar"
+                         style="width: 85%; background: linear-gradient(90deg, #10b981 0%, #34d399 100%);"></div>
+                </div>
+                <div class="mt-4">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-500/10 text-emerald-400">
+                        <i class="fas fa-robot mr-2"></i>
+                        IA + Expert
                     </span>
                 </div>
             </div>
@@ -409,23 +650,24 @@
 
     <!-- Documents Tab (tableau complet) -->
     <div id="documents-tab" class="tab-content hidden">
-        <div class="card">
+        <h1 class="main-title">Documents à Réviser - Expert</h1>
+        
+        {% if recent_documents %}
+        <div class="card animate-slide-up">
             <h2 class="card-title">
-                <i class="fas fa-file-alt text-blue-400"></i>
-                Documents à Réviser
+                <i class="fas fa-file-alt text-sky-400"></i>
+                Documents Disponibles
             </h2>
-            {% if recent_documents %}
             <div class="overflow-x-auto">
-                <table class="review-table">
+                <table class="annotation-table">
                     <thead>
                         <tr>
                             <th>Statut</th>
                             <th>Document</th>
                             <th>Pages</th>
-                            <th>Annotateur</th>
                             <th>Annotations</th>
-                            <th>Date MAJ</th>
-                            <th>Action</th>
+                            <th>Dernière Modif.</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -442,23 +684,32 @@
                                     <span class="badge pending"><i class="fas fa-file"></i> À réviser</span>
                                 {% endif %}
                             </td>
-                            <td>{{ doc.file.name|truncatechars:30 }}</td>
-                            <td>{{ doc.pages.count }}</td>
                             <td>
-                                <i class="fas fa-user"></i> {{ doc.annotator.username }}
+                                <div class="font-medium text-gray-900">
+                                    {{ doc.file.name|truncatechars:50 }}
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    Par {{ doc.annotator.username }}
+                                </div>
                             </td>
                             <td>
-                                <span class="badge" style="background:rgba(245,158,11,0.11);color:#f59e0b;">
-                                    <i class="fas fa-pen"></i> {{ doc.annotations.count }}
-                                </span>
+                                <span class="font-medium">{{ doc.pages.count }}</span>
+                            </td>
+                            <td>
+                                {% with annotations_count=doc.annotations.count %}
+                                <div class="text-sm">
+                                    <div>{{ annotations_count }} annotations</div>
+                                    <div class="text-gray-500">{{ doc.pages.count }} pages</div>
+                                </div>
+                                {% endwith %}
                             </td>
                             <td class="date">
-                                <i class="fas fa-calendar"></i>
-                                {{ doc.updated_at|date:"d/m/Y" }}
+                                {{ doc.updated_at|date:"d/m/Y H:i" }}
                             </td>
                             <td class="action-cell">
                                 <a href="{% url 'expert:review_document' doc.id %}" class="action-btn">
-                                    <i class="fas fa-magnifying-glass"></i> Réviser
+                                    <i class="fas fa-magnifying-glass"></i>
+                                    Réviser
                                 </a>
                             </td>
                         </tr>
@@ -490,18 +741,174 @@
                 {% endif %}
             </div>
             {% endif %}
-            {% else %}
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-check-circle"></i>
+        </div>
+        {% else %}
+        <div class="card animate-slide-up">
+            <div class="text-center py-8">
+                <i class="fas fa-file-alt text-6xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-600 mb-2">Aucun document à réviser</h3>
+                <p class="text-gray-500">Il n'y a actuellement aucun document à réviser.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Annotation Tab -->
+    <div id="annotation-tab" class="tab-content hidden">
+        <h1 class="main-title">Annotation Expert</h1>
+        
+        <!-- Statistiques d'annotation -->
+        <div class="stats-grid">
+            <div class="card animate-fade-in">
+                <div class="stat-icon validated">
+                    <i class="fas fa-check-circle text-white"></i>
                 </div>
-                <h3>Aucun document à réviser</h3>
-                <p>Tous les documents ont été validés avec succès.</p>
-                <a href="{% url 'expert:document_list' %}" class="btn btn-primary mt-4">
-                    <i class="fas fa-list"></i> Voir la liste complète
+                <div class="stat-value">{{ validated_documents_count|default:0 }}</div>
+                <div class="stat-label">Documents validés prêts pour annotation</div>
+                <div class="progress-container">
+                    <div class="progress-bar bg-gradient-to-r from-sky-500 to-sky-400"
+                         style="width: 85%"></div>
+                </div>
+            </div>
+            <div class="card animate-fade-in" style="animation-delay: 0.1s">
+                <div class="stat-icon annotated">
+                    <i class="fas fa-highlighter text-white"></i>
+                </div>
+                <div class="stat-value">{{ total_expert_annotations|default:0 }}</div>
+                <div class="stat-label">Annotations créées par l'expert</div>
+                <div class="progress-container">
+                    <div class="progress-bar bg-gradient-to-r from-amber-500 to-yellow-400"
+                         style="width: 70%"></div>
+                </div>
+            </div>
+            <div class="card animate-fade-in" style="animation-delay: 0.2s">
+                <div class="stat-icon in-progress">
+                    <i class="fas fa-spinner text-white"></i>
+                </div>
+                <div class="stat-value">{{ documents_in_annotation|default:0 }}</div>
+                <div class="stat-label">Documents en cours d'annotation</div>
+                <div class="progress-container">
+                    <div class="progress-bar bg-gradient-to-r from-emerald-500 to-teal-400"
+                         style="width: 60%"></div>
+                </div>
+            </div>
+            <div class="card animate-fade-in" style="animation-delay: 0.3s">
+                <div class="stat-icon completed">
+                    <i class="fas fa-clipboard-check text-white"></i>
+                </div>
+                <div class="stat-value">{{ completed_annotations|default:0 }}</div>
+                <div class="stat-label">Documents complètement annotés</div>
+                <div class="mt-4">
+                    <div class="badge completed">
+                        <i class="fas fa-trophy"></i>
+                        Expert Level
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions rapides annotation -->
+        <div class="card animate-slide-up">
+            <h2 class="card-title">
+                <i class="fas fa-bolt text-amber-400"></i>
+                Actions Rapides - Annotation Expert
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <a href="{% url 'expert:annotation_dashboard' %}" class="action-card">
+                    <div class="action-icon bg-gradient-to-br from-blue-500 to-blue-600">
+                        <i class="fas fa-tachometer-alt text-white"></i>
+                    </div>
+                    <div class="action-content">
+                        <h3>Dashboard Annotation</h3>
+                        <p>Accéder au dashboard complet d'annotation expert</p>
+                    </div>
+                    <div class="action-arrow">
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </a>
+                
+                <div class="action-card cursor-pointer" onclick="alert('Fonctionnalité à venir')">
+                    <div class="action-icon bg-gradient-to-br from-green-500 to-green-600">
+                        <i class="fas fa-robot text-white"></i>
+                    </div>
+                    <div class="action-content">
+                        <h3>IA Annotation Batch</h3>
+                        <p>Annoter plusieurs documents automatiquement</p>
+                    </div>
+                    <div class="action-arrow">
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+                
+                <div class="action-card cursor-pointer" onclick="alert('Fonctionnalité à venir')">
+                    <div class="action-icon bg-gradient-to-br from-purple-500 to-purple-600">
+                        <i class="fas fa-file-export text-white"></i>
+                    </div>
+                    <div class="action-content">
+                        <h3>Export Global</h3>
+                        <p>Exporter toutes les annotations en JSON/Excel</p>
+                    </div>
+                    <div class="action-arrow">
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Derniers documents annotés -->
+        <div class="card animate-slide-up" style="animation-delay: 0.2s">
+            <h2 class="card-title">
+                <i class="fas fa-history text-green-400"></i>
+                Dernières Annotations Expert
+            </h2>
+            <div class="space-y-4">
+                <!-- Placeholder pour les dernières annotations -->
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-file-alt text-blue-600"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-gray-900">Document Pharmaceutique #1</h4>
+                            <p class="text-sm text-gray-500">15 annotations créées • Il y a 2h</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="badge success">
+                            <i class="fas fa-check"></i> Complété
+                        </span>
+                        <button class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-file-alt text-amber-600"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-gray-900">Rapport Clinique #2</h4>
+                            <p class="text-sm text-gray-500">8 annotations créées • Il y a 4h</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="badge in-progress">
+                            <i class="fas fa-clock"></i> En cours
+                        </span>
+                        <button class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-6 text-center">
+                <a href="{% url 'expert:annotation_dashboard' %}" class="btn btn-outline">
+                    <i class="fas fa-list"></i> Voir toutes les annotations
                 </a>
             </div>
-            {% endif %}
         </div>
     </div>
 </div>
@@ -512,41 +919,69 @@
     // Tabs switching with animation
     const dashboardTab = document.getElementById('dashboard-tab');
     const documentsTab = document.getElementById('documents-tab');
+    const annotationTab = document.getElementById('annotation-tab');
     const btnDashboard = document.getElementById('tab-dashboard');
     const btnDocuments = document.getElementById('tab-documents');
-    function switchTab(activeTab, activeBtn, inactiveTab, inactiveBtn) {
-        inactiveTab.style.opacity = '0';
-        inactiveTab.style.transform = 'translateY(10px)';
+    const btnAnnotation = document.getElementById('tab-annotation');
+    
+    function switchTab(activeTab, activeBtn, ...inactiveTabs) {
+        // Hide all inactive tabs
+        inactiveTabs.forEach(([tab, btn]) => {
+            tab.style.opacity = '0';
+            tab.style.transform = 'translateY(10px)';
+            btn.classList.remove('active');
+        });
+        
         setTimeout(() => {
-            inactiveTab.classList.add('hidden');
-            inactiveTab.classList.remove('block');
+            inactiveTabs.forEach(([tab]) => {
+                tab.classList.add('hidden');
+                tab.classList.remove('block');
+            });
+            
             activeTab.classList.remove('hidden');
             activeTab.classList.add('block');
             activeTab.style.opacity = '0';
             activeTab.style.transform = 'translateY(10px)';
+            
             setTimeout(() => {
                 activeTab.style.opacity = '1';
                 activeTab.style.transform = 'translateY(0)';
             }, 50);
         }, 200);
+        
         activeBtn.classList.add('active');
-        inactiveBtn.classList.remove('active');
     }
+    
     function switchToDocumentsTab() {
-        switchTab(documentsTab, btnDocuments, dashboardTab, btnDashboard);
+        switchTab(documentsTab, btnDocuments, [dashboardTab, btnDashboard], [annotationTab, btnAnnotation]);
     }
+    
+    function switchToAnnotationTab() {
+        switchTab(annotationTab, btnAnnotation, [dashboardTab, btnDashboard], [documentsTab, btnDocuments]);
+    }
+    
     btnDashboard.addEventListener('click', () => {
         if (!btnDashboard.classList.contains('active')) {
-            switchTab(dashboardTab, btnDashboard, documentsTab, btnDocuments);
+            switchTab(dashboardTab, btnDashboard, [documentsTab, btnDocuments], [annotationTab, btnAnnotation]);
         }
     });
+    
     btnDocuments.addEventListener('click', () => {
         if (!btnDocuments.classList.contains('active')) {
-            switchTab(documentsTab, btnDocuments, dashboardTab, btnDashboard);
+            switchToDocumentsTab();
         }
     });
+    
+    btnAnnotation.addEventListener('click', () => {
+        if (!btnAnnotation.classList.contains('active')) {
+            switchToAnnotationTab();
+        }
+    });
+    
+    // Add transitions to all tabs
     dashboardTab.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
     documentsTab.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+    annotationTab.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
 
     // Charts
     document.addEventListener('DOMContentLoaded', function() {

@@ -1,0 +1,195 @@
+/* 
+ * CSS pour le formatage et l'affichage des JSON
+ * Améliore la lisibilité des JSON d'annotations
+ */
+
+/* Variables CSS pour la cohérence des couleurs */
+:root {
+    --json-bg: #ffffff;
+    --json-border: #e9ecef;
+    --json-key-color: #0451a5;
+    --json-string-color: #0a7d0a;
+    --json-number-color: #098658;
+    --json-boolean-color: #0000ff;
+    --json-null-color: #0000ff;
+    --json-bracket-color: #000000;
+    --json-comma-color: #000000;
+    --json-line-number-bg: #f8f9fa;
+    --json-line-number-color: #858585;
+    --json-line-number-border: #e0e0e0;
+    --json-scrollbar-track: #f1f1f1;
+    --json-scrollbar-thumb: #c1c1c1;
+    --json-scrollbar-thumb-hover: #a8a8a8;
+}
+
+/* Conteneur principal JSON */
+.json-display {
+    background: var(--json-bg);
+    border: 2px solid var(--json-border);
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 600px;
+    overflow-y: auto;
+    color: #24292e;
+    position: relative;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.json-display:hover {
+    border-color: #3b82f6;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1), 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Barres de défilement personnalisées */
+.json-display::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.json-display::-webkit-scrollbar-track {
+    background: var(--json-scrollbar-track);
+    border-radius: 4px;
+}
+
+.json-display::-webkit-scrollbar-thumb {
+    background: var(--json-scrollbar-thumb);
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+.json-display::-webkit-scrollbar-thumb:hover {
+    background: var(--json-scrollbar-thumb-hover);
+}
+
+/* Coloration syntaxique JSON */
+.json-display .json-key { 
+    color: var(--json-key-color);
+    font-weight: 600;
+}
+
+.json-display .json-string { 
+    color: var(--json-string-color);
+}
+
+.json-display .json-number { 
+    color: var(--json-number-color);
+    font-weight: 500;
+}
+
+.json-display .json-boolean { 
+    color: var(--json-boolean-color);
+    font-weight: 600;
+}
+
+.json-display .json-null { 
+    color: var(--json-null-color);
+    font-weight: 600;
+    font-style: italic;
+}
+
+.json-display .json-bracket { 
+    color: var(--json-bracket-color);
+    font-weight: bold;
+}
+
+.json-display .json-comma { 
+    color: var(--json-comma-color);
+}
+
+/* Numéros de ligne */
+.json-display.json-with-lines {
+    counter-reset: line-counter;
+    padding: 0;
+}
+
+.json-display .line-number {
+    display: inline-block;
+    width: 3em;
+    padding: 0.25rem 1em 0.25rem 0.5rem;
+    color: var(--json-line-number-color);
+    font-size: 0.85em;
+    text-align: right;
+    user-select: none;
+    border-right: 1px solid var(--json-line-number-border);
+    margin-right: 1em;
+    background: var(--json-line-number-bg);
+    position: sticky;
+    left: 0;
+}
+
+.json-display .line-content {
+    display: inline;
+    padding-left: 0.5rem;
+}
+
+/* Amélioration de la lisibilité */
+.json-display .line-content:hover {
+    background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* Animation pour les changements */
+.json-display * {
+    transition: background-color 0.2s ease;
+}
+
+/* Mode sombre (optionnel) */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --json-bg: #1e1e1e;
+        --json-border: #404040;
+        --json-key-color: #9cdcfe;
+        --json-string-color: #ce9178;
+        --json-number-color: #b5cea8;
+        --json-boolean-color: #569cd6;
+        --json-null-color: #569cd6;
+        --json-bracket-color: #d4d4d4;
+        --json-comma-color: #d4d4d4;
+        --json-line-number-bg: #2d2d2d;
+        --json-line-number-color: #858585;
+        --json-line-number-border: #404040;
+    }
+    
+    .json-display {
+        color: #d4d4d4;
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .json-display {
+        font-size: 0.8rem;
+        max-height: 400px;
+    }
+    
+    .json-display .line-number {
+        width: 2.5em;
+        font-size: 0.8em;
+    }
+}
+
+/* États de focus pour l'accessibilité */
+.json-display:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Amélioration pour l'impression */
+@media print {
+    .json-display {
+        border: 1px solid #000;
+        box-shadow: none;
+        max-height: none;
+        overflow: visible;
+    }
+    
+    .json-display .line-number {
+        background: transparent;
+        border-right: 1px solid #000;
+    }
+}

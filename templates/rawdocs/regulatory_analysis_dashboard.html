@@ -1,0 +1,312 @@
+<!-- rawdocs/templates/rawdocs/regulatory_analysis_dashboard.html -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Analyse Réglementaire</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold text-gray-900">
+                        <i class="fas fa-gavel text-blue-600 mr-2"></i>
+                        Analyse Réglementaire
+                    </h1>
+                    <span class="bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded">
+                        IA-Powered
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="{% url 'rawdocs:annotation_dashboard' %}"
+                       class="text-gray-600 hover:text-gray-900">
+                        <i class="fas fa-arrow-left mr-1"></i> Retour Annotation
+                    </a>
+                    <span class="text-sm text-gray-500">{{ user.username }}</span>
+                    <a href="{% url 'rawdocs:logout' %}"
+                       class="text-red-600 hover:text-red-800">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Statistiques Globales -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-file-alt text-3xl text-blue-500"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Documents Totaux</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ total_documents }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-check-circle text-3xl text-green-500"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Documents Analysés</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ analyzed_documents }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-chart-line text-3xl text-purple-500"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Taux d'Analyse</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ analysis_completion }}%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liste des Documents -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">
+                    <i class="fas fa-list mr-2"></i>
+                    Documents Disponibles pour Analyse
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">
+                    Cliquez sur un document pour commencer ou continuer l'analyse réglementaire
+                </p>
+            </div>
+
+            <div class="overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Document
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Progression
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Score Réglementaire
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for item in documents_with_stats %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10">
+                                        <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                            <i class="fas fa-file-pdf text-blue-600"></i>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">
+                                            {{ item.document.title|default:"Document sans titre" }}
+                                        </div>
+                                        <div class="text-sm text-gray-500">
+                                            {{ item.document.doc_type|title }} • {{ item.document.source }}
+                                        </div>
+                                        <div class="text-xs text-gray-400">
+                                            {{ item.total_pages }} page{{ item.total_pages|pluralize }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-blue-600 h-2 rounded-full"
+                                         style="width: {{ item.completion_percentage }}%"></div>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    {{ item.analyzed_pages }}/{{ item.total_pages }} pages analysées ({{ item.completion_percentage }}%)
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                {% if item.global_score > 0 %}
+                                    <div class="flex items-center">
+                                        <span class="text-2xl font-bold
+                                            {% if item.global_score >= 80 %}text-red-600
+                                            {% elif item.global_score >= 60 %}text-orange-500
+                                            {% elif item.global_score >= 40 %}text-yellow-500
+                                            {% else %}text-green-500{% endif %}">
+                                            {{ item.global_score }}
+                                        </span>
+                                        <span class="text-sm text-gray-500 ml-1">/100</span>
+                                    </div>
+                                    <div class="text-xs text-gray-400">
+                                        {% if item.global_score >= 80 %}Critique
+                                        {% elif item.global_score >= 60 %}Important
+                                        {% elif item.global_score >= 40 %}Modéré
+                                        {% else %}Faible{% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-gray-400 text-sm">Non analysé</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-sm font-medium space-x-2">
+                                <a href="{% url 'rawdocs:annotate_document' item.document.id %}"
+                                   class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700">
+                                    <i class="fas fa-microscope mr-1"></i>
+                                    {% if item.completion_percentage == 0 %}
+                                        Commencer Analyse
+                                    {% elif item.completion_percentage < 100 %}
+                                        Continuer Analyse
+                                    {% else %}
+                                        Voir Résultats
+                                    {% endif %}
+                                </a>
+
+                                {% if item.completion_percentage < 100 %}
+                                <button onclick="analyzeFullDocument({{ item.document.id }})"
+                                        class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">
+                                    <i class="fas fa-bolt mr-1"></i>
+                                    Analyse Complète
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                <i class="fas fa-inbox text-4xl text-gray-300 mb-4"></i>
+                                <p>Aucun document disponible pour l'analyse réglementaire</p>
+                                <p class="text-sm">Les documents doivent être validés par un métadonneur</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Guide d'utilisation -->
+        <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 class="text-lg font-medium text-blue-900 mb-4">
+                <i class="fas fa-info-circle mr-2"></i>
+                Guide d'Analyse Réglementaire
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-blue-800">
+                <div>
+                    <h4 class="font-medium mb-2">🔍 Analyse par Page</h4>
+                    <ul class="space-y-1">
+                        <li>• Identifie les obligations réglementaires</li>
+                        <li>• Extrait les délais critiques</li>
+                        <li>• Détecte les autorités concernées</li>
+                        <li>• Évalue l'importance réglementaire</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-medium mb-2">📊 Résumé Global</h4>
+                    <ul class="space-y-1">
+                        <li>• Synthèse des obligations principales</li>
+                        <li>• Calendrier des délais critiques</li>
+                        <li>• Impact sur la conformité</li>
+                        <li>• Recommandations d'actions</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de progression -->
+    <div id="progressModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full">
+                <div class="text-center">
+                    <i class="fas fa-cog fa-spin text-4xl text-blue-600 mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Analyse en cours...</h3>
+                    <p class="text-sm text-gray-500 mb-4">L'IA analyse le document complet. Cela peut prendre plusieurs minutes.</p>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <p id="progressText" class="text-xs text-gray-500 mt-2">Initialisation...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function analyzeFullDocument(documentId) {
+            // Afficher le modal de progression
+            document.getElementById('progressModal').classList.remove('hidden');
+
+            // Simuler la progression
+            let progress = 0;
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 10;
+                if (progress > 90) progress = 90;
+
+                progressBar.style.width = progress + '%';
+                progressText.textContent = `Analyse en cours... ${Math.round(progress)}%`;
+            }, 1000);
+
+            // Lancer l'analyse
+            fetch(`/rawdocs/regulatory/analyze-document/${documentId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Analyse terminée!';
+
+                setTimeout(() => {
+                    document.getElementById('progressModal').classList.add('hidden');
+                    if (data.success) {
+                        alert(`✅ ${data.message}\nScore global: ${data.global_score}/100`);
+                        location.reload();
+                    } else {
+                        alert(`❌ ${data.error || 'Erreur lors de l\'analyse'}`);
+                    }
+                }, 1000);
+            })
+            .catch(error => {
+                clearInterval(progressInterval);
+                document.getElementById('progressModal').classList.add('hidden');
+                alert('❌ Erreur lors de l\'analyse: ' + error);
+            });
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>

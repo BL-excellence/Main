@@ -1,0 +1,780 @@
+{% extends "base.html" %}
+{% load static %}
+{% load rawdocs_extras %}
+{% block title %}JSON Annotations - Page {{ page.page_number }} – RawDocs{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'rawdocs/css/rlhf_styles.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'css/json-formatter.css' %}">
+
+<style>
+:root {
+    --pharma-primary: #3b82f6;
+    --pharma-accent: #10b981;
+    --pharma-info: #06b6d4;
+    --pharma-bg-card: #ffffff;
+    --pharma-bg: #f8fafc;
+    --pharma-text: #1e293b;
+    --pharma-text-soft: #64748b;
+    --pharma-border: #e2e8f0;
+    --pharma-radius: 12px;
+    --pharma-radius-sm: 8px;
+    --pharma-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+    --pharma-glass: rgba(255, 255, 255, 0.85);
+    --pharma-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body {
+    background-color: var(--pharma-bg);
+    color: var(--pharma-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Header Styles */
+.annotation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    border-radius: var(--pharma-radius);
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    border: 1px solid var(--pharma-border);
+    box-shadow: var(--pharma-shadow);
+}
+
+.header-info h2 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--pharma-text);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.header-info h2 i {
+    color: var(--pharma-primary);
+}
+
+.document-meta {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    color: var(--pharma-text-soft);
+}
+
+.meta-item i {
+    color: var(--pharma-primary);
+    width: 18px;
+    text-align: center;
+}
+
+/* Card Styles */
+.json-container {
+    background: var(--pharma-bg-card);
+    border-radius: var(--pharma-radius);
+    box-shadow: var(--pharma-shadow);
+    border: 1px solid var(--pharma-border);
+    margin-bottom: 2rem;
+    padding: 2rem;
+    transition: var(--pharma-transition);
+}
+
+.json-container:hover {
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.json-container h3 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: var(--pharma-text);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.json-container h3 i {
+    color: var(--pharma-primary);
+}
+
+/* JSON Display - Amélioré */
+.json-display {
+    background: #ffffff;
+    border: 2px solid #e9ecef;
+    border-radius: var(--pharma-radius-sm);
+    padding: 0;
+    font-family: 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 600px;
+    overflow-y: auto;
+    color: #24292e;
+    position: relative;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.json-display::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.json-display::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+.json-display::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+.json-display::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Syntax Highlighting for JSON - Style MongoDB/VS Code */
+.json-display .json-key { 
+    color: #0451a5; 
+    font-weight: 600; 
+}
+.json-display .json-string { 
+    color: #0a7d0a; 
+}
+.json-display .json-number { 
+    color: #098658; 
+    font-weight: 500;
+}
+.json-display .json-boolean { 
+    color: #0000ff; 
+    font-weight: 600;
+}
+.json-display .json-null { 
+    color: #0000ff; 
+    font-weight: 600;
+    font-style: italic;
+}
+.json-display .json-bracket { 
+    color: #000000; 
+    font-weight: bold;
+}
+.json-display .json-comma { 
+    color: #000000; 
+}
+
+/* Numéros de ligne */
+.json-display.json-with-lines {
+    counter-reset: line-counter;
+}
+.json-display .line-number {
+    display: inline-block;
+    width: 3em;
+    padding-right: 1em;
+    color: #858585;
+    font-size: 0.85em;
+    text-align: right;
+    user-select: none;
+    border-right: 1px solid #e0e0e0;
+    margin-right: 1em;
+    background: #f8f9fa;
+}
+.json-display .line-content {
+    display: inline;
+}
+
+/* Summary Section */
+.summary-container {
+    background: linear-gradient(120deg, #f0f9ff 70%, #e0f2fe 100%);
+    border: 1px solid var(--pharma-info);
+    border-radius: var(--pharma-radius);
+    margin-bottom: 2rem;
+    box-shadow: var(--pharma-shadow);
+    padding: 2rem;
+    transition: var(--pharma-transition);
+}
+
+.summary-container:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(6, 182, 212, 0.15);
+}
+
+.summary-text {
+    background: var(--pharma-bg-card);
+    border-radius: var(--pharma-radius-sm);
+    padding: 1.5rem;
+    line-height: 1.8;
+    font-size: 1.05rem;
+    color: var(--pharma-text);
+    border: 1px solid var(--pharma-border);
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+}
+
+.stat-card {
+    background: var(--pharma-bg-card);
+    border: 1px solid var(--pharma-border);
+    border-radius: var(--pharma-radius);
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: var(--pharma-shadow);
+    transition: var(--pharma-transition);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--pharma-primary);
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.95rem;
+    color: var(--pharma-text-soft);
+    margin-top: 0.5rem;
+    font-weight: 500;
+}
+
+/* Buttons */
+.btn-action {
+    background: linear-gradient(90deg, var(--pharma-primary), var(--pharma-accent));
+    color: #fff;
+    border: none;
+    border-radius: var(--pharma-radius-sm);
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    transition: var(--pharma-transition);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.btn-action:hover {
+    background: linear-gradient(90deg, var(--pharma-accent), var(--pharma-primary));
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(16, 185, 129, 0.2);
+}
+
+.btn-action i {
+    font-size: 0.9em;
+}
+
+.copy-btn {
+    background: var(--pharma-accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--pharma-radius-sm);
+    padding: 0.6rem 1.25rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: var(--pharma-transition);
+}
+
+.copy-btn:hover {
+    background: #059669;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .annotation-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .json-container, .summary-container {
+        padding: 1.5rem;
+    }
+}
+
+/* Floating action button */
+.floating-action {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 99;
+}
+
+.floating-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.floating-btn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Alert Styles */
+.alert {
+    padding: 1rem;
+    border-radius: var(--pharma-radius-sm);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.alert-warning {
+    background-color: #fffbeb;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+}
+
+.alert-warning i {
+    color: #f59e0b;
+}
+</style>
+
+<!-- Header -->
+<section class="annotation-header">
+  <div class="header-info">
+    <h2><i class="fas fa-code"></i> JSON Annotations - Page {{ page.page_number }}</h2>
+    <div class="document-meta">
+      <span class="meta-item">
+        <i class="fas fa-file-alt"></i>
+        {{ document.title }}
+      </span>
+      <span class="meta-item">
+        <i class="fas fa-tags"></i>
+        {{ total_annotations }} annotation(s)
+      </span>
+      <span class="meta-item">
+        <i class="fas fa-calendar-alt"></i>
+        {% if page.annotations_summary_generated_at %}
+          {{ page.annotations_summary_generated_at|date:"d/m/Y H:i" }}
+        {% else %}
+          Pas encore généré
+        {% endif %}
+      </span>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <a href="{% url 'rawdocs:annotate_document' document.id %}?page={{ page.page_number }}" class="btn-action">
+      <i class="fas fa-arrow-left"></i> Retour à l'annotation
+    </a>
+  </div>
+</section>
+
+<!-- Statistiques -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <span class="stat-value">{{ total_annotations }}</span>
+    <span class="stat-label">Total Annotations</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-value">{{ page.page_number }}</span>
+    <span class="stat-label">Numéro de Page</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-value">
+      {% if annotations_json.annotations %}
+        {{ annotations_json.annotations|length }}
+      {% else %}
+        0
+      {% endif %}
+    </span>
+    <span class="stat-label">Dans le JSON</span>
+  </div>
+</div>
+
+<!-- Résumé en langage naturel -->
+{% if annotations_summary %}
+<section class="summary-container">
+  <h3><i class="fas fa-file-text"></i> Résumé des Annotations</h3>
+  <div class="summary-text">
+    <div class="alert alert-info" style="margin-bottom: 1.5rem;">
+      <i class="fas fa-info-circle"></i> Ce résumé a été généré automatiquement à partir des annotations de cette page.
+    </div>
+    {{ annotations_summary|linebreaks }}
+  </div>
+</section>
+{% endif %}
+
+<!-- JSON structuré -->
+<section class="json-container">
+  <h3><i class="fas fa-code"></i> JSON Structuré des Annotations</h3>
+  {% if annotations_json %}
+  <div class="alert alert-info" style="margin-bottom: 1.5rem;">
+    <i class="fas fa-info-circle"></i> Ce JSON contient toutes les annotations validées pour cette page, avec leurs métadonnées complètes.
+  </div>
+
+  <div class="json-display" id="json-display">{{ annotations_json|format_json }}</div>
+
+  <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+    <button class="copy-btn" onclick="copyJsonToClipboard()">
+      <i class="fas fa-copy"></i> Copier le JSON
+    </button>
+    <button class="copy-btn" style="background: var(--pharma-primary);" onclick="downloadJson()">
+      <i class="fas fa-download"></i> Télécharger
+    </button>
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle"></i>
+    Aucun JSON généré pour cette page. Les annotations n'ont peut-être pas encore été traitées.
+  </div>
+  {% endif %}
+</section>
+
+<!-- Actions -->
+<section class="json-container">
+  <h3><i class="fas fa-cogs"></i> Actions</h3>
+  <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+    <button class="btn-action" onclick="regeneratePageSummary()">
+      <i class="fas fa-sync-alt"></i> Régénérer le Résumé
+    </button>
+
+    <a href="{% url 'rawdocs:view_document_annotation_json' document.id %}" class="btn-action">
+      <i class="fas fa-file-contract"></i> Voir JSON Global
+    </a>
+
+    {% if annotations_json %}
+    <button class="btn-action" onclick="showJsonHelp()">
+      <i class="fas fa-question-circle"></i> Aide sur le JSON
+    </button>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Floating action button -->
+<div class="floating-action">
+  <button class="floating-btn" onclick="scrollToTop()">
+    <i class="fas fa-arrow-up"></i>
+  </button>
+</div>
+
+<!-- JSON Help Modal -->
+<div id="jsonHelpModal" class="modal" style="display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+  <div class="modal-content" style="background-color: white; margin: 5% auto; padding: 2rem; border-radius: 12px; max-width: 800px; max-height: 80vh; overflow-y: auto;">
+    <h3 style="display: flex; justify-content: space-between; align-items: center;">
+      <span><i class="fas fa-info-circle"></i> Structure du JSON des Annotations</span>
+      <span style="cursor: pointer; font-size: 1.5rem;" onclick="document.getElementById('jsonHelpModal').style.display='none'">&times;</span>
+    </h3>
+    <div style="margin-top: 1.5rem;">
+      <p>Le JSON des annotations par page contient toutes les annotations validées pour cette page, avec leurs métadonnées complètes :</p>
+
+      <div style="background: #f8f9fa; border-radius: 8px; padding: 1.5rem; margin-top: 1rem; font-family: monospace;">
+        <p><strong style="color: #d946ef;">page_info</strong>: Métadonnées de la page</p>
+        <p><strong style="color: #d946ef;">annotations</strong>: Liste des annotations</p>
+        <p style="margin-left: 1.5rem;">├── <strong style="color: #d946ef;">id</strong>: Identifiant unique</p>
+        <p style="margin-left: 1.5rem;">├── <strong style="color: #d946ef;">type</strong>: Type d'annotation</p>
+        <p style="margin-left: 1.5rem;">├── <strong style="color: #d946ef;">text</strong>: Texte annoté</p>
+        <p style="margin-left: 1.5rem;">├── <strong style="color: #d946ef;">coordinates</strong>: Position dans la page</p>
+        <p style="margin-left: 1.5rem;">└── <strong style="color: #d946ef;">metadata</strong>: Métadonnées supplémentaires</p>
+        <p><strong style="color: #d946ef;">summary</strong>: Résumé généré automatiquement</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Formatage JSON avancé avec coloration syntaxique améliorée
+function formatJson(jsonElement) {
+    if (!jsonElement || !jsonElement.textContent) return;
+    
+    try {
+        const jsonContent = jsonElement.textContent.trim();
+        const parsedJson = JSON.parse(jsonContent);
+
+        // Format avec indentation de 2 espaces
+        const formattedJson = JSON.stringify(parsedJson, null, 2);
+
+        // Coloration syntaxique avancée
+        let highlightedJson = formattedJson
+            // Clés d'objet (propriétés)
+            .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")(\s*:)/g, '<span class="json-key">$1</span>$3')
+            // Chaînes de caractères
+            .replace(/:\s*("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")/g, ': <span class="json-string">$1</span>')
+            // Nombres (entiers et décimaux)
+            .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
+            // Booléens
+            .replace(/:\s*(true|false)/g, ': <span class="json-boolean">$1</span>')
+            // Null
+            .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>')
+            // Crochets et accolades
+            .replace(/([{}[\]])/g, '<span class="json-bracket">$1</span>')
+            // Virgules
+            .replace(/(,)$/gm, '<span class="json-comma">$1</span>');
+
+        jsonElement.innerHTML = highlightedJson;
+        
+        // Ajouter des numéros de ligne
+        addLineNumbers(jsonElement);
+        
+    } catch (e) {
+        console.log('JSON invalide ou déjà formaté:', e);
+        // En cas d'erreur, on laisse le contenu tel quel
+    }
+}
+
+// Ajouter des numéros de ligne au JSON
+function addLineNumbers(jsonElement) {
+    const lines = jsonElement.innerHTML.split('\n');
+    const numberedLines = lines.map((line, index) => {
+        const lineNumber = (index + 1).toString().padStart(3, ' ');
+        return `<span class="line-number">${lineNumber}</span><span class="line-content">${line}</span>`;
+    }).join('\n');
+    
+    jsonElement.innerHTML = numberedLines;
+    jsonElement.classList.add('json-with-lines');
+}
+
+// Copy JSON to clipboard
+function copyJsonToClipboard() {
+    const jsonText = document.getElementById('json-display').textContent;
+    navigator.clipboard.writeText(jsonText).then(function() {
+        showToast('JSON copié dans le presse-papier!', 'success');
+    }, function(err) {
+        console.error('Erreur lors de la copie: ', err);
+        showToast('Erreur lors de la copie', 'error');
+    });
+}
+
+// Regenerate page summary
+function regeneratePageSummary() {
+    if (!confirm('Régénérer le résumé et le JSON de cette page ?')) {
+        return;
+    }
+
+    showLoading('Génération du résumé en cours...');
+
+    fetch(`{% url 'rawdocs:generate_page_annotation_summary' page.id %}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showToast('Résumé régénéré avec succès!', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showToast('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Erreur:', error);
+        showToast('Erreur lors de la régénération', 'error');
+    });
+}
+
+// Download JSON file
+function downloadJson() {
+    const jsonData = document.getElementById('json-display').textContent;
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `page_{{ page.page_number }}_annotations_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Téléchargement du JSON démarré', 'success');
+}
+
+// Show JSON help modal
+function showJsonHelp() {
+    document.getElementById('jsonHelpModal').style.display = 'block';
+}
+
+// Scroll to top
+function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Show toast notification
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 1rem 1.5rem;
+        background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6'};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+        animation: fadeIn 0.3s ease;
+    `;
+    toast.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-circle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i> ${message}`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease';
+        setTimeout(() => document.body.removeChild(toast), 300);
+    }, 3000);
+}
+
+// Show loading indicator
+function showLoading(message) {
+    const loading = document.createElement('div');
+    loading.id = 'global-loading';
+    loading.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.8);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    `;
+    loading.innerHTML = `
+        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); text-align: center;">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p style="margin-top: 1.5rem; font-size: 1.1rem;">${message}</p>
+        </div>
+    `;
+    document.body.appendChild(loading);
+}
+
+// Hide loading indicator
+function hideLoading() {
+    const loading = document.getElementById('global-loading');
+    if (loading) {
+        document.body.removeChild(loading);
+    }
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Apply syntax highlighting to pre-formatted JSON
+    const jsonDisplay = document.getElementById('json-display');
+    if (jsonDisplay) {
+        // Le JSON est déjà formaté par le filtre Django, on applique juste la coloration syntaxique
+        applySyntaxHighlighting(jsonDisplay);
+    }
+
+    // Add animation styles
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(20px); }
+        }
+    `;
+    document.head.appendChild(style);
+});
+
+// Apply syntax highlighting to already formatted JSON
+function applySyntaxHighlighting(jsonElement) {
+    if (!jsonElement || !jsonElement.textContent) return;
+    
+    try {
+        const jsonContent = jsonElement.textContent.trim();
+        
+        // Coloration syntaxique avancée
+        let highlightedJson = jsonContent
+            // Clés d'objet (propriétés)
+            .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")(\s*:)/g, '<span class="json-key">$1</span>$3')
+            // Chaînes de caractères
+            .replace(/:\s*("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")/g, ': <span class="json-string">$1</span>')
+            // Nombres (entiers et décimaux)
+            .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
+            // Booléens
+            .replace(/:\s*(true|false)/g, ': <span class="json-boolean">$1</span>')
+            // Null
+            .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>')
+            // Crochets et accolades
+            .replace(/([{}[\]])/g, '<span class="json-bracket">$1</span>')
+            // Virgules
+            .replace(/(,)$/gm, '<span class="json-comma">$1</span>');
+
+        jsonElement.innerHTML = highlightedJson;
+        
+        // Ajouter des numéros de ligne
+        addLineNumbers(jsonElement);
+        
+    } catch (e) {
+        console.log('Erreur lors de l\'application de la coloration syntaxique:', e);
+        // En cas d'erreur, on laisse le contenu tel quel
+    }
+}
+</script>
+{% endblock %}

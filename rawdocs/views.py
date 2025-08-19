@@ -1,3 +1,6 @@
+# rawdocs/views.py
+from django.utils import timezone  # AJOUT pour corriger le timezone warning
+import time
 import os
 import json
 import requests
@@ -1075,3 +1078,679 @@ def create_product_from_metadata(document):
     
     print(f"✅ Product '{product.name}' created from metadata!")
     return product
+
+
+###############################
+# rawdocs/views.py - AJOUTER ces vues au fichier existant
+
+from .regulatory_analyzer import RegulatoryAnalyzer
+from .models import DocumentRegulatoryAnalysis
+
+
+# =================== NOUVELLES VUES POUR L'ANALYSE RÉGLEMENTAIRE ===================
+
+@login_required
+@csrf_exempt
+def analyze_page_regulatory(request, page_id):
+    """
+    Analyse réglementaire d'une page spécifique avec GROQ
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+
+        # Vérifier les permissions (annotateur ou plus)
+        if not (is_annotateur(request.user) or is_expert(request.user) or is_metadonneur(request.user)):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+
+        print(f"🔍 Lancement analyse réglementaire page {page.page_number}")
+
+        # Initialiser l'analyseur
+        analyzer = RegulatoryAnalyzer()
+
+        # Obtenir le contexte du document
+        document_context = f"{page.document.title} - {page.document.doc_type} - {page.document.source}"
+
+        # Analyser la page
+        analysis = analyzer.analyze_page_regulatory_content(
+            page_text=page.cleaned_text,
+            page_num=page.page_number,
+            document_context=document_context
+        )
+
+        # Sauvegarder l'analyse dans la base de données
+        page.regulatory_analysis = analysis
+        page.page_summary = analysis.get('page_summary', '')
+        page.regulatory_obligations = analysis.get('regulatory_obligations', [])
+        page.critical_deadlines = analysis.get('critical_deadlines', [])
+        page.regulatory_importance_score = analysis.get('regulatory_importance_score', 0)
+        page.is_regulatory_analyzed = True
+        page.regulatory_analyzed_at = datetime.now()
+        page.regulatory_analyzed_by = request.user
+        page.save()
+
+        print(
+            f"✅ Analyse réglementaire page {page.page_number} sauvegardée - Score: {page.regulatory_importance_score}")
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Page {page.page_number} analysée avec succès!',
+            'analysis': analysis,
+            'importance_score': page.regulatory_importance_score
+        })
+
+    except Exception as e:
+        print(f"❌ Erreur analyse réglementaire page {page_id}: {e}")
+        return JsonResponse({
+            'error': f'Erreur lors de l\'analyse: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@csrf_exempt
+def analyze_document_regulatory_bulk(request, doc_id):
+    """
+    Analyse réglementaire complète d'un document (toutes les pages)
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+
+        # Vérifier les permissions
+        if not (is_annotateur(request.user) or is_expert(request.user) or is_metadonneur(request.user)):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+
+        print(f"🔍 Lancement analyse réglementaire complète document {doc_id}")
+
+        # Initialiser l'analyseur
+        analyzer = RegulatoryAnalyzer()
+        document_context = f"{document.title} - {document.doc_type} - {document.source}"
+
+        # Analyser toutes les pages
+        pages = document.pages.all().order_by('page_number')
+        analyses = []
+        analyzed_count = 0
+
+        for page in pages:
+            try:
+                print(f"📄 Analyse page {page.page_number}/{document.total_pages}")
+
+                analysis = analyzer.analyze_page_regulatory_content(
+                    page_text=page.cleaned_text,
+                    page_num=page.page_number,
+                    document_context=document_context
+                )
+
+                # Sauvegarder l'analyse
+                page.regulatory_analysis = analysis
+                page.page_summary = analysis.get('page_summary', '')
+                page.regulatory_obligations = analysis.get('regulatory_obligations', [])
+                page.critical_deadlines = analysis.get('critical_deadlines', [])
+                page.regulatory_importance_score = analysis.get('regulatory_importance_score', 0)
+                page.is_regulatory_analyzed = True
+                page.regulatory_analyzed_at = datetime.now()
+                page.regulatory_analyzed_by = request.user
+                page.save()
+
+                analyses.append(analysis)
+                analyzed_count += 1
+
+                # Pause pour éviter les limites d'API
+                time.sleep(2)
+
+            except Exception as e:
+                print(f"❌ Erreur page {page.page_number}: {e}")
+                continue
+
+        # Générer le résumé global
+        print(f"📊 Génération résumé global avec {len(analyses)} analyses...")
+        global_analysis = analyzer.generate_document_global_summary(document, analyses)
+
+        # Sauvegarder l'analyse globale
+        doc_analysis, created = DocumentRegulatoryAnalysis.objects.update_or_create(
+            document=document,
+            defaults={
+                'global_summary': global_analysis.get('global_summary', ''),
+                'consolidated_analysis': global_analysis,
+                'main_obligations': global_analysis.get('critical_compliance_requirements', []),
+                'critical_deadlines_summary': global_analysis.get('key_deadlines_summary', []),
+                'relevant_authorities': global_analysis.get('regulatory_authorities_involved', []),
+                'global_regulatory_score': global_analysis.get('global_regulatory_score', 0),
+                'analyzed_by': request.user,
+                'total_pages_analyzed': analyzed_count,
+                'pages_with_regulatory_content': sum(
+                    1 for a in analyses if a.get('regulatory_importance_score', 0) > 30)
+            }
+        )
+
+        print(f"✅ Analyse complète terminée: {analyzed_count} pages analysées")
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Document analysé avec succès! {analyzed_count} pages traitées.',
+            'analyzed_pages': analyzed_count,
+            'total_pages': document.total_pages,
+            'global_score': global_analysis.get('global_regulatory_score', 0),
+            'global_analysis': global_analysis
+        })
+
+    except Exception as e:
+        print(f"❌ Erreur analyse document {doc_id}: {e}")
+        return JsonResponse({
+            'error': f'Erreur lors de l\'analyse: {str(e)}'
+        }, status=500)
+
+
+@login_required
+def get_page_regulatory_analysis(request, page_id):
+    """
+    Récupère l'analyse réglementaire d'une page
+    """
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+
+        if not page.is_regulatory_analyzed:
+            return JsonResponse({
+                'analyzed': False,
+                'message': 'Page non analysée'
+            })
+
+        return JsonResponse({
+            'analyzed': True,
+            'page_summary': page.page_summary,
+            'importance_score': page.regulatory_importance_score,
+            'regulatory_analysis': page.regulatory_analysis,
+            'analyzed_at': page.regulatory_analyzed_at.isoformat() if page.regulatory_analyzed_at else None
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def get_document_regulatory_summary(request, doc_id):
+    """
+    Récupère le résumé réglementaire global d'un document
+    """
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id)
+
+        # Statistiques des pages
+        total_pages = document.pages.count()
+        analyzed_pages = document.pages.filter(is_regulatory_analyzed=True).count()
+        high_importance_pages = document.pages.filter(regulatory_importance_score__gte=70).count()
+
+        # Analyse globale si disponible
+        try:
+            global_analysis = document.regulatory_analysis
+            has_global_analysis = True
+        except DocumentRegulatoryAnalysis.DoesNotExist:
+            global_analysis = None
+            has_global_analysis = False
+
+        # Résumé des pages importantes
+        important_pages = []
+        for page in document.pages.filter(regulatory_importance_score__gte=50).order_by('-regulatory_importance_score')[
+                    :5]:
+            important_pages.append({
+                'page_number': page.page_number,
+                'summary': page.page_summary,
+                'score': page.regulatory_importance_score,
+                'key_points': page.regulatory_analysis.get('key_regulatory_points',
+                                                           []) if page.regulatory_analysis else []
+            })
+
+        return JsonResponse({
+            'has_global_analysis': has_global_analysis,
+            'stats': {
+                'total_pages': total_pages,
+                'analyzed_pages': analyzed_pages,
+                'high_importance_pages': high_importance_pages,
+                'completion_percentage': int((analyzed_pages / total_pages * 100)) if total_pages > 0 else 0
+            },
+            'global_summary': global_analysis.global_summary if global_analysis else '',
+            'global_score': global_analysis.global_regulatory_score if global_analysis else 0,
+            'consolidated_analysis': global_analysis.consolidated_analysis if global_analysis else {},
+            'important_pages': important_pages
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# =================== MISE À JOUR DE LA VUE ANNOTATION EXISTANTE ===================
+
+@login_required
+@user_passes_test(is_annotateur)
+def annotate_document(request, doc_id):
+    """Vue d'annotation mise à jour avec analyse réglementaire"""
+    document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+    pages = document.pages.all()
+    pnum = int(request.GET.get('page', 1))
+    page_obj = get_object_or_404(DocumentPage, document=document, page_number=pnum)
+
+    # Statistiques d'analyse réglementaire
+    regulatory_stats = {
+        'total_pages': document.total_pages,
+        'analyzed_pages': pages.filter(is_regulatory_analyzed=True).count(),
+        'high_importance_pages': pages.filter(regulatory_importance_score__gte=70).count(),
+    }
+    regulatory_stats['completion_percentage'] = int(
+        (regulatory_stats['analyzed_pages'] / regulatory_stats['total_pages'] * 100)) if regulatory_stats[
+                                                                                             'total_pages'] > 0 else 0
+
+    # Analyse globale du document
+    try:
+        global_analysis = document.regulatory_analysis
+    except DocumentRegulatoryAnalysis.DoesNotExist:
+        global_analysis = None
+
+    return render(request, 'rawdocs/annotate_document.html', {
+        'document': document,
+        'pages': pages,
+        'current_page': page_obj,
+        'annotation_types': AnnotationType.objects.all(),
+        'existing_annotations': page_obj.annotations.all().order_by('start_pos'),
+        'total_pages': document.total_pages,
+        # Nouvelles données pour l'analyse réglementaire
+        'regulatory_stats': regulatory_stats,
+        'global_analysis': global_analysis,
+        'page_analysis': page_obj.regulatory_analysis if page_obj.is_regulatory_analyzed else None,
+        'page_summary': page_obj.page_summary,
+        'page_importance_score': page_obj.regulatory_importance_score
+    })
+
+
+# =================== VUE POUR LE DASHBOARD D'ANALYSE RÉGLEMENTAIRE ===================
+
+@login_required
+@user_passes_test(is_annotateur)
+def regulatory_analysis_dashboard(request):
+    """
+    Dashboard spécialisé pour l'analyse réglementaire
+    """
+    # Documents disponibles pour analyse
+    documents = RawDocument.objects.filter(
+        is_validated=True,
+        pages_extracted=True
+    ).order_by('-validated_at')
+
+    # Statistiques globales
+    total_documents = documents.count()
+    analyzed_documents = documents.filter(regulatory_analysis__isnull=False).count()
+
+    # Documents avec analyse en cours ou complète
+    documents_with_stats = []
+    for doc in documents[:20]:  # Limiter pour performance
+        analyzed_pages = doc.pages.filter(is_regulatory_analyzed=True).count()
+        total_pages = doc.total_pages
+        completion = int((analyzed_pages / total_pages * 100)) if total_pages > 0 else 0
+
+        try:
+            global_score = doc.regulatory_analysis.global_regulatory_score
+        except DocumentRegulatoryAnalysis.DoesNotExist:
+            global_score = 0
+
+        documents_with_stats.append({
+            'document': doc,
+            'analyzed_pages': analyzed_pages,
+            'total_pages': total_pages,
+            'completion_percentage': completion,
+            'global_score': global_score
+        })
+
+    context = {
+        'documents_with_stats': documents_with_stats,
+        'total_documents': total_documents,
+        'analyzed_documents': analyzed_documents,
+        'analysis_completion': int((analyzed_documents / total_documents * 100)) if total_documents > 0 else 0
+    }
+
+    return render(request, 'rawdocs/regulatory_analysis_dashboard.html', context)
+
+
+# =================== NOUVELLES VUES POUR JSON ET RÉSUMÉS D'ANNOTATIONS ===================
+
+from .regulatory_analyzer import RegulatoryAnalyzer
+
+from collections import OrderedDict
+from datetime import datetime
+
+def _build_entities_map(annotations_qs, use_display_name=True):
+    """
+    Construit {entité -> [valeurs_uniques]} à partir d'un QuerySet d'annotations.
+    - use_display_name=True : clé = display_name (lisible)
+      sinon clé = name (technique)
+    """
+    entities = OrderedDict()
+    seen_per_key = {}
+
+    for ann in annotations_qs:
+        key = ann.annotation_type.display_name if use_display_name else ann.annotation_type.name
+        val = (ann.selected_text or "").strip()
+        if not val:
+            continue
+
+        if key not in entities:
+            entities[key] = []
+            seen_per_key[key] = set()
+
+        if val not in seen_per_key[key]:
+            entities[key].append(val)
+            seen_per_key[key].add(val)
+
+    return entities
+
+@login_required
+@csrf_exempt
+def generate_page_annotation_summary(request, page_id):
+    """
+    Produit un JSON minimaliste (doc info + entities) et un résumé
+    basés uniquement sur {entité -> valeurs} pour UNE page.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+
+        if not (is_annotateur(request.user) or is_expert(request.user) or is_metadonneur(request.user)):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+
+        # Récupérer les annotations de la page
+        annotations = page.annotations.all().select_related('annotation_type').order_by('start_pos')
+
+        # Construire entities -> [valeurs]
+        entities = _build_entities_map(annotations, use_display_name=True)
+
+        # JSON minimaliste
+        page_json = {
+            'document': {
+                'id': str(page.document.id),
+                'title': page.document.title,
+                'doc_type': getattr(page.document, 'doc_type', None),
+                'source': getattr(page.document, 'source', None),
+            },
+            'page': {
+                'number': page.page_number,
+                'annotations_count': annotations.count(),
+            },
+            'entities': entities,
+            'generated_at': datetime.utcnow().isoformat() + 'Z',
+        }
+
+        # Résumé à partir des seules entités/valeurs
+        summary = generate_entities_based_page_summary(
+            entities=entities,
+            page_number=page.page_number,
+            document_title=page.document.title
+        )
+
+        # Sauvegarde
+        page.annotations_json = page_json
+        page.annotations_summary = summary
+        page.save(update_fields=['annotations_json', 'annotations_summary'])
+
+        return JsonResponse({
+            'success': True,
+            'page_json': page_json,
+            'summary': summary,
+            'message': f'JSON et résumé générés pour la page {page.page_number}'
+        })
+    except Exception as e:
+        print(f"❌ Erreur génération résumé page {page_id}: {e}")
+        return JsonResponse({'error': f'Erreur lors de la génération: {str(e)}'}, status=500)
+
+
+
+@login_required
+@csrf_exempt
+def generate_document_annotation_summary(request, doc_id):
+    """
+    Produit un JSON global minimaliste (doc info + entities) et un résumé
+    basés uniquement sur {entité -> valeurs} pour TOUT le document.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+
+        if not (is_annotateur(request.user) or is_expert(request.user) or is_metadonneur(request.user)):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+
+        pages = document.pages.all().order_by('page_number')
+
+        # Agrégation globale des entités
+        global_entities = OrderedDict()
+        total_annotations_count = 0
+
+        for page in pages:
+            page_annotations = page.annotations.all().select_related('annotation_type').order_by('start_pos')
+            total_annotations_count += page_annotations.count()
+
+            page_entities = _build_entities_map(page_annotations, use_display_name=True)
+            # Fusion {entité -> valeurs}
+            for ent, vals in page_entities.items():
+                if ent not in global_entities:
+                    global_entities[ent] = []
+                for v in vals:
+                    if v not in global_entities[ent]:
+                        global_entities[ent].append(v)
+
+        global_json = {
+            'document': {
+                'id': str(document.id),
+                'title': document.title,
+                'doc_type': getattr(document, 'doc_type', None),
+                'source': getattr(document, 'source', None),
+                'total_pages': getattr(document, 'total_pages', pages.count()),
+                'total_annotations': total_annotations_count,
+            },
+            'entities': global_entities,
+            'generated_at': datetime.utcnow().isoformat() + 'Z',
+        }
+
+        # Résumé global basé uniquement sur les entités/valeurs
+        global_summary = generate_entities_based_document_summary(
+            entities=global_entities,
+            doc_title=document.title,
+            doc_type=getattr(document, 'doc_type', None),
+            total_annotations=total_annotations_count
+        )
+
+        document.global_annotations_json = global_json
+        document.global_annotations_summary = global_summary
+        document.save(update_fields=['global_annotations_json', 'global_annotations_summary'])
+
+        return JsonResponse({
+            'success': True,
+            'global_json': global_json,
+            'global_summary': global_summary,
+            'stats': {
+                'total_pages': getattr(document, 'total_pages', pages.count()),
+                'total_annotations': total_annotations_count,
+                'entities_count': len(global_entities)
+            },
+            'message': 'JSON global et résumé générés pour le document complet'
+        })
+    except Exception as e:
+        print(f"❌ Erreur génération résumé document {doc_id}: {e}")
+        return JsonResponse({'error': f'Erreur lors de la génération: {str(e)}'}, status=500)
+
+def generate_entities_based_page_summary(entities, page_number, document_title):
+    """
+    Résumé NL d'une page à partir du dict {entité -> [valeurs]}.
+    """
+    try:
+        if not entities:
+            return "Aucune entité annotée sur cette page."
+
+        # Préparer un texte compact pour le prompt/backup
+        lines = []
+        total_pairs = 0
+        for ent, vals in entities.items():
+            total_pairs += len(vals)
+            preview = "; ".join(vals[:4]) + ("…" if len(vals) > 4 else "")
+            lines.append(f"- {ent}: {preview}")
+
+        structured_view = "\n".join(lines)
+
+        prompt = f"""Tu es un expert en analyse documentaire.
+Génère un résumé court (3–4 phrases) et fluide basé UNIQUEMENT sur les entités et leurs valeurs.
+
+DOCUMENT: {document_title}
+PAGE: {page_number}
+
+ENTITÉS → VALEURS:
+{structured_view}
+
+Contraintes:
+- Ne liste pas tout; synthétise les thèmes/infos clés.
+- Utilise un ton pro et clair.
+- Termine par le nombre total de paires entité-valeur entre parenthèses.
+
+Réponds UNIQUEMENT par le paragraphe.
+"""
+
+        analyzer = RegulatoryAnalyzer()
+        response = analyzer.call_groq_api(prompt, max_tokens=280)
+        return response.strip() if response else f"Page {page_number}: synthèse de {total_pairs} élément(s) annoté(s) sur les entités « {', '.join(list(entities.keys())[:5])}{'…' if len(entities)>5 else ''} »."
+    except Exception as e:
+        print(f"❌ Erreur génération résumé (page): {e}")
+        # Fallback minimal
+        flat_count = sum(len(v) for v in entities.values())
+        return f"Page {page_number}: {flat_count} valeur(s) annotée(s) sur {len(entities)} entité(s)."
+
+
+def generate_entities_based_document_summary(entities, doc_title, doc_type, total_annotations):
+    """
+    Résumé NL global à partir du dict {entité -> [valeurs]}.
+    """
+    try:
+        if not entities:
+            return "Aucune entité annotée dans ce document."
+
+        # Top entités par volume
+        ranked = sorted(entities.items(), key=lambda kv: len(kv[1]), reverse=True)
+        top_lines = [f"- {k}: {len(v)} valeur(s)" for k, v in ranked[:6]]
+        repartition = "\n".join(top_lines)
+
+        prompt = f"""Tu es un expert en analyse documentaire.
+Produis un résumé exécutif (4–6 phrases) basé UNIQUEMENT sur les entités et leurs valeurs.
+
+DOCUMENT: {doc_title}
+TYPE: {doc_type or '—'}
+TOTAL ANNOTATIONS: {total_annotations}
+
+RÉPARTITION (Top entités par nombre de valeurs):
+{repartition}
+
+Contraintes:
+- Extrais les thèmes majeurs qui se dégagent des entités dominantes.
+- Indique la couverture globale (ex.: diversité des entités, répartition).
+- Reste factuel, ton professionnel, sans lister toutes les valeurs.
+
+Réponds UNIQUEMENT par le paragraphe.
+"""
+
+        analyzer = RegulatoryAnalyzer()
+        response = analyzer.call_groq_api(prompt, max_tokens=360)
+        if response:
+            return response.strip()
+
+        # Fallback succinct
+        top_names = [k for k, _ in ranked[:3]]
+        total_values = sum(len(v) for v in entities.values())
+        return (f"Le document agrège {total_values} valeur(s) annotée(s) sur {len(entities)} entité(s). "
+                f"Principales entités : {', '.join(top_names)}.")
+    except Exception as e:
+        print(f"❌ Erreur génération résumé (document): {e}")
+        total_values = sum(len(v) for v in entities.values())
+        return f"Document : {total_values} valeur(s) sur {len(entities)} entité(s)."
+
+@login_required
+def view_page_annotation_json(request, page_id):
+    """
+    Affiche le JSON et résumé d'une page dans une vue dédiée
+    """
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+
+        # Vérifier les permissions
+        if not (is_annotateur(request.user) or is_expert(request.user) or is_metadonneur(request.user)):
+            messages.error(request, "Permission denied")
+            return redirect('rawdocs:annotation_dashboard')
+
+        # Si pas encore généré, le générer
+        if not hasattr(page, 'annotations_json') or not page.annotations_json:
+            # Déclencher la génération
+            from django.test import RequestFactory
+            factory = RequestFactory()
+            fake_request = factory.post(f'/generate-page-annotation-summary/{page_id}/')
+            fake_request.user = request.user
+            generate_page_annotation_summary(fake_request, page_id)
+            page.refresh_from_db()
+
+        context = {
+            'page': page,
+            'document': page.document,
+            'annotations_json': page.annotations_json if hasattr(page, 'annotations_json') else None,
+            'annotations_summary': page.annotations_summary if hasattr(page, 'annotations_summary') else None,
+            'total_annotations': page.annotations.count()
+        }
+
+        return render(request, 'rawdocs/view_page_annotation_json.html', context)
+
+    except Exception as e:
+        messages.error(request, f"Erreur: {str(e)}")
+        return redirect('rawdocs:annotation_dashboard')
+
+
+@login_required
+def view_document_annotation_json(request, doc_id):
+    """
+    Affiche le JSON global et résumé du document dans une vue dédiée
+    """
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+
+        # Vérifier les permissions
+        if not (is_annotateur(request.user) or is_expert(request.user) or is_metadonneur(request.user)):
+            messages.error(request, "Permission denied")
+            return redirect('rawdocs:annotation_dashboard')
+
+        # Si pas encore généré, le générer
+        if not hasattr(document, 'global_annotations_json') or not document.global_annotations_json:
+            # Déclencher la génération
+            from django.test import RequestFactory
+            factory = RequestFactory()
+            fake_request = factory.post(f'/generate-document-annotation-summary/{doc_id}/')
+            fake_request.user = request.user
+            generate_document_annotation_summary(fake_request, doc_id)
+            document.refresh_from_db()
+
+        # Statistiques
+        total_annotations = sum(page.annotations.count() for page in document.pages.all())
+        annotated_pages = document.pages.filter(annotations__isnull=False).distinct().count()
+
+        context = {
+            'document': document,
+            'global_annotations_json': document.global_annotations_json if hasattr(document,
+                                                                                   'global_annotations_json') else None,
+            'global_annotations_summary': document.global_annotations_summary if hasattr(document,
+                                                                                         'global_annotations_summary') else None,
+            'total_annotations': total_annotations,
+            'annotated_pages': annotated_pages,
+            'total_pages': document.total_pages
+        }
+
+        return render(request, 'rawdocs/view_document_annotation_json.html', context)
+
+    except Exception as e:
+        messages.error(request, f"Erreur: {str(e)}")
+        return redirect('rawdocs:annotation_dashboard')
