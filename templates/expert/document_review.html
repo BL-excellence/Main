@@ -1854,34 +1854,46 @@ function validateAllAnnotations() {
         showErrorNotification('❌ Aucune page sélectionnée');
         return;
     }
-    
-    if (confirm('Êtes-vous sûr de vouloir valider toutes les annotations de cette page ?')) {
-        showSuccessNotification('✅ Validation de toutes les annotations...');
-        
-        fetch('{% url "expert:validate_page_annotations" current_page.id %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showSuccessNotification('✅ ' + data.message);
-                // Recharger la page pour voir les changements
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            } else {
-                showErrorNotification('❌ Erreur: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showErrorNotification('❌ Erreur lors de la validation');
-        });
+
+    if (!confirm('Êtes-vous sûr de vouloir valider toutes les annotations de cette page ?')) {
+        return;
     }
+
+    showSuccessNotification('✅ Validation de toutes les annotations...');
+
+    const url = '{% url "expert:validate_page_annotations" current_page.id %}';
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]')?.value || '')
+        },
+        credentials: 'same-origin'
+    })
+    .then(async (response) => {
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`HTTP ${response.status}: ${text.substring(0, 200)}`);
+        }
+        if (!contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error('Réponse non JSON: ' + text.substring(0, 200));
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showSuccessNotification('✅ ' + (data.message || 'Validé'));
+            setTimeout(() => window.location.reload(), 800);
+        } else {
+            showErrorNotification('❌ Erreur: ' + (data.error || 'inconnue'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showErrorNotification('❌ Erreur lors de la validation: ' + error.message);
+    });
 }
 
 // Améliorer les notifications avec des styles plus modernes

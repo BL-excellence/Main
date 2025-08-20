@@ -61,6 +61,12 @@ urlpatterns = [
         views.edit_metadata,
         name='edit_metadata'
     ),
+    # 8b) Réextraction des métadonnées (POST)
+    path(
+        'edit/<int:doc_id>/reextract/',
+        views.reextract_metadata,
+        name='reextract_metadata'
+    ),
 
     # 9) Validation d'un document (extraction des pages)
     path(

@@ -277,7 +277,8 @@ label.block { margin-bottom: 0.4rem; font-weight:500; font-size:0.98rem;}
                             Date de publication
                             <span class="badge badge-success"><i class="fas fa-calendar-check"></i>Auto-extraite</span>
                         </label>
-                        <input id="id_publication_date" name="publication_date" type="date"
+                        <input id="id_publication_date" name="publication_date" type="text"
+                            placeholder="Ex: 23 January 2025"
                             value="{{ form.publication_date.value|default_if_none:'' }}" />
                     </div>
 
@@ -412,7 +413,31 @@ label.block { margin-bottom: 0.4rem; font-weight:500; font-size:0.98rem;}
 <script>
 function reextractMetadata() {
     if (!confirm("Relancer l'extraction automatique ?")) return;
-    alert("Extraction relancée !");
+    // Appelle l'endpoint relatif à la page d'édition actuelle
+    fetch('reextract/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) { alert('Erreur: ' + (data.error || 'réextraction')); return; }
+        const m = data.metadata || {};
+        // Met à jour les inputs avec les nouvelles valeurs
+        document.getElementById('id_title').value = m.title || '';
+        document.getElementById('id_type').value = m.type || '';
+        document.getElementById('id_context').value = m.context || '';
+        document.getElementById('id_language').value = m.language || '';
+        document.getElementById('id_publication_date').value = m.publication_date || '';
+        document.getElementById('id_version').value = m.version || '';
+        document.getElementById('id_source').value = m.source || '';
+        document.getElementById('id_url_source').value = m.url_source || '';
+        // country si présent
+        const countryInput = document.getElementById('id_country');
+        if (countryInput) countryInput.value = m.country || '';
+
+        alert('Réextraction terminée et champs mis à jour.');
+    })
+    .catch(err => alert('Erreur réseau: ' + err));
 }
 </script>
 <script>

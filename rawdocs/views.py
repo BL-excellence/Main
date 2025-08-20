@@ -21,6 +21,7 @@ from django import forms
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import views as auth_views
 from django.http import HttpResponse
+from django.views.decorators.http import require_POST
 
 
 from .models import (
@@ -74,10 +75,8 @@ class RegisterForm(UserCreationForm):
 class MetadataEditForm(forms.Form):
     title = forms.CharField(required=False)
     type = forms.CharField(required=False)
-    publication_date = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={'type': 'date'})
-    )
+    # Use CharField to accept free-text dates coming from LLM (e.g., "23 January 2025")
+    publication_date = forms.CharField(required=False)
     version = forms.CharField(required=False)
     source = forms.CharField(required=False)
     context = forms.CharField(required=False)
@@ -274,6 +273,18 @@ def edit_metadata(request, doc_id):
                             modified_by=request.user
                         )
                         metadata[field_name] = new_value
+
+            # Persist updates to the RawDocument model so changes are visible everywhere (Library, details, etc.)
+            rd.title = form.cleaned_data.get('title', rd.title) or ''
+            rd.doc_type = form.cleaned_data.get('type', rd.doc_type) or ''
+            rd.publication_date = form.cleaned_data.get('publication_date', rd.publication_date) or ''
+            rd.version = form.cleaned_data.get('version', rd.version) or ''
+            rd.source = form.cleaned_data.get('source', rd.source) or ''
+            rd.context = form.cleaned_data.get('context', rd.context) or ''
+            rd.country = form.cleaned_data.get('country', rd.country) or ''
+            rd.language = form.cleaned_data.get('language', rd.language) or ''
+            rd.url_source = form.cleaned_data.get('url_source', rd.url_source) or (rd.url or '')
+            rd.save()
             
             from .models import CustomField, CustomFieldValue
             for key, value in request.POST.items():
@@ -305,7 +316,18 @@ def edit_metadata(request, doc_id):
             messages.success(request, "Métadonnées mises à jour")
             return redirect('rawdocs:document_list')
     else:
-        form = MetadataEditForm(initial=metadata)
+        initial_data = {
+            'title': rd.title or '',
+            'type': rd.doc_type or '',
+            'publication_date': rd.publication_date or '',
+            'version': rd.version or '',
+            'source': rd.source or '',
+            'context': rd.context or '',
+            'country': rd.country or '',
+            'language': rd.language or '',
+            'url_source': rd.url_source or (rd.url or ''),
+        }
+        form = MetadataEditForm(initial=initial_data)
 
     logs = MetadataLog.objects.filter(document=rd).order_by('-modified_at')
     
@@ -326,6 +348,57 @@ def edit_metadata(request, doc_id):
         'logs': logs,
         'custom_fields_data': custom_fields_data  # ADD THIS LINE
     })
+
+@login_required(login_url='rawdocs:login')
+@user_passes_test(is_metadonneur)
+def reextract_metadata(request, doc_id):
+    """Relance l'extraction, écrase les champs du modèle et logue les changements."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    rd = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
+
+    try:
+        new_metadata = extract_metadonnees(rd.file.path, rd.url or "") or {}
+
+        # mapping: modèle -> clé metadata
+        mapping = {
+            'title': ('title',),
+            'doc_type': ('type',),
+            'publication_date': ('publication_date',),
+            'version': ('version',),
+            'source': ('source',),
+            'context': ('context',),
+            'country': ('country',),
+            'language': ('language',),
+            'url_source': ('url_source',),
+        }
+
+        # Appliquer tous les champs et logger les changements
+        for model_field, meta_keys in mapping.items():
+            meta_key = meta_keys[0]
+            old_val = getattr(rd, model_field, '') or ''
+            # Ne pas écraser par une valeur vide; écraser seulement si on a une vraie nouvelle valeur non vide
+            candidate_val = new_metadata.get(meta_key, None)
+            new_val = (candidate_val if candidate_val is not None else '')
+            if new_val == '':
+                continue
+            if str(old_val) != str(new_val):
+                MetadataLog.objects.create(
+                    document=rd,
+                    field_name=('type' if model_field == 'doc_type' else model_field),
+                    old_value=old_val,
+                    new_value=new_val,
+                    modified_by=request.user
+                )
+                setattr(rd, model_field, new_val)
+
+        rd.save()
+
+        return JsonResponse({'success': True, 'metadata': new_metadata})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
 
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_metadonneur)
