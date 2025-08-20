@@ -937,36 +937,42 @@ def validate_document(request, document_id):
                 upsert=True
             )
 
+            # Préparer le message à renvoyer (et conserver messages Django pour fallback)
+            response_message = ''
             if product:
                 debug_product_annotations()
-                # Check if it was an update or new creation
                 variations_today = ProductVariation.objects.filter(
                     product=product,
                     submission_date=timezone.now().date()
                 ).count()
 
                 if variations_today > 0:
-                    messages.success(
-                        request,
+                    response_message = (
                         f'🎉 Document validé avec succès! Le produit "{product.name}" a été mis à jour avec {variations_today} nouvelle(s) variation(s). '
                         f'Consultez l\'onglet "Variations" pour voir les changements.'
                     )
+                    messages.success(request, response_message)
                 else:
-                    messages.success(
-                        request,
+                    response_message = (
                         f'🎉 Document validé avec succès! Le produit "{product.name}" a été créé dans le module client.'
                     )
+                    messages.success(request, response_message)
             else:
                 debug_info = debug_annotations_for_product(document)
-                messages.warning(
-                    request,
-                    f'⚠️ Document validé mais aucun produit créé. '
-                    f'Détails: {debug_info}'
+                response_message = (
+                    f'⚠️ Document validé mais aucun produit créé. Détails: {debug_info}'
                 )
+                messages.warning(request, response_message)
+
+            # Si appel AJAX, renvoyer JSON au lieu de rediriger
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': response_message})
 
             return redirect('expert:dashboard')
 
         except Exception as e:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': str(e)}, status=500)
             messages.error(request, f'❌ Erreur lors de la validation: {str(e)}')
             return redirect('expert:review_document', document_id=document_id)
 

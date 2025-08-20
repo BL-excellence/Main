@@ -952,12 +952,9 @@ body {
 
       <div class="expert-controls">
         <!-- Validation du document complet -->
-        <form method="POST" action="{% url 'expert:validate_document' document.id %}" style="display: inline;" onsubmit="return handleValidation(event)">
-          {% csrf_token %}
-          <button type="submit" class="btn-validate">
-            <i class="fas fa-check-circle"></i> Valider Document
-          </button>
-        </form>
+        <button type="button" class="btn-validate" onclick="validateWholeDocument(this)">
+          <i class="fas fa-check-circle"></i> Valider Document
+        </button>
       </div>
     </div>
 
@@ -1672,19 +1669,52 @@ function clearExistingHighlights() {
     }
 }
 
-// Handle document validation with automatic success message
-function handleValidation(event) {
-    // Don't prevent the form submission, just add success handling
-    const form = event.target;
-    
-    // Show loading state
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validation en cours...';
-    submitBtn.disabled = true;
-    
-    // Let the form submit normally, success message will be handled by Django messages
-    return true;
+// Validation du document via AJAX avec notification, sans quitter la page
+function validateWholeDocument(btn) {
+    const csrfToken = (document.querySelector('[name=csrfmiddlewaretoken]')?.value || '');
+    const url = '{% url "expert:validate_document" document.id %}';
+
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validation en cours...';
+    btn.disabled = true;
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+    })
+    .then(async (response) => {
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`HTTP ${response.status}: ${text.substring(0,200)}`);
+        }
+        if (!contentType.includes('application/json')) {
+            const text = await response.text();
+            // Si backend renvoie une redirection HTML, considérer comme succès visuel
+            showSuccessNotification('✅ Document validé');
+            return { success: true, message: 'Document validé' };
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showSuccessNotification('✅ ' + (data.message || 'Document validé'));
+        } else {
+            showErrorNotification('❌ ' + (data.error || 'Erreur inconnue'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showErrorNotification('❌ Erreur: ' + err.message);
+    })
+    .finally(() => {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    });
 }
 
 // Check for success messages and show automatic popup
