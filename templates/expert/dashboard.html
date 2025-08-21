@@ -183,23 +183,25 @@
     }
 
     /* Table documents style ligne */
-    .annotation-table {
+    .annotation-table, .review-table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         margin-top: 1.5rem;
         background: var(--card-bg);
         border-radius: 14px;
         overflow: hidden;
         box-shadow: 0 2px 6px rgba(14, 165, 233, 0.04);
     }
-    .annotation-table th, .annotation-table td {
-        padding: 1rem 1.2rem;
+    .annotation-table th, .annotation-table td,
+    .review-table th, .review-table td {
+        padding: 1.2rem 1.5rem;
         text-align: left;
         border-bottom: 1px solid rgba(14, 165, 233, 0.06);
         font-size: 0.95rem;
         vertical-align: middle;
     }
-    .annotation-table th {
+    .annotation-table th, .review-table th {
         background: rgba(14, 165, 233, 0.08);
         font-weight: 600;
         color: var(--text-secondary);
@@ -207,14 +209,17 @@
         letter-spacing: 0.03em;
         font-size: 0.85rem;
     }
-    .annotation-table tr:hover td {
+    .annotation-table tr:hover td,
+    .review-table tr:hover td {
         background: var(--hover-bg);
         transition: all 0.2s;
     }
-    .annotation-table .action-cell {
+    .annotation-table .action-cell,
+    .review-table .action-cell {
         min-width: 130px;
     }
-    .annotation-table .action-btn {
+    .annotation-table .action-btn,
+    .review-table .action-btn {
         padding: 0.5rem 1rem;
         font-size: 0.95em;
         border-radius: 8px;
@@ -228,14 +233,31 @@
         align-items: center;
         gap: 0.35em;
     }
-    .annotation-table .action-btn:hover {
+    .annotation-table .action-btn:hover,
+    .review-table .action-btn:hover {
         box-shadow: 0 2px 12px rgba(14, 165, 233, 0.15);
         transform: translateY(-2px);
     }
-    .annotation-table .date {
+    .annotation-table .date,
+    .review-table .date {
         font-size: 0.92em;
         color: var(--text-secondary);
         white-space: nowrap;
+    }
+    
+    /* Style spécifique pour les tables de révision */
+    .review-table tr {
+        transition: all 0.3s ease;
+    }
+    .review-table tr:not(:last-child) td {
+        border-bottom: 1px solid rgba(14, 165, 233, 0.1);
+    }
+    .review-table td {
+        padding: 1.4rem 1.5rem;
+    }
+    .review-table th {
+        padding: 1.2rem 1.5rem;
+        background: rgba(14, 165, 233, 0.1);
     }
     .annotation-table .font-medium {
         font-weight: 500;
