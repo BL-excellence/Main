@@ -9,6 +9,12 @@
 {% endblock %}
 
 {% block content %}
+<script>
+window.ALL_FIELDS_DATA = {{ all_fields|safe }};
+window.allFields = {{ all_fields|safe }};
+window.filterOptions = {{ filter_options|safe }};
+</script>
+
 <div class="matrix-builder">
     <div class="builder-header">
         <h1 class="builder-title">
@@ -21,33 +27,50 @@
     </div>
 
     <div class="builder-grid">
-    <div class="column-selector">
-        <!-- Dynamic fields will be loaded by JavaScript -->
-        <div class="selector-section">
-            <div class="selector-title">
-                <i class="material-icons">view_column</i>
-                Tous les Champs Disponibles
-                <span class="field-count">{{ all_fields|length }} champs</span>
-            </div>
-            
-            <!-- All fields in one container -->
-            <div class="unified-field-list">
-                {% for field in all_fields %}
-                <div class="field-item" 
-                    data-field="{{ field.name }}" 
-                    data-type="{{ field.type }}"
-                    data-count="{{ field.data_count }}">
-                    <div class="field-icon {{ field.type }}">
-                        <i class="material-icons">{{ field.icon }}</i>
-                    </div>
-                    <div class="field-info">
-                        <div class="field-name">{{ field.label }}</div>
-                        <div class="field-description">{{ field.description }}</div>
+        <div class="column-selector">
+            <!-- Smart Search -->
+            <div class="search-container">
+                <div class="search-header">
+                    <h3><i class="material-icons">search</i>Smart Field Search</h3>
+                    <p class="search-subtitle">{{ all_fields|length }} fields available</p>
+                </div>
+                
+                <div class="search-input-container">
+                    <input type="text" id="field-search" placeholder="Search fields... (e.g. 'product name')" autocomplete="off"/>
+                    <i class="material-icons search-icon">search</i>
+                </div>
+                
+                <div id="search-results" class="search-results">
+                    <div class="search-empty">
+                        <i class="material-icons">lightbulb</i>
+                        <p>Start typing to search through all available fields</p>
                     </div>
                 </div>
-                {% empty %}
-                <p>Aucun champ disponible</p>
-                {% endfor %}
+            </div>
+
+            <div class="selector-section" style="display: none;">
+                <div class="selector-title">
+                    <i class="material-icons">view_column</i>
+                    Tous les Champs Disponibles
+                    <span class="field-count">{{ all_fields|length }} champs</span>
+                </div>
+                
+                <div class="unified-field-list">
+                    {% for field in all_fields %}
+                    <div class="field-item" 
+                        data-field="{{ field.name }}" 
+                        data-type="{{ field.type }}"
+                        data-count="{{ field.data_count }}">
+                        <div class="field-icon {{ field.type }}">
+                            <i class="material-icons">label</i>
+                        </div>
+                        <div class="field-info">
+                            <div class="field-name">{{ field.label }}</div>
+                            <div class="field-description">{{ field.description }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
         
@@ -58,7 +81,6 @@
                 <span class="filter-count" id="filter-count">0 filtres</span>
             </div>
             
-            <!-- Time Period Filter (always visible) -->
             <div class="filter-group">
                 <label>📅 Période</label>
                 <select name="period" class="filter-select">
@@ -69,10 +91,8 @@
                 </select>
             </div>
             
-            <!-- Dynamic filters will be added here by JavaScript -->
             <div id="column-specific-filters"></div>
             
-            <!-- Clear Filters Button -->
             <button class="btn btn-secondary" id="clear-filters" style="display: none;">
                 <i class="material-icons">clear_all</i>
                 Effacer Filtres
@@ -81,7 +101,6 @@
     </div>
     
     <div class="matrix-preview">
-        <!-- Matrix preview will be loaded by JavaScript -->
         <div class="preview-header">
             <div class="preview-title">
                 <i class="material-icons">table_chart</i>
@@ -104,27 +123,100 @@
         </div>
     </div>
 </div>
-<!-- CSRF Token -->
 {% csrf_token %}
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    window.allFields = {{ all_fields|safe }};
-    
-    console.log('🚀 All fields loaded from Django:', window.allFields);
-    
-    window.filterOptions = {{ filter_options|safe }};
-    window.annotationFields = {{ all_fields|safe }}.filter(f => f.type === 'annotation');
-    window.productFields = {{ all_fields|safe }}.filter(f => f.type === 'product');
-    window.documentFields = {{ all_fields|safe }}.filter(f => f.type === 'document');
-    
-    // Debug check
-    if (!window.allFields || window.allFields.length === 0) {
-        console.error('❌ No fields loaded!');
-    } else {
-        console.log(`✅ ${window.allFields.length} fields loaded successfully`);
-    }
-</script>
 <script src="{% static 'js/reports.js' %}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('field-search');
+    const searchResults = document.getElementById('search-results');
+    const allFields = window.ALL_FIELDS_DATA || [];
+    
+    function performSearch(query) {
+        if (!query || query.length < 2) {
+            searchResults.innerHTML = `
+                <div class="search-empty">
+                    <i class="material-icons">lightbulb</i>
+                    <p>Start typing to search through all available fields</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const matches = allFields.filter(field => 
+            field.label.toLowerCase().includes(query.toLowerCase()) ||
+            field.name.toLowerCase().includes(query.toLowerCase()) ||
+            field.description.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        if (matches.length === 0) {
+            searchResults.innerHTML = `
+                <div class="search-empty">
+                    <i class="material-icons">search_off</i>
+                    <p>No fields found for "${query}"</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const resultsHtml = matches.map(field => `
+            <div class="field-item search-result" 
+                 data-field="${field.name}" 
+                 data-type="${field.type}">
+                <div class="field-icon ${field.type}">
+                    <i class="material-icons">label</i>
+                </div>
+                <div class="field-info">
+                    <div class="field-name">${field.label}</div>
+                    <div class="field-description">${field.description}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        searchResults.innerHTML = resultsHtml;
+        
+        // Add click listeners to search results
+        document.querySelectorAll('.search-result').forEach(item => {
+            item.addEventListener('click', function() {
+                const fieldName = this.dataset.field;
+                const fieldType = this.dataset.type;
+                
+                // Find the corresponding hidden field and click it
+                const hiddenField = document.querySelector(`.unified-field-list .field-item[data-field="${fieldName}"]`);
+                if (hiddenField) {
+                    hiddenField.click();
+                }
+                
+                // Clear search
+                searchInput.value = '';
+                performSearch('');
+            });
+        });
+    } // This closing brace was missing
+    
+    searchInput.addEventListener('input', function(e) {
+        performSearch(e.target.value.trim());
+    });
+    
+    // X button handler
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove') && e.target.closest('.column-chip')) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const chip = e.target.closest('.column-chip');
+            const fieldName = chip.dataset.field;
+            
+            // Find the field item and simulate clicking it to remove
+            const fieldItem = document.querySelector(`.unified-field-list .field-item[data-field="${fieldName}"]`);
+            if (fieldItem) {
+                fieldItem.click();
+            }
+        }
+    });
+});
+</script>
 {% endblock %}

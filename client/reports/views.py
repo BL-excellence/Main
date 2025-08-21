@@ -10,6 +10,8 @@ import json
 import csv
 from client.products.models import Product, ManufacturingSite, ProductSpecification, ProductVariation
 import io
+from pymongo import MongoClient
+from django.conf import settings
 import uuid
 from django.views.decorators.csrf import csrf_exempt
 import time
@@ -22,6 +24,146 @@ from expert.models import ExpertLog
 
 def is_client(user):
     return user.groups.filter(name="Client").exists()
+
+MONGO_URI = getattr(settings, "MONGO_URI", "mongodb://localhost:27017/")
+MONGO_DB = getattr(settings, "MONGO_DB", "annotations_db")
+MONGO_COLLECTION = getattr(settings, "MONGO_COLLECTION", "documents")
+
+mongo_client = MongoClient(MONGO_URI)
+mongo_db = mongo_client[MONGO_DB]
+mongo_collection = mongo_db[MONGO_COLLECTION]
+
+def get_all_dynamic_fields():
+    """
+    🚀 PRODUCTION-READY: Discover ALL fields dynamically - FIXED VERSION
+    """
+    all_fields = []
+    
+    # === 1. PRODUCT MODEL FIELDS (SQL) - FIXED ===
+    try:
+        if Product.objects.exists():
+            for field in Product._meta.get_fields():
+                if (hasattr(field, 'get_internal_type') and 
+                    field.get_internal_type() in ['CharField', 'TextField', 'IntegerField'] and
+                    not field.many_to_many and not field.one_to_many):
+                    
+                    try:
+                        # Use values_list to avoid date validation issues
+                        count = Product.objects.exclude(**{f'{field.name}__isnull': True}).exclude(**{f'{field.name}': ''}).count()
+                        
+                        if count > 0:
+                            all_fields.append({
+                                'name': f'product_{field.name}',
+                                'label': field.verbose_name or field.name.replace("_", " ").title(),
+                                'description': f'{count} products with data',
+                                'type': 'product',
+                                'source': 'sql_product',
+                                'data_count': count
+                            })
+                    except Exception as field_error:
+                        print(f"⚠️ Skipping Product field {field.name}: {field_error}")
+                        continue
+                        
+    except Exception as e:
+        print(f"❌ Error discovering Product fields: {e}")
+    
+    # === 2. RAWDOCUMENT MODEL FIELDS (SQL) - FIXED ===
+    try:
+        if RawDocument.objects.exists():
+            for field in RawDocument._meta.get_fields():
+                if (hasattr(field, 'get_internal_type') and 
+                    field.get_internal_type() in ['CharField', 'TextField'] and
+                    not field.many_to_many and not field.one_to_many):
+                    
+                    try:
+                        count = RawDocument.objects.exclude(**{f'{field.name}__isnull': True}).exclude(**{f'{field.name}': ''}).count()
+                        
+                        if count > 0:
+                            all_fields.append({
+                                'name': f'document_{field.name}',
+                                'label': field.verbose_name or field.name.replace("_", " ").title(),
+                                'description': f'{count} documents with data',
+                                'type': 'document',
+                                'source': 'sql_document',
+                                'data_count': count
+                            })
+                    except Exception as field_error:
+                        print(f"⚠️ Skipping Document field {field.name}: {field_error}")
+                        continue
+                        
+    except Exception as e:
+        print(f"❌ Error discovering RawDocument fields: {e}")
+    
+    # === 3. MONGODB ENTITIES (Dynamic annotations) ===
+    try:
+        # Get all unique entity types from MongoDB
+        pipeline = [
+            {"$match": {"entities": {"$exists": True}}},
+            {"$project": {"entities": {"$objectToArray": "$entities"}}},
+            {"$unwind": "$entities"},
+            {"$group": {
+                "_id": "$entities.k",
+                "count": {"$sum": 1}
+            }}
+        ]
+        
+        entity_stats = list(mongo_collection.aggregate(pipeline))
+        
+        for entity in entity_stats:
+            entity_name = entity['_id']
+            count = entity['count']
+            
+            if entity_name and count > 0:
+                all_fields.append({
+                    'name': f'entity_{entity_name.lower().replace(" ", "_")}',
+                    'label': entity_name,
+                    'description': f'{count} documents with {entity_name}',
+                    'type': 'entity',
+                    'source': 'mongodb_entity',
+                    'data_count': count
+                })
+                
+        print(f"✅ Found {len(entity_stats)} MongoDB entities")
+                
+    except Exception as e:
+        print(f"❌ Error discovering MongoDB entities: {e}")
+    
+    # === 4. MONGODB METADATA (Dynamic fields) ===
+    try:
+        # Get all unique metadata fields
+        pipeline = [
+            {"$match": {"metadata": {"$exists": True}}},
+            {"$project": {"metadata": {"$objectToArray": "$metadata"}}},
+            {"$unwind": "$metadata"},
+            {"$group": {
+                "_id": "$metadata.k",
+                "count": {"$sum": 1}
+            }}
+        ]
+        
+        metadata_stats = list(mongo_collection.aggregate(pipeline))
+        
+        for metadata in metadata_stats:
+            field_name = metadata['_id']
+            count = metadata['count']
+            
+            if field_name and count > 0 and field_name not in ['_id', 'document_id']:
+                all_fields.append({
+                    'name': f'metadata_{field_name}',
+                    'label': field_name.replace("_", " ").title(),
+                    'description': f'{count} documents with {field_name}',
+                    'type': 'metadata',
+                    'source': 'mongodb_metadata',
+                    'data_count': count
+                })
+                
+        print(f"✅ Found {len(metadata_stats)} MongoDB metadata fields")
+                
+    except Exception as e:
+        print(f"❌ Error discovering MongoDB metadata: {e}")
+    
+    print(f"🎯 Discovered {len(all_fields)} dynamic fields total")
+    return all_fields
 
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_client)
@@ -325,22 +467,19 @@ def reports_create(request):
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_client)
 def matrix_builder(request):
+    # Get all fields - use your new dynamic function
+    all_fields = get_all_dynamic_fields()
     
-    # Get all fields at once - no separate calls
-    product_fields = get_populated_product_fields() 
-    document_fields = get_populated_document_fields()
-    
-    # Combine all fields into one list
-    all_fields = product_fields + document_fields
-    
+    # Get filter options using the working function
     filter_options = get_real_filter_options()
     
     context = {
-        'all_fields': all_fields,  # One unified list
+        'all_fields': all_fields,
         'filter_options': filter_options,
     }
     
     return render(request, 'client/reports/matrix_builder.html', context)
+
 
 def get_real_filter_options():
     """Generate filter options with EXACT field name matching - SIMPLE"""
@@ -773,16 +912,10 @@ def generate_matrix_data_simple(columns: List[Dict], filters: Dict, user: User) 
     
     print(f"📊 Detection: {len(annotation_columns)} annotations, {len(product_columns)} products, {len(document_columns)} documents")
     
-    if len(annotation_columns) > 0:
-        print("📊 Using annotation-based approach (documents with annotations)")
-        rows = generate_annotation_rows(columns, filters)
-    elif len(product_columns) > 0:
-        print("📊 Using product-based approach")
-        rows = generate_product_rows(columns, filters)
-    else:
-        print("📊 Using document-based approach")
-        rows = generate_document_rows(columns, filters)
-    
+    # Use unified approach for all data sources
+    print("Using unified approach for all data sources")
+    rows = generate_unified_rows(columns, filters)
+
     generation_time = time.time() - start_time
     print(f"✅ Matrix generated: {len(rows)} rows in {generation_time:.2f}s")
     
@@ -794,133 +927,89 @@ def generate_matrix_data_simple(columns: List[Dict], filters: Dict, user: User) 
         'timestamp': timezone.now().isoformat(),
         'filters_applied': filters,
     }
-
-def generate_annotation_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
-    """Generate rows for annotation-based queries - only show documents that have the selected annotations"""
+def generate_unified_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
+    """Single function to generate rows from any data source"""
     
-    # Find which annotation types are selected
-    selected_annotation_types = []
-    for col in columns:
-        if col.get('source_type') == 'annotation':
-            selected_annotation_types.append(col.get('name'))
+    rows = []
     
-    print(f"📝 Looking for documents with these annotation types: {selected_annotation_types}")
+    # Determine if we have product columns
+    has_product_columns = any(
+        col.get('source') == 'sql_product' or col.get('name', '').startswith('product_') 
+        for col in columns
+    )
     
-    # Get documents that have these annotation types
-    if selected_annotation_types:
-        documents_with_annotations = RawDocument.objects.filter(
-            pages__annotations__annotation_type__name__in=selected_annotation_types,
-            pages__annotations__validation_status__in=['validated', 'expert_created'],
-            is_validated=True
-        ).distinct()
+    if has_product_columns:
+        # Use products as base to avoid duplicates
+        products = Product.objects.all()
+        products = apply_filters_dynamically(products, Product, filters)
         
-        # Apply additional filters
         if filters.get('period'):
-            period = filters['period']
-            if period == '7d':
-                start_date = timezone.now() - timedelta(days=7)
-            elif period == '30d':
-                start_date = timezone.now() - timedelta(days=30)
-            elif period == '90d':
-                start_date = timezone.now() - timedelta(days=90)
-            else:
-                start_date = timezone.now() - timedelta(days=30)
+            products = apply_period_filter(products, filters['period'])
+        
+        products = products[:20]
+        
+        for product in products:
+            row_data = {}
+            has_data = False
             
-            documents_with_annotations = documents_with_annotations.filter(created_at__gte=start_date)
-        
-        # Limit to documents that actually have data
-        documents = documents_with_annotations[:10]
-        
-        print(f"📄 Found {documents.count()} documents with selected annotations")
+            for column in columns:
+                field_name = column.get('name', '')
+                source = column.get('source', '')
+                
+                try:
+                    if source == 'sql_product' or field_name.startswith('product_'):
+                        value = get_field_value_dynamically(product, field_name)
+                    else:
+                        # For non-product fields, try to get from related document
+                        document = getattr(product, 'source_document', None)
+                        if document:
+                            value = get_field_value_dynamically(document, field_name)
+                        else:
+                            value = ''
+                    
+                    if value and value not in ['', 'Field not found', 'None', 'No data', 'Error', '—']:
+                        has_data = True
+                    
+                    row_data[field_name] = str(value)
+                    
+                except Exception as e:
+                    row_data[field_name] = f"Error: {str(e)}"
+            
+            if has_data:
+                rows.append(row_data)
     else:
-        # Fallback to all validated documents
-        documents = RawDocument.objects.filter(is_validated=True)[:10]
-    
-    rows = []
-    for document in documents:
-        row_data = {}
-        has_data = False
+        # Use documents as base for non-product queries
+        base_documents = RawDocument.objects.filter(is_validated=True)
+        base_documents = apply_filters_dynamically(base_documents, RawDocument, filters)
         
-        for column in columns:
-            try:
-                value = generate_column_value_simple(column, document)
-                if value and value not in ["", "N/A", "Error"]:
-                    has_data = True
-                row_data[column['name']] = value
-            except Exception as e:
-                row_data[column['name']] = "Error"
+        if filters.get('period'):
+            base_documents = apply_period_filter(base_documents, filters['period'])
         
-        # Only add rows that have some actual data
-        if has_data:
-            rows.append(row_data)
+        base_documents = base_documents.order_by('-created_at')[:20]
+        
+        for document in base_documents:
+            row_data = {}
+            has_data = False
+            
+            for column in columns:
+                field_name = column.get('name', '')
+                
+                try:
+                    value = get_field_value_dynamically(document, field_name)
+                    
+                    if value and value not in ['', 'Field not found', 'None', 'No data', 'Error', '—']:
+                        has_data = True
+                    
+                    row_data[field_name] = str(value)
+                    
+                except Exception as e:
+                    row_data[field_name] = f"Error: {str(e)}"
+            
+            if has_data:
+                rows.append(row_data)
     
     return rows
 
-def generate_product_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
-    """Generate rows starting from products - COMPLETELY DYNAMIC"""
-    
-    # Start with all products
-    products = Product.objects.all()
-    
-    # Apply filters dynamically - NO HARDCODING
-    products = apply_filters_dynamically(products, Product, filters)
-    
-    # Handle period filter separately (applies to created_at)
-    if filters.get('period'):
-        products = apply_period_filter(products, filters['period'])
-    
-    # Limit results
-    products = products[:10]
-    
-    print(f"🏭 Final filtered products count: {products.count()}")
-    
-    # Generate rows (this part stays the same)
-    rows = []
-    for product in products:
-        row_data = {}
-        for column in columns:
-            field_name = column.get('name', '')
-            try:
-                value = get_field_value_dynamically(product, field_name)
-                row_data[field_name] = str(value)
-            except Exception as e:
-                row_data[field_name] = f"Error: {str(e)}"
-        rows.append(row_data)
-    
-    return rows
-
-def generate_document_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
-    """Generate rows starting from documents - COMPLETELY DYNAMIC"""
-    
-    # Start with all documents
-    documents = RawDocument.objects.filter(is_validated=True)
-    
-    # Apply filters dynamically - NO HARDCODING
-    documents = apply_filters_dynamically(documents, RawDocument, filters)
-    
-    # Handle period filter
-    if filters.get('period'):
-        documents = apply_period_filter(documents, filters['period'])
-    
-    # Limit results
-    documents = documents.order_by('-created_at')[:10]
-    
-    print(f"📄 Final filtered documents count: {documents.count()}")
-    
-    # Generate rows dynamically
-    rows = []
-    for document in documents:
-        row_data = {}
-        for column in columns:
-            field_name = column.get('name', '')
-            try:
-                value = get_field_value_dynamically(document, field_name)
-                row_data[field_name] = str(value)
-            except Exception as e:
-                row_data[field_name] = f"Error: {str(e)}"
-        rows.append(row_data)
-    
-    return rows
 def apply_period_filter(queryset, period):
     """Apply period filter dynamically"""
     period_days = {
@@ -932,57 +1021,78 @@ def apply_period_filter(queryset, period):
     return queryset.filter(created_at__gte=start_date)
 
 def get_field_value_dynamically(obj, field_name):
-    """Get field value from any object dynamically - ZERO HARDCODING"""
+    """Get field value from any object - handles all sources"""
     
-    # SPECIAL HANDLING for sites field
-    if field_name == 'sites' and hasattr(obj, 'sites'):
-        sites = obj.sites.all()
-        if sites.exists():
-            # Get site names, not object references
-            site_names = []
-            for site in sites[:3]:  # Limit to 3 sites
-                if hasattr(site, 'site_name') and site.site_name:
-                    site_names.append(str(site.site_name))
-                else:
-                    site_names.append(f"Site #{site.id}")
-            return '; '.join(site_names) if site_names else "No site names"
-        else:
-            return "No manufacturing sites"
-    
-    # Try direct attribute access
-    if hasattr(obj, field_name):
-        value = getattr(obj, field_name)
-        if value is not None:
+    try:
+        # Handle MongoDB entities (from your MongoDB collection)
+        if field_name.startswith('entity_') or field_name.startswith('metadata_'):
+            # For MongoDB fields, we need to query MongoDB directly
+            if hasattr(obj, 'id'):
+                doc_data = mongo_collection.find_one({"document_id": str(obj.id)})
+                if doc_data:
+                    if field_name.startswith('entity_'):
+                        entity_key = field_name.replace('entity_', '').replace('_', ' ').title()
+                        entities = doc_data.get('entities', {})
+                        if entity_key in entities:
+                            values = entities[entity_key]
+                            return ', '.join(values) if isinstance(values, list) else str(values)
+                    
+                    elif field_name.startswith('metadata_'):
+                        metadata_key = field_name.replace('metadata_', '')
+                        metadata = doc_data.get('metadata', {})
+                        return str(metadata.get(metadata_key, ''))
+            
+            return '—'
+        
+        # Clean field name for SQL fields
+        clean_field_name = field_name
+        if field_name.startswith('product_'):
+            clean_field_name = field_name.replace('product_', '')
+        elif field_name.startswith('document_'):
+            clean_field_name = field_name.replace('document_', '')
+        
+        # Try direct attribute access
+        if hasattr(obj, clean_field_name):
+            value = getattr(obj, clean_field_name)
+            
+            if value is None:
+                return ''
+            
             # Handle datetime fields
             if hasattr(value, 'strftime'):
                 return value.strftime('%d/%m/%Y')
-            return str(value)
-    
-    # Handle additional_ prefixed fields
-    if field_name.startswith('additional_') and hasattr(obj, 'additional_annotations'):
-        annotation_key = field_name.replace('additional_', '')
-        return obj.additional_annotations.get(annotation_key, 'No data')
-    
-    # Handle other related fields (but NOT sites - we handled that above)
-    if hasattr(obj, field_name) and field_name != 'sites':
-        related_obj = getattr(obj, field_name)
-        if hasattr(related_obj, 'all'):  # QuerySet
-            items = related_obj.all()[:3]
-            # Try to get meaningful string representation
-            item_strs = []
-            for item in items:
-                if hasattr(item, 'name'):
-                    item_strs.append(str(item.name))
-                elif hasattr(item, 'title'):
-                    item_strs.append(str(item.title))
-                elif hasattr(item, '__str__'):
-                    item_strs.append(str(item))
+            
+            # Handle QuerySet/Manager (relationships)
+            if hasattr(value, 'all'):
+                related_items = value.all()[:3]
+                if related_items.exists():
+                    item_strings = []
+                    for item in related_items:
+                        for name_field in ['name', 'title', 'site_name', 'label', 'display_name']:
+                            if hasattr(item, name_field):
+                                field_value = getattr(item, name_field)
+                                if field_value:
+                                    item_strings.append(str(field_value))
+                                    break
+                        else:
+                            item_strings.append(str(item))
+                    
+                    return '; '.join(item_strings) if item_strings else 'None'
                 else:
-                    item_strs.append(f"Item #{item.id}")
-            return '; '.join(item_strs) if item_strs else "No items"
-        return str(related_obj)
-    
-    return 'Field not found'
+                    return 'None'
+            
+            return str(value)
+        
+        # Handle JSONField lookups
+        if field_name.startswith('additional_') and hasattr(obj, 'additional_annotations'):
+            annotation_key = field_name.replace('additional_', '')
+            if obj.additional_annotations and isinstance(obj.additional_annotations, dict):
+                return str(obj.additional_annotations.get(annotation_key, ''))
+        
+        return 'Field not found'
+        
+    except Exception as e:
+        return f'Error: {str(e)}'
 
 def build_base_queryset_simple(filters: Dict):
     """Build the base queryset based on filter values - SUPPORTS ALL FILTERS"""
