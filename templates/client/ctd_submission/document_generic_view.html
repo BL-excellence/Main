@@ -1,0 +1,692 @@
+<!-- Chemin d'intégration : templates/ctd_submission/document_generic_view.html -->
+<!-- Template générique pour afficher un document dans son état brut original -->
+
+{% extends 'client/ctd_submission/base.html' %}
+
+{% block title %}Voir Document - {{ document.name }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'ctd_submission:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'ctd_submission:submission_detail' document.submission.id %}">{{ document.submission.name }}</a>
+        </li>
+        <li class="breadcrumb-item active">Voir - {{ document.name }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<!-- En-tête du document -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h4 mb-1">
+                    <i class="fas fa-file text-secondary me-2"></i>
+                    {{ document.name }}
+                </h1>
+                <p class="text-muted mb-0">
+                    {% if document.section %}
+                        {{ document.section.module.code }}.{{ document.section.code }} - {{ document.section.name }}
+                    {% else %}
+                        Document non classifié
+                    {% endif %}
+                </p>
+                <small class="badge bg-info">{{ document.get_document_type_display }}</small>
+            </div>
+            <div class="btn-group">
+                <a href="{% url 'ctd_submission:document_template' document.id %}" class="btn btn-primary">
+                    <i class="fas fa-edit me-2"></i>Modifier (Template)
+                </a>
+                {% if document.file %}
+                <a href="{% url 'ctd_submission:document_download' document.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-download me-2"></i>Télécharger
+                </a>
+                {% endif %}
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="analyzeDocument({{ document.id }})">
+                            <i class="fas fa-brain me-2"></i>Analyser avec IA
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="extractContent({{ document.id }})">
+                            <i class="fas fa-extract me-2"></i>Extraire contenu
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="generateTemplate({{ document.id }})">
+                            <i class="fas fa-magic me-2"></i>Générer template
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" onclick="editMetadata({{ document.id }})">
+                            <i class="fas fa-edit me-2"></i>Modifier métadonnées
+                        </a></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteDocument({{ document.id }})">
+                            <i class="fas fa-trash me-2"></i>Supprimer
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <small class="text-muted">
+            Créé le {{ document.created_at|date:"d M Y à H:i" }}<br>
+            {% if document.file %}
+                Taille: {{ document.file.size|filesizeformat }}<br>
+            {% endif %}
+            {% if document.updated_at != document.created_at %}
+                Modifié le {{ document.updated_at|date:"d M Y à H:i" }}
+            {% endif %}
+        </small>
+    </div>
+</div>
+
+<!-- Alertes et statuts -->
+<div class="row mb-4">
+    <!-- Analyse IA -->
+    {% if document.ai_analysis %}
+    <div class="col-12 mb-3">
+        <div class="alert alert-info">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h6 class="alert-heading mb-1">
+                        <i class="fas fa-brain me-2"></i>Analyse IA disponible
+                    </h6>
+                    <p class="mb-0">
+                        Classification suggérée: <strong>{{ document.ai_analysis.suggested_module.code }}.{{ document.ai_analysis.suggested_section.code }}</strong>
+                        - {{ document.ai_analysis.suggested_section.name }}
+                    </p>
+                    {% if document.ai_analysis.keywords_found %}
+                        <small class="text-muted">
+                            Mots-clés trouvés: 
+                            {% for keyword in document.ai_analysis.keywords_found %}
+                                <span class="badge bg-light text-dark">{{ keyword }}</span>
+                            {% endfor %}
+                        </small>
+                    {% endif %}
+                </div>
+                <div class="col-md-4 text-end">
+                    <span class="badge bg-{% if document.ai_analysis.confidence_score >= 0.8 %}success{% elif document.ai_analysis.confidence_score >= 0.6 %}warning{% else %}danger{% endif %} fs-6">
+                        Confiance: {{ document.ai_analysis.confidence_score|floatformat:0 }}%
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Template disponible -->
+    {% if document.is_template_generated %}
+    <div class="col-12 mb-3">
+        <div class="alert alert-success">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h6 class="alert-heading mb-1">
+                        <i class="fas fa-check-circle me-2"></i>Template généré
+                    </h6>
+                    <p class="mb-0">
+                        Ce document dispose d'un formulaire modifiable. Vous pouvez le modifier et les changements seront synchronisés automatiquement.
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="{% url 'ctd_submission:document_template' document.id %}" class="btn btn-success btn-sm">
+                        <i class="fas fa-edit me-1"></i>Modifier Template
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Document non classifié -->
+    {% if not document.section %}
+    <div class="col-12 mb-3">
+        <div class="alert alert-warning">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h6 class="alert-heading mb-1">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Document non classifié
+                    </h6>
+                    <p class="mb-0">
+                        Ce document n'a pas encore été assigné à une section CTD. Utilisez l'analyse IA pour obtenir une suggestion automatique.
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button class="btn btn-warning btn-sm" onclick="suggestClassification({{ document.id }})">
+                        <i class="fas fa-magic me-1"></i>Suggérer Section
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Contenu principal -->
+<div class="row">
+    <!-- Contenu du document -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-file-alt me-2"></i>
+                    Contenu du document
+                </h5>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary active" onclick="showViewMode('content')">
+                        <i class="fas fa-align-left me-1"></i>Contenu
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="showViewMode('metadata')">
+                        <i class="fas fa-info-circle me-1"></i>Métadonnées
+                    </button>
+                    {% if document.template_data %}
+                    <button class="btn btn-outline-secondary" onclick="showViewMode('template-data')">
+                        <i class="fas fa-edit me-1"></i>Template Data
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                
+                <!-- Vue Contenu -->
+                <div id="content-view">
+                    {% if content %}
+                        {% if content.extracted %}
+                            <div class="document-content">
+                                {% if content.text %}
+                                    <div class="content-text border rounded p-3 bg-light" style="max-height: 500px; overflow-y: auto;">
+                                        <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ content.text }}</pre>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-file-alt text-muted fa-2x mb-2"></i>
+                                        <p class="text-muted">Contenu extrait mais aucun texte détecté</p>
+                                    </div>
+                                {% endif %}
+                                
+                                <!-- Statistiques -->
+                                <div class="mt-3 p-3 bg-light rounded">
+                                    <div class="row text-center">
+                                        <div class="col-md-4">
+                                            <h6 class="text-primary mb-1">{{ content.text|length|default:0 }}</h6>
+                                            <small class="text-muted">Caractères</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6 class="text-primary mb-1">{{ content.text|wordcount|default:0 }}</h6>
+                                            <small class="text-muted">Mots</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6 class="{% if content.extracted %}text-success{% else %}text-warning{% endif %} mb-1">
+                                                <i class="fas fa-{% if content.extracted %}check-circle{% else %}exclamation-triangle{% endif %}"></i>
+                                            </h6>
+                                            <small>{% if content.extracted %}Extrait{% else %}Partiel{% endif %}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <!-- Contenu non extrait -->
+                            <div class="text-center py-5">
+                                <i class="fas fa-file text-muted fa-3x mb-3"></i>
+                                <h5 class="text-muted">Contenu non extrait</h5>
+                                <p class="text-muted mb-3">
+                                    {% if content.note %}
+                                        {{ content.note }}
+                                    {% elif content.error %}
+                                        Erreur: {{ content.error }}
+                                    {% else %}
+                                        Le contenu de ce document n'a pas encore été extrait.
+                                    {% endif %}
+                                </p>
+                                <button class="btn btn-primary" onclick="extractContent({{ document.id }})">
+                                    <i class="fas fa-extract me-2"></i>Extraire le contenu maintenant
+                                </button>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <!-- Aucun contenu -->
+                        <div class="text-center py-5">
+                            <i class="fas fa-file text-muted fa-3x mb-3"></i>
+                            <h5 class="text-muted">Aucun contenu disponible</h5>
+                            <p class="text-muted mb-3">
+                                {% if document.file %}
+                                    Ce document n'a pas encore été traité.
+                                {% else %}
+                                    Ce document ne contient pas de fichier.
+                                {% endif %}
+                            </p>
+                            {% if document.file %}
+                            <button class="btn btn-primary" onclick="extractContent({{ document.id }})">
+                                <i class="fas fa-extract me-2"></i>Extraire le contenu
+                            </button>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Vue Métadonnées -->
+                <div id="metadata-view" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <tr>
+                                <th style="width: 30%;">Nom du fichier</th>
+                                <td>{{ document.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Type de document</th>
+                                <td>
+                                    <span class="badge bg-secondary">{{ document.get_document_type_display }}</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Soumission</th>
+                                <td>
+                                    <a href="{% url 'ctd_submission:submission_detail' document.submission.id %}">
+                                        {{ document.submission.name }}
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Section CTD</th>
+                                <td>
+                                    {% if document.section %}
+                                        <span class="badge bg-primary">
+                                            {{ document.section.module.code }}.{{ document.section.code }}
+                                        </span>
+                                        {{ document.section.name }}
+                                    {% else %}
+                                        <span class="text-muted">Non assigné</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% if document.file %}
+                            <tr>
+                                <th>Taille du fichier</th>
+                                <td>{{ document.file.size|filesizeformat }}</td>
+                            </tr>
+                            <tr>
+                                <th>Chemin du fichier</th>
+                                <td><code>{{ document.file.name }}</code></td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <th>Date de création</th>
+                                <td>{{ document.created_at|date:"d M Y à H:i:s" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Dernière modification</th>
+                                <td>{{ document.updated_at|date:"d M Y à H:i:s" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Template généré</th>
+                                <td>
+                                    {% if document.is_template_generated %}
+                                        <span class="badge bg-success">Oui</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Non</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Vue Template Data -->
+                {% if document.template_data %}
+                <div id="template-data-view" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Champ</th>
+                                    <th>Valeur</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for field_name, field_value in document.template_data.items %}
+                                <tr>
+                                    <td><code>{{ field_name }}</code></td>
+                                    <td>
+                                        {% if field_value|length > 100 %}
+                                            <details>
+                                                <summary>{{ field_value|truncatechars:50 }}</summary>
+                                                <pre class="mt-2 p-2 bg-light rounded">{{ field_value }}</pre>
+                                            </details>
+                                        {% else %}
+                                            {{ field_value|default:"<vide>" }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">
+                                            {% if field_value|length > 50 %}text{% else %}string{% endif %}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Panneau latéral -->
+    <div class="col-md-4">
+        
+        <!-- Actions rapides -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>Actions rapides
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if not document.is_template_generated %}
+                    <button class="btn btn-success" onclick="generateTemplate({{ document.id }})">
+                        <i class="fas fa-magic me-2"></i>Générer Template
+                    </button>
+                    {% endif %}
+                    
+                    {% if not document.ai_analysis %}
+                    <button class="btn btn-info" onclick="analyzeDocument({{ document.id }})">
+                        <i class="fas fa-brain me-2"></i>Analyser avec IA
+                    </button>
+                    {% endif %}
+                    
+                    {% if not content or not content.extracted %}
+                    <button class="btn btn-primary" onclick="extractContent({{ document.id }})">
+                        <i class="fas fa-extract me-2"></i>Extraire Contenu
+                    </button>
+                    {% endif %}
+                    
+                    <button class="btn btn-outline-secondary" onclick="syncWithTemplate({{ document.id }})">
+                        <i class="fas fa-sync me-2"></i>Synchroniser
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historique des modifications -->
+        {% if document.template_data %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-history me-2"></i>Modifications récentes
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success">
+                    <small>
+                        <i class="fas fa-check-circle me-1"></i>
+                        Template synchronisé le {{ document.updated_at|date:"d M Y à H:i" }}
+                    </small>
+                </div>
+                <div class="small text-muted">
+                    <strong>{{ document.template_data|length }}</strong> champs modifiés via le template
+                </div>
+                <div class="mt-2">
+                    <a href="{% url 'ctd_submission:document_template' document.id %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-edit me-1"></i>Voir Template
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Informations techniques -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-cog me-2"></i>Informations techniques
+                </h6>
+            </div>
+            <div class="card-body">
+                <dl class="row small">
+                    <dt class="col-6">ID Document:</dt>
+                    <dd class="col-6"><code>{{ document.id }}</code></dd>
+                    
+                    <dt class="col-6">Type MIME:</dt>
+                    <dd class="col-6">
+                        {% if document.document_type == 'pdf' %}application/pdf
+                        {% elif document.document_type == 'docx' %}application/vnd.openxmlformats-officedocument.wordprocessingml.document
+                        {% elif document.document_type == 'xlsx' %}application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+                        {% else %}application/octet-stream
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-6">Région:</dt>
+                    <dd class="col-6">{{ document.submission.get_region_display }}</dd>
+                    
+                    <dt class="col-6">Statut:</dt>
+                    <dd class="col-6">
+                        <span class="badge bg-{{ document.submission.status|default:'secondary' }}">
+                            {{ document.submission.get_status_display }}
+                        </span>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.content-text {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.document-content pre {
+    font-size: 13px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+details summary {
+    cursor: pointer;
+    color: #0d6efd;
+}
+
+details summary:hover {
+    text-decoration: underline;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showViewMode(mode) {
+    // Masquer toutes les vues
+    document.querySelectorAll('[id$="-view"]').forEach(view => {
+        view.style.display = 'none';
+    });
+    
+    // Afficher la vue sélectionnée
+    document.getElementById(`${mode}-view`).style.display = 'block';
+    
+    // Mettre à jour les boutons
+    document.querySelectorAll('[onclick^="showViewMode"]').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+
+function analyzeDocument(documentId) {
+    CTDSubmission.showNotification('Analyse IA en cours...', 'info');
+    
+    $.ajax({
+        url: `/api/analyze-document/${documentId}/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                CTDSubmission.showNotification('Analyse terminée avec succès!', 'success');
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                CTDSubmission.showNotification(response.message || 'Erreur lors de l\'analyse', 'error');
+            }
+        },
+        error: function() {
+            CTDSubmission.showNotification('Erreur lors de la communication avec le serveur', 'error');
+        }
+    });
+}
+
+function extractContent(documentId) {
+    CTDSubmission.showNotification('Extraction du contenu en cours...', 'info');
+    
+    $.ajax({
+        url: `/api/extract-content/${documentId}/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                CTDSubmission.showNotification('Contenu extrait avec succès!', 'success');
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                CTDSubmission.showNotification(response.message || 'Erreur lors de l\'extraction', 'error');
+            }
+        },
+        error: function() {
+            CTDSubmission.showNotification('Erreur lors de la communication avec le serveur', 'error');
+        }
+    });
+}
+
+function generateTemplate(documentId) {
+    CTDSubmission.showNotification('Génération du template en cours...', 'info');
+    
+    $.ajax({
+        url: `/generate-template/${documentId}/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                CTDSubmission.showNotification('Template généré avec succès!', 'success');
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                CTDSubmission.showNotification(response.message || 'Erreur lors de la génération', 'error');
+            }
+        },
+        error: function() {
+            CTDSubmission.showNotification('Erreur lors de la génération du template', 'error');
+        }
+    });
+}
+
+function syncWithTemplate(documentId) {
+    CTDSubmission.showNotification('Synchronisation en cours...', 'info');
+    
+    $.ajax({
+        url: `/api/update-template/${documentId}/`,
+        method: 'POST',
+        data: JSON.stringify({
+            'action': 'sync_document'
+        }),
+        contentType: 'application/json',
+        headers: {
+            'X-CSRFToken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                CTDSubmission.showNotification('Document synchronisé avec succès!', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                CTDSubmission.showNotification(response.message || 'Erreur lors de la synchronisation', 'error');
+            }
+        },
+        error: function() {
+            CTDSubmission.showNotification('Erreur lors de la synchronisation', 'error');
+        }
+    });
+}
+
+function suggestClassification(documentId) {
+    CTDSubmission.showNotification('Recherche de classification automatique...', 'info');
+    
+    $.ajax({
+        url: `/ajax/suggest-classification/`,
+        method: 'POST',
+        data: {
+            'document_id': documentId,
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                const suggestion = response.suggestion;
+                CTDSubmission.showNotification(
+                    `Classification suggérée: ${suggestion.module.code}.${suggestion.section.code} - ${suggestion.section.name} (${Math.round(suggestion.confidence * 100)}% confiance)`, 
+                    'success'
+                );
+            } else {
+                CTDSubmission.showNotification(response.message || 'Aucune classification trouvée', 'warning');
+            }
+        },
+        error: function() {
+            CTDSubmission.showNotification('Erreur lors de la suggestion', 'error');
+        }
+    });
+}
+
+function editMetadata(documentId) {
+    // Modal pour éditer les métadonnées
+    CTDSubmission.showNotification('Fonctionnalité d\'édition des métadonnées à venir', 'info');
+}
+
+function deleteDocument(documentId) {
+    CTDSubmission.confirmAction(
+        'Êtes-vous sûr de vouloir supprimer ce document ?',
+        function() {
+            $.ajax({
+                url: `/document/${documentId}/delete/`,
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCsrfToken()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        CTDSubmission.showNotification('Document supprimé avec succès!', 'success');
+                        setTimeout(() => window.history.back(), 1000);
+                    } else {
+                        CTDSubmission.showNotification('Erreur lors de la suppression', 'error');
+                    }
+                },
+                error: function() {
+                    CTDSubmission.showNotification('Erreur lors de la suppression', 'error');
+                }
+            });
+        }
+    );
+}
+
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+           document.querySelector('meta[name=csrf-token]')?.getAttribute('content') ||
+           $('input[name="csrfmiddlewaretoken"]').val();
+}
+</script>
+{% endblock %}

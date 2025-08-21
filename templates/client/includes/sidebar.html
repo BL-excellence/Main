@@ -14,7 +14,7 @@
             <span>LIBRARY</span>
         </a>
 
-        <a href="{% url 'submissions:list' %}" class="nav-item {% if 'submissions' in request.resolver_match.namespace %}active{% endif %}">
+        <a href="{% url 'client:ctd_submission:dashboard' %}" class="nav-item {% if 'ctd_submission' in request.resolver_match.namespace %}active{% endif %}">
             <i class="material-icons">assignment</i>
             <span>SUBMISSIONS</span>
         </a>

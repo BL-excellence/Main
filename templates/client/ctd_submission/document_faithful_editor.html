@@ -1,0 +1,534 @@
+<!-- templates/ctd_submission/document_faithful_editor.html -->
+{% extends 'client/ctd_submission/base.html' %}
+{% load static %}
+
+{% block title %}Éditeur Fidèle - {{ document.name }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+/* Styles pour l'éditeur fidèle */
+.faithful-editor-interface {
+    background: #f5f7fa;
+    min-height: 100vh;
+}
+
+.faithful-header {
+    background: white;
+    border-bottom: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.faithful-toolbar {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+.faithful-editing-area {
+    background: white;
+    min-height: 70vh;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.extraction-pending {
+    text-align: center;
+    padding: 60px 20px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 12px;
+}
+
+.extraction-pending .document-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+}
+
+/* Styles pour le contenu fidèle affiché */
+.pdf-document-faithful {
+    max-width: 100%;
+    margin: 0 auto;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.pdf-page-faithful {
+    background: white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    margin-bottom: 30px;
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto 30px auto;
+    position: relative;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.table-container-faithful {
+    margin: 25px 0;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.table-faithful {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    background: white;
+    margin: 0;
+}
+
+.table-cell-faithful {
+    padding: 8px 10px;
+    border: 1px solid #dee2e6;
+    vertical-align: top;
+    word-wrap: break-word;
+}
+
+.faithful-image {
+    margin: 15px 0;
+    text-align: center;
+}
+
+.faithful-heading {
+    color: #2c3e50;
+    font-weight: 600;
+    margin: 15px 0 10px 0;
+}
+
+.faithful-paragraph {
+    margin: 10px 0;
+    line-height: 1.6;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<!-- Interface de l'éditeur fidèle -->
+<div class="faithful-editor-interface">
+    <!-- En-tête -->
+    <div class="faithful-header p-3 mb-4">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="h4 mb-1">
+                    <i class="fas fa-magic text-primary me-2"></i>
+                    Éditeur Fidèle - {{ document.name }}
+                </h1>
+                <p class="text-muted mb-0">
+                    Édition en place avec préservation complète de la structure originale
+                </p>
+                {% if extraction_info %}
+                <small class="text-info">
+                    <i class="fas fa-info-circle me-1"></i>
+                    {% if extraction_info.is_extracted %}
+                        Contenu extrait ({{ extraction_info.method }}) - 
+                        {{ extraction_info.pages_count }} page(s), 
+                        {{ extraction_info.tables_count }} tableau(x), 
+                        {{ extraction_info.images_count }} image(s)
+                        {% if not extraction_info.has_html %}<span class="text-warning"> - HTML manquant</span>{% endif %}
+                    {% else %}
+                        Non extrait
+                    {% endif %}
+                </small>
+                {% endif %}
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="btn-group">
+                    <button class="btn btn-success" id="saveFaithfulBtn" {% if not extraction_info.is_extracted %}disabled{% endif %}>
+                        <i class="fas fa-save me-2"></i>Sauvegarder
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="window.history.back()">
+                        <i class="fas fa-arrow-left me-2"></i>Retour
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Barre d'outils -->
+    <div class="faithful-toolbar p-2 mb-3 rounded">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" title="Annuler" disabled>
+                        <i class="fas fa-undo"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" title="Refaire" disabled>
+                        <i class="fas fa-redo"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" title="Rechercher">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-6 text-end">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    {% if extraction_info.is_extracted %}
+                        Cliquez sur les éléments pour les modifier • Ctrl+S pour sauvegarder
+                    {% else %}
+                        Extraction nécessaire pour activer l'édition fidèle
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Zone d'édition fidèle -->
+    <div class="faithful-editing-area">
+        {% if extraction_info.is_extracted %}
+            {% if extraction_info.has_html and content.html %}
+                <!-- Contenu HTML éditable fidèle généré par le processeur -->
+                <div class="faithful-content-container">
+                    {{ content.html|safe }}
+                </div>
+            {% else %}
+                <!-- Contenu extrait mais HTML manquant - Affichage basique -->
+                <div class="alert alert-info mb-4">
+                    <h5><i class="fas fa-info-circle me-2"></i>Contenu extrait - HTML en cours de génération</h5>
+                    <p>Le contenu a été extrait mais le HTML fidèle n'est pas encore disponible.</p>
+                    <button class="btn btn-primary" onclick="reprocessFaithful()">
+                        <i class="fas fa-refresh me-2"></i>Regénérer le HTML fidèle
+                    </button>
+                </div>
+                
+                <!-- Affichage basique du contenu -->
+                {% if content.pages %}
+                    <div class="pdf-document-faithful">
+                        {% for page in content.pages %}
+                            <div class="pdf-page-faithful" data-page="{{ page.page_number }}">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="text-primary mb-0">
+                                        <i class="fas fa-file-alt me-2"></i>Page {{ page.page_number }}
+                                    </h5>
+                                    <small class="text-muted">
+                                        {{ page.chars_count|default:0 }} caractères
+                                    </small>
+                                </div>
+                                
+                                <!-- Tableaux de la page -->
+                                {% if page.tables %}
+                                    <h6 class="text-success mt-3">
+                                        <i class="fas fa-table me-2"></i>Tableaux ({{ page.tables|length }})
+                                    </h6>
+                                    {% for table in page.tables %}
+                                        <div class="table-container-faithful mb-3">
+                                            <div class="bg-light p-2 border-bottom">
+                                                <small class="text-muted">
+                                                    Tableau {{ table.index|add:1 }} - {{ table.rows }}×{{ table.cols }}
+                                                </small>
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="table table-faithful table-sm table-bordered">
+                                                    {% for row in table.data %}
+                                                        {% if forloop.counter <= 5 %}
+                                                            <tr>
+                                                                {% for cell in row %}
+                                                                    <{% if forloop.parentloop.first %}th{% else %}td{% endif %} class="table-cell-faithful">
+                                                                        {{ cell|truncatechars:50 }}
+                                                                    </{% if forloop.parentloop.first %}th{% else %}td{% endif %}>
+                                                                {% endfor %}
+                                                            </tr>
+                                                        {% elif forloop.counter == 6 %}
+                                                            <tr>
+                                                                <td colspan="{{ row|length }}" class="text-center text-muted">
+                                                                    ... {{ table.data|length|add:"-5" }} ligne(s) supplémentaire(s)
+                                                                </td>
+                                                            </tr>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </table>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+                                
+                                <!-- Images de la page -->
+                                {% if page.images %}
+                                    <h6 class="text-info mt-3">
+                                        <i class="fas fa-images me-2"></i>Images ({{ page.images|length }})
+                                    </h6>
+                                    <div class="row">
+                                        {% for image in page.images %}
+                                            <div class="col-md-4 mb-2">
+                                                <div class="faithful-image">
+                                                    {% if image.image_data %}
+                                                        <img src="{{ image.image_data }}" 
+                                                             alt="Image {{ image.index }}"
+                                                             class="img-fluid rounded border"
+                                                             style="max-height: 150px;">
+                                                    {% else %}
+                                                        <div class="bg-light p-3 rounded border">
+                                                            <i class="fas fa-image fa-2x text-muted"></i>
+                                                            <br><small>Image {{ image.index }}</small>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                
+                                <!-- Texte de la page -->
+                                {% if page.text %}
+                                    <h6 class="text-secondary mt-3">
+                                        <i class="fas fa-align-left me-2"></i>Contenu textuel
+                                    </h6>
+                                    <div class="bg-light p-3 rounded">
+                                        <pre class="mb-0" style="white-space: pre-wrap; font-size: 12px;">{{ page.text|truncatechars:1000 }}</pre>
+                                        {% if page.text|length > 1000 %}
+                                            <small class="text-muted">... contenu tronqué</small>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning">
+                        <h5><i class="fas fa-exclamation-triangle me-2"></i>Contenu partiellement extrait</h5>
+                        <p>Le contenu a été marqué comme extrait mais aucune page n'est disponible.</p>
+                    </div>
+                {% endif %}
+            {% endif %}
+        {% else %}
+            <!-- Document non extrait -->
+            <div class="extraction-pending">
+                <div class="document-icon">
+                    <i class="fas fa-file-pdf"></i>
+                </div>
+                <h4>Processeur Fidèle Disponible</h4>
+                <p class="text-muted mb-4">
+                    Ce document peut être converti en mode éditable fidèle avec préservation 
+                    complète de la structure, tableaux et images.
+                </p>
+                
+                {% if content.error %}
+                    <div class="alert alert-danger mb-4">
+                        <strong>Erreur lors de la dernière extraction :</strong><br>
+                        {{ content.error }}
+                    </div>
+                {% endif %}
+                
+                <button class="btn btn-primary btn-lg" onclick="extractFaithful()" id="extractFaithfulBtn">
+                    <i class="fas fa-magic me-2"></i>Activer l'édition fidèle
+                </button>
+                
+                <div class="mt-4">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        L'extraction fidèle préserve exactement la structure originale du PDF
+                    </small>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Indicateurs flottants -->
+<div id="faithful-indicators"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+// Configuration pour l'éditeur fidèle
+window.FAITHFUL_CONFIG = {
+    documentId: {{ document.id }},
+    documentName: "{{ document.name|escapejs }}",
+    isExtracted: {{ extraction_info.is_extracted|yesno:"true,false" }},
+    hasHtml: {{ extraction_info.has_html|yesno:"true,false" }},
+    extractionMethod: "{{ extraction_info.method|default:'none' }}",
+    urls: {
+        saveFaithful: "{% url 'ctd_submission:save_faithful_changes' document.id %}",
+        reprocessFaithful: "{% url 'ctd_submission:reprocess_faithful' document.id %}",
+        extractContent: "{% url 'ctd_submission:api_extract_content' document.id %}"
+    }
+};
+
+window.CSRF_TOKEN = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+console.log('🎯 Configuration éditeur fidèle:', window.FAITHFUL_CONFIG);
+
+// Fonctions principales
+function extractFaithful() {
+    const btn = document.getElementById('extractFaithfulBtn');
+    if (btn) {
+        btn.innerHTML = '<span class="loading-spinner me-2"></span>Extraction fidèle en cours...';
+        btn.disabled = true;
+    }
+    
+    showNotification('Début de l\'extraction fidèle...', 'info');
+    
+    fetch(window.FAITHFUL_CONFIG.urls.extractContent, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.CSRF_TOKEN
+        },
+        body: JSON.stringify({
+            faithful_mode: true,
+            force_reextraction: true
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('📊 Résultat extraction:', data);
+        
+        if (data.success) {
+            showNotification('Extraction fidèle réussie - Rechargement...', 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showNotification('Erreur: ' + (data.message || 'Extraction échouée'), 'error');
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-magic me-2"></i>Réessayer l\'extraction fidèle';
+                btn.disabled = false;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('❌ Erreur extraction:', error);
+        showNotification('Erreur de communication: ' + error.message, 'error');
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-magic me-2"></i>Réessayer l\'extraction fidèle';
+            btn.disabled = false;
+        }
+    });
+}
+
+function reprocessFaithful() {
+    if (!confirm('Retraiter le document avec le processeur fidèle ? Cela peut prendre quelques instants.')) {
+        return;
+    }
+    
+    showNotification('Retraitement fidèle en cours...', 'info');
+    
+    fetch(window.FAITHFUL_CONFIG.urls.reprocessFaithful, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.CSRF_TOKEN
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('📊 Résultat retraitement:', data);
+        
+        if (data.success) {
+            showNotification('Retraitement fidèle réussi - Rechargement...', 'success');
+            setTimeout(() => {
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    window.location.reload();
+                }
+            }, 1500);
+        } else {
+            showNotification('Erreur: ' + (data.message || 'Retraitement échoué'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('❌ Erreur retraitement:', error);
+        showNotification('Erreur de communication: ' + error.message, 'error');
+    });
+}
+
+// Bouton de sauvegarde manuel
+const saveFaithfulBtn = document.getElementById('saveFaithfulBtn');
+if (saveFaithfulBtn) {
+    saveFaithfulBtn.addEventListener('click', () => {
+        if (window.faithfulEditor && window.FAITHFUL_CONFIG.hasHtml) {
+            window.faithfulEditor.saveChanges();
+        } else {
+            showNotification('Contenu fidèle non disponible pour la sauvegarde', 'warning');
+        }
+    });
+}
+
+// Utilitaires d'interface
+function showNotification(message, type = 'info') {
+    // Retirer les notifications existantes
+    document.querySelectorAll('.faithful-notification').forEach(n => n.remove());
+    
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 
+                      'alert-info';
+    
+    const notification = document.createElement('div');
+    notification.className = `alert ${alertClass} position-fixed faithful-notification`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
+    notification.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+            <span>${message}</span>
+            <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove après 5 secondes sauf pour les erreurs
+    if (type !== 'error') {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+}
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🎯 Éditeur fidèle initialisé');
+    console.log('📋 État:', {
+        extracted: window.FAITHFUL_CONFIG.isExtracted,
+        hasHtml: window.FAITHFUL_CONFIG.hasHtml,
+        method: window.FAITHFUL_CONFIG.extractionMethod
+    });
+    
+    // Si le contenu est extrait et a du HTML, initialiser l'éditeur
+    if (window.FAITHFUL_CONFIG.isExtracted && window.FAITHFUL_CONFIG.hasHtml) {
+        // L'éditeur fidèle sera initialisé par le JavaScript intégré dans le HTML
+        console.log('✅ Contenu fidèle disponible pour édition');
+    } else if (window.FAITHFUL_CONFIG.isExtracted && !window.FAITHFUL_CONFIG.hasHtml) {
+        console.log('⚠️ Contenu extrait mais HTML manquant');
+    } else {
+        console.log('📄 Extraction nécessaire');
+    }
+});
+
+console.log('🎯 Interface d\'éditeur fidèle chargée');
+</script>
+{% endblock %}

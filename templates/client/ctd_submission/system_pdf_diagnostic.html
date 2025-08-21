@@ -1,0 +1,284 @@
+<!-- ctd_submission/templates/ctd_submission/system_pdf_diagnostic.html -->
+{% extends 'client/ctd_submission/base.html' %}
+
+{% block title %}Diagnostic Système PDF{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">
+                    <i class="fas fa-stethoscope me-2"></i>
+                    Diagnostic Système PDF
+                </h1>
+                <a href="{% url 'ctd_submission:dashboard' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Retour au Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if diagnostic.error %}
+    <div class="alert alert-danger">
+        <h5><i class="fas fa-exclamation-circle me-2"></i>Erreur de diagnostic</h5>
+        <p>{{ diagnostic.error }}</p>
+    </div>
+    {% endif %}
+
+    <!-- État général du système -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cog me-2"></i>État du Système
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            {% if diagnostic.system_info.django_available %}
+                                <i class="fas fa-check-circle fa-2x text-success"></i>
+                                <div class="mt-2"><strong>Django</strong></div>
+                                <small class="text-success">Disponible</small>
+                            {% else %}
+                                <i class="fas fa-times-circle fa-2x text-danger"></i>
+                                <div class="mt-2"><strong>Django</strong></div>
+                                <small class="text-danger">Indisponible</small>
+                            {% endif %}
+                        </div>
+                        <div class="col-4">
+                            {% if diagnostic.system_info.models_available %}
+                                <i class="fas fa-check-circle fa-2x text-success"></i>
+                                <div class="mt-2"><strong>Modèles</strong></div>
+                                <small class="text-success">Disponibles</small>
+                            {% else %}
+                                <i class="fas fa-times-circle fa-2x text-danger"></i>
+                                <div class="mt-2"><strong>Modèles</strong></div>
+                                <small class="text-danger">Indisponibles</small>
+                            {% endif %}
+                        </div>
+                        <div class="col-4">
+                            {% if diagnostic.system_info.utils_available %}
+                                <i class="fas fa-check-circle fa-2x text-success"></i>
+                                <div class="mt-2"><strong>Utils</strong></div>
+                                <small class="text-success">Disponibles</small>
+                            {% else %}
+                                <i class="fas fa-times-circle fa-2x text-danger"></i>
+                                <div class="mt-2"><strong>Utils</strong></div>
+                                <small class="text-danger">Indisponibles</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Statistiques Documents
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if diagnostic.document_stats %}
+                    <div class="row text-center">
+                        <div class="col-3">
+                            <h4 class="text-primary">{{ diagnostic.document_stats.total_documents }}</h4>
+                            <small>Total</small>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="text-info">{{ diagnostic.document_stats.pdf_documents }}</h4>
+                            <small>PDF</small>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="text-success">{{ diagnostic.document_stats.extracted_documents }}</h4>
+                            <small>Extraits</small>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="text-warning">{{ diagnostic.document_stats.extraction_rate|floatformat:1 }}%</h4>
+                            <small>Taux</small>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">Statistiques non disponibles</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- État des processeurs PDF -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-pdf me-2 text-danger"></i>
+                        Processeurs PDF Disponibles
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if diagnostic.available_processors %}
+                        <div class="alert alert-success">
+                            <h6><i class="fas fa-check-circle me-2"></i>Processeurs actifs</h6>
+                            <ul class="mb-0">
+                                {% for processor in diagnostic.available_processors %}
+                                <li><strong>{{ processor }}</strong></li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Aucun processeur PDF disponible</h6>
+                            <p>L'extraction PDF sera très limitée sans les bibliothèques appropriées.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- État des bibliothèques -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-book me-2"></i>
+                        État des Bibliothèques PDF
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for lib_name, lib_info in diagnostic.libraries_status.items %}
+                        <div class="col-md-6 col-lg-3 mb-3">
+                            <div class="card h-100 {% if lib_info.available %}border-success{% else %}border-danger{% endif %}">
+                                <div class="card-body text-center">
+                                    {% if lib_info.available %}
+                                        <i class="fas fa-check-circle fa-3x text-success mb-2"></i>
+                                        <h6 class="text-success">{{ lib_name|title }}</h6>
+                                        <small class="text-muted">
+                                            Version: {{ lib_info.version|default:"Inconnue" }}
+                                        </small>
+                                    {% else %}
+                                        <i class="fas fa-times-circle fa-3x text-danger mb-2"></i>
+                                        <h6 class="text-danger">{{ lib_name|title }}</h6>
+                                        <small class="text-muted">Non installé</small>
+                                    {% endif %}
+                                </div>
+                                {% if not lib_info.available %}
+                                <div class="card-footer">
+                                    <code class="small">{{ installation_commands|default_if_none:lib_name }}</code>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide d'installation -->
+    {% if not diagnostic.available_processors %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-download me-2"></i>
+                        Guide d'Installation
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Pour une extraction PDF optimale, installez les bibliothèques suivantes :</strong></p>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-star text-warning me-2"></i>Recommandé (extraction complète)</h6>
+                            <div class="bg-dark text-light p-3 rounded mb-3">
+                                <code>pip install PyMuPDF</code>
+                            </div>
+                            <small class="text-muted">PyMuPDF offre la meilleure extraction avec tableaux, images et structure préservée.</small>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-table text-info me-2"></i>Excellent pour tableaux</h6>
+                            <div class="bg-dark text-light p-3 rounded mb-3">
+                                <code>pip install pdfplumber</code>
+                            </div>
+                            <small class="text-muted">pdfplumber excelle dans l'extraction de tableaux structurés.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-cogs text-secondary me-2"></i>Alternative robuste</h6>
+                            <div class="bg-dark text-light p-3 rounded mb-3">
+                                <code>pip install pdfminer.six</code>
+                            </div>
+                            <small class="text-muted">pdfminer est une alternative stable et fiable.</small>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-archive text-muted me-2"></i>Fallback basique</h6>
+                            <div class="bg-dark text-light p-3 rounded mb-3">
+                                <code>pip install PyPDF2</code>
+                            </div>
+                            <small class="text-muted">PyPDF2 pour extraction de base en dernier recours.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <h6><i class="fas fa-rocket me-2"></i>Installation complète (recommandée)</h6>
+                        <div class="bg-dark text-light p-3 rounded">
+                            <code>pip install PyMuPDF pdfplumber pdfminer.six PyPDF2</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Actualiser la page automatiquement après installation
+function refreshDiagnostic() {
+    location.reload();
+}
+
+// Tester l'extraction sur un document spécifique
+function testExtraction(documentId) {
+    fetch(`/api/test-pdf-extraction/${documentId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken()
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Test réussi:', data);
+            alert('Test d\'extraction réussi!');
+        } else {
+            console.error('Test échoué:', data);
+            alert('Test d\'extraction échoué: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        alert('Erreur lors du test');
+    });
+}
+
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+           document.querySelector('meta[name=csrf-token]')?.getAttribute('content');
+}
+</script>
+{% endblock %}

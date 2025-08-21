@@ -52,7 +52,7 @@ INSTALLED_APPS = [
     'client.library',
     'client.products',
     'client.reports',
-    'submissions',
+    'client.submissions.ctd_submission',  # new client submissions app
     'chatbot',
     'rest_framework',
 ]

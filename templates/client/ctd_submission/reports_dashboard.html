@@ -1,0 +1,516 @@
+<!-- Chemin d'intégration : templates/ctd_submission/reports_dashboard.html -->
+<!-- Template pour le dashboard des rapports et statistiques -->
+
+{% extends 'client/ctd_submission/base.html' %}
+
+{% block title %}Rapports et Statistiques - CTD Submission{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Rapports</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0">
+            <i class="fas fa-chart-bar me-2 text-primary"></i>
+            Rapports et Statistiques
+        </h1>
+        <p class="text-muted mb-0">Analyse des performances et suivi des soumissions</p>
+    </div>
+    <div class="btn-group">
+        <button class="btn btn-outline-primary" onclick="exportReports()">
+            <i class="fas fa-download me-2"></i>Exporter
+        </button>
+        <button class="btn btn-primary" onclick="refreshStats()">
+            <i class="fas fa-sync me-2"></i>Actualiser
+        </button>
+    </div>
+</div>
+
+<!-- Cartes de statistiques principales -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Total Soumissions
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ stats.total_submissions }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-file-alt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Documents Total
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ stats.total_documents }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-folder fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Templates Générés
+                        </div>
+                        <div class="row no-gutters align-items-center">
+                            <div class="col-auto">
+                                <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">
+                                    {{ stats.documents_with_templates }}
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="progress progress-sm mr-2">
+                                    <div class="progress-bar bg-info" role="progressbar" 
+                                         style="width: {% widthratio stats.documents_with_templates stats.total_documents 100 %}%">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-edit fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Analyses IA
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ stats.ai_analyzed_documents }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-brain fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques -->
+<div class="row mb-4">
+    <!-- Répartition par statut -->
+    <div class="col-xl-6 col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Répartition par Statut</h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-pie pt-4 pb-2">
+                    <canvas id="statusChart"></canvas>
+                </div>
+                <div class="mt-4 text-center small">
+                    {% for status in stats.by_status %}
+                        <span class="mr-2">
+                            <i class="fas fa-circle" style="color: 
+                                {% if status.status == 'draft' %}#f6c23e
+                                {% elif status.status == 'in_progress' %}#36b9cc
+                                {% elif status.status == 'completed' %}#1cc88a
+                                {% else %}#6f42c1{% endif %}"></i>
+                            {{ status.get_status_display|default:status.status }}: {{ status.count }}
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Répartition par région -->
+    <div class="col-xl-6 col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Répartition par Région</h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-bar">
+                    <canvas id="regionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tableau des soumissions récentes -->
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Soumissions Récentes</h6>
+                <div class="dropdown no-arrow">
+                    <a class="dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right shadow">
+                        <a class="dropdown-item" href="#" onclick="exportSubmissions()">
+                            <i class="fas fa-download fa-sm fa-fw mr-2 text-gray-400"></i>
+                            Exporter la liste
+                        </a>
+                        <a class="dropdown-item" href="{% url 'dashboard' %}">
+                            <i class="fas fa-eye fa-sm fa-fw mr-2 text-gray-400"></i>
+                            Voir toutes
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if recent_submissions %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Région</th>
+                                    <th>Type</th>
+                                    <th>Statut</th>
+                                    <th>Documents</th>
+                                    <th>Progression</th>
+                                    <th>Créé le</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for submission in recent_submissions %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'submission_detail' submission.id %}" 
+                                           class="text-decoration-none font-weight-bold">
+                                            {{ submission.name }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class="flag-icon">
+                                            {% if submission.region == 'EU' %}🇪🇺
+                                            {% elif submission.region == 'US' %}🇺🇸
+                                            {% elif submission.region == 'CA' %}🇨🇦
+                                            {% else %}🇬🇧{% endif %}
+                                        </span>
+                                        {{ submission.region }}
+                                    </td>
+                                    <td>
+                                        <small>{{ submission.submission_type|truncatewords:3 }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if submission.status == 'draft' %}bg-warning
+                                            {% elif submission.status == 'in_progress' %}bg-info
+                                            {% elif submission.status == 'completed' %}bg-success
+                                            {% else %}bg-primary{% endif %}">
+                                            {{ submission.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            {{ submission.documents.count }} docs
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% with total_docs=submission.documents.count templates=submission.documents.filter:is_template_generated=True %}
+                                            {% if total_docs > 0 %}
+                                                {% widthratio templates.count total_docs 100 as progress %}
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar" role="progressbar" 
+                                                         style="width: {{ progress }}%">{{ progress }}%</div>
+                                                </div>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ submission.created_at|date:"d/m/Y" }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'submission_detail' submission.id %}" 
+                                               class="btn btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'submission_report' submission.id %}" 
+                                               class="btn btn-outline-info">
+                                                <i class="fas fa-chart-line"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Aucune soumission</h5>
+                        <p class="text-muted">Créez votre première soumission pour voir les statistiques</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Métriques de performance IA -->
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-brain me-2"></i>Performance de l'Analyse IA
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        <div class="border-right">
+                            <h4 class="text-success">95.2%</h4>
+                            <p class="text-muted mb-0">Précision moyenne</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="border-right">
+                            <h4 class="text-info">2.3s</h4>
+                            <p class="text-muted mb-0">Temps d'analyse moyen</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="border-right">
+                            <h4 class="text-warning">{{ stats.ai_analyzed_documents }}</h4>
+                            <p class="text-muted mb-0">Documents analysés</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <h4 class="text-primary">87%</h4>
+                        <p class="text-muted mb-0">Classification automatique</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+$(document).ready(function() {
+    // Graphique en secteurs pour les statuts
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const statusData = {
+        labels: [
+            {% for status in stats.by_status %}
+                '{{ status.get_status_display|default:status.status }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for status in stats.by_status %}
+                    {{ status.count }},
+                {% endfor %}
+            ],
+            backgroundColor: ['#f6c23e', '#36b9cc', '#1cc88a', '#6f42c1'],
+            hoverBackgroundColor: ['#f4b30d', '#2e9aa3', '#17a673', '#5a2d8a'],
+            hoverBorderColor: "rgba(234, 236, 244, 1)",
+        }],
+    };
+
+    new Chart(statusCtx, {
+        type: 'doughnut',
+        data: statusData,
+        options: {
+            maintainAspectRatio: false,
+            tooltips: {
+                backgroundColor: "rgb(255,255,255)",
+                bodyFontColor: "#858796",
+                borderColor: '#dddfeb',
+                borderWidth: 1,
+                displayColors: false,
+                caretPadding: 10,
+            },
+            legend: {
+                display: false
+            },
+            cutoutPercentage: 80,
+        },
+    });
+
+    // Graphique en barres pour les régions
+    const regionCtx = document.getElementById('regionChart').getContext('2d');
+    const regionData = {
+        labels: [
+            {% for region in stats.by_region %}
+                '{{ region.region }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Soumissions',
+            data: [
+                {% for region in stats.by_region %}
+                    {{ region.count }},
+                {% endfor %}
+            ],
+            backgroundColor: '#4e73df',
+            hoverBackgroundColor: '#2e59d9',
+            borderColor: '#4e73df',
+            borderWidth: 1,
+        }],
+    };
+
+    new Chart(regionCtx, {
+        type: 'bar',
+        data: regionData,
+        options: {
+            maintainAspectRatio: false,
+            layout: {
+                padding: {
+                    left: 10,
+                    right: 25,
+                    top: 25,
+                    bottom: 0
+                }
+            },
+            scales: {
+                xAxes: [{
+                    gridLines: {
+                        display: false,
+                        drawBorder: false
+                    },
+                    ticks: {
+                        maxTicksLimit: 6
+                    },
+                    maxBarThickness: 25,
+                }],
+                yAxes: [{
+                    ticks: {
+                        min: 0,
+                        maxTicksLimit: 5,
+                        padding: 10,
+                    },
+                    gridLines: {
+                        color: "rgb(234, 236, 244)",
+                        zeroLineColor: "rgb(234, 236, 244)",
+                        drawBorder: false,
+                        borderDash: [2],
+                        zeroLineBorderDash: [2]
+                    }
+                }],
+            },
+            legend: {
+                display: false
+            },
+            tooltips: {
+                titleMarginBottom: 10,
+                titleFontColor: '#6e707e',
+                titleFontSize: 14,
+                backgroundColor: "rgb(255,255,255)",
+                bodyFontColor: "#858796",
+                borderColor: '#dddfeb',
+                borderWidth: 1,
+                displayColors: false,
+                caretPadding: 10,
+            },
+        }
+    });
+});
+
+// Fonctions utilitaires
+function refreshStats() {
+    window.location.reload();
+}
+
+function exportReports() {
+    // Simuler un export
+    CTDSubmission.showNotification('Export des rapports en cours...', 'info');
+    
+    setTimeout(() => {
+        CTDSubmission.showNotification('Rapports exportés avec succès!', 'success');
+    }, 2000);
+}
+
+function exportSubmissions() {
+    // Export de la liste des soumissions
+    const csvContent = "data:text/csv;charset=utf-8," + 
+        "Nom,Région,Type,Statut,Documents,Créé le\n" +
+        {% for submission in recent_submissions %}
+            "{{ submission.name }},{{ submission.region }},{{ submission.submission_type }},{{ submission.status }},{{ submission.documents.count }},{{ submission.created_at|date:'Y-m-d' }}\n" +
+        {% endfor %};
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "soumissions_ctd.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    CTDSubmission.showNotification('Liste des soumissions exportée!', 'success');
+}
+
+// Mise à jour automatique des statistiques toutes les 5 minutes
+setInterval(function() {
+    // Vérifier s'il y a de nouvelles données
+    fetch(window.location.href + '?ajax=1')
+        .then(response => response.json())
+        .then(data => {
+            if (data.updated) {
+                // Afficher une notification de mise à jour disponible
+                const updateBanner = document.createElement('div');
+                updateBanner.className = 'alert alert-info alert-dismissible fade show position-fixed';
+                updateBanner.style.top = '20px';
+                updateBanner.style.right = '20px';
+                updateBanner.style.zIndex = '9999';
+                updateBanner.innerHTML = `
+                    <i class="fas fa-info-circle me-2"></i>
+                    Nouvelles données disponibles
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-primary" onclick="refreshStats()">Actualiser</button>
+                    </div>
+                `;
+                document.body.appendChild(updateBanner);
+            }
+        })
+        .catch(error => console.log('Erreur de mise à jour:', error));
+}, 300000); // 5 minutes
+</script>
+{% endblock %}

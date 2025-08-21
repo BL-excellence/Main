@@ -1,0 +1,561 @@
+<!-- Chemin d'intégration : templates/ctd_submission/document_template.html -->
+<!-- Template pour la vue "Template" avec formulaire dynamique comme dans les captures EMA -->
+
+{% extends 'client/ctd_submission/base.html' %}
+
+{% block title %}Template - {{ document.name }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'ctd_submission:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'ctd_submission:submission_detail' document.submission.id %}">{{ document.submission.name }}</a>
+        </li>
+        <li class="breadcrumb-item active">Template - {{ document.name }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<!-- En-tête avec logo EMA (si région EU) -->
+{% if document.submission.region == 'EU' %}
+<div class="text-center mb-4">
+    <div class="ema-header">
+        <i class="fas fa-certificate text-primary fa-3x mb-2"></i>
+        <h4 class="text-primary">EUROPEAN MEDICINES AGENCY</h4>
+        <p class="text-muted">SCIENCE MEDICINES HEALTH</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Informations du document -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h4 mb-1">{{ document.section.code }} {{ document.section.name }} - Document {{ document.submission.region }}</h1>
+                <p class="text-muted mb-0">{{ document.name }}</p>
+            </div>
+            <div class="btn-group">
+                <a href="{% url 'ctd_submission:document_view' document.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-eye me-2"></i>Voir Original
+                </a>
+                <button class="btn btn-success" id="saveTemplateBtn">
+                    <i class="fas fa-save me-2"></i>Sauvegarder
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <small class="text-muted">
+            {{ document.created_at|date:"d M Y" }}<br>
+            Information Management Division, Version 5
+        </small>
+    </div>
+</div>
+
+<!-- Instructions -->
+<div class="alert alert-info mb-4">
+    <h5 class="alert-heading">Formatted table template</h5>
+    <p class="mb-0">To be inserted in each procedural submission cover letter.</p>
+</div>
+
+<!-- Formulaire Template Dynamique -->
+<div class="template-form">
+    <form id="templateForm" method="post">
+        {% csrf_token %}
+        
+        <!-- Table formattée comme dans les captures EMA -->
+        <table class="formatted-table">
+            <thead>
+                <tr>
+                    <th style="width: 50px;"></th>
+                    <th style="width: 300px;"></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Ligne 1 - Applicant/MAH Name -->
+                <tr>
+                    <td class="table-number">1*</td>
+                    <td><strong>Applicant/MAH Name</strong></td>
+                    <td>
+                        <input type="text" class="form-control" name="applicant_name" 
+                               placeholder="Enter applicant/MAH name" required>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 2 - Customer Account Number -->
+                <tr>
+                    <td class="table-number">2*</td>
+                    <td><strong>Customer Account Number</strong></td>
+                    <td>
+                        <input type="text" class="form-control" name="customer_account" 
+                               placeholder="000060xxxx (only one number for WS and IG)" required>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 3 - Customer Reference -->
+                <tr>
+                    <td class="table-number">3*</td>
+                    <td><strong>Customer Reference / Purchase Order Number</strong></td>
+                    <td>
+                        <input type="text" class="form-control" name="customer_reference" 
+                               placeholder="Enter reference number">
+                    </td>
+                </tr>
+                
+                <!-- Ligne 4 - INN/Active substance -->
+                <tr>
+                    <td class="table-number">4</td>
+                    <td><strong>INN / Active substance/ATC Code</strong></td>
+                    <td>
+                        <input type="text" class="form-control" name="inn_code" 
+                               placeholder="Enter INN/Active substance/ATC Code">
+                    </td>
+                </tr>
+                
+                <!-- Ligne 5 - Product Name -->
+                <tr>
+                    <td class="table-number">5</td>
+                    <td><strong>Product Name of centrally authorised medicinal product(s)</strong></td>
+                    <td>
+                        <input type="text" class="form-control" name="product_name" 
+                               placeholder="Enter product name">
+                    </td>
+                </tr>
+                
+                <!-- Ligne 5.1 - Nationally Authorised Product -->
+                <tr>
+                    <td class="table-number">5.1*</td>
+                    <td><strong>Nationally Authorised Product(s)</strong></td>
+                    <td>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="nationally_authorised" 
+                                   id="nationallyAuthorised">
+                            <label class="form-check-label" for="nationallyAuthorised">
+                                Check if applicable
+                            </label>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 6 - Product Number -->
+                <tr style="border-top: 2px solid #dee2e6;">
+                    <td class="table-number">6*</td>
+                    <td>
+                        <strong>Product Number or<br>
+                        Procedure Number or<br>
+                        PSUSA (PSUR Single Assessment)<br>
+                        Non-EU single assessment<br>
+                        PSUR Period Covered (for both PSUSA and Non-EU procedures)</strong>
+                    </td>
+                    <td>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <input type="text" class="form-control mb-2" name="product_number" 
+                                       placeholder="EMEA/H/C/XXXX / type /">
+                                <small class="text-muted">or</small><br>
+                                <input type="text" class="form-control mt-1" name="psusa_number" 
+                                       placeholder="PSUSA/000XXXXX/yyyymm">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="national_marketing_auth">
+                                    <label class="form-check-label">
+                                        National Marketing Authorisation No
+                                    </label>
+                                </div>
+                                <input type="text" class="form-control mt-2" name="national_auth_number" 
+                                       placeholder="Authorization number">
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 6.1 - Is this -->
+                <tr>
+                    <td class="table-number">6.1</td>
+                    <td><strong>Is this:</strong></td>
+                    <td>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="submission_type" 
+                                           value="new" id="submissionNew" checked>
+                                    <label class="form-check-label" for="submissionNew">
+                                        A submission of a new procedure
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="submission_type" 
+                                           value="response" id="submissionResponse">
+                                    <label class="form-check-label" for="submissionResponse">
+                                        A response/supplementary information to an on-going procedure
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 7 - Unit Type -->
+                <tr style="border-top: 2px solid #dee2e6;">
+                    <td class="table-number">7*</td>
+                    <td><strong>Unit Type</strong></td>
+                    <td>
+                        <select class="form-control" name="unit_type">
+                            <option value="">Please select</option>
+                            <option value="single">Single</option>
+                            <option value="multiple">Multiple</option>
+                        </select>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 7.1 - Mode -->
+                <tr>
+                    <td class="table-number">7.1*</td>
+                    <td><strong>Mode</strong></td>
+                    <td>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="mode" 
+                                           value="single" id="modeSingle" checked>
+                                    <label class="form-check-label" for="modeSingle">Single</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="mode" 
+                                           value="grouping" id="modeGrouping">
+                                    <label class="form-check-label" for="modeGrouping">Grouping</label>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 7.2 - Procedure Type -->
+                <tr>
+                    <td class="table-number">7.2*</td>
+                    <td><strong>Procedure Type (Please select)</strong></td>
+                    <td>
+                        <input type="text" class="form-control" name="procedure_type" 
+                               value="MAA - Marketing Authorisation Application" readonly>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 7.3 - Description -->
+                <tr>
+                    <td class="table-number">7.3*</td>
+                    <td><strong>Description of submission</strong></td>
+                    <td>
+                        <select class="form-control" name="description_submission">
+                            <option value="">Please select</option>
+                            <option value="initial">Initial application</option>
+                            <option value="variation">Variation</option>
+                            <option value="extension">Extension of indication</option>
+                        </select>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 8 - Centrally authorised info -->
+                <tr style="border-top: 2px solid #dee2e6;">
+                    <td class="table-number">8*</td>
+                    <td>
+                        <strong>Please provide the name(s) of any centrally authorised medicinal product 
+                        for which the same change(s) are being applied for outside of this procedure<br><br>
+                        Product name and number:</strong>
+                    </td>
+                    <td>
+                        <textarea class="form-control" name="centrally_authorised_info" rows="3" 
+                                  placeholder="Enter product names and numbers"></textarea>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 9 - RMP -->
+                <tr>
+                    <td class="table-number">9*</td>
+                    <td><strong>RMP included in this submission:</strong></td>
+                    <td>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="rmp_included" 
+                                           value="yes" id="rmpYes">
+                                    <label class="form-check-label" for="rmpYes">Yes</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="rmp_included" 
+                                           value="no" id="rmpNo" checked>
+                                    <label class="form-check-label" for="rmpNo">No</label>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <input type="text" class="form-control" name="rmp_version" 
+                                       placeholder="RMP version N.">
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- Ligne 10 - eCTD sequence -->
+                <tr>
+                    <td class="table-number">10*</td>
+                    <td><strong>eCTD sequence</strong></td>
+                    <td>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <input type="text" class="form-control" name="ectd_sequence" 
+                                       placeholder="eCTD sequence">
+                            </div>
+                            <div class="col-md-6">
+                                <input type="text" class="form-control" name="related_sequence" 
+                                       placeholder="Related sequence">
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <!-- Actions pour le template -->
+        <div class="mt-4 p-3 bg-light rounded">
+            <h6><i class="fas fa-tools me-2"></i>Actions Template</h6>
+            <div class="btn-group me-3">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="addTableRow()">
+                    <i class="fas fa-plus me-1"></i>Ajouter une ligne
+                </button>
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="addTableColumn()">
+                    <i class="fas fa-columns me-1"></i>Ajouter une colonne
+                </button>
+            </div>
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeSelectedField()">
+                    <i class="fas fa-trash me-1"></i>Supprimer l'élément sélectionné
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Bouton flottant pour sauvegarder -->
+<button class="btn btn-success floating-btn" onclick="saveTemplate()">
+    <i class="fas fa-save me-2"></i>Sauvegarder Template
+</button>
+
+<!-- Modal d'ajout de colonne -->
+<div class="modal fade" id="addColumnModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ajouter une colonne</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="columnName" class="form-label">Nom de la colonne</label>
+                    <input type="text" class="form-control" id="columnName" placeholder="Ex: Nouvelle colonne">
+                </div>
+                <div class="mb-3">
+                    <label for="columnType" class="form-label">Type de champ</label>
+                    <select class="form-control" id="columnType">
+                        <option value="text">Texte</option>
+                        <option value="textarea">Zone de texte</option>
+                        <option value="select">Liste déroulante</option>
+                        <option value="checkbox">Case à cocher</option>
+                        <option value="radio">Bouton radio</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="confirmAddColumn()">Ajouter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedField = null;
+
+$(document).ready(function() {
+    // Sélection de champs pour modification
+    $('.formatted-table input, .formatted-table select, .formatted-table textarea').click(function() {
+        $('.formatted-table tr').removeClass('table-active');
+        $(this).closest('tr').addClass('table-active');
+        selectedField = this;
+    });
+    
+    // Charger les données existantes si disponibles
+    loadExistingData();
+});
+
+function saveTemplate() {
+    const formData = new FormData($('#templateForm')[0]);
+    
+    $('#saveTemplateBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Sauvegarde...');
+    
+    $.ajax({
+        url: window.location.href,
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            CTDSubmission.showNotification('Template sauvegardé avec succès!', 'success');
+            
+            // Mettre à jour le document original en arrière-plan
+            updateOriginalDocument();
+        },
+        error: function() {
+            CTDSubmission.showNotification('Erreur lors de la sauvegarde', 'error');
+        },
+        complete: function() {
+            $('#saveTemplateBtn').prop('disabled', false).html('<i class="fas fa-save me-2"></i>Sauvegarder');
+        }
+    });
+}
+
+function updateOriginalDocument() {
+    // Cette fonction met à jour le document original avec les données du template
+    $.ajax({
+        url: '{% url "ctd_submission:document_view" document.id %}',
+        method: 'POST',
+        data: {
+            'update_from_template': true,
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function() {
+            console.log('Document original mis à jour');
+        }
+    });
+}
+
+function addTableRow() {
+    const table = $('.formatted-table tbody');
+    const lastRow = table.find('tr:last');
+    const newRowNumber = table.find('tr').length + 1;
+    
+    const newRow = `
+        <tr>
+            <td class="table-number">${newRowNumber}</td>
+            <td><strong>Nouveau champ</strong></td>
+            <td>
+                <input type="text" class="form-control" name="new_field_${newRowNumber}" 
+                       placeholder="Saisir la valeur">
+            </td>
+        </tr>
+    `;
+    
+    table.append(newRow);
+    
+    // Ajouter l'événement de sélection au nouveau champ
+    table.find('tr:last input').click(function() {
+        $('.formatted-table tr').removeClass('table-active');
+        $(this).closest('tr').addClass('table-active');
+        selectedField = this;
+    });
+    
+    CTDSubmission.showNotification('Nouvelle ligne ajoutée', 'success');
+}
+
+function addTableColumn() {
+    $('#addColumnModal').modal('show');
+}
+
+function confirmAddColumn() {
+    const columnName = $('#columnName').val();
+    const columnType = $('#columnType').val();
+    
+    if (!columnName) {
+        CTDSubmission.showNotification('Veuillez saisir un nom de colonne', 'error');
+        return;
+    }
+    
+    // Ajouter une nouvelle colonne à la table (logique simplifiée)
+    // Dans un vrai système, cela nécessiterait une restructuration de la table
+    
+    $.ajax({
+        url: '{% url "ctd_submission:template_add_column" document.id %}',
+        method: 'POST',
+        data: {
+            'column_name': columnName,
+            'column_type': columnType,
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                $('#addColumnModal').modal('hide');
+                CTDSubmission.showNotification('Colonne ajoutée avec succès', 'success');
+                // Recharger la page pour voir la nouvelle colonne
+                setTimeout(() => window.location.reload(), 1000);
+            }
+        },
+        error: function() {
+            CTDSubmission.showNotification('Erreur lors de l\'ajout de la colonne', 'error');
+        }
+    });
+}
+
+function removeSelectedField() {
+    if (!selectedField) {
+        CTDSubmission.showNotification('Veuillez sélectionner un champ à supprimer', 'error');
+        return;
+    }
+    
+    CTDSubmission.confirmAction(
+        'Êtes-vous sûr de vouloir supprimer ce champ ?',
+        function() {
+            const row = $(selectedField).closest('tr');
+            
+            // Vérifier si c'est un champ obligatoire
+            const isRequired = row.find('.table-number').text().includes('*');
+            if (isRequired) {
+                CTDSubmission.showNotification('Impossible de supprimer un champ obligatoire', 'error');
+                return;
+            }
+            
+            row.remove();
+            selectedField = null;
+            CTDSubmission.showNotification('Champ supprimé', 'success');
+        }
+    );
+}
+
+function loadExistingData() {
+    // Charger les données existantes du template si disponibles
+    const templateData = {{ document.template_data|safe }};
+    
+    if (templateData && Object.keys(templateData).length > 0) {
+        for (const [fieldName, fieldValue] of Object.entries(templateData)) {
+            const field = $(`[name="${fieldName}"]`);
+            if (field.length > 0) {
+                if (field.is(':checkbox') || field.is(':radio')) {
+                    if (fieldValue === 'true' || fieldValue === true) {
+                        field.prop('checked', true);
+                    }
+                } else {
+                    field.val(fieldValue);
+                }
+            }
+        }
+    }
+}
+
+// Auto-save toutes les 30 secondes
+setInterval(function() {
+    if ($('#templateForm').find('input:focus, select:focus, textarea:focus').length === 0) {
+        console.log('Auto-sauvegarde du template...');
+        saveTemplate();
+    }
+}, 30000);
+</script>
+{% endblock %}

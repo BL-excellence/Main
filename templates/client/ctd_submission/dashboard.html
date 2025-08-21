@@ -1,0 +1,381 @@
+{% extends 'client/ctd_submission/base.html' %}
+
+{% block title %}Dashboard - CTD Submission{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0">
+            <i class="fas fa-tachometer-alt me-2 text-primary"></i>
+            Writing
+        </h1>
+        <p class="text-muted mb-0">Génération et gestion des dossiers réglementaires</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newSubmissionModal">
+        <i class="fas fa-plus me-2"></i>New Writing
+    </button>
+</div>
+
+<!-- Statistiques -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-file-alt fa-2x text-primary mb-2"></i>
+                <h5 class="card-title">{{ total_submissions }}</h5>
+                <p class="card-text text-muted">Total Soumissions</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-edit fa-2x text-warning mb-2"></i>
+                <h5 class="card-title">{{ draft_submissions }}</h5>
+                <p class="card-text text-muted">Brouillons</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-clock fa-2x text-info mb-2"></i>
+                <h5 class="card-title">{{ in_progress_submissions }}</h5>
+                <p class="card-text text-muted">En cours</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                <h5 class="card-title">{{ completed_submissions }}</h5>
+                <p class="card-text text-muted">Terminées</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Writing Configurator -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-cog me-2"></i>Writing Configurator
+        </h5>
+    </div>
+    <div class="card-body">
+        <form id="writingConfigForm">
+            {% csrf_token %}
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="writingName" class="form-label">Writing name</label>
+                    <input type="text" class="form-control" id="writingName" 
+                           placeholder="ex: EU-MAA-Product-001">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="paysRegion" class="form-label">Pays/Région</label>
+                    <select class="form-control" id="paysRegion">
+                        <option value="">Sélectionner pays</option>
+                        <option value="EU">Union Européenne (EMA)</option>
+                        <option value="US">États-Unis (FDA)</option>
+                        <option value="CA">Canada (Health Canada)</option>
+                        <option value="UK">Royaume-Uni (MHRA)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="typeVariation" class="form-label">Type de variation</label>
+                    <select class="form-control" id="typeVariation">
+                        <option value="">Type variation</option>
+                        <option value="Type IA">Variation Type IA</option>
+                        <option value="Type IB">Variation Type IB</option>
+                        <option value="Type II">Variation Type II</option>
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="changementDescription" class="form-label">
+                        <i class="fas fa-exchange-alt me-1"></i>Changement description
+                    </label>
+                    <select class="form-control" id="changementDescription">
+                        <option value="">Sélectionner changement</option>
+                        <option value="ajout_site_fabrication">Ajout de site de fabrication primaire</option>
+                        <option value="modification_procede">Modification du procédé de fabrication</option>
+                        <option value="changement_specification">Changement de spécification</option>
+                        <option value="nouveau_dosage">Nouveau dosage</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <button type="button" class="btn btn-primary btn-lg" id="generateCTDBtn">
+                    <i class="fas fa-magic me-2"></i>Générer Structure CTD Intelligente
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Soumissions Récentes -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-history me-2"></i>Soumissions Récentes
+        </h5>
+        <a href="#" class="btn btn-outline-primary btn-sm">Voir tout</a>
+    </div>
+    <div class="card-body">
+        {% if recent_submissions %}
+            <div class="list-group list-group-flush">
+                {% for submission in recent_submissions %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            {% if submission.region == 'EU' %}
+                                <i class="fas fa-flag text-primary fa-lg"></i>
+                                <small class="d-block text-center mt-1">EU</small>
+                            {% elif submission.region == 'US' %}
+                                <i class="fas fa-flag text-danger fa-lg"></i>
+                                <small class="d-block text-center mt-1">US</small>
+                            {% elif submission.region == 'CA' %}
+                                <i class="fas fa-flag text-warning fa-lg"></i>
+                                <small class="d-block text-center mt-1">CA</small>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <h6 class="mb-1">
+                                <a href="{% url 'ctd_submission:submission_detail' submission.id %}" class="text-decoration-none">
+                                    {{ submission.name }}
+                                </a>
+                            </h6>
+                            <p class="mb-0 text-muted small">{{ submission.submission_type }}</p>
+                            <small class="text-muted">{{ submission.created_at|date:"d M Y à H:i" }}</small>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <span class="status-badge status-{{ submission.status }}">
+                            {% if submission.status == 'draft' %}Draft
+                            {% elif submission.status == 'in_progress' %}En cours
+                            {% elif submission.status == 'completed' %}Soumis
+                            {% endif %}
+                        </span>
+                        <div class="mt-2">
+                            <a href="{% url 'ctd_submission:submission_detail' submission.id %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-eye me-1"></i>Voir
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Aucune soumission pour le moment</h5>
+                <p class="text-muted">Créez votre première soumission CTD pour commencer</p>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newSubmissionModal">
+                    <i class="fas fa-plus me-2"></i>Créer une soumission
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Nouvelle Soumission -->
+<div class="modal fade" id="newSubmissionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i>Nouvelle Soumission CTD
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="newSubmissionForm" method="post" action="{% url 'ctd_submission:submission_create' %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="id_name" class="form-label">Nom de la soumission *</label>
+                            <input type="text" class="form-control" id="id_name" name="name" 
+                                   placeholder="ex: EU-MAA-Product-001" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_region" class="form-label">Région *</label>
+                            <select class="form-control" id="id_region" name="region" required>
+                                <option value="">Sélectionner la région</option>
+                                <option value="EU">Union Européenne (EMA)</option>
+                                <option value="US">États-Unis (FDA)</option>
+                                <option value="CA">Canada (Health Canada)</option>
+                                <option value="UK">Royaume-Uni (MHRA)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_submission_type" class="form-label">Type de soumission *</label>
+                        <input type="text" class="form-control" id="id_submission_type" name="submission_type" 
+                               placeholder="ex: MAA - Marketing Authorisation Application" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="id_variation_type" class="form-label">Type de variation</label>
+                            <select class="form-control" id="id_variation_type" name="variation_type">
+                                <option value="">Sélectionner le type</option>
+                                <option value="Type IA">Variation Type IA</option>
+                                <option value="Type IB">Variation Type IB</option>
+                                <option value="Type II">Variation Type II</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_change_description" class="form-label">Description du changement</label>
+                            <select class="form-control" id="id_change_description" name="change_description">
+                                <option value="">Sélectionner le changement</option>
+                                <option value="ajout_site_fabrication">Ajout de site de fabrication primaire</option>
+                                <option value="modification_procede">Modification du procédé de fabrication</option>
+                                <option value="changement_specification">Changement de spécification</option>
+                                <option value="nouveau_dosage">Nouveau dosage</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Créer la soumission
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Assistant IA (comme dans les captures) -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+    <div class="bg-primary text-white rounded p-3 shadow" style="max-width: 300px;" id="aiAssistant">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">
+                <i class="fas fa-robot me-2"></i>Assistant IA RegX
+            </h6>
+            <button class="btn-close btn-close-white" onclick="$('#aiAssistant').hide()"></button>
+        </div>
+        <p class="small mb-2">Bonjour ! Je suis l'assistant IA RegX. Comment puis-je vous aider avec vos questions réglementaires ?</p>
+        <div class="mb-2">
+            <span class="badge bg-light text-dark">
+                <i class="fas fa-cog me-1"></i>Workflow Module
+            </span>
+        </div>
+        <div class="mb-2">
+            <small class="text-light">
+                <i class="fas fa-user me-1"></i>UTILISATEUR
+            </small>
+        </div>
+        <div class="text-end">
+            <button class="btn btn-light btn-sm">
+                <i class="fas fa-plus me-1"></i>Créer une formule métier
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+$(document).ready(function() {
+    // Génération de structure CTD intelligente
+    $('#generateCTDBtn').click(function() {
+        const formData = {
+            'writing_name': $('#writingName').val(),
+            'region': $('#paysRegion').val(),
+            'variation_type': $('#typeVariation').val(),
+            'change_description': $('#changementDescription').val(),
+            'csrfmiddlewaretoken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value
+        };
+        
+        if (!formData.writing_name || !formData.region) {
+            CTDSubmission.showNotification('Veuillez remplir au minimum le nom et la région', 'error');
+            return;
+        }
+        
+        $(this).prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Génération en cours...');
+        
+        // Simuler une création de soumission puis génération de structure
+        $.ajax({
+            url: '{% url "ctd_submission:submission_create" %}',
+            method: 'POST',
+            data: {
+                'name': formData.writing_name,
+                'region': formData.region,
+                'submission_type': 'MAA - Marketing Authorisation Application',
+                'variation_type': formData.variation_type,
+                'change_description': formData.change_description,
+                'csrfmiddlewaretoken': formData.csrfmiddlewaretoken
+            },
+            success: function(response) {
+                CTDSubmission.showNotification('Structure CTD générée avec succès!', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            },
+            error: function() {
+                CTDSubmission.showNotification('Erreur lors de la génération', 'error');
+            },
+            complete: function() {
+                $('#generateCTDBtn').prop('disabled', false).html('<i class="fas fa-magic me-2"></i>Générer Structure CTD Intelligente');
+            }
+        });
+    });
+    
+    // Auto-remplissage selon la région sélectionnée
+    $('#paysRegion').change(function() {
+        const region = $(this).val();
+        if (region === 'EU') {
+            $('#writingName').attr('placeholder', 'ex: EU-MAA-Product-001');
+        } else if (region === 'US') {
+            $('#writingName').attr('placeholder', 'ex: US-NDA-Product-001');
+        } else if (region === 'CA') {
+            $('#writingName').attr('placeholder', 'ex: CA-DIN-Product-001');
+        }
+    });
+    
+    // Soumission du formulaire modal
+    $('#newSubmissionForm').submit(function(e) {
+        e.preventDefault();
+        
+        const submitBtn = $(this).find('button[type="submit"]');
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Création...');
+        
+        $.ajax({
+            url: $(this).attr('action'),
+            method: 'POST',
+            data: $(this).serialize(),
+            success: function(response) {
+                // Bootstrap 5 API pour fermer le modal
+                const modalEl = document.getElementById('newSubmissionModal');
+                const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                modal.hide();
+                
+                CTDSubmission.showNotification('Soumission créée avec succès!', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            },
+            error: function() {
+                CTDSubmission.showNotification('Erreur lors de la création', 'error');
+            },
+            complete: function() {
+                submitBtn.prop('disabled', false).html('<i class="fas fa-save me-2"></i>Créer la soumission');
+            }
+        });
+    });
+    
+    // Animation de l'assistant IA
+    setTimeout(() => {
+        $('#aiAssistant').addClass('animate__animated animate__fadeInUp');
+    }, 2000);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,678 @@
+<!-- templates/ctd_submission/document_version_history.html -->
+<!-- Interface pour visualiser et gérer l'historique des versions -->
+
+{% extends 'client/ctd_submission/base.html' %}
+
+{% block title %}Historique des Versions - {{ document.name }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'ctd_submission:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'ctd_submission:submission_detail' document.submission.id %}">{{ document.submission.name }}</a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'ctd_submission:document_view' document.id %}">{{ document.name }}</a>
+        </li>
+        <li class="breadcrumb-item active">Historique des Versions</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.version-timeline {
+    position: relative;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.version-timeline::after {
+    content: '';
+    position: absolute;
+    width: 3px;
+    background: linear-gradient(to bottom, #007bff, #6c757d);
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    margin-left: -1.5px;
+}
+
+.version-item {
+    padding: 20px 30px;
+    position: relative;
+    background-color: inherit;
+    width: 50%;
+}
+
+.version-item::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    right: -10px;
+    background-color: white;
+    border: 3px solid #007bff;
+    top: 30px;
+    border-radius: 50%;
+    z-index: 1;
+}
+
+.version-item.current::after {
+    background-color: #28a745;
+    border-color: #28a745;
+    box-shadow: 0 0 0 4px rgba(40, 167, 69, 0.2);
+}
+
+.version-item.left {
+    left: 0;
+}
+
+.version-item.right {
+    left: 50%;
+}
+
+.version-item.right::after {
+    left: -10px;
+}
+
+.version-content {
+    padding: 20px;
+    background-color: white;
+    position: relative;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.version-content:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.version-item.left .version-content::after {
+    content: " ";
+    height: 0;
+    position: absolute;
+    top: 30px;
+    width: 0;
+    z-index: 1;
+    right: -15px;
+    border: solid transparent;
+    border-color: rgba(255, 255, 255, 0);
+    border-left-color: white;
+    border-width: 10px;
+}
+
+.version-item.right .version-content::after {
+    content: " ";
+    height: 0;
+    position: absolute;
+    top: 30px;
+    width: 0;
+    z-index: 1;
+    left: -15px;
+    border: solid transparent;
+    border-color: rgba(255, 255, 255, 0);
+    border-right-color: white;
+    border-width: 10px;
+}
+
+.version-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.version-number {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.version-number.current {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.version-meta {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.version-description {
+    margin-bottom: 15px;
+    color: #495057;
+    line-height: 1.6;
+}
+
+.changes-summary {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-left: 4px solid #007bff;
+}
+
+.changes-badge {
+    display: inline-block;
+    background: #e9ecef;
+    color: #495057;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-right: 6px;
+    margin-bottom: 4px;
+}
+
+.version-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.compare-panel {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 400px;
+    height: 100vh;
+    background: white;
+    box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+    z-index: 1050;
+    transition: right 0.3s ease;
+    overflow-y: auto;
+}
+
+.compare-panel.open {
+    right: 0;
+}
+
+.compare-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.compare-content {
+    padding: 20px;
+}
+
+@media screen and (max-width: 768px) {
+    .version-timeline::after {
+        left: 30px;
+    }
+    
+    .version-item {
+        width: 100%;
+        padding-left: 70px;
+        padding-right: 25px;
+    }
+    
+    .version-item::after {
+        left: 20px;
+    }
+    
+    .version-item.right {
+        left: 0%;
+    }
+    
+    .version-item.left .version-content::after,
+    .version-item.right .version-content::after {
+        left: -15px;
+        border-color: rgba(255, 255, 255, 0);
+        border-right-color: white;
+        border-left-color: transparent;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- En-tête -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h4 mb-1">
+            <i class="fas fa-history me-2 text-primary"></i>
+            Historique des Versions
+        </h1>
+        <p class="text-muted mb-0">{{ document.name }}</p>
+    </div>
+    <div class="btn-group">
+        <a href="{% url 'ctd_submission:document_advanced_editor' document.id %}" class="btn btn-primary">
+            <i class="fas fa-edit me-2"></i>Retour à l'Éditeur
+        </a>
+        <button class="btn btn-outline-secondary" onclick="toggleComparePanel()">
+            <i class="fas fa-columns me-2"></i>Comparer
+        </button>
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="fas fa-cog"></i>
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#" onclick="exportVersionHistory()">
+                    <i class="fas fa-download me-2"></i>Exporter historique
+                </a></li>
+                <li><a class="dropdown-item" href="#" onclick="cleanupOldVersions()">
+                    <i class="fas fa-trash me-2"></i>Nettoyer anciennes versions
+                </a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Statistiques rapides -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-code-branch fa-2x text-primary mb-2"></i>
+                <h5 class="card-title">{{ versions.count }}</h5>
+                <p class="card-text text-muted small">Versions Total</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-edit fa-2x text-success mb-2"></i>
+                <h5 class="card-title">
+                    {% for version in versions %}
+                        {% if version.is_current %}{{ version.get_changes_count }}{% endif %}
+                    {% endfor %}
+                </h5>
+                <p class="card-text text-muted small">Modifications Actuelles</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-users fa-2x text-info mb-2"></i>
+                <h5 class="card-title">
+                    {{ versions|regroup:"created_by"|length }}
+                </h5>
+                <p class="card-text text-muted small">Contributeurs</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+                <h5 class="card-title">
+                    {% if versions.first %}
+                        {{ versions.first.created_at|timesince }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </h5>
+                <p class="card-text text-muted small">Dernière Modification</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Timeline des versions -->
+<div class="version-timeline">
+    {% for version in versions %}
+        <div class="version-item {% cycle 'left' 'right' %} {% if version.is_current %}current{% endif %}">
+            <div class="version-content">
+                <div class="version-header">
+                    <span class="version-number {% if version.is_current %}current{% endif %}">
+                        Version {{ version.version_number }}
+                        {% if version.is_current %}
+                            <i class="fas fa-star ms-1"></i>
+                        {% endif %}
+                    </span>
+                    <div class="version-meta text-end">
+                        <div>
+                            <i class="fas fa-user me-1"></i>
+                            {{ version.created_by.get_full_name|default:version.created_by.username }}
+                        </div>
+                        <div>
+                            <i class="fas fa-calendar me-1"></i>
+                            {{ version.created_at|date:"d M Y à H:i" }}
+                        </div>
+                    </div>
+                </div>
+                
+                {% if version.description %}
+                    <div class="version-description">
+                        {{ version.description }}
+                    </div>
+                {% endif %}
+                
+                {% if version.changes_summary %}
+                    <div class="changes-summary">
+                        <h6 class="mb-2">
+                            <i class="fas fa-list-ul me-1"></i>
+                            Résumé des Modifications ({{ version.get_changes_count }})
+                        </h6>
+                        <div class="changes-list">
+                            {{ version.get_summary }}
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <div class="version-actions">
+                    {% if not version.is_current %}
+                        <button class="btn btn-sm btn-success" onclick="restoreVersion({{ version.id }})">
+                            <i class="fas fa-undo me-1"></i>Restaurer
+                        </button>
+                    {% endif %}
+                    
+                    <button class="btn btn-sm btn-outline-primary" onclick="previewVersion({{ version.id }})">
+                        <i class="fas fa-eye me-1"></i>Prévisualiser
+                    </button>
+                    
+                    <button class="btn btn-sm btn-outline-info" onclick="addToComparison({{ version.id }})">
+                        <i class="fas fa-plus me-1"></i>Comparer
+                    </button>
+                    
+                    {% if not version.is_current %}
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteVersion({{ version.id }})">
+                            <i class="fas fa-trash me-1"></i>Supprimer
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="text-center py-5">
+            <i class="fas fa-history fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">Aucune version disponible</h5>
+            <p class="text-muted">Les versions seront créées automatiquement lors des modifications du document.</p>
+        </div>
+    {% endfor %}
+</div>
+
+<!-- Panneau de comparaison -->
+<div id="comparePanel" class="compare-panel">
+    <div class="compare-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-columns me-2"></i>
+                Comparaison de Versions
+            </h5>
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleComparePanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+    <div class="compare-content">
+        <div id="comparisonResult">
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-info-circle fa-2x mb-3"></i>
+                <p>Sélectionnez deux versions à comparer en cliquant sur "Comparer" dans la timeline.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de prévisualisation -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-eye me-2"></i>
+                    Prévisualisation de Version
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent" style="max-height: 70vh; overflow-y: auto;">
+                    <!-- Contenu de prévisualisation -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-success" id="restoreFromPreview">
+                    <i class="fas fa-undo me-2"></i>Restaurer cette Version
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedVersions = [];
+let currentPreviewVersion = null;
+
+function restoreVersion(versionId) {
+    CTDSubmission.confirmAction(
+        'Êtes-vous sûr de vouloir restaurer cette version ? La version actuelle sera sauvegardée automatiquement.',
+        function() {
+            $.ajax({
+                url: `/document/{{ document.id }}/restore-version/${versionId}/`,
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        CTDSubmission.showNotification('Version restaurée avec succès!', 'success');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        CTDSubmission.showNotification(response.message || 'Erreur lors de la restauration', 'error');
+                    }
+                },
+                error: function() {
+                    CTDSubmission.showNotification('Erreur lors de la restauration', 'error');
+                }
+            });
+        }
+    );
+}
+
+function previewVersion(versionId) {
+    currentPreviewVersion = versionId;
+    
+    // Simuler le chargement de la prévisualisation
+    $('#previewContent').html(`
+        <div class="text-center py-4">
+            <i class="fas fa-spinner fa-spin fa-2x text-primary mb-3"></i>
+            <p>Chargement de la prévisualisation...</p>
+        </div>
+    `);
+    
+    $('#previewModal').modal('show');
+    
+    // Charger le contenu de la version
+    setTimeout(() => {
+        $('#previewContent').html(`
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Prévisualisation de la version ${versionId}
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Contenu de la Version</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Ici s'afficherait le contenu complet de la version sélectionnée.
+                        Dans une implémentation complète, cela inclurait :
+                    </p>
+                    <ul>
+                        <li>Le contenu formaté du document</li>
+                        <li>Les données des templates</li>
+                        <li>Les métadonnées de la version</li>
+                        <li>Les modifications apportées</li>
+                    </ul>
+                </div>
+            </div>
+        `);
+    }, 1000);
+}
+
+function addToComparison(versionId) {
+    if (selectedVersions.includes(versionId)) {
+        selectedVersions = selectedVersions.filter(id => id !== versionId);
+        CTDSubmission.showNotification('Version retirée de la comparaison', 'info');
+    } else {
+        if (selectedVersions.length >= 2) {
+            selectedVersions = [selectedVersions[1], versionId];
+            CTDSubmission.showNotification('Version ajoutée (limite de 2 versions)', 'warning');
+        } else {
+            selectedVersions.push(versionId);
+            CTDSubmission.showNotification('Version ajoutée à la comparaison', 'success');
+        }
+    }
+    
+    updateComparisonPanel();
+}
+
+function updateComparisonPanel() {
+    const comparisonResult = document.getElementById('comparisonResult');
+    
+    if (selectedVersions.length === 0) {
+        comparisonResult.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-info-circle fa-2x mb-3"></i>
+                <p>Sélectionnez deux versions à comparer.</p>
+            </div>
+        `;
+    } else if (selectedVersions.length === 1) {
+        comparisonResult.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
+                <p><strong>Version ${selectedVersions[0]} sélectionnée</strong></p>
+                <p class="small">Sélectionnez une deuxième version pour comparer.</p>
+            </div>
+        `;
+    } else {
+        comparisonResult.innerHTML = `
+            <div class="comparison-active">
+                <div class="alert alert-success">
+                    <i class="fas fa-columns me-2"></i>
+                    <strong>Comparaison: Version ${selectedVersions[0]} vs Version ${selectedVersions[1]}</strong>
+                </div>
+                
+                <div class="row">
+                    <div class="col-6">
+                        <h6>Version ${selectedVersions[0]}</h6>
+                        <div class="border rounded p-3 bg-light">
+                            <p class="small text-muted">Contenu de la version ${selectedVersions[0]}...</p>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h6>Version ${selectedVersions[1]}</h6>
+                        <div class="border rounded p-3 bg-light">
+                            <p class="small text-muted">Contenu de la version ${selectedVersions[1]}...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <h6>Différences Détectées</h6>
+                    <div class="list-group">
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1 text-success">+ Ajout</h6>
+                                <small>Ligne 15</small>
+                            </div>
+                            <p class="mb-1">Nouveau paragraphe ajouté dans la version ${selectedVersions[1]}</p>
+                        </div>
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1 text-danger">- Suppression</h6>
+                                <small>Ligne 8</small>
+                            </div>
+                            <p class="mb-1">Texte supprimé dans la version ${selectedVersions[1]}</p>
+                        </div>
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1 text-warning">~ Modification</h6>
+                                <small>Ligne 22</small>
+                            </div>
+                            <p class="mb-1">Date modifiée: 2024-01-15 → 2024-01-20</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3 text-center">
+                    <button class="btn btn-outline-secondary" onclick="clearComparison()">
+                        <i class="fas fa-times me-1"></i>Effacer
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function clearComparison() {
+    selectedVersions = [];
+    updateComparisonPanel();
+    CTDSubmission.showNotification('Comparaison effacée', 'info');
+}
+
+function toggleComparePanel() {
+    const panel = document.getElementById('comparePanel');
+    panel.classList.toggle('open');
+}
+
+function deleteVersion(versionId) {
+    CTDSubmission.confirmAction(
+        'Êtes-vous sûr de vouloir supprimer cette version ? Cette action est irréversible.',
+        function() {
+            // Simulation de suppression
+            CTDSubmission.showNotification('Fonctionnalité de suppression à implémenter', 'info');
+        }
+    );
+}
+
+function exportVersionHistory() {
+    // Générer un export de l'historique
+    window.location.href = `/document/{{ document.id }}/export-history/`;
+    CTDSubmission.showNotification('Export de l\'historique en cours...', 'info');
+}
+
+function cleanupOldVersions() {
+    CTDSubmission.confirmAction(
+        'Voulez-vous supprimer les versions anciennes (> 30 jours) ? Cette action libérera de l\'espace de stockage.',
+        function() {
+            CTDSubmission.showNotification('Nettoyage des anciennes versions en cours...', 'info');
+            // Implémentation du nettoyage
+        }
+    );
+}
+
+// Restaurer depuis la prévisualisation
+document.getElementById('restoreFromPreview')?.addEventListener('click', function() {
+    if (currentPreviewVersion) {
+        $('#previewModal').modal('hide');
+        restoreVersion(currentPreviewVersion);
+    }
+});
+
+// Raccourcis clavier
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        if ($('#previewModal').hasClass('show')) {
+            $('#previewModal').modal('hide');
+        } else if (document.getElementById('comparePanel').classList.contains('open')) {
+            toggleComparePanel();
+        }
+    }
+});
+
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+           document.querySelector('meta[name=csrf-token]')?.getAttribute('content');
+}
+</script>
+{% endblock %}

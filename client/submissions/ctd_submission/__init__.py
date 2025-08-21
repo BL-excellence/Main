@@ -1,0 +1,1 @@
+default_app_config = 'client.submissions.ctd_submission.apps.CtdSubmissionConfig'

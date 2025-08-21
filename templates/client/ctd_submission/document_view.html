@@ -1,0 +1,524 @@
+<!-- Chemin d'intégration : templates/ctd_submission/document_view.html -->
+<!-- Template pour la vue "Voir" - Affichage du document dans son état brut original -->
+
+{% extends 'client/ctd_submission/base.html' %}
+
+{% block title %}Document - {{ document.name }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'submission_detail' document.submission.id %}">{{ document.submission.name }}</a>
+        </li>
+        <li class="breadcrumb-item active">{{ document.name }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<!-- En-tête du document -->
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h1 class="h4 mb-2">
+            {% if document.document_type == 'pdf' %}
+                <i class="fas fa-file-pdf text-danger me-2"></i>
+            {% elif document.document_type == 'docx' %}
+                <i class="fas fa-file-word text-primary me-2"></i>
+            {% elif document.document_type == 'xlsx' %}
+                <i class="fas fa-file-excel text-success me-2"></i>
+            {% endif %}
+            {{ document.name }}
+        </h1>
+        <div class="d-flex align-items-center gap-3">
+            <span class="badge bg-secondary">{{ document.get_document_type_display }}</span>
+            <span class="badge bg-primary">{{ document.section.code }} {{ document.section.name }}</span>
+            <small class="text-muted">
+                <i class="fas fa-calendar me-1"></i>{{ document.created_at|date:"d M Y H:i" }}
+            </small>
+        </div>
+    </div>
+    <div class="btn-group">
+        <a href="{% url 'document_template' document.id %}" class="btn btn-success">
+            <i class="fas fa-edit me-2"></i>Mode Template
+        </a>
+        <button class="btn btn-outline-primary" onclick="downloadDocument()">
+            <i class="fas fa-download me-2"></i>Télécharger
+        </button>
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="fas fa-cog"></i>
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#" onclick="refreshDocument()">
+                    <i class="fas fa-sync me-2"></i>Actualiser
+                </a></li>
+                <li><a class="dropdown-item" href="#" onclick="viewMetadata()">
+                    <i class="fas fa-info-circle me-2"></i>Métadonnées
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="#" onclick="deleteDocument()">
+                    <i class="fas fa-trash me-2"></i>Supprimer
+                </a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Informations sur l'analyse IA -->
+{% if document.ai_analysis %}
+<div class="ai-analysis-result mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h6 class="mb-1">
+                <i class="fas fa-brain me-2"></i>Analyse IA - Classification Automatique
+            </h6>
+            <p class="mb-0">
+                Ce document a été automatiquement classifié avec 
+                <strong>{{ document.ai_analysis.confidence_score|floatformat:1 }}% de confiance</strong>
+            </p>
+        </div>
+        <div class="text-end">
+            <small>Module suggéré: <strong>{{ document.ai_analysis.suggested_module.name }}</strong></small><br>
+            <small>Section suggérée: <strong>{{ document.ai_analysis.suggested_section.name }}</strong></small>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Zone de contenu selon le type de document -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            {% if is_raw_view %}
+                <i class="fas fa-eye me-2"></i>Vue Brute Originale
+            {% else %}
+                <i class="fas fa-file-alt me-2"></i>Contenu du Document
+            {% endif %}
+        </h5>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" onclick="zoomIn()">
+                <i class="fas fa-search-plus"></i>
+            </button>
+            <button class="btn btn-outline-secondary" onclick="zoomOut()">
+                <i class="fas fa-search-minus"></i>
+            </button>
+            <button class="btn btn-outline-secondary" onclick="fitToWidth()">
+                <i class="fas fa-expand-arrows-alt"></i>
+            </button>
+        </div>
+    </div>
+    
+    <div class="card-body p-0">
+        {% if document.document_type == 'pdf' %}
+            <!-- Affichage PDF -->
+            <div id="pdfViewer" class="text-center p-4">
+                {% if document.file %}
+                    <iframe src="{{ document.file.url }}" 
+                            width="100%" 
+                            height="800px" 
+                            style="border: none;">
+                        <p>Votre navigateur ne peut pas afficher ce PDF. 
+                           <a href="{{ document.file.url }}" target="_blank">Cliquez ici pour le télécharger</a>
+                        </p>
+                    </iframe>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-file-pdf fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">Document PDF non disponible</h5>
+                        <p class="text-muted">Le fichier PDF original n'est pas accessible.</p>
+                    </div>
+                {% endif %}
+            </div>
+            
+        {% elif document.document_type == 'docx' %}
+            <!-- Affichage Word -->
+            <div id="wordViewer" class="p-4">
+                {% if content and content.paragraphs %}
+                    <div class="document-content" style="font-family: 'Times New Roman', serif; line-height: 1.6;">
+                        {% for paragraph in content.paragraphs %}
+                            <p style="margin-bottom: 1em;">{{ paragraph|linebreaks }}</p>
+                        {% endfor %}
+                    </div>
+                {% elif content and content.text %}
+                    <div class="document-content" style="font-family: 'Times New Roman', serif; line-height: 1.6;">
+                        {{ content.text|linebreaks }}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-file-word fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">Contenu Word en cours d'extraction</h5>
+                        <p class="text-muted">Le contenu du document Word sera affiché une fois l'extraction terminée.</p>
+                        <button class="btn btn-primary" onclick="extractContent()">
+                            <i class="fas fa-sync me-2"></i>Extraire le contenu
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+            
+        {% elif document.document_type == 'xlsx' %}
+            <!-- Affichage Excel -->
+            <div id="excelViewer" class="p-4">
+                {% if content and content.sheets %}
+                    <!-- Onglets pour les feuilles -->
+                    {% if content.sheets|length > 1 %}
+                    <ul class="nav nav-tabs mb-3">
+                        {% for sheet in content.sheets %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if forloop.first %}active{% endif %}" 
+                               data-bs-toggle="tab" href="#sheet{{ forloop.counter }}">
+                                {{ sheet.name }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    
+                    <!-- Contenu des feuilles -->
+                    <div class="tab-content">
+                        {% for sheet in content.sheets %}
+                        <div class="tab-pane {% if forloop.first %}active{% endif %}" 
+                             id="sheet{{ forloop.counter }}">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered excel-table">
+                                    {% for row in sheet.data %}
+                                        <tr>
+                                            {% for cell in row %}
+                                                {% if forloop.parentloop.first %}
+                                                    <th class="bg-light">{{ cell }}</th>
+                                                {% else %}
+                                                    <td>{{ cell }}</td>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-file-excel fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">Contenu Excel en cours d'extraction</h5>
+                        <p class="text-muted">Le contenu du fichier Excel sera affiché une fois l'extraction terminée.</p>
+                        <button class="btn btn-primary" onclick="extractContent()">
+                            <i class="fas fa-sync me-2"></i>Extraire le contenu
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+            
+        {% else %}
+            <!-- Type de document générique -->
+            <div class="p-4">
+                <div class="text-center py-5">
+                    <i class="fas fa-file fa-4x text-muted mb-3"></i>
+                    <h5 class="text-muted">Aperçu non disponible</h5>
+                    <p class="text-muted">Ce type de document ne peut pas être affiché directement.</p>
+                    {% if document.file %}
+                        <a href="{{ document.file.url }}" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-external-link-alt me-2"></i>Ouvrir dans un nouvel onglet
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Historique des modifications (si template modifié) -->
+{% if document.template_data %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h6 class="mb-0">
+            <i class="fas fa-history me-2"></i>Modifications du Template
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Ce document a été modifié via le mode Template. 
+            <a href="{% url 'document_template' document.id %}" class="alert-link">
+                Voir les modifications dans le template
+            </a>
+        </div>
+        
+        <div class="row">
+            {% for field_name, field_value in document.template_data.items %}
+                <div class="col-md-6 mb-2">
+                    <small class="text-muted">{{ field_name }}</small><br>
+                    <strong>{{ field_value|truncatewords:10 }}</strong>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal des métadonnées -->
+<div class="modal fade" id="metadataModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-info-circle me-2"></i>Métadonnées du Document
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Informations générales</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Nom:</strong></td>
+                                <td>{{ document.name }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Type:</strong></td>
+                                <td>{{ document.get_document_type_display }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Section CTD:</strong></td>
+                                <td>{{ document.section.code }} {{ document.section.name }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Créé le:</strong></td>
+                                <td>{{ document.created_at|date:"d M Y H:i:s" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Modifié le:</strong></td>
+                                <td>{{ document.updated_at|date:"d M Y H:i:s" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Analyse et traitement</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Contenu extrait:</strong></td>
+                                <td>
+                                    {% if document.content_extracted %}
+                                        <span class="badge bg-success">Oui</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Non</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Template généré:</strong></td>
+                                <td>
+                                    {% if document.is_template_generated %}
+                                        <span class="badge bg-success">Oui</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Non</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% if document.ai_analysis %}
+                            <tr>
+                                <td><strong>Analyse IA:</strong></td>
+                                <td><span class="badge bg-info">{{ document.ai_analysis.confidence_score|floatformat:1 }}%</span></td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+                
+                {% if document.ai_analysis and document.ai_analysis.keywords_found %}
+                <hr>
+                <h6>Mots-clés identifiés par l'IA</h6>
+                <div>
+                    {% for keyword in document.ai_analysis.keywords_found %}
+                        <span class="badge bg-secondary me-1">{{ keyword }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.document-content {
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+    padding: 2rem;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.excel-table {
+    font-size: 0.875rem;
+}
+
+.excel-table th {
+    background-color: #f8f9fa !important;
+    font-weight: bold;
+    text-align: center;
+}
+
+.excel-table td {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#pdfViewer iframe {
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.zoom-controls {
+    position: sticky;
+    top: 10px;
+    z-index: 100;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentZoom = 100;
+
+function downloadDocument() {
+    {% if document.file %}
+        window.open('{{ document.file.url }}', '_blank');
+    {% else %}
+        CTDSubmission.showNotification('Fichier non disponible pour le téléchargement', 'error');
+    {% endif %}
+}
+
+function refreshDocument() {
+    window.location.reload();
+}
+
+function viewMetadata() {
+    $('#metadataModal').modal('show');
+}
+
+function deleteDocument() {
+    CTDSubmission.confirmAction(
+        'Êtes-vous sûr de vouloir supprimer ce document ? Cette action est irréversible.',
+        function() {
+            $.ajax({
+                url: '{% url "template_delete_field" 0 %}'.replace('0', '{{ document.id }}'),
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCsrfToken()
+                },
+                success: function() {
+                    CTDSubmission.showNotification('Document supprimé avec succès', 'success');
+                    setTimeout(() => {
+                        window.location.href = '{% url "submission_detail" document.submission.id %}';
+                    }, 1500);
+                },
+                error: function() {
+                    CTDSubmission.showNotification('Erreur lors de la suppression', 'error');
+                }
+            });
+        }
+    );
+}
+
+function extractContent() {
+    const btn = event.target;
+    $(btn).prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Extraction...');
+    
+    $.ajax({
+        url: window.location.href,
+        method: 'POST',
+        data: {
+            'extract_content': true,
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function() {
+            CTDSubmission.showNotification('Contenu extrait avec succès', 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        },
+        error: function() {
+            CTDSubmission.showNotification('Erreur lors de l\'extraction', 'error');
+        },
+        complete: function() {
+            $(btn).prop('disabled', false).html('<i class="fas fa-sync me-2"></i>Extraire le contenu');
+        }
+    });
+}
+
+function zoomIn() {
+    currentZoom += 10;
+    applyZoom();
+}
+
+function zoomOut() {
+    if (currentZoom > 50) {
+        currentZoom -= 10;
+        applyZoom();
+    }
+}
+
+function fitToWidth() {
+    currentZoom = 100;
+    applyZoom();
+}
+
+function applyZoom() {
+    const content = $('.document-content, #pdfViewer iframe, .excel-table');
+    content.css('zoom', currentZoom + '%');
+    
+    // Mettre à jour l'affichage du zoom
+    $('.zoom-level').text(currentZoom + '%');
+}
+
+// Raccourcis clavier
+$(document).keydown(function(e) {
+    if (e.ctrlKey) {
+        switch(e.which) {
+            case 107: // Ctrl + +
+            case 187: // Ctrl + = (pour les claviers US)
+                e.preventDefault();
+                zoomIn();
+                break;
+            case 109: // Ctrl + -
+            case 189: // Ctrl + - (pour les claviers US)
+                e.preventDefault();
+                zoomOut();
+                break;
+            case 48: // Ctrl + 0
+                e.preventDefault();
+                fitToWidth();
+                break;
+        }
+    }
+});
+
+// Auto-refresh pour les documents en cours d'extraction
+$(document).ready(function() {
+    {% if not content or not content.extracted %}
+        // Vérifier toutes les 10 secondes si l'extraction est terminée
+        const checkExtractionInterval = setInterval(function() {
+            $.ajax({
+                url: window.location.href + '?check_extraction=1',
+                method: 'GET',
+                success: function(response) {
+                    if (response.extracted) {
+                        clearInterval(checkExtractionInterval);
+                        window.location.reload();
+                    }
+                }
+            });
+        }, 10000);
+        
+        // Arrêter après 2 minutes
+        setTimeout(() => {
+            clearInterval(checkExtractionInterval);
+        }, 120000);
+    {% endif %}
+});
+</script>
+{% endblock %}

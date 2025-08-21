@@ -1,0 +1,1188 @@
+<!-- templates/ctd_submission/document_intelligent_editor.html -->
+{% extends 'client/ctd_submission/base.html' %}
+{% load static %}
+
+{% block title %}Éditeur Intelligent - {{ document.name }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+/* Styles spéciaux pour l'éditeur intelligent */
+.intelligent-editor-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.intelligent-header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 1rem 2rem;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.fidelity-indicators {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.fidelity-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.fidelity-indicator.active {
+    background: linear-gradient(45deg, #28a745, #20c997);
+    color: white;
+}
+
+.fidelity-indicator.inactive {
+    background: #f8f9fa;
+    color: #6c757d;
+}
+
+.intelligent-toolbar {
+    background: white;
+    padding: 1rem 2rem;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.overlay-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.overlay-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.overlay-opacity-slider {
+    width: 150px;
+}
+
+.intelligent-editor-main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    background: #f8f9fa;
+}
+
+.document-canvas {
+    flex: 1;
+    overflow: auto;
+    padding: 2rem;
+    position: relative;
+}
+
+/* Animation pour les zones d'édition */
+@keyframes zone-highlight {
+    0% { box-shadow: 0 0 0 3px rgba(0, 123, 255, 0); }
+    50% { box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.6); }
+    100% { box-shadow: 0 0 0 3px rgba(0, 123, 255, 0); }
+}
+
+.intelligent-editable-zone.highlight {
+    animation: zone-highlight 2s ease-in-out;
+}
+
+/* Panneau de propriétés */
+.properties-panel {
+    width: 300px;
+    background: white;
+    border-left: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+}
+
+.properties-header {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    font-weight: 600;
+}
+
+.properties-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.property-group {
+    margin-bottom: 1.5rem;
+}
+
+.property-group h6 {
+    margin-bottom: 0.5rem;
+    color: #495057;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.property-item {
+    margin-bottom: 0.75rem;
+}
+
+.property-item label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6c757d;
+}
+
+.property-item input,
+.property-item select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.color-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.color-sample {
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    border: 1px solid #ced4da;
+    cursor: pointer;
+}
+
+.font-preview {
+    padding: 0.5rem;
+    border: 1px solid #e9ecef;
+    border-radius: 0.25rem;
+    background: #f8f9fa;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<div class="intelligent-editor-container">
+    <!-- Header avec indicateurs de fidélité -->
+    <div class="intelligent-header">
+        <div class="document-info">
+            <h1 class="h4 mb-1">
+                <i class="fas fa-brain text-primary me-2"></i>
+                Éditeur Intelligent - {{ document.name }}
+            </h1>
+            <div class="fidelity-indicators">
+                <div class="fidelity-indicator {% if has_overlay_support %}active{% else %}inactive{% endif %}">
+                    <i class="fas fa-layer-group"></i>
+                    <span>Overlay Visuel</span>
+                </div>
+                <div class="fidelity-indicator {% if style_preservation %}active{% else %}inactive{% endif %}">
+                    <i class="fas fa-palette"></i>
+                    <span>Styles Préservés</span>
+                </div>
+                <div class="fidelity-indicator {% if editing_zones %}active{% else %}inactive{% endif %}">
+                    <i class="fas fa-crosshairs"></i>
+                    <span>Zones Précises</span>
+                </div>
+                <div class="fidelity-indicator {% if color_palette %}active{% else %}inactive{% endif %}">
+                    <i class="fas fa-eye-dropper"></i>
+                    <span>Couleurs Fidèles</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="header-actions">
+            <button class="btn btn-outline-secondary me-2" onclick="window.history.back()">
+                <i class="fas fa-arrow-left me-2"></i>Retour
+            </button>
+            <button class="btn btn-success" id="saveIntelligentBtn">
+                <i class="fas fa-save me-2"></i>Sauvegarder
+            </button>
+        </div>
+    </div>
+    
+    <!-- Toolbar intelligent -->
+    <div class="intelligent-toolbar">
+        <div class="overlay-controls">
+            {% if has_overlay_support %}
+            <div class="overlay-toggle">
+                <label class="form-check-label me-2">
+                    <input type="checkbox" class="form-check-input" id="overlayToggle" checked>
+                    Overlay de référence
+                </label>
+                <input type="range" class="form-range overlay-opacity-slider" 
+                       id="overlayOpacity" min="0" max="100" value="30">
+                <small class="text-muted ms-2">Opacité: <span id="opacityValue">30%</span></small>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="editing-tools">
+            <button class="btn btn-sm btn-outline-primary me-2" id="highlightZonesBtn">
+                <i class="fas fa-crosshairs me-1"></i>Zones d'édition
+            </button>
+            <button class="btn btn-sm btn-outline-info me-2" id="previewModeBtn">
+                <i class="fas fa-eye me-1"></i>Aperçu
+            </button>
+            <button class="btn btn-sm btn-outline-warning" id="resetStylesBtn">
+                <i class="fas fa-undo me-1"></i>Réinitialiser
+            </button>
+        </div>
+    </div>
+    
+    <!-- Interface principale -->
+    <div class="intelligent-editor-main">
+        <!-- Canvas du document -->
+        <div class="document-canvas" id="documentCanvas">
+            {% if content.html %}
+                {{ content.html|safe }}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-brain fa-3x text-muted mb-3"></i>
+                    <h5>Extraction intelligente requise</h5>
+                    <p class="text-muted">Ce document nécessite une extraction intelligente pour préserver sa fidélité.</p>
+                    <button class="btn btn-primary btn-lg" id="extractIntelligentBtn">
+                        <i class="fas fa-magic me-2"></i>Extraire avec IA
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Panneau de propriétés -->
+        <div class="properties-panel" id="propertiesPanel">
+            <div class="properties-header">
+                <i class="fas fa-sliders-h me-2"></i>Propriétés de l'élément
+            </div>
+            <div class="properties-content" id="propertiesContent">
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-mouse-pointer fa-2x mb-3"></i>
+                    <p>Sélectionnez un élément pour modifier ses propriétés</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Configuration pour l'éditeur intelligent
+window.INTELLIGENT_EDITOR = {
+    documentId: {{ document.id }},
+    hasOverlay: {{ has_overlay_support|yesno:"true,false" }},
+    stylePreservation: {{ style_preservation|yesno:"true,false" }},
+    colorPalette: {{ color_palette|safe }},
+    editingZones: {{ editing_zones|length|default:0 }},
+    urls: {
+        save: "{% url 'ctd_submission:document_save_changes' document.id %}",
+        extractIntelligent: "{% url 'ctd_submission:api_extract_content_intelligent' document.id %}"
+    }
+};
+
+// Initialisation de l'éditeur intelligent
+document.addEventListener('DOMContentLoaded', function() {
+    initializeIntelligentEditor();
+});
+
+function initializeIntelligentEditor() {
+    console.log('🧠 Initialisation de l\'éditeur intelligent...');
+    
+    // Gestion de l'overlay
+    initializeOverlayControls();
+    
+    // Gestion des zones d'édition
+    initializeEditingZones();
+    
+    // Panneau de propriétés
+    initializePropertiesPanel();
+    
+    // Boutons d'action
+    initializeIntelligentActions();
+    
+    console.log('✅ Éditeur intelligent initialisé');
+}
+
+function initializeOverlayControls() {
+    if (!window.INTELLIGENT_EDITOR.hasOverlay) return;
+    
+    const overlayToggle = document.getElementById('overlayToggle');
+    const overlayOpacity = document.getElementById('overlayOpacity');
+    const opacityValue = document.getElementById('opacityValue');
+    
+    overlayToggle?.addEventListener('change', function() {
+        const backgroundImages = document.querySelectorAll('.page-background-image');
+        backgroundImages.forEach(img => {
+            img.style.display = this.checked ? 'block' : 'none';
+        });
+    });
+    
+    overlayOpacity?.addEventListener('input', function() {
+        const opacity = this.value / 100;
+        opacityValue.textContent = this.value + '%';
+        
+        const backgroundImages = document.querySelectorAll('.page-background-image');
+        backgroundImages.forEach(img => {
+            img.style.opacity = opacity;
+        });
+    });
+}
+
+function initializeEditingZones() {
+    const editableZones = document.querySelectorAll('.intelligent-editable-zone');
+    
+    editableZones.forEach(zone => {
+        // Gestion de la sélection
+        zone.addEventListener('click', function(e) {
+            e.stopPropagation();
+            selectEditingZone(this);
+        });
+        
+        // Gestion des modifications
+        zone.addEventListener('input', function() {
+            this.classList.add('modified');
+            updatePropertiesPanel(this);
+        });
+        
+        // Feedback visuel
+        zone.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.02)';
+        });
+        
+        zone.addEventListener('mouseleave', function() {
+            if (!this.classList.contains('selected')) {
+                this.style.transform = 'scale(1)';
+            }
+        });
+    });
+}
+
+function selectEditingZone(zone) {
+    // Désélectionner les autres zones
+    document.querySelectorAll('.intelligent-editable-zone.selected').forEach(z => {
+        z.classList.remove('selected');
+        z.style.transform = 'scale(1)';
+    });
+    
+    // Sélectionner la zone actuelle
+    zone.classList.add('selected');
+    zone.style.transform = 'scale(1.02)';
+    
+    // Mettre à jour le panneau de propriétés
+    updatePropertiesPanel(zone);
+}
+
+function updatePropertiesPanel(zone) {
+    const propertiesContent = document.getElementById('propertiesContent');
+    
+    // Extraire les propriétés de la zone
+    const computedStyle = window.getComputedStyle(zone);
+    const elementType = zone.getAttribute('data-element-type') || 'text';
+    const confidence = parseFloat(zone.getAttribute('data-confidence') || '0.5');
+    
+    const propertiesHTML = `
+        <div class="property-group">
+            <h6>Élément</h6>
+            <div class="property-item">
+                <label>Type</label>
+                <select id="elementType">
+                    <option value="paragraph" ${elementType === 'paragraph' ? 'selected' : ''}>Paragraphe</option>
+                    <option value="heading" ${elementType === 'heading' ? 'selected' : ''}>Titre</option>
+                    <option value="list_item" ${elementType === 'list_item' ? 'selected' : ''}>Élément de liste</option>
+                    <option value="label" ${elementType === 'label' ? 'selected' : ''}>Libellé</option>
+                </select>
+            </div>
+            <div class="property-item">
+                <label>Confiance IA</label>
+                <div class="progress">
+                    <div class="progress-bar" style="width: ${confidence * 100}%">${Math.round(confidence * 100)}%</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="property-group">
+            <h6>Style</h6>
+            <div class="property-item">
+                <label>Police</label>
+                <select id="fontFamily">
+                    <option value="${computedStyle.fontFamily}">${computedStyle.fontFamily}</option>
+                </select>
+            </div>
+            <div class="property-item">
+                <label>Taille</label>
+                <input type="number" id="fontSize" value="${parseInt(computedStyle.fontSize)}" min="8" max="72">
+            </div>
+            <div class="property-item">
+                <label>Couleur</label>
+                <div class="color-picker">
+                    <div class="color-sample" style="background-color: ${computedStyle.color}" id="colorSample"></div>
+                    <input type="color" id="textColor" value="${rgbToHex(computedStyle.color)}">
+                </div>
+            </div>
+            <div class="property-item">
+                <label>Style</label>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary ${computedStyle.fontWeight === 'bold' || parseInt(computedStyle.fontWeight) > 400 ? 'active' : ''}" 
+                            id="boldBtn" onclick="toggleBold()">
+                        <i class="fas fa-bold"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary ${computedStyle.fontStyle === 'italic' ? 'active' : ''}" 
+                            id="italicBtn" onclick="toggleItalic()">
+                        <i class="fas fa-italic"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary ${computedStyle.textDecoration.includes('underline') ? 'active' : ''}" 
+                            id="underlineBtn" onclick="toggleUnderline()">
+                        <i class="fas fa-underline"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="property-group">
+            <h6>Position</h6>
+            <div class="property-item">
+                <label>Alignement</label>
+                <select id="textAlign">
+                    <option value="left" ${computedStyle.textAlign === 'left' ? 'selected' : ''}>Gauche</option>
+                    <option value="center" ${computedStyle.textAlign === 'center' ? 'selected' : ''}>Centre</option>
+                    <option value="right" ${computedStyle.textAlign === 'right' ? 'selected' : ''}>Droite</option>
+                    <option value="justify" ${computedStyle.textAlign === 'justify' ? 'selected' : ''}>Justifié</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="property-group">
+            <h6>Aperçu</h6>
+            <div class="font-preview" id="fontPreview">
+                ${zone.textContent.substring(0, 50)}${zone.textContent.length > 50 ? '...' : ''}
+            </div>
+        </div>
+    `;
+    
+    propertiesContent.innerHTML = propertiesHTML;
+    
+    // Attacher les événements
+    attachPropertyEvents(zone);
+}
+
+function attachPropertyEvents(zone) {
+    // Événements pour les contrôles de propriétés
+    document.getElementById('fontSize')?.addEventListener('input', function() {
+        zone.style.fontSize = this.value + 'px';
+        updateFontPreview(zone);
+    });
+    
+    document.getElementById('textColor')?.addEventListener('change', function() {
+        zone.style.color = this.value;
+        document.getElementById('colorSample').style.backgroundColor = this.value;
+        updateFontPreview(zone);
+    });
+    
+    document.getElementById('textAlign')?.addEventListener('change', function() {
+        zone.style.textAlign = this.value;
+    });
+    
+    document.getElementById('elementType')?.addEventListener('change', function() {
+        zone.setAttribute('data-element-type', this.value);
+        zone.className = zone.className.replace(/element-\w+/, `element-${this.value}`);
+    });
+}
+
+function toggleBold() {
+    const zone = document.querySelector('.intelligent-editable-zone.selected');
+    if (zone) {
+        const isBold = window.getComputedStyle(zone).fontWeight === 'bold' || parseInt(window.getComputedStyle(zone).fontWeight) > 400;
+        zone.style.fontWeight = isBold ? 'normal' : 'bold';
+        document.getElementById('boldBtn').classList.toggle('active', !isBold);
+        updateFontPreview(zone);
+    }
+}
+
+function toggleItalic() {
+    const zone = document.querySelector('.intelligent-editable-zone.selected');
+    if (zone) {
+        const isItalic = window.getComputedStyle(zone).fontStyle === 'italic';
+        zone.style.fontStyle = isItalic ? 'normal' : 'italic';
+        document.getElementById('italicBtn').classList.toggle('active', !isItalic);
+        updateFontPreview(zone);
+    }
+}
+
+function toggleUnderline() {
+    const zone = document.querySelector('.intelligent-editable-zone.selected');
+    if (zone) {
+        const isUnderlined = window.getComputedStyle(zone).textDecoration.includes('underline');
+        zone.style.textDecoration = isUnderlined ? 'none' : 'underline';
+        document.getElementById('underlineBtn').classList.toggle('active', !isUnderlined);
+        updateFontPreview(zone);
+    }
+}
+
+function updateFontPreview(zone) {
+    const preview = document.getElementById('fontPreview');
+    if (preview && zone) {
+        preview.style.fontFamily = zone.style.fontFamily || window.getComputedStyle(zone).fontFamily;
+        preview.style.fontSize = zone.style.fontSize || window.getComputedStyle(zone).fontSize;
+        preview.style.color = zone.style.color || window.getComputedStyle(zone).color;
+        preview.style.fontWeight = zone.style.fontWeight || window.getComputedStyle(zone).fontWeight;
+        preview.style.fontStyle = zone.style.fontStyle || window.getComputedStyle(zone).fontStyle;
+        preview.style.textDecoration = zone.style.textDecoration || window.getComputedStyle(zone).textDecoration;
+    }
+}
+
+function initializeIntelligentActions() {
+    // Bouton de sauvegarde intelligente
+    document.getElementById('saveIntelligentBtn')?.addEventListener('click', saveIntelligentDocument);
+    
+    // Bouton d'extraction intelligente
+    document.getElementById('extractIntelligentBtn')?.addEventListener('click', extractIntelligentContent);
+    
+    // Bouton de mise en évidence des zones
+    document.getElementById('highlightZonesBtn')?.addEventListener('click', highlightEditingZones);
+    
+    // Bouton de mode aperçu
+    document.getElementById('previewModeBtn')?.addEventListener('click', togglePreviewMode);
+    
+    // Bouton de réinitialisation des styles
+    document.getElementById('resetStylesBtn')?.addEventListener('click', resetElementStyles);
+    
+    // Raccourcis clavier intelligents
+    document.addEventListener('keydown', handleIntelligentKeyboard);
+}
+
+function saveIntelligentDocument() {
+    const content = document.getElementById('documentCanvas').innerHTML;
+    const changes = collectIntelligentChanges();
+    
+    const saveBtn = document.getElementById('saveIntelligentBtn');
+    const originalHTML = saveBtn.innerHTML;
+    
+    saveBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Sauvegarde...';
+    saveBtn.disabled = true;
+    
+    fetch(window.INTELLIGENT_EDITOR.urls.save, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            content: content,
+            changes: changes,
+            intelligent_data: {
+                preservation_mode: 'intelligent',
+                style_modifications: getStyleModifications(),
+                zone_adjustments: getZoneAdjustments()
+            }
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Marquer comme sauvegardé
+            document.querySelectorAll('.intelligent-editable-zone.modified').forEach(zone => {
+                zone.classList.remove('modified');
+                zone.classList.add('just-changed');
+                
+                // Retirer l'animation après 1 seconde
+                setTimeout(() => zone.classList.remove('just-changed'), 1000);
+            });
+            
+            showIntelligentNotification('Document sauvegardé avec préservation de la fidélité', 'success');
+        } else {
+            throw new Error(data.message || 'Erreur lors de la sauvegarde');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur sauvegarde intelligente:', error);
+        showIntelligentNotification('Erreur lors de la sauvegarde: ' + error.message, 'error');
+    })
+    .finally(() => {
+        saveBtn.innerHTML = originalHTML;
+        saveBtn.disabled = false;
+    });
+}
+
+function extractIntelligentContent() {
+    const extractBtn = document.getElementById('extractIntelligentBtn');
+    const originalHTML = extractBtn.innerHTML;
+    
+    extractBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Extraction intelligente...';
+    extractBtn.disabled = true;
+    
+    fetch(window.INTELLIGENT_EDITOR.urls.extractIntelligent, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showIntelligentNotification('Extraction intelligente réussie - Rechargement...', 'success');
+            
+            // Afficher les statistiques d'extraction
+            const stats = data.stats;
+            const message = `
+                ✅ Extraction ${stats.method} réussie !
+                📄 ${stats.pages_count} page(s) traitée(s)
+                🎯 ${stats.editing_zones_count} zone(s) d'édition précise(s)
+                🎨 ${stats.colors_detected} couleur(s) détectée(s)
+                ${stats.style_preservation ? '✨ Styles préservés' : ''}
+            `;
+            
+            showIntelligentNotification(message, 'success', 5000);
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            throw new Error(data.message || 'Extraction intelligente échouée');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur extraction intelligente:', error);
+        showIntelligentNotification('Erreur lors de l\'extraction intelligente: ' + error.message, 'error');
+        extractBtn.innerHTML = originalHTML;
+        extractBtn.disabled = false;
+    });
+}
+
+function highlightEditingZones() {
+    const zones = document.querySelectorAll('.intelligent-editable-zone');
+    const btn = document.getElementById('highlightZonesBtn');
+    
+    if (btn.classList.contains('active')) {
+        // Désactiver la mise en évidence
+        zones.forEach(zone => zone.classList.remove('highlight'));
+        btn.classList.remove('active');
+        btn.innerHTML = '<i class="fas fa-crosshairs me-1"></i>Zones d\'édition';
+    } else {
+        // Activer la mise en évidence
+        zones.forEach(zone => zone.classList.add('highlight'));
+        btn.classList.add('active');
+        btn.innerHTML = '<i class="fas fa-crosshairs me-1"></i>Masquer zones';
+    }
+}
+
+function togglePreviewMode() {
+    const canvas = document.getElementById('documentCanvas');
+    const propertiesPanel = document.getElementById('propertiesPanel');
+    const btn = document.getElementById('previewModeBtn');
+    
+    if (btn.classList.contains('active')) {
+        // Mode édition
+        canvas.classList.remove('preview-mode');
+        propertiesPanel.style.display = 'flex';
+        btn.classList.remove('active');
+        btn.innerHTML = '<i class="fas fa-eye me-1"></i>Aperçu';
+        
+        // Réactiver l'édition
+        document.querySelectorAll('.intelligent-editable-zone').forEach(zone => {
+            zone.contentEditable = 'true';
+            zone.style.cursor = 'text';
+        });
+    } else {
+        // Mode aperçu
+        canvas.classList.add('preview-mode');
+        propertiesPanel.style.display = 'none';
+        btn.classList.add('active');
+        btn.innerHTML = '<i class="fas fa-edit me-1"></i>Édition';
+        
+        // Désactiver l'édition
+        document.querySelectorAll('.intelligent-editable-zone').forEach(zone => {
+            zone.contentEditable = 'false';
+            zone.style.cursor = 'default';
+            zone.classList.remove('selected');
+        });
+    }
+}
+
+function resetElementStyles() {
+    const selectedZone = document.querySelector('.intelligent-editable-zone.selected');
+    
+    if (selectedZone) {
+        if (confirm('Réinitialiser les styles de cet élément à leur état original ?')) {
+            const originalValue = selectedZone.getAttribute('data-original-value');
+            
+            // Réinitialiser les styles inline
+            selectedZone.style.cssText = '';
+            
+            // Réinitialiser le contenu si souhaité
+            if (confirm('Réinitialiser également le contenu ?')) {
+                selectedZone.textContent = originalValue || selectedZone.textContent;
+            }
+            
+            selectedZone.classList.remove('modified');
+            updatePropertiesPanel(selectedZone);
+            
+            showIntelligentNotification('Styles réinitialisés', 'info');
+        }
+    } else {
+        showIntelligentNotification('Sélectionnez d\'abord un élément à réinitialiser', 'warning');
+    }
+}
+
+function handleIntelligentKeyboard(e) {
+    // Raccourcis clavier pour l'éditeur intelligent
+    if (e.ctrlKey || e.metaKey) {
+        switch(e.key) {
+            case 's':
+                e.preventDefault();
+                saveIntelligentDocument();
+                break;
+            case 'z':
+                if (e.shiftKey) {
+                    e.preventDefault();
+                    // Redo (à implémenter)
+                    showIntelligentNotification('Redo non encore implémenté', 'info');
+                } else {
+                    e.preventDefault();
+                    // Undo (à implémenter)
+                    showIntelligentNotification('Undo non encore implémenté', 'info');
+                }
+                break;
+            case 'h':
+                e.preventDefault();
+                highlightEditingZones();
+                break;
+            case 'p':
+                e.preventDefault();
+                togglePreviewMode();
+                break;
+        }
+    }
+    
+    // Échap pour désélectionner
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.intelligent-editable-zone.selected').forEach(zone => {
+            zone.classList.remove('selected');
+            zone.style.transform = 'scale(1)';
+        });
+        
+        // Réinitialiser le panneau de propriétés
+        const propertiesContent = document.getElementById('propertiesContent');
+        propertiesContent.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-mouse-pointer fa-2x mb-3"></i>
+                <p>Sélectionnez un élément pour modifier ses propriétés</p>
+            </div>
+        `;
+    }
+}
+
+function collectIntelligentChanges() {
+    const changes = [];
+    
+    document.querySelectorAll('.intelligent-editable-zone.modified').forEach(zone => {
+        const originalValue = zone.getAttribute('data-original-value') || '';
+        const currentValue = zone.textContent || zone.innerText || '';
+        const elementId = zone.getAttribute('data-element-id');
+        
+        if (originalValue !== currentValue) {
+            changes.push({
+                element_id: elementId,
+                old_value: originalValue,
+                new_value: currentValue,
+                element_type: zone.getAttribute('data-element-type') || 'text',
+                position: {
+                    x: parseFloat(zone.style.left) || 0,
+                    y: parseFloat(zone.style.top) || 0
+                },
+                style_changes: getElementStyleChanges(zone),
+                type: 'intelligent_text_change'
+            });
+        }
+    });
+    
+    return changes;
+}
+
+function getStyleModifications() {
+    const modifications = {};
+    
+    document.querySelectorAll('.intelligent-editable-zone').forEach(zone => {
+        const elementId = zone.getAttribute('data-element-id');
+        const computedStyle = window.getComputedStyle(zone);
+        
+        // Vérifier quels styles ont été modifiés par rapport aux originaux
+        const styleChanges = {};
+        
+        if (zone.style.fontSize) styleChanges.fontSize = zone.style.fontSize;
+        if (zone.style.color) styleChanges.color = zone.style.color;
+        if (zone.style.fontWeight) styleChanges.fontWeight = zone.style.fontWeight;
+        if (zone.style.fontStyle) styleChanges.fontStyle = zone.style.fontStyle;
+        if (zone.style.textDecoration) styleChanges.textDecoration = zone.style.textDecoration;
+        if (zone.style.textAlign) styleChanges.textAlign = zone.style.textAlign;
+        
+        if (Object.keys(styleChanges).length > 0) {
+            modifications[elementId] = styleChanges;
+        }
+    });
+    
+    return modifications;
+}
+
+function getZoneAdjustments() {
+    const adjustments = {};
+    
+    document.querySelectorAll('.intelligent-editable-zone').forEach(zone => {
+        const elementId = zone.getAttribute('data-element-id');
+        
+        // Vérifier les ajustements de position (si applicable)
+        if (zone.style.left || zone.style.top || zone.style.width || zone.style.height) {
+            adjustments[elementId] = {
+                left: zone.style.left,
+                top: zone.style.top,
+                width: zone.style.width,
+                height: zone.style.height
+            };
+        }
+    });
+    
+    return adjustments;
+}
+
+function getElementStyleChanges(element) {
+    const changes = {};
+    const style = element.style;
+    
+    // Recueillir tous les styles inline qui ont été modifiés
+    for (let i = 0; i < style.length; i++) {
+        const property = style[i];
+        const value = style.getPropertyValue(property);
+        if (value) {
+            changes[property] = value;
+        }
+    }
+    
+    return changes;
+}
+
+function showIntelligentNotification(message, type = 'info', duration = 3000) {
+    // Créer une notification moderne
+    const notification = document.createElement('div');
+    notification.className = `intelligent-notification ${type}`;
+    
+    const icon = type === 'success' ? 'fa-check-circle' : 
+                 type === 'error' ? 'fa-exclamation-circle' : 
+                 type === 'warning' ? 'fa-exclamation-triangle' : 
+                 'fa-info-circle';
+    
+    notification.innerHTML = `
+        <div class="notification-content">
+            <i class="fas ${icon} me-2"></i>
+            <span>${message}</span>
+        </div>
+        <button class="notification-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Styles pour la notification
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        max-width: 400px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-left: 4px solid ${type === 'success' ? '#28a745' : 
+                                  type === 'error' ? '#dc3545' : 
+                                  type === 'warning' ? '#ffc107' : '#007bff'};
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animation d'entrée
+    setTimeout(() => {
+        notification.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Auto-suppression
+    setTimeout(() => {
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => notification.remove(), 300);
+    }, duration);
+}
+
+function rgbToHex(rgb) {
+    // Convertir rgb(r, g, b) en #rrggbb
+    const result = rgb.match(/\d+/g);
+    if (result && result.length >= 3) {
+        const r = parseInt(result[0]);
+        const g = parseInt(result[1]);
+        const b = parseInt(result[2]);
+        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+    return '#000000';
+}
+
+// Initialisation des propriétés du panneau
+function initializePropertiesPanel() {
+    // Clic à l'extérieur pour désélectionner
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.intelligent-editable-zone') && 
+            !e.target.closest('.properties-panel')) {
+            
+            document.querySelectorAll('.intelligent-editable-zone.selected').forEach(zone => {
+                zone.classList.remove('selected');
+                zone.style.transform = 'scale(1)';
+            });
+            
+            const propertiesContent = document.getElementById('propertiesContent');
+            propertiesContent.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-mouse-pointer fa-2x mb-3"></i>
+                    <p>Sélectionnez un élément pour modifier ses propriétés</p>
+                </div>
+            `;
+        }
+    });
+}
+
+// Auto-sauvegarde intelligente
+let autoSaveTimeout;
+function setupAutoSave() {
+    document.addEventListener('input', function(e) {
+        if (e.target.classList.contains('intelligent-editable-zone')) {
+            clearTimeout(autoSaveTimeout);
+            autoSaveTimeout = setTimeout(() => {
+                console.log('Auto-sauvegarde intelligente...');
+                saveIntelligentDocument();
+            }, 30000); // 30 secondes
+        }
+    });
+}
+
+// Démarrer l'auto-sauvegarde
+setupAutoSave();
+</script>
+
+<!-- Styles CSS additionnels pour les notifications et le mode aperçu -->
+<style>
+.intelligent-notification {
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.notification-content {
+    display: flex;
+    align-items: center;
+    flex: 1;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.notification-close:hover {
+    background: #f8f9fa;
+    color: #495057;
+}
+
+.document-canvas.preview-mode {
+    padding: 1rem;
+}
+
+.document-canvas.preview-mode .intelligent-editable-zone {
+    border: none !important;
+    background: transparent !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.document-canvas.preview-mode .intelligent-editable-zone:hover {
+    border: none !important;
+    background: transparent !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Styles pour le mode sombre (optionnel) */
+.intelligent-editor-container.dark-mode {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+}
+
+.intelligent-editor-container.dark-mode .intelligent-header,
+.intelligent-editor-container.dark-mode .intelligent-toolbar {
+    background: rgba(52, 73, 94, 0.95);
+    color: #ecf0f1;
+    border-color: #495057;
+}
+
+.intelligent-editor-container.dark-mode .properties-panel {
+    background: #343a40;
+    color: #ecf0f1;
+    border-color: #495057;
+}
+
+.intelligent-editor-container.dark-mode .properties-header {
+    background: #495057;
+}
+
+.intelligent-editor-container.dark-mode .intelligent-editable-zone {
+    background: rgba(52, 73, 94, 0.8);
+    color: #ecf0f1;
+}
+
+/* Animations pour les interactions */
+.intelligent-editable-zone {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.intelligent-editable-zone:hover {
+    transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.intelligent-editable-zone.selected {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 0 2px #007bff, 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+/* Indicateurs de fidélité */
+.fidelity-indicator {
+    transition: all 0.3s ease;
+}
+
+.fidelity-indicator.active {
+    animation: pulse-success 2s infinite;
+}
+
+@keyframes pulse-success {
+    0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+}
+
+/* Responsive pour l'éditeur intelligent */
+@media (max-width: 1200px) {
+    .properties-panel {
+        width: 250px;
+    }
+    
+    .fidelity-indicators {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .fidelity-indicator {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .intelligent-header {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+    }
+    
+    .intelligent-toolbar {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+    }
+    
+    .intelligent-editor-main {
+        flex-direction: column;
+    }
+    
+    .properties-panel {
+        width: 100%;
+        max-height: 300px;
+        order: -1;
+    }
+    
+    .document-canvas {
+        padding: 1rem;
+    }
+    
+    .overlay-controls {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+    
+    .overlay-opacity-slider {
+        width: 100%;
+    }
+}
+
+/* Amélioration de l'accessibilité */
+.intelligent-editable-zone:focus {
+    outline: 3px solid #007bff;
+    outline-offset: 2px;
+}
+
+.fidelity-indicator[aria-pressed="true"] {
+    background: linear-gradient(45deg, #28a745, #20c997);
+    color: white;
+}
+
+/* Styles pour l'impression */
+@media print {
+    .intelligent-header,
+    .intelligent-toolbar,
+    .properties-panel {
+        display: none !important;
+    }
+    
+    .intelligent-editor-main {
+        flex-direction: column;
+    }
+    
+    .document-canvas {
+        padding: 0;
+    }
+    
+    .page-background-image {
+        opacity: 1 !important;
+    }
+    
+    .intelligent-editable-zone {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        transform: none !important;
+    }
+}
+</style>
+
+{% endblock %}

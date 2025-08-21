@@ -1,0 +1,784 @@
+<!-- templates/ctd_submission/document_pdf_view.html -->
+<!-- Template corrigé pour afficher un document PDF avec structure préservée -->
+
+{% extends 'client/ctd_submission/base.html' %}
+
+{% block title %}Voir Document PDF - {{ document.name }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'ctd_submission:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'ctd_submission:submission_detail' document.submission.id %}">{{ document.submission.name }}</a>
+        </li>
+        <li class="breadcrumb-item active">Voir - {{ document.name }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<!-- En-tête du document -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h4 mb-1">
+                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                    {{ document.name }}
+                </h1>
+                <p class="text-muted mb-0">
+                    {% if document.section %}
+                        {{ document.section.module.code }}.{{ document.section.code }} - {{ document.section.name }}
+                    {% else %}
+                        Document non classifié
+                    {% endif %}
+                </p>
+            </div>
+            <div class="btn-group">
+                <a href="{% url 'ctd_submission:document_template' document.id %}" class="btn btn-primary">
+                    <i class="fas fa-edit me-2"></i>Modifier (Template)
+                </a>
+                <a href="{% url 'ctd_submission:document_advanced_editor' document.id %}" class="btn btn-success">
+                    <i class="fas fa-magic me-2"></i>Éditeur Avancé
+                </a>
+                
+                <a href="{% url 'ctd_submission:document_download' document.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-download me-2"></i>Télécharger
+                </a>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="analyzeDocument({{ document.id }})">
+                            <i class="fas fa-brain me-2"></i>Analyser avec IA
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="extractContent({{ document.id }})">
+                            <i class="fas fa-extract me-2"></i>Re-extraire contenu
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="testExtraction({{ document.id }})">
+                            <i class="fas fa-vial me-2"></i>Test extraction
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteDocument({{ document.id }})">
+                            <i class="fas fa-trash me-2"></i>Supprimer
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <small class="text-muted">
+            Créé le {{ document.created_at|date:"d M Y à H:i" }}<br>
+            Taille: {% if document.file %}{{ document.file.size|filesizeformat }}{% else %}N/A{% endif %}<br>
+            {% if document.updated_at != document.created_at %}
+                Modifié le {{ document.updated_at|date:"d M Y à H:i" }}
+            {% endif %}
+        </small>
+    </div>
+</div>
+
+<!-- Statut et analyse IA -->
+{% if document.ai_analysis %}
+<div class="alert alert-info mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h6 class="alert-heading mb-1">
+                <i class="fas fa-brain me-2"></i>Analyse IA disponible
+            </h6>
+            <p class="mb-0">
+                Classification suggérée: <strong>{{ document.ai_analysis.suggested_module.code }}.{{ document.ai_analysis.suggested_section.code }}</strong>
+                - {{ document.ai_analysis.suggested_section.name }}
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <span class="badge bg-{% if document.ai_analysis.confidence_score >= 0.8 %}success{% elif document.ai_analysis.confidence_score >= 0.6 %}warning{% else %}danger{% endif %} fs-6">
+                Confiance: {{ document.ai_analysis.confidence_score|floatformat:0 }}%
+            </span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Informations d'extraction -->
+{% if extraction_info.has_content %}
+<div class="alert alert-{% if extraction_info.is_extracted %}success{% else %}warning{% endif %} mb-3">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <small class="mb-0">
+                <i class="fas fa-{% if extraction_info.is_extracted %}check-circle{% else %}exclamation-triangle{% endif %} me-1"></i>
+                <strong>Extraction:</strong> 
+                {% if extraction_info.is_extracted %}
+                    Réussie avec {{ extraction_info.method|upper }}
+                {% else %}
+                    Partielle ou échouée
+                {% endif %}
+                {% if extraction_info.has_structure %}
+                    | <i class="fas fa-table me-1"></i>Structure détectée
+                {% endif %}
+            </small>
+        </div>
+        <div class="col-md-4 text-end">
+            <button class="btn btn-sm btn-outline-info" onclick="showExtractionDetails()">
+                <i class="fas fa-info-circle me-1"></i>Détails
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Contenu du PDF -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-file-pdf text-danger me-2"></i>
+            Contenu du document PDF
+            {% if content.extraction_method %}
+                <small class="text-muted">({{ content.extraction_method }})</small>
+            {% endif %}
+        </h5>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" onclick="toggleViewMode('structure')" id="btn-structure">
+                <i class="fas fa-sitemap me-1"></i>Vue structurée
+            </button>
+            <button class="btn btn-outline-secondary active" onclick="toggleViewMode('original')" id="btn-original">
+                <i class="fas fa-file-alt me-1"></i>Vue originale
+            </button>
+            <button class="btn btn-outline-secondary" onclick="toggleViewMode('text')" id="btn-text">
+                <i class="fas fa-align-left me-1"></i>Texte seul
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if content and content.extracted %}
+            
+            <!-- Vue structurée (nouvelle) -->
+            <div id="structureView" style="display: none;">
+                <div class="structure-viewer-container">
+                    {% if content.html %}
+                        {{ content.html|safe }}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-exclamation-triangle text-warning fa-3x mb-3"></i>
+                            <h5 class="text-muted">Structure HTML non disponible</h5>
+                            <p class="text-muted">La structure n'a pas pu être générée pour ce document.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Vue originale (améliorée) -->
+            <div id="originalView">
+                {% if content.pages %}
+                    <div class="pages-container">
+                        {% for page in content.pages %}
+                            <div class="pdf-page-original mb-4" data-page="{{ page.page_number }}">
+                                <div class="page-header d-flex justify-content-between align-items-center mb-2 px-3 py-2 bg-light">
+                                    <h6 class="text-muted mb-0">
+                                        <i class="fas fa-file-alt me-2"></i>Page {{ page.page_number }}
+                                    </h6>
+                                    <div class="page-stats">
+                                        <small class="text-muted">
+                                            {% if page.chars_count %}{{ page.chars_count }} caractères{% endif %}
+                                            {% if page.elements %}| {{ page.elements|length }} éléments{% endif %}
+                                            {% if page.tables %}| {{ page.tables|length }} tableau(x){% endif %}
+                                            {% if page.images %}| {{ page.images|length }} image(s){% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <div class="page-content p-3">
+                                    {% if page.elements %}
+                                        <!-- Affichage des éléments avec position relative -->
+                                        <div class="elements-preview mb-3">
+                                            <div class="row">
+                                                {% if page.images %}
+                                                    <div class="col-md-4">
+                                                        <h6 class="text-primary">Images ({{ page.images|length }})</h6>
+                                                        {% for image in page.images %}
+                                                            <div class="image-preview mb-2 p-2 border rounded">
+                                                                {% if image.image_data %}
+                                                                    <img src="{{ image.image_data }}" 
+                                                                         alt="Image {{ image.index }}" 
+                                                                         class="img-fluid rounded"
+                                                                         style="max-height: 150px;">
+                                                                {% else %}
+                                                                    <div class="image-placeholder text-center p-3 bg-light">
+                                                                        <i class="fas fa-image fa-2x text-muted"></i>
+                                                                        <br><small>Image {{ image.index }}</small>
+                                                                    </div>
+                                                                {% endif %}
+                                                                <small class="text-muted">
+                                                                    Position: {{ image.position.x_percent|floatformat:1 }}%, {{ image.position.y_percent|floatformat:1 }}%
+                                                                </small>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                                
+                                                {% if page.tables %}
+                                                    <div class="col-md-8">
+                                                        <h6 class="text-success">Tableaux ({{ page.tables|length }})</h6>
+                                                        {% for table in page.tables %}
+                                                            <div class="table-preview mb-3">
+                                                                <div class="table-info mb-2">
+                                                                    <small class="text-muted">
+                                                                        <strong>Tableau {{ table.index }}</strong> - 
+                                                                        {{ table.rows }} lignes × {{ table.cols }} colonnes
+                                                                        {% if table.method %} ({{ table.method }}){% endif %}
+                                                                    </small>
+                                                                </div>
+                                                                <div class="table-responsive" style="max-height: 300px;">
+                                                            <table class="table table-sm table-bordered">
+                                                                {% for row in table.data %}
+                                                                    {% if forloop.counter <= 10 %}
+                                                                        <tr>
+                                                                            {% for cell in row %}
+                                                                                <{% if forloop.parentloop.first %}th{% else %}td{% endif %} class="small">
+                                                                                    {{ cell|truncatechars:30 }}
+                                                                                </{% if forloop.parentloop.first %}th{% else %}td{% endif %}>
+                                                                            {% endfor %}
+                                                                        </tr>
+                                                                    {% elif forloop.counter == 11 %}
+                                                                        <tr>
+                                                                            <td colspan="{{ row|length }}" class="text-center text-muted">
+                                                                                ... {{ table.data|length|add:"-10" }} lignes supplémentaires
+                                                                            </td>
+                                                                        </tr>
+                                                                    {% endif %}
+                                                                {% endfor %}
+                                                            </table>
+                                                            </div>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <!-- Texte de la page -->
+                                    {% if page.text %}
+                                        <div class="page-text">
+                                            <h6 class="text-secondary mb-2">Texte extrait</h6>
+                                            <div class="pdf-content border rounded p-3 bg-light" style="max-height: 400px; overflow-y: auto;">
+                                                <pre class="mb-0" style="white-space: pre-wrap; font-size: 12px;">{{ page.text }}</pre>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center py-3 text-muted">
+                                            <i class="fas fa-exclamation-circle"></i>
+                                            Aucun texte extrait de cette page
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-file-pdf text-muted fa-3x mb-3"></i>
+                        <h5 class="text-muted">Aucune page extraite</h5>
+                        <p class="text-muted">Le contenu des pages n'a pas pu être extrait.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Vue texte seul -->
+            <div id="textView" style="display: none;">
+                <div class="text-only-container p-3">
+                    {% if content.text %}
+                        <div class="pdf-content border rounded p-3 bg-light" style="max-height: 600px; overflow-y: auto;">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-size: 13px; line-height: 1.4;">{{ content.text }}</pre>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-align-left fa-3x mb-3"></i>
+                            <h5>Aucun texte disponible</h5>
+                            <p>Le texte n'a pas pu être extrait de ce document.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Statistiques d'extraction -->
+            <div class="extraction-stats mt-3 p-3 bg-light border-top">
+                <div class="row text-center">
+                    <div class="col-md-2">
+                        <div class="stat-item">
+                            <h5 class="text-primary mb-1">{{ content.pages|length|default:0 }}</h5>
+                            <small class="text-muted">Pages</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="stat-item">
+                            <h5 class="text-primary mb-1">{{ content.structure.images|length|default:0 }}</h5>
+                            <small class="text-muted">Images</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="stat-item">
+                            <h5 class="text-primary mb-1">{{ content.structure.tables|length|default:0 }}</h5>
+                            <small class="text-muted">Tableaux</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="stat-item">
+                            <h5 class="text-primary mb-1">{{ content.text|length|default:0 }}</h5>
+                            <small class="text-muted">Caractères</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="stat-item">
+                            <h5 class="text-primary mb-1">{{ content.text|wordcount|default:0 }}</h5>
+                            <small class="text-muted">Mots</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="extraction-status {% if content.extracted %}text-success{% else %}text-warning{% endif %}">
+                            <h5 class="mb-1">
+                                <i class="fas fa-{% if content.extracted %}check-circle{% else %}exclamation-triangle{% endif %}"></i>
+                            </h5>
+                            <small>{% if content.extracted %}Extrait{% else %}Partiel{% endif %}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        {% else %}
+            <!-- Contenu non extrait -->
+            <div class="text-center py-5">
+                <i class="fas fa-file-pdf text-muted fa-3x mb-3"></i>
+                <h5 class="text-muted">Contenu non extrait</h5>
+                <p class="text-muted mb-3">
+                    {% if content.note %}
+                        {{ content.note }}
+                    {% else %}
+                        Le contenu de ce document PDF n'a pas encore été extrait.
+                    {% endif %}
+                </p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button class="btn btn-primary" onclick="extractContent({{ document.id }})">
+                        <i class="fas fa-extract me-2"></i>Extraire le contenu
+                    </button>
+                    <button class="btn btn-outline-info" onclick="testExtraction({{ document.id }})">
+                        <i class="fas fa-vial me-2"></i>Test extraction
+                    </button>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal détails d'extraction -->
+<div class="modal fade" id="extractionDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-info-circle me-2"></i>Détails de l'extraction
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="extractionDetailsContent">
+                    <!-- Contenu chargé via JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-primary" onclick="extractContent({{ document.id }})">
+                    Re-extraire
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Styles pour l'affichage PDF amélioré */
+.pdf-content {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.pdf-page-original {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.page-header {
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 0.375rem 0.375rem 0 0;
+}
+
+.structure-viewer-container {
+    background: #f8f9fa;
+    min-height: 400px;
+    overflow: auto;
+}
+
+.stat-item {
+    padding: 0.5rem;
+}
+
+.stat-item h5 {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.extraction-status {
+    padding: 0.5rem;
+}
+
+.image-preview img {
+    border: 1px solid #dee2e6;
+}
+
+.image-placeholder {
+    border: 2px dashed #dee2e6;
+    background: #f8f9fa;
+}
+
+.table-preview {
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    background: white;
+    padding: 0.75rem;
+}
+
+.elements-preview {
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+}
+
+/* Styles pour la vue structurée */
+.pdf-document-structured {
+    background: #f8f9fa;
+}
+
+.pdf-page-container {
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.pdf-element:hover {
+    outline: 2px dashed #007bff;
+    outline-offset: 2px;
+}
+
+.pdf-table {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.pdf-image {
+    border: 2px solid #e9ecef;
+    background: white;
+}
+
+.pdf-text {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 4px;
+    border-radius: 2px;
+}
+
+.pdf-heading {
+    font-weight: bold;
+    color: #2c3e50;
+    background: rgba(52, 152, 219, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .pdf-page-container {
+        padding-bottom: 150% !important;
+    }
+    
+    .btn-group-sm .btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .extraction-stats .col-md-2 {
+        margin-bottom: 1rem;
+    }
+}
+
+@media print {
+    .pdf-page-container {
+        page-break-after: always;
+        box-shadow: none;
+        border: none;
+    }
+    
+    .card-header, .extraction-stats, .page-header {
+        display: none;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Gestion des vues d'affichage
+function toggleViewMode(mode) {
+    const structureView = document.getElementById('structureView');
+    const originalView = document.getElementById('originalView');
+    const textView = document.getElementById('textView');
+    const buttons = document.querySelectorAll('[onclick^="toggleViewMode"]');
+    
+    // Retirer la classe active de tous les boutons
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    // Masquer toutes les vues
+    structureView.style.display = 'none';
+    originalView.style.display = 'none';
+    textView.style.display = 'none';
+    
+    // Afficher la vue sélectionnée et activer le bouton
+    if (mode === 'structure') {
+        structureView.style.display = 'block';
+        document.getElementById('btn-structure').classList.add('active');
+    } else if (mode === 'text') {
+        textView.style.display = 'block';
+        document.getElementById('btn-text').classList.add('active');
+    } else {
+        originalView.style.display = 'block';
+        document.getElementById('btn-original').classList.add('active');
+    }
+}
+
+function showExtractionDetails() {
+    const modal = new bootstrap.Modal(document.getElementById('extractionDetailsModal'));
+    
+    // Charger les détails d'extraction
+    const content = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Informations d'extraction</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Méthode:</strong> {{ content.extraction_method|default:"Inconnue" }}</li>
+                    <li><strong>Statut:</strong> {% if content.extracted %}✅ Réussie{% else %}⚠️ Partielle{% endif %}</li>
+                    <li><strong>Pages:</strong> {{ content.pages|length|default:0 }}</li>
+                    <li><strong>Éléments détectés:</strong> {{ content.structure.elements|length|default:0 }}</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Contenu détecté</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Images:</strong> {{ content.structure.images|length|default:0 }}</li>
+                    <li><strong>Tableaux:</strong> {{ content.structure.tables|length|default:0 }}</li>
+                    <li><strong>Blocs de texte:</strong> {{ content.structure.text_blocks|length|default:0 }}</li>
+                    <li><strong>Caractères totaux:</strong> {{ content.text|length|default:0 }}</li>
+                </ul>
+            </div>
+        </div>
+        {% if content.errors %}
+        <div class="mt-3">
+            <h6 class="text-danger">Erreurs rencontrées</h6>
+            <ul class="list-unstyled small text-danger">
+                {% for error in content.errors %}
+                    <li>• {{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    `;
+    
+    document.getElementById('extractionDetailsContent').innerHTML = content;
+    modal.show();
+}
+
+function analyzeDocument(documentId) {
+    showNotification('Analyse IA en cours...', 'info');
+    
+    fetch(`/api/analyze-document/${documentId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Analyse terminée avec succès!', 'success');
+            setTimeout(() => window.location.reload(), 2000);
+        } else {
+            showNotification(data.message || 'Erreur lors de l\'analyse', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Erreur de communication avec le serveur', 'error');
+        console.error('Erreur:', error);
+    });
+}
+
+function extractContent(documentId) {
+    showNotification('Extraction du contenu en cours...', 'info');
+    
+    fetch(`/api/extract-content/${documentId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Contenu extrait avec succès!', 'success');
+            setTimeout(() => window.location.reload(), 2000);
+        } else {
+            showNotification(data.message || 'Erreur lors de l\'extraction', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Erreur de communication avec le serveur', 'error');
+        console.error('Erreur:', error);
+    });
+}
+
+function testExtraction(documentId) {
+    showNotification('Test d\'extraction en cours...', 'info');
+    
+    fetch(`/api/test-pdf-extraction/${documentId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Afficher les résultats du test dans une modal
+            const modal = new bootstrap.Modal(document.getElementById('extractionDetailsModal'));
+            const diagnostic = data.diagnostic;
+            const extractionTest = data.extraction_test;
+            
+            const content = `
+                <div class="row">
+                    <div class="col-12">
+                        <h6>Diagnostic du système</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Processeurs disponibles:</strong> ${diagnostic.available_processors.join(', ') || 'Aucun'}</li>
+                            <li><strong>Bibliothèques chargées:</strong> ${diagnostic.libraries_loaded.join(', ') || 'Aucune'}</li>
+                            <li><strong>Fichier accessible:</strong> ${diagnostic.file_exists ? '✅ Oui' : '❌ Non'}</li>
+                            <li><strong>Taille du fichier:</strong> ${diagnostic.file_size} octets</li>
+                        </ul>
+                        
+                        <h6>Résultat du test</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Extraction:</strong> ${extractionTest.success ? '✅ Réussie' : '❌ Échouée'}</li>
+                            ${extractionTest.method ? `<li><strong>Méthode:</strong> ${extractionTest.method}</li>` : ''}
+                            ${extractionTest.pages_found ? `<li><strong>Pages trouvées:</strong> ${extractionTest.pages_found}</li>` : ''}
+                            ${extractionTest.tables_found ? `<li><strong>Tableaux trouvés:</strong> ${extractionTest.tables_found}</li>` : ''}
+                            ${extractionTest.images_found ? `<li><strong>Images trouvées:</strong> ${extractionTest.images_found}</li>` : ''}
+                            ${extractionTest.error ? `<li class="text-danger"><strong>Erreur:</strong> ${extractionTest.error}</li>` : ''}
+                        </ul>
+                        
+                        ${data.recommendations && Object.keys(data.recommendations).length > 0 ? `
+                        <h6>Recommandations d'installation</h6>
+                        <ul class="list-unstyled small">
+                            ${Object.entries(data.recommendations).map(([lib, cmd]) => `<li><code>${cmd}</code></li>`).join('')}
+                        </ul>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('extractionDetailsContent').innerHTML = content;
+            modal.show();
+            
+            showNotification('Test d\'extraction terminé', 'success');
+        } else {
+            showNotification(data.message || 'Erreur lors du test', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Erreur de communication avec le serveur', 'error');
+        console.error('Erreur:', error);
+    });
+}
+
+function deleteDocument(documentId) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce document ?')) {
+        fetch(`/document/${documentId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCsrfToken()
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Document supprimé avec succès!', 'success');
+                setTimeout(() => window.history.back(), 1000);
+            } else {
+                showNotification('Erreur lors de la suppression', 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('Erreur lors de la suppression', 'error');
+            console.error('Erreur:', error);
+        });
+    }
+}
+
+function showNotification(message, type) {
+    // Fonction pour afficher les notifications
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 
+                      type === 'info' ? 'alert-info' : 'alert-warning';
+    
+    const notification = document.createElement('div');
+    notification.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove après 5 secondes
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+           document.querySelector('meta[name=csrf-token]')?.getAttribute('content') ||
+           $('input[name="csrfmiddlewaretoken"]').val() ||
+           '{{ csrf_token }}';
+}
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    // Par défaut, afficher la vue originale
+    toggleViewMode('original');
+    
+    // Ajouter des tooltips si Bootstrap est disponible
+    if (typeof bootstrap !== 'undefined') {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+});
+</script>
+{% endblock %}

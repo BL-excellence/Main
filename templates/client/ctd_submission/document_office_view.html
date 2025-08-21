@@ -1,0 +1,982 @@
+{% extends 'client/ctd_submission/base.html' %}
+
+{% block title %}Voir Document - {{ document.name }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'ctd_submission:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'ctd_submission:submission_detail' document.submission.id %}">{{ document.submission.name }}</a>
+        </li>
+        <li class="breadcrumb-item active">Voir - {{ document.name }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<!-- En-tête du document -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h4 mb-1">
+                    {% if document.document_type == 'docx' %}
+                        <i class="fas fa-file-word text-primary me-2"></i>
+                    {% elif document.document_type == 'xlsx' %}
+                        <i class="fas fa-file-excel text-success me-2"></i>
+                    {% else %}
+                        <i class="fas fa-file text-secondary me-2"></i>
+                    {% endif %}
+                    {{ document.name }}
+                </h1>
+                <p class="text-muted mb-0">
+                    {% if document.section %}
+                        {{ document.section.module.code }}.{{ document.section.code }} - {{ document.section.name }}
+                    {% else %}
+                        Document non classifié
+                    {% endif %}
+                </p>
+            </div>
+            <div class="btn-group">
+                <a href="{% url 'ctd_submission:document_template' document.id %}" class="btn btn-primary">
+                    <i class="fas fa-edit me-2"></i>Modifier (Template)
+                </a>
+                <a href="{% url 'ctd_submission:document_download' document.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-download me-2"></i>Télécharger
+                </a>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="analyzeDocument({{ document.id }})">
+                            <i class="fas fa-brain me-2"></i>Analyser avec IA
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="extractContent({{ document.id }})">
+                            <i class="fas fa-extract me-2"></i>Extraire contenu
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="generateTemplate({{ document.id }})">
+                            <i class="fas fa-magic me-2"></i>Générer template
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteDocument({{ document.id }})">
+                            <i class="fas fa-trash me-2"></i>Supprimer
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <small class="text-muted">
+            Créé le {{ document.created_at|date:"d M Y à H:i" }}<br>
+            Taille: {% if document.file %}{{ document.file.size|filesizeformat }}{% else %}N/A{% endif %}<br>
+            {% if document.updated_at != document.created_at %}
+                Modifié le {{ document.updated_at|date:"d M Y à H:i" }}
+            {% endif %}
+        </small>
+    </div>
+</div>
+
+<!-- Statut et analyse IA -->
+{% if document.ai_analysis %}
+<div class="alert alert-info mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h6 class="alert-heading mb-1">
+                <i class="fas fa-brain me-2"></i>Analyse IA disponible
+            </h6>
+            <p class="mb-0">
+                Classification suggérée: <strong>{{ document.ai_analysis.suggested_module.code }}.{{ document.ai_analysis.suggested_section.code }}</strong>
+                - {{ document.ai_analysis.suggested_section.name }}
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <span class="badge bg-{% if document.ai_analysis.confidence_score >= 0.8 %}success{% elif document.ai_analysis.confidence_score >= 0.6 %}warning{% else %}danger{% endif %} fs-6">
+                Confiance: {{ document.ai_analysis.confidence_score|floatformat:0 }}%
+            </span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Contenu du document Office -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            {% if document.document_type == 'docx' %}
+                <i class="fas fa-file-word text-primary me-2"></i>
+                Contenu du document Word
+                {% if content.stats.pages_count %}
+                    <small class="text-muted ms-2">({{ content.stats.pages_count }} page{{ content.stats.pages_count|pluralize }})</small>
+                {% endif %}
+            {% elif document.document_type == 'xlsx' %}
+                <i class="fas fa-file-excel text-success me-2"></i>
+                Contenu du document Excel
+            {% else %}
+                <i class="fas fa-file text-secondary me-2"></i>
+                Contenu du document
+            {% endif %}
+        </h5>
+        
+        <!-- Navigation pour Excel OU pagination pour Word -->
+        {% if document.document_type == 'xlsx' and content.sheets %}
+            <div class="btn-group btn-group-sm">
+                {% for sheet in content.sheets %}
+                    <button class="btn btn-outline-secondary {% if forloop.first %}active{% endif %}" 
+                            onclick="showSheet('{{ forloop.counter0 }}')">
+                        {{ sheet.name }}
+                    </button>
+                {% endfor %}
+            </div>
+        {% elif document.document_type == 'docx' and content.pages %}
+            <div class="btn-group btn-group-sm">
+                {% for page in content.pages %}
+                    <button class="btn btn-outline-primary {% if forloop.first %}active{% endif %}" 
+                            onclick="showWordPage({{ page.page_number }})" 
+                            id="page-btn-{{ page.page_number }}">
+                        Page {{ page.page_number }}
+                    </button>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if content %}
+            {% if content.extracted %}
+                
+                {% if document.document_type == 'docx' %}
+                    <!-- Contenu Word paginé -->
+                    <div class="word-content-paginated">
+                        {% if content.pages %}
+                            {% for page in content.pages %}
+                                <div class="word-page" id="word-page-{{ page.page_number }}" 
+                                     style="{% if not forloop.first %}display: none;{% endif %}">
+                                    
+                                    <!-- En-tête de page -->
+                                    <div class="page-header mb-3 p-3 bg-light rounded">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0 text-primary">
+                                                <i class="fas fa-file-alt me-2"></i>
+                                                Page {{ page.page_number }} sur {{ content.pages|length }}
+                                            </h6>
+                                            <div class="page-controls">
+                                                {% if page.page_number > 1 %}
+                                                    <button class="btn btn-sm btn-outline-secondary me-1" 
+                                                            onclick="showWordPage({{ page.page_number|add:'-1' }})">
+                                                        <i class="fas fa-chevron-left"></i> Précédent
+                                                    </button>
+                                                {% endif %}
+                                                {% if page.page_number < content.pages|length %}
+                                                    <button class="btn btn-sm btn-outline-secondary" 
+                                                            onclick="showWordPage({{ page.page_number|add:'1' }})">
+                                                        Suivant <i class="fas fa-chevron-right"></i>
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">
+                                            {{ page.paragraphs|length }} paragraphe{{ page.paragraphs|length|pluralize }},
+                                            {% if page.tables %}{{ page.tables|length }} tableau{{ page.tables|length|pluralize:"x" }}{% else %}0 tableau{% endif %}
+                                        </small>
+                                    </div>
+                                    
+                                    <!-- Contenu de la page avec mise en forme originale -->
+                                    <div class="page-content-original" style="
+                                        background: white;
+                                        border: 1px solid #ddd;
+                                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                                        margin: 20px auto;
+                                        padding: 40px;
+                                        min-height: 600px;
+                                        max-width: 210mm;
+                                        font-family: 'Times New Roman', serif;
+                                        font-size: 12pt;
+                                        line-height: 1.5;
+                                    ">
+                                        {% for paragraph in page.paragraphs %}
+                                            {% if paragraph.is_heading %}
+                                                <h{{ paragraph.heading_level|default:3 }} style="
+                                                    font-weight: bold;
+                                                    margin: {{ paragraph.heading_level|default:3|floatformat:0 }}em 0 1em 0;
+                                                    color: #2c3e50;
+                                                ">
+                                                    {{ paragraph.text }}
+                                                </h{{ paragraph.heading_level|default:3 }}>
+                                            {% else %}
+                                                <p style="
+                                                    margin: 1em 0;
+                                                    text-align: {% if paragraph.alignment == 'CENTER' %}center{% elif paragraph.alignment == 'RIGHT' %}right{% elif paragraph.alignment == 'JUSTIFY' %}justify{% else %}left{% endif %};
+                                                    text-indent: {% if not paragraph.is_heading %}1.25em{% else %}0{% endif %};
+                                                ">
+                                                    {% for run in paragraph.runs %}
+                                                        <span style="
+                                                            {% if run.bold %}font-weight: bold;{% endif %}
+                                                            {% if run.italic %}font-style: italic;{% endif %}
+                                                            {% if run.underline %}text-decoration: underline;{% endif %}
+                                                            {% if run.font_size %}font-size: {{ run.font_size }}pt;{% endif %}
+                                                            {% if run.font_name %}font-family: '{{ run.font_name }}', serif;{% endif %}
+                                                        ">{{ run.text }}</span>
+                                                    {% empty %}
+                                                        {{ paragraph.text }}
+                                                    {% endfor %}
+                                                </p>
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        <!-- Tableaux de la page -->
+                                        {% if page.tables %}
+                                            {% for table in page.tables %}
+                                                <div style="margin: 2em 0;">
+                                                    <table style="
+                                                        width: 100%;
+                                                        border-collapse: collapse;
+                                                        border: 1px solid #333;
+                                                        font-size: 11pt;
+                                                    ">
+                                                        {% for row in table.data %}
+                                                            <tr>
+                                                                {% for cell in row %}
+                                                                    {% if forloop.parentloop.first and table.has_header %}
+                                                                        <th style="
+                                                                            border: 1px solid #333;
+                                                                            padding: 8px;
+                                                                            background-color: #f8f9fa;
+                                                                            font-weight: bold;
+                                                                            text-align: center;
+                                                                        ">
+                                                                            {{ cell.text }}
+                                                                        </th>
+                                                                    {% else %}
+                                                                        <td style="
+                                                                            border: 1px solid #333;
+                                                                            padding: 6px 8px;
+                                                                            vertical-align: top;
+                                                                        ">
+                                                                            {{ cell.text }}
+                                                                        </td>
+                                                                    {% endif %}
+                                                                {% endfor %}
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </table>
+                                                </div>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Pied de page -->
+                                    <div class="page-footer mt-3 text-center">
+                                        <small class="text-muted">— Page {{ page.page_number }} —</small>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <!-- Affichage linéaire si pas de pages détectées -->
+                            <div class="word-content">
+                                {{ content.html|safe }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Statistiques Word -->
+                    <div class="mt-4 p-3 bg-light rounded">
+                        <div class="row text-center">
+                            <div class="col-md-2">
+                                <div class="border-end">
+                                    <h5 class="text-primary mb-1">{{ content.stats.pages_count|default:1 }}</h5>
+                                    <small class="text-muted">Page{{ content.stats.pages_count|pluralize }}</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="border-end">
+                                    <h5 class="text-primary mb-1">{{ content.paragraphs|length|default:0 }}</h5>
+                                    <small class="text-muted">Paragraphes</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="border-end">
+                                    <h5 class="text-primary mb-1">{{ content.text|length|default:0 }}</h5>
+                                    <small class="text-muted">Caractères</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="border-end">
+                                    <h5 class="text-primary mb-1">{{ content.text|wordcount|default:0 }}</h5>
+                                    <small class="text-muted">Mots</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="border-end">
+                                    <h5 class="text-primary mb-1">{{ content.tables|length|default:0 }}</h5>
+                                    <small class="text-muted">Tableau{{ content.tables|length|pluralize:"x" }}</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="{% if content.extracted %}text-success{% else %}text-warning{% endif %}">
+                                    <h5 class="mb-1">
+                                        <i class="fas fa-{% if content.extracted %}check-circle{% else %}exclamation-triangle{% endif %}"></i>
+                                    </h5>
+                                    <small>{% if content.extracted %}Extrait{% else %}Partiel{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                {% elif document.document_type == 'xlsx' %}
+                    <!-- Contenu Excel (inchangé) -->
+                    <div class="excel-content">
+                        {% if content.sheets %}
+                            {% for sheet in content.sheets %}
+                                <div class="sheet-content" id="sheet-{{ forloop.counter0 }}" 
+                                     style="{% if not forloop.first %}display: none;{% endif %}">
+                                    
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-table me-2"></i>
+                                            Feuille: {{ sheet.name }}
+                                        </h6>
+                                        <small class="text-muted">
+                                            {{ sheet.data|length }} lignes
+                                        </small>
+                                    </div>
+                                    
+                                    {% if sheet.data %}
+                                        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                                            <table class="table table-bordered table-sm table-hover">
+                                                <thead class="table-light sticky-top">
+                                                    {% for row in sheet.data %}
+                                                        {% if forloop.first %}
+                                                            <tr>
+                                                                <th style="width: 50px;">#</th>
+                                                                {% for cell in row %}
+                                                                    <th>{{ forloop.counter }}</th>
+                                                                {% endfor %}
+                                                            </tr>
+                                                        {% endif %}
+                                                        {% if forloop.counter <= 1 %}
+                                                            <tr class="table-secondary">
+                                                                <td><strong>{{ forloop.counter }}</strong></td>
+                                                                {% for cell in row %}
+                                                                    <td><strong>{{ cell|default:"" }}</strong></td>
+                                                                {% endfor %}
+                                                            </tr>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </thead>
+                                                <tbody>
+                                                    {% for row in sheet.data %}
+                                                        {% if not forloop.first %}
+                                                            <tr>
+                                                                <td class="table-secondary"><strong>{{ forloop.counter }}</strong></td>
+                                                                {% for cell in row %}
+                                                                    <td>{{ cell|default:"" }}</td>
+                                                                {% endfor %}
+                                                            </tr>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center py-4">
+                                            <i class="fas fa-table text-muted fa-2x mb-2"></i>
+                                            <p class="text-muted">Cette feuille ne contient pas de données</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="document-text border rounded p-3 bg-light" style="max-height: 600px; overflow-y: auto;">
+                                {{ content.text|linebreaks|default:"[Aucune donnée extraite du document]" }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Statistiques Excel -->
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <div class="border-end">
+                                    <h5 class="text-primary mb-1">{{ content.sheets|length|default:0 }}</h5>
+                                    <small class="text-muted">Feuilles</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border-end">
+                                    <h5 class="text-primary mb-1">
+                                        {% for sheet in content.sheets %}{{ sheet.data|length }}{% if not forloop.last %} + {% endif %}{% endfor %}
+                                    </h5>
+                                    <small class="text-muted">Lignes total</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border-end">
+                                    <h5 class="text-primary mb-1">{{ content.text|length|default:0 }}</h5>
+                                    <small class="text-muted">Caractères</small>
+                                </div>
+                            </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="{% if content.extracted %}text-success{% else %}text-warning{% endif %}">
+                                    <h5 class="mb-1">
+                                        <i class="fas fa-{% if content.extracted %}check-circle{% else %}exclamation-triangle{% endif %}"></i>
+                                    </h5>
+                                    <small>{% if content.extracted %}Extrait{% else %}Partiel{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+            {% else %}
+                <!-- Contenu non extrait -->
+                <div class="text-center py-5">
+                    {% if document.document_type == 'docx' %}
+                        <i class="fas fa-file-word text-primary fa-3x mb-3"></i>
+                        <h5 class="text-muted">Contenu Word non extrait</h5>
+                    {% elif document.document_type == 'xlsx' %}
+                        <i class="fas fa-file-excel text-success fa-3x mb-3"></i>
+                        <h5 class="text-muted">Contenu Excel non extrait</h5>
+                    {% else %}
+                        <i class="fas fa-file text-secondary fa-3x mb-3"></i>
+                        <h5 class="text-muted">Contenu non extrait</h5>
+                    {% endif %}
+                    <p class="text-muted mb-3">
+                        {% if content.note %}
+                            {{ content.note }}
+                        {% else %}
+                            Le contenu de ce document n'a pas encore été extrait.
+                        {% endif %}
+                    </p>
+                    <button class="btn btn-primary" onclick="extractContent({{ document.id }})">
+                        <i class="fas fa-extract me-2"></i>Extraire le contenu maintenant
+                    </button>
+                </div>
+            {% endif %}
+        {% else %}
+            <!-- Aucun contenu -->
+            <div class="text-center py-5">
+                {% if document.document_type == 'docx' %}
+                    <i class="fas fa-file-word text-primary fa-3x mb-3"></i>
+                {% elif document.document_type == 'xlsx' %}
+                    <i class="fas fa-file-excel text-success fa-3x mb-3"></i>
+                {% else %}
+                    <i class="fas fa-file text-secondary fa-3x mb-3"></i>
+                {% endif %}
+                <h5 class="text-muted">Aucun contenu disponible</h5>
+                <p class="text-muted mb-3">Ce document ne contient pas de contenu extrait.</p>
+                <button class="btn btn-primary" onclick="extractContent({{ document.id }})">
+                    <i class="fas fa-extract me-2"></i>Extraire le contenu
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modifications récentes du template -->
+{% if document.template_data and document.is_template_generated %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-edit text-primary me-2"></i>
+            Modifications du template
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-success">
+            <i class="fas fa-sync me-2"></i>
+            Ce document a été modifié via le template et synchronisé automatiquement.
+            <br><small class="text-muted">Dernière synchronisation: {{ document.updated_at|date:"d M Y à H:i" }}</small>
+        </div>
+        
+        <!-- Aperçu des modifications -->
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Champs modifiés</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Champ</th>
+                                <th>Valeur</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for field_name, field_value in document.template_data.items %}
+                                {% if field_value %}
+                                    <tr>
+                                        <td><code>{{ field_name }}</code></td>
+                                        <td>
+                                            {% if field_value|length > 30 %}
+                                                <span title="{{ field_value }}">{{ field_value|truncatechars:30 }}</span>
+                                            {% else %}
+                                                {{ field_value }}
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6>Actions disponibles</h6>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'ctd_submission:document_template' document.id %}" class="btn btn-primary">
+                        <i class="fas fa-edit me-2"></i>Modifier le template
+                    </a>
+                    <button class="btn btn-outline-secondary" onclick="syncWithTemplate({{ document.id }})">
+                        <i class="fas fa-sync me-2"></i>Synchroniser maintenant
+                    </button>
+                    <button class="btn btn-outline-info" onclick="exportTemplate({{ document.id }})">
+                        <i class="fas fa-download me-2"></i>Exporter template
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Informations du document -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-info-circle text-info me-2"></i>
+            Informations détaillées
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <dl class="row">
+                    <dt class="col-sm-4">Type:</dt>
+                    <dd class="col-sm-8">{{ document.get_document_type_display }}</dd>
+                    
+                    <dt class="col-sm-4">Soumission:</dt>
+                    <dd class="col-sm-8">{{ document.submission.name }}</dd>
+                    
+                    <dt class="col-sm-4">Section CTD:</dt>
+                    <dd class="col-sm-8">
+                        {% if document.section %}
+                            {{ document.section.module.code }}.{{ document.section.code }} - {{ document.section.name }}
+                        {% else %}
+                            <span class="text-muted">Non assigné</span>
+                            <button class="btn btn-sm btn-outline-primary ms-2" onclick="suggestClassification({{ document.id }})">
+                                <i class="fas fa-magic me-1"></i>Suggérer
+                            </button>
+                        {% endif %}
+                    </dd>
+                </dl>
+            </div>
+            <div class="col-md-6">
+                <dl class="row">
+                    <dt class="col-sm-4">Template:</dt>
+                    <dd class="col-sm-8">
+                        {% if document.is_template_generated %}
+                            <span class="badge bg-success">
+                                <i class="fas fa-check me-1"></i>Généré
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">Non généré</span>
+                            <button class="btn btn-sm btn-outline-success ms-2" onclick="generateTemplate({{ document.id }})">
+                                <i class="fas fa-magic me-1"></i>Générer
+                            </button>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-4">Analysé IA:</dt>
+                    <dd class="col-sm-8">
+                        {% if document.ai_analysis %}
+                            <span class="badge bg-success">
+                                <i class="fas fa-check me-1"></i>Oui
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">Non</span>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-4">Créé:</dt>
+                    <dd class="col-sm-8">{{ document.created_at|date:"d M Y à H:i" }}</dd>
+                    
+                    <dt class="col-sm-4">Modifié:</dt>
+                    <dd class="col-sm-8">{{ document.updated_at|date:"d M Y à H:i" }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.document-text {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.word-content .paragraph {
+    border-left: 3px solid #e9ecef;
+    padding-left: 15px;
+    margin-left: 10px;
+}
+
+.excel-content .table {
+    font-size: 12px;
+}
+
+.excel-content .table td,
+.excel-content .table th {
+    padding: 4px 8px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.border-end {
+    border-right: 1px solid #dee2e6;
+}
+
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Styles spécifiques pour la pagination Word */
+.word-content-paginated .word-page {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.page-content-original {
+    position: relative;
+    overflow: hidden;
+}
+
+.page-content-original::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    border: 1px solid #ddd;
+}
+
+.word-page .page-header {
+    border-bottom: 2px solid #007bff;
+}
+
+.page-controls .btn {
+    font-size: 12px;
+}
+
+/* Zoom controls */
+.zoom-controls {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    z-index: 1000;
+}
+
+.zoom-controls .btn {
+    display: block;
+    margin-bottom: 5px;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Variable globale pour le tracking de la page courante
+let currentWordPage = 1;
+
+function showSheet(sheetIndex) {
+    // Masquer toutes les feuilles Excel
+    document.querySelectorAll('.sheet-content').forEach(sheet => {
+        sheet.style.display = 'none';
+    });
+    
+    // Afficher la feuille sélectionnée
+    document.getElementById(`sheet-${sheetIndex}`).style.display = 'block';
+    
+    // Mettre à jour les boutons
+    document.querySelectorAll('[onclick^="showSheet"]').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+
+function showWordPage(pageNumber) {
+    // Masquer toutes les pages Word
+    document.querySelectorAll('.word-page').forEach(page => {
+        page.style.display = 'none';
+    });
+    
+    // Afficher la page sélectionnée
+    const targetPage = document.getElementById(`word-page-${pageNumber}`);
+    if (targetPage) {
+        targetPage.style.display = 'block';
+        currentWordPage = pageNumber;
+        
+        // Mettre à jour les boutons de navigation
+        document.querySelectorAll('[onclick^="showWordPage"]').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        const pageBtn = document.getElementById(`page-btn-${pageNumber}`);
+        if (pageBtn) {
+            pageBtn.classList.add('active');
+        }
+        
+        // Smooth scroll vers le haut de la page
+        targetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        // Notification pour l'utilisateur
+        if (window.CTDSubmission && CTDSubmission.showNotification) {
+            CTDSubmission.showNotification(`Page ${pageNumber} affichée`, 'info', 1000);
+        }
+    }
+}
+
+// Navigation au clavier pour les pages Word
+document.addEventListener('keydown', function(e) {
+    if (document.querySelector('.word-content-paginated')) {
+        const totalPages = document.querySelectorAll('.word-page').length;
+        
+        if (e.key === 'ArrowLeft' && currentWordPage > 1) {
+            e.preventDefault();
+            showWordPage(currentWordPage - 1);
+        } else if (e.key === 'ArrowRight' && currentWordPage < totalPages) {
+            e.preventDefault();
+            showWordPage(currentWordPage + 1);
+        }
+    }
+});
+
+function analyzeDocument(documentId) {
+    if (window.CTDSubmission && CTDSubmission.showNotification) {
+        CTDSubmission.showNotification('Analyse IA en cours...', 'info');
+    }
+    
+    $.ajax({
+        url: `/api/analyze-document/${documentId}/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                if (window.CTDSubmission && CTDSubmission.showNotification) {
+                    CTDSubmission.showNotification('Analyse terminée avec succès!', 'success');
+                }
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                if (window.CTDSubmission && CTDSubmission.showNotification) {
+                    CTDSubmission.showNotification(response.message || 'Erreur lors de l\'analyse', 'error');
+                }
+            }
+        },
+        error: function() {
+            if (window.CTDSubmission && CTDSubmission.showNotification) {
+                CTDSubmission.showNotification('Erreur lors de la communication avec le serveur', 'error');
+            }
+        }
+    });
+}
+
+function extractContent(documentId) {
+    if (window.CTDSubmission && CTDSubmission.showNotification) {
+        CTDSubmission.showNotification('Extraction du contenu en cours...', 'info');
+    }
+    
+    $.ajax({
+        url: `/api/extract-content/${documentId}/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                if (window.CTDSubmission && CTDSubmission.showNotification) {
+                    CTDSubmission.showNotification('Contenu extrait avec succès!', 'success');
+                }
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                if (window.CTDSubmission && CTDSubmission.showNotification) {
+                    CTDSubmission.showNotification(response.message || 'Erreur lors de l\'extraction', 'error');
+                }
+            }
+        },
+        error: function() {
+            if (window.CTDSubmission && CTDSubmission.showNotification) {
+                CTDSubmission.showNotification('Erreur lors de la communication avec le serveur', 'error');
+            }
+        }
+    });
+}
+
+function generateTemplate(documentId) {
+    if (window.CTDSubmission && CTDSubmission.showNotification) {
+        CTDSubmission.showNotification('Génération du template en cours...', 'info');
+    }
+    
+    $.ajax({
+        url: `/generate-template/${documentId}/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                if (window.CTDSubmission && CTDSubmission.showNotification) {
+                    CTDSubmission.showNotification('Template généré avec succès!', 'success');
+                }
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                if (window.CTDSubmission && CTDSubmission.showNotification) {
+                    CTDSubmission.showNotification(response.message || 'Erreur lors de la génération', 'error');
+                }
+            }
+        },
+        error: function() {
+            if (window.CTDSubmission && CTDSubmission.showNotification) {
+                CTDSubmission.showNotification('Erreur lors de la génération du template', 'error');
+            }
+        }
+    });
+}
+
+function syncWithTemplate(documentId) {
+    if (window.CTDSubmission && CTDSubmission.showNotification) {
+        CTDSubmission.showNotification('Synchronisation en cours...', 'info');
+    }
+    
+    $.ajax({
+        url: `/api/update-template/${documentId}/`,
+        method: 'POST',
+        data: JSON.stringify({
+            'action': 'sync_document'
+        }),
+        contentType: 'application/json',
+        headers: {
+            'X-CSRFToken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                if (window.CTDSubmission && CTDSubmission.showNotification) {
+                    CTDSubmission.showNotification('Document synchronisé avec succès!', 'success');
+                }
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                if (window.CTDSubmission && CTDSubmission.showNotification) {
+                    CTDSubmission.showNotification(response.message || 'Erreur lors de la synchronisation', 'error');
+                }
+            }
+        },
+        error: function() {
+            if (window.CTDSubmission && CTDSubmission.showNotification) {
+                CTDSubmission.showNotification('Erreur lors de la synchronisation', 'error');
+            }
+        }
+    });
+}
+
+function exportTemplate(documentId) {
+    window.location.href = `/export/template/${documentId}/`;
+    if (window.CTDSubmission && CTDSubmission.showNotification) {
+        CTDSubmission.showNotification('Export du template en cours...', 'info');
+    }
+}
+
+function suggestClassification(documentId) {
+    if (window.CTDSubmission && CTDSubmission.showNotification) {
+        CTDSubmission.showNotification('Recherche de classification automatique...', 'info');
+    }
+    
+    $.ajax({
+        url: `/ajax/suggest-classification/`,
+        method: 'POST',
+        data: {
+            'document_id': documentId,
+            'csrfmiddlewaretoken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                const suggestion = response.suggestion;
+                if (window.CTDSubmission && CTDSubmission.showNotification) {
+                    CTDSubmission.showNotification(
+                        `Classification suggérée: ${suggestion.module.code}.${suggestion.section.code} - ${suggestion.section.name} (${Math.round(suggestion.confidence * 100)}% confiance)`, 
+                        'success'
+                    );
+                }
+            } else {
+                if (window.CTDSubmission && CTDSubmission.showNotification) {
+                    CTDSubmission.showNotification(response.message || 'Aucune classification trouvée', 'warning');
+                }
+            }
+        },
+        error: function() {
+            if (window.CTDSubmission && CTDSubmission.showNotification) {
+                CTDSubmission.showNotification('Erreur lors de la suggestion', 'error');
+            }
+        }
+    });
+}
+
+function deleteDocument(documentId) {
+    if (window.CTDSubmission && CTDSubmission.confirmAction) {
+        CTDSubmission.confirmAction(
+            'Êtes-vous sûr de vouloir supprimer ce document ?',
+            function() {
+                $.ajax({
+                    url: `/document/${documentId}/delete/`,
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            CTDSubmission.showNotification('Document supprimé avec succès!', 'success');
+                            setTimeout(() => window.history.back(), 1000);
+                        } else {
+                            CTDSubmission.showNotification('Erreur lors de la suppression', 'error');
+                        }
+                    },
+                    error: function() {
+                        CTDSubmission.showNotification('Erreur lors de la suppression', 'error');
+                    }
+                });
+            }
+        );
+    }
+}
+
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+           document.querySelector('meta[name=csrf-token]')?.getAttribute('content') ||
+           $('input[name="csrfmiddlewaretoken"]').val();
+}
+
+// Initialisation au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    // Afficher la première page Word par défaut
+    if (document.querySelector('.word-content-paginated')) {
+        showWordPage(1);
+    }
+});
+</script>
+{% endblock %}

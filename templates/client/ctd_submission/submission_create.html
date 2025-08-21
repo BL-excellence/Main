@@ -1,0 +1,422 @@
+<!-- Chemin d'intégration : templates/ctd_submission/submission_create.html -->
+<!-- Template pour créer/modifier une soumission CTD -->
+
+{% extends 'client/ctd_submission/base.html' %}
+
+{% block title %}
+    {% if is_edit_mode %}Modifier{% else %}Nouvelle{% endif %} Soumission - CTD Submission
+{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'ctd_submission:dashboard' %}">Dashboard</a></li>
+        {% if is_edit_mode %}
+            <li class="breadcrumb-item">
+                <a href="{% url 'submission_detail' submission.id %}">{{ submission.name }}</a>
+            </li>
+            <li class="breadcrumb-item active">Modifier</li>
+        {% else %}
+            <li class="breadcrumb-item active">Nouvelle Soumission</li>
+        {% endif %}
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    {% if is_edit_mode %}
+                        <i class="fas fa-edit me-2"></i>Modifier la Soumission
+                    {% else %}
+                        <i class="fas fa-plus me-2"></i>Nouvelle Soumission CTD
+                    {% endif %}
+                </h4>
+                <p class="text-muted mb-0">
+                    {% if is_edit_mode %}
+                        Modifiez les informations de votre soumission
+                    {% else %}
+                        Créez une nouvelle soumission de dossier réglementaire
+                    {% endif %}
+                </p>
+            </div>
+            
+            <div class="card-body">
+                <form method="post" id="submissionForm">
+                    {% csrf_token %}
+                    
+                    <!-- Étapes de création -->
+                    <div class="progress mb-4" style="height: 10px;">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: 33%"></div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-sm-3">
+                            <span class="badge bg-primary">Étape 1/3</span>
+                        </div>
+                        <div class="col-sm-9">
+                            <h6 class="mb-0">Informations de base</h6>
+                            <small class="text-muted">Nom, région et type de soumission</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Nom de la soumission -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="id_name" class="form-label">
+                                <i class="fas fa-tag me-2"></i>Nom de la soumission *
+                            </label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="id_name" 
+                                   name="name" 
+                                   value="{% if submission %}{{ submission.name }}{% endif %}"
+                                   placeholder="ex: EU-MAA-Product-001" 
+                                   required>
+                            <div class="form-text">
+                                Format recommandé: [Région]-[Type]-[Produit]-[Numéro]
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_region" class="form-label">
+                                <i class="fas fa-globe me-2"></i>Région *
+                            </label>
+                            <select class="form-control" id="id_region" name="region" required>
+                                <option value="">Sélectionner la région</option>
+                                <option value="EU" {% if submission.region == 'EU' %}selected{% endif %}>
+                                    🇪🇺 Union Européenne (EMA)
+                                </option>
+                                <option value="US" {% if submission.region == 'US' %}selected{% endif %}>
+                                    🇺🇸 États-Unis (FDA)
+                                </option>
+                                <option value="CA" {% if submission.region == 'CA' %}selected{% endif %}>
+                                    🇨🇦 Canada (Health Canada)
+                                </option>
+                                <option value="UK" {% if submission.region == 'UK' %}selected{% endif %}>
+                                    🇬🇧 Royaume-Uni (MHRA)
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Type de soumission -->
+                    <div class="mb-4">
+                        <label for="id_submission_type" class="form-label">
+                            <i class="fas fa-file-alt me-2"></i>Type de soumission *
+                        </label>
+                        <select class="form-control" id="id_submission_type" name="submission_type" required>
+                            <option value="">Sélectionner le type</option>
+                            <!-- Options dynamiques selon la région -->
+                        </select>
+                        <div class="form-text">
+                            Le type de soumission dépend de la région sélectionnée
+                        </div>
+                    </div>
+                    
+                    <!-- Section variation (optionnelle) -->
+                    <div id="variationSection" class="border rounded p-3 mb-4" style="display: none;">
+                        <h6 class="text-primary mb-3">
+                            <i class="fas fa-exchange-alt me-2"></i>Informations sur la variation
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="id_variation_type" class="form-label">Type de variation</label>
+                                <select class="form-control" id="id_variation_type" name="variation_type">
+                                    <option value="">Sélectionner le type</option>
+                                    <option value="Type IA" {% if submission.variation_type == 'Type IA' %}selected{% endif %}>
+                                        Type IA - Variations mineures
+                                    </option>
+                                    <option value="Type IB" {% if submission.variation_type == 'Type IB' %}selected{% endif %}>
+                                        Type IB - Variations mineures avec notification
+                                    </option>
+                                    <option value="Type II" {% if submission.variation_type == 'Type II' %}selected{% endif %}>
+                                        Type II - Variations majeures
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="id_change_description" class="form-label">Description du changement</label>
+                                <select class="form-control" id="id_change_description" name="change_description">
+                                    <option value="">Sélectionner le changement</option>
+                                    <option value="ajout_site_fabrication" 
+                                            {% if submission.change_description == 'ajout_site_fabrication' %}selected{% endif %}>
+                                        Ajout de site de fabrication primaire
+                                    </option>
+                                    <option value="modification_procede" 
+                                            {% if submission.change_description == 'modification_procede' %}selected{% endif %}>
+                                        Modification du procédé de fabrication
+                                    </option>
+                                    <option value="changement_specification" 
+                                            {% if submission.change_description == 'changement_specification' %}selected{% endif %}>
+                                        Changement de spécification
+                                    </option>
+                                    <option value="nouveau_dosage" 
+                                            {% if submission.change_description == 'nouveau_dosage' %}selected{% endif %}>
+                                        Nouveau dosage
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Résumé de la soumission -->
+                    <div class="alert alert-info" id="submissionSummary" style="display: none;">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-info-circle me-2"></i>Résumé de la soumission
+                        </h6>
+                        <div id="summaryContent"></div>
+                    </div>
+                    
+                    <!-- Boutons d'action -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'ctd_submission:dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Annuler
+                        </a>
+                        
+                        <div class="btn-group">
+                            <button type="submit" name="action" value="save_draft" class="btn btn-outline-primary">
+                                <i class="fas fa-save me-2"></i>Sauvegarder comme brouillon
+                            </button>
+                            <button type="submit" name="action" value="save_continue" class="btn btn-primary">
+                                {% if is_edit_mode %}
+                                    <i class="fas fa-check me-2"></i>Enregistrer les modifications
+                                {% else %}
+                                    <i class="fas fa-arrow-right me-2"></i>Créer et continuer
+                                {% endif %}
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Informations d'aide -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-lightbulb me-2"></i>Conseils de nomenclature
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>🇪🇺 EMA (EU)</strong>
+                        <ul class="small">
+                            <li>EU-MAA-[Produit]-001</li>
+                            <li>EU-VAR-[Produit]-001</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>🇺🇸 FDA (US)</strong>
+                        <ul class="small">
+                            <li>US-NDA-[Produit]-001</li>
+                            <li>US-ANDA-[Produit]-001</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>🇨🇦 HC (CA)</strong>
+                        <ul class="small">
+                            <li>CA-DIN-[Produit]-001</li>
+                            <li>CA-NOC-[Produit]-001</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>🇬🇧 MHRA (UK)</strong>
+                        <ul class="small">
+                            <li>UK-MA-[Produit]-001</li>
+                            <li>UK-VAR-[Produit]-001</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Types de soumission par région
+    const submissionTypes = {
+        'EU': [
+            { value: 'MAA - Marketing Authorisation Application', text: 'MAA - Marketing Authorisation Application' },
+            { value: 'Variation - Type IA', text: 'Variation - Type IA' },
+            { value: 'Variation - Type IB', text: 'Variation - Type IB' },
+            { value: 'Variation - Type II', text: 'Variation - Type II' },
+            { value: 'Annual Reassessment', text: 'Annual Reassessment' },
+            { value: 'PSUR', text: 'PSUR - Periodic Safety Update Report' }
+        ],
+        'US': [
+            { value: 'NDA - New Drug Application', text: 'NDA - New Drug Application' },
+            { value: 'ANDA - Abbreviated New Drug Application', text: 'ANDA - Abbreviated New Drug Application' },
+            { value: 'BLA - Biologics License Application', text: 'BLA - Biologics License Application' },
+            { value: 'IND - Investigational New Drug', text: 'IND - Investigational New Drug' },
+            { value: 'Annual Report', text: 'Annual Report' }
+        ],
+        'CA': [
+            { value: 'DIN - Drug Identification Number', text: 'DIN - Drug Identification Number' },
+            { value: 'NOC - Notice of Compliance', text: 'NOC - Notice of Compliance' },
+            { value: 'Clinical Trial Application', text: 'Clinical Trial Application' },
+            { value: 'Annual Summary Report', text: 'Annual Summary Report' }
+        ],
+        'UK': [
+            { value: 'MA - Marketing Authorisation', text: 'MA - Marketing Authorisation' },
+            { value: 'Variation Application', text: 'Variation Application' },
+            { value: 'Clinical Trial Authorisation', text: 'Clinical Trial Authorisation' },
+            { value: 'Annual Review', text: 'Annual Review' }
+        ]
+    };
+    
+    // Gestionnaire de changement de région
+    $('#id_region').change(function() {
+        const region = $(this).val();
+        const submissionTypeSelect = $('#id_submission_type');
+        
+        // Vider les options existantes
+        submissionTypeSelect.empty().append('<option value="">Sélectionner le type</option>');
+        
+        if (region && submissionTypes[region]) {
+            // Ajouter les types de soumission pour la région
+            submissionTypes[region].forEach(function(type) {
+                submissionTypeSelect.append(`<option value="${type.value}">${type.text}</option>`);
+            });
+        }
+        
+        // Mettre à jour l'exemple de nom
+        updateNameExample(region);
+        
+        // Mettre à jour le résumé
+        updateSummary();
+    });
+    
+    // Gestionnaire de changement de type de soumission
+    $('#id_submission_type').change(function() {
+        const type = $(this).val();
+        
+        // Afficher la section variation si c'est une variation
+        if (type && type.toLowerCase().includes('variation')) {
+            $('#variationSection').slideDown();
+        } else {
+            $('#variationSection').slideUp();
+        }
+        
+        updateSummary();
+    });
+    
+    // Gestionnaires pour les autres champs
+    $('#id_name, #id_variation_type, #id_change_description').on('input change', updateSummary);
+    
+    // Fonction pour mettre à jour l'exemple de nom
+    function updateNameExample(region) {
+        const nameInput = $('#id_name');
+        if (!nameInput.val()) {
+            const examples = {
+                'EU': 'EU-MAA-Product-001',
+                'US': 'US-NDA-Product-001',
+                'CA': 'CA-DIN-Product-001',
+                'UK': 'UK-MA-Product-001'
+            };
+            nameInput.attr('placeholder', examples[region] || 'ex: EU-MAA-Product-001');
+        }
+    }
+    
+    // Fonction pour mettre à jour le résumé
+    function updateSummary() {
+        const name = $('#id_name').val();
+        const region = $('#id_region').val();
+        const submissionType = $('#id_submission_type').val();
+        const variationType = $('#id_variation_type').val();
+        const changeDescription = $('#id_change_description').val();
+        
+        if (name && region && submissionType) {
+            let summaryHtml = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>📝 Nom:</strong> ${name}<br>
+                        <strong>🌍 Région:</strong> ${$('#id_region option:selected').text()}<br>
+                        <strong>📄 Type:</strong> ${submissionType}
+                    </div>
+                    <div class="col-md-6">
+            `;
+            
+            if (variationType) {
+                summaryHtml += `<strong>🔄 Variation:</strong> ${variationType}<br>`;
+            }
+            if (changeDescription) {
+                summaryHtml += `<strong>📋 Changement:</strong> ${$('#id_change_description option:selected').text()}<br>`;
+            }
+            
+            summaryHtml += `
+                        <strong>📅 Statut:</strong> <span class="badge bg-warning">Brouillon</span>
+                    </div>
+                </div>
+            `;
+            
+            $('#summaryContent').html(summaryHtml);
+            $('#submissionSummary').slideDown();
+        } else {
+            $('#submissionSummary').slideUp();
+        }
+    }
+    
+    // Validation du formulaire
+    $('#submissionForm').submit(function(e) {
+        const name = $('#id_name').val();
+        const region = $('#id_region').val();
+        const submissionType = $('#id_submission_type').val();
+        
+        if (!name || !region || !submissionType) {
+            e.preventDefault();
+            CTDSubmission.showNotification('Veuillez remplir tous les champs obligatoires', 'error');
+            return false;
+        }
+        
+        // Désactiver le bouton de soumission pour éviter les doubles clics
+        $(this).find('button[type="submit"]').prop('disabled', true);
+    });
+    
+    // Initialisation si on est en mode édition
+    {% if is_edit_mode %}
+        $('#id_region').trigger('change');
+        setTimeout(function() {
+            $('#id_submission_type').val('{{ submission.submission_type }}').trigger('change');
+        }, 100);
+    {% endif %}
+    
+    // Auto-complétion du nom basé sur la région et le type
+    $('#id_region, #id_submission_type').change(function() {
+        const region = $('#id_region').val();
+        const type = $('#id_submission_type').val();
+        const nameInput = $('#id_name');
+        
+        if (region && type && !nameInput.val()) {
+            const typeCode = type.split(' - ')[0] || type.substring(0, 3).toUpperCase();
+            const suggestedName = `${region}-${typeCode}-Product-001`;
+            nameInput.val(suggestedName);
+            updateSummary();
+        }
+    });
+    
+    // Validation en temps réel du nom
+    $('#id_name').on('input', function() {
+        const name = $(this).val();
+        const namePattern = /^[A-Z]{2,3}-[A-Z]{2,5}-[A-Za-z0-9]+-[0-9]{3}$/;
+        
+        if (name && !namePattern.test(name)) {
+            $(this).addClass('is-invalid');
+            if (!$(this).siblings('.invalid-feedback').length) {
+                $(this).after('<div class="invalid-feedback">Format recommandé: XX-TYPE-Product-001</div>');
+            }
+        } else {
+            $(this).removeClass('is-invalid');
+            $(this).siblings('.invalid-feedback').remove();
+        }
+    });
+});
+</script>
+{% endblock %}

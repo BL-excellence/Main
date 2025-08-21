@@ -1,0 +1,3309 @@
+<!-- templates/ctd_submission/document_advanced_editor.html -->
+<!-- Éditeur avancé avec styles utilisateur et design intuitif amélioré -->
+
+{% extends 'client/ctd_submission/base.html' %}
+{% load static %}
+
+{% block title %}Éditeur Fidèle - {{ document.name }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+<style>
+/* ==================== VARIABLES CSS ÉTENDUES ==================== */
+:root {
+    --primary-color: #2c5aa0;
+    --secondary-color: #4a90e2;
+    --accent-color: #7b68ee;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --info-color: #17a2b8;
+    --light-bg: #f8f9fa;
+    --dark-bg: #343a40;
+    --border-color: #e9ecef;
+    --text-muted: #6c757d;
+    --shadow: 0 2px 10px rgba(0,0,0,0.1);
+    --shadow-hover: 0 4px 20px rgba(0,0,0,0.15);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Nouvelles variables pour les styles utilisateur */
+    --user-primary: #6366f1;
+    --user-secondary: #8b5cf6;
+    --user-accent: #ec4899;
+    --user-highlight: #fbbf24;
+    --user-success: #10b981;
+    --user-warning: #f59e0b;
+    --user-error: #ef4444;
+    --user-info: #06b6d4;
+    
+    /* Typographie */
+    --font-main: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-heading: 'Inter', var(--font-main);
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Monaco', monospace;
+    
+    /* Espacement */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+    
+    /* Rayons de bordure */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 9999px;
+}
+
+/* ==================== BASE ET RESET ==================== */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-main);
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+}
+
+/* ==================== CONTAINER PRINCIPAL ==================== */
+.advanced-editor-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* ==================== HEADER MODERNE AMÉLIORÉ ==================== */
+.editor-header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-color);
+    padding: var(--spacing-md) var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow);
+    z-index: 100;
+    position: relative;
+}
+
+.editor-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, var(--user-primary), var(--user-secondary));
+    height: 3px;
+}
+
+.document-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.document-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+    position: relative;
+    transition: var(--transition);
+}
+
+.document-icon::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.2), transparent);
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.document-icon:hover::after {
+    opacity: 1;
+}
+
+.document-icon.pdf { 
+    background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+}
+.document-icon.docx { 
+    background: linear-gradient(45deg, #4285f4, #2196f3);
+    box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
+}
+.document-icon.xlsx { 
+    background: linear-gradient(45deg, #0f7b0f, #4caf50);
+    box-shadow: 0 4px 15px rgba(15, 123, 15, 0.3);
+}
+
+.document-title {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.document-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+    font-family: var(--font-heading);
+}
+
+.document-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.section-badge {
+    background: linear-gradient(45deg, var(--user-primary), var(--user-secondary));
+    color: white;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+/* ==================== TOOLBAR DE FORMATAGE UTILISATEUR ==================== */
+.formatting-toolbar {
+    background: white;
+    border-bottom: 1px solid var(--border-color);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    flex-wrap: wrap;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+    margin: 0 var(--spacing-sm);
+}
+
+/* Sélecteur de style de texte */
+.text-style-selector {
+    position: relative;
+}
+
+.style-dropdown {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: var(--transition);
+    min-width: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.style-dropdown:hover {
+    border-color: var(--user-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.style-options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-hover);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
+}
+
+.style-options.show {
+    display: block;
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.style-option {
+    padding: var(--spacing-sm) var(--spacing-md);
+    cursor: pointer;
+    transition: var(--transition);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.style-option:hover {
+    background: var(--light-bg);
+}
+
+.style-option.active {
+    background: var(--user-primary);
+    color: white;
+}
+
+/* Boutons de formatage */
+.format-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-color);
+    background: white;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    color: #4a5568;
+    position: relative;
+    overflow: hidden;
+}
+
+.format-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: var(--transition);
+}
+
+.format-btn:hover {
+    border-color: var(--user-primary);
+    color: var(--user-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.format-btn:hover::before {
+    left: 100%;
+}
+
+.format-btn.active {
+    background: var(--user-primary);
+    color: white;
+    border-color: var(--user-primary);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+/* Palette de couleurs */
+.color-palette {
+    display: flex;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    background: var(--light-bg);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: var(--transition);
+    position: relative;
+}
+
+.color-swatch::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.8), transparent);
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+    border-color: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.color-swatch:hover::before {
+    opacity: 1;
+}
+
+.color-swatch.active {
+    border-color: white;
+    box-shadow: 0 0 0 2px var(--user-primary);
+}
+
+/* Couleurs prédéfinies */
+.color-primary { background: var(--user-primary); }
+.color-secondary { background: var(--user-secondary); }
+.color-accent { background: var(--user-accent); }
+.color-success { background: var(--user-success); }
+.color-warning { background: var(--user-warning); }
+.color-error { background: var(--user-error); }
+.color-info { background: var(--user-info); }
+.color-dark { background: #1f2937; }
+.color-light { background: #f9fafb; border: 1px solid var(--border-color); }
+
+/* Mode selector amélioré */
+.mode-selector {
+    display: flex;
+    background: var(--light-bg);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xs);
+    border: 1px solid var(--border-color);
+    position: relative;
+    overflow: hidden;
+}
+
+.mode-selector::before {
+    content: '';
+    position: absolute;
+    top: var(--spacing-xs);
+    bottom: var(--spacing-xs);
+    left: var(--spacing-xs);
+    width: calc(33.333% - var(--spacing-xs));
+    background: linear-gradient(45deg, var(--user-primary), var(--user-secondary));
+    border-radius: var(--radius-md);
+    transition: var(--transition);
+    transform: translateX(var(--mode-offset, 0));
+}
+
+.mode-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    background: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    justify-content: center;
+}
+
+.mode-btn.active {
+    color: white;
+}
+
+.mode-btn:nth-child(2).active ~ .mode-selector::before {
+    --mode-offset: 100%;
+}
+
+.mode-btn:nth-child(3).active ~ .mode-selector::before {
+    --mode-offset: 200%;
+}
+
+/* ==================== STYLES PRÉDÉFINIS UTILISATEUR ==================== */
+.user-style-h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--user-primary);
+    font-family: var(--font-heading);
+    line-height: 1.2;
+    margin: var(--spacing-xl) 0 var(--spacing-lg) 0;
+    background: linear-gradient(45deg, var(--user-primary), var(--user-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.user-style-h2 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--user-secondary);
+    font-family: var(--font-heading);
+    line-height: 1.3;
+    margin: var(--spacing-lg) 0 var(--spacing-md) 0;
+    border-left: 4px solid var(--user-secondary);
+    padding-left: var(--spacing-md);
+}
+
+.user-style-h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--user-accent);
+    font-family: var(--font-heading);
+    line-height: 1.4;
+    margin: var(--spacing-md) 0 var(--spacing-sm) 0;
+}
+
+.user-style-paragraph {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #374151;
+    margin: var(--spacing-sm) 0;
+}
+
+.user-style-lead {
+    font-size: 1.125rem;
+    font-weight: 400;
+    color: #4b5563;
+    line-height: 1.7;
+    margin: var(--spacing-md) 0;
+}
+
+.user-style-quote {
+    font-size: 1.125rem;
+    font-style: italic;
+    color: var(--user-primary);
+    border-left: 4px solid var(--user-accent);
+    padding-left: var(--spacing-lg);
+    margin: var(--spacing-lg) 0;
+    background: rgba(99, 102, 241, 0.05);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.user-style-code {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    background: #f1f5f9;
+    color: #e11d48;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    border: 1px solid #e2e8f0;
+}
+
+.user-style-highlight {
+    background: linear-gradient(120deg, var(--user-highlight) 0%, var(--user-highlight) 100%);
+    background-repeat: no-repeat;
+    background-size: 100% 0.3em;
+    background-position: 0 88%;
+    padding: 0 var(--spacing-xs);
+}
+
+/* ==================== THÈMES DE TABLEAUX UTILISATEUR ==================== */
+.table-theme-default {
+    border: 1px solid var(--border-color);
+}
+
+.table-theme-modern {
+    border: none;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.table-theme-modern .table-header-row th {
+    background: linear-gradient(135deg, var(--user-primary), var(--user-secondary)) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    padding: var(--spacing-md) !important;
+    border: none !important;
+}
+
+.table-theme-minimal {
+    border: none;
+    background: transparent;
+}
+
+.table-theme-minimal .table-cell-faithful {
+    border: none;
+    border-bottom: 1px solid #f3f4f6;
+    padding: var(--spacing-md);
+}
+
+.table-theme-colorful .table-data-row:nth-child(odd) {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
+}
+
+.table-theme-colorful .table-data-row:nth-child(even) {
+    background: linear-gradient(90deg, rgba(236, 72, 153, 0.05), rgba(6, 182, 212, 0.05));
+}
+
+.table-theme-professional {
+    border: 2px solid var(--user-primary);
+    border-radius: var(--radius-md);
+}
+
+.table-theme-professional .table-header-row th {
+    background: var(--user-primary) !important;
+    color: white !important;
+}
+
+/* ==================== ZONE DE CONTENU AMÉLIORÉE ==================== */
+.content-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+.document-viewer {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-xl);
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    position: relative;
+    scroll-behavior: smooth;
+}
+
+.document-content {
+    max-width: 100%;
+    margin: 0 auto;
+    line-height: 1.6;
+    color: #2d3748;
+    position: relative;
+}
+
+/* ==================== STYLES FIDÈLES AMÉLIORÉS ==================== */
+.pdf-document-faithful {
+    max-width: 100%;
+    margin: 0 auto;
+    font-family: var(--font-main);
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    position: relative;
+}
+
+.pdf-page-faithful {
+    background: white;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    margin-bottom: 30px;
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto 30px auto;
+    position: relative;
+    padding: var(--spacing-2xl);
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-xl);
+    overflow: visible;
+    transition: var(--transition);
+}
+
+.pdf-page-faithful:hover {
+    box-shadow: 0 12px 35px rgba(0,0,0,0.2);
+    transform: translateY(-2px);
+}
+
+.pdf-page-faithful::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--user-primary), var(--user-secondary), var(--user-accent));
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+/* ==================== ÉLÉMENTS ÉDITABLES AMÉLIORÉS ==================== */
+.editable-element {
+    position: relative;
+    cursor: text;
+    transition: var(--transition);
+    min-height: 20px;
+    padding: var(--spacing-sm);
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    margin: var(--spacing-xs) 0;
+}
+
+.editable-element::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-md);
+    background: linear-gradient(45deg, var(--user-primary), var(--user-secondary));
+    opacity: 0;
+    transition: var(--transition);
+    z-index: -1;
+}
+
+.editable-element:hover {
+    background: rgba(99, 102, 241, 0.05);
+    border-color: rgba(99, 102, 241, 0.3);
+    transform: translateY(-1px);
+}
+
+.editable-element:hover::before {
+    opacity: 0.1;
+}
+
+.editable-element:focus {
+    outline: none;
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--user-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    transform: translateY(-1px);
+}
+
+.editable-element:focus::before {
+    opacity: 0.15;
+}
+
+.editable-element.active {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: var(--user-primary);
+}
+
+.editable-element.modified {
+    border-left: 4px solid var(--user-warning);
+    background: rgba(245, 158, 11, 0.1);
+    position: relative;
+}
+
+.editable-element.modified::after {
+    content: '●';
+    position: absolute;
+    top: var(--spacing-xs);
+    right: var(--spacing-xs);
+    color: var(--user-warning);
+    font-size: 0.75rem;
+    animation: pulse 2s infinite;
+}
+
+/* ==================== INDICATEURS VISUELS AMÉLIORÉS ==================== */
+.unsaved-indicator {
+    position: absolute;
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    background: linear-gradient(45deg, var(--user-warning), #f59e0b);
+    color: white;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-full);
+    font-size: 0.875rem;
+    font-weight: 500;
+    animation: pulse 2s infinite;
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+/* ==================== BOUTONS FLOTTANTS AMÉLIORÉS ==================== */
+.floating-save {
+    position: fixed;
+    bottom: var(--spacing-xl);
+    right: var(--spacing-xl);
+    background: linear-gradient(135deg, var(--user-success), #10b981);
+    color: white;
+    border: none;
+    border-radius: var(--radius-full);
+    padding: var(--spacing-md) var(--spacing-lg);
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+    cursor: pointer;
+    font-weight: 600;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+}
+
+.floating-save::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-full);
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.floating-save:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 12px 35px rgba(16, 185, 129, 0.4);
+}
+
+.floating-save:hover::before {
+    opacity: 1;
+}
+
+/* ==================== ANIMATIONS AMÉLIORÉES ==================== */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+@keyframes highlightNew {
+    0% { 
+        background: linear-gradient(45deg, var(--user-success), #10b981);
+        transform: scale(1.02);
+    }
+    100% { 
+        background: transparent;
+        transform: scale(1);
+    }
+}
+
+.newly-added {
+    animation: highlightNew 2s ease-out;
+}
+
+@keyframes tableDetected {
+    0% { 
+        transform: scale(0.95) rotateX(10deg);
+        opacity: 0.7;
+    }
+    50% { 
+        transform: scale(1.02) rotateX(-5deg);
+    }
+    100% { 
+        transform: scale(1) rotateX(0deg);
+        opacity: 1;
+    }
+}
+
+.table-container-faithful.newly-detected {
+    animation: tableDetected 0.7s ease-out;
+}
+
+/* ==================== MICRO-INTERACTIONS ==================== */
+.interactive-element {
+    transition: var(--transition);
+}
+
+.interactive-element:hover {
+    transform: translateY(-1px);
+}
+
+.interactive-element:active {
+    transform: translateY(0);
+}
+
+/* ==================== RESPONSIVE AMÉLIORÉ ==================== */
+@media (max-width: 1200px) {
+    .formatting-toolbar {
+        flex-wrap: wrap;
+        padding: var(--spacing-sm);
+    }
+    
+    .toolbar-group {
+        flex-wrap: wrap;
+    }
+    
+    .pdf-page-faithful {
+        padding: var(--spacing-lg);
+    }
+}
+
+@media (max-width: 768px) {
+    .formatting-toolbar {
+        gap: var(--spacing-sm);
+    }
+    
+    .mode-selector {
+        order: 1;
+        width: 100%;
+        margin-top: var(--spacing-sm);
+    }
+    
+    .color-palette {
+        flex-wrap: wrap;
+    }
+    
+    .document-viewer {
+        padding: var(--spacing-md);
+    }
+    
+    .floating-save {
+        bottom: var(--spacing-md);
+        right: var(--spacing-md);
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+}
+
+/* ==================== DARK MODE SUPPORT ==================== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --light-bg: #1f2937;
+        --dark-bg: #111827;
+        --border-color: #374151;
+        --text-muted: #9ca3af;
+    }
+    
+    .pdf-page-faithful {
+        background: #1f2937;
+        color: #f9fafb;
+    }
+    
+    .document-viewer {
+        background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+    }
+}
+
+/* ==================== ACCESSIBILITÉ ==================== */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ==================== FOCUS VISIBLE ==================== */
+.format-btn:focus-visible,
+.mode-btn:focus-visible,
+.color-swatch:focus-visible {
+    outline: 2px solid var(--user-primary);
+    outline-offset: 2px;
+}
+
+/* ==================== PRINT STYLES ==================== */
+@media print {
+    .formatting-toolbar,
+    .editor-header,
+    .floating-save,
+    .unsaved-indicator {
+        display: none !important;
+    }
+    
+    .pdf-page-faithful {
+        box-shadow: none;
+        border: 1px solid #000;
+        page-break-after: always;
+    }
+    
+    .editable-element {
+        border: none !important;
+        background: transparent !important;
+    }
+}
+
+/* ==================== STYLES DE TABLE COMPLÉMENTAIRES ==================== */
+.table-container-faithful {
+    margin: var(--spacing-lg) 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    position: relative;
+    transition: var(--transition);
+}
+
+.table-container-faithful:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.table-container-faithful::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--user-primary), var(--user-secondary), var(--user-accent));
+}
+
+/* ==================== ENHANCED TABLE CELLS ==================== */
+.table-cell-faithful {
+    padding: var(--spacing-md);
+    border: 1px solid #e5e7eb;
+    vertical-align: top;
+    word-wrap: break-word;
+    transition: var(--transition);
+    position: relative;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+}
+
+.table-cell-faithful:hover {
+    background: rgba(99, 102, 241, 0.05);
+    border-color: var(--user-primary);
+}
+
+.table-cell-faithful:focus {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--user-primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    outline: none;
+}
+
+/* ==================== TYPES DE CELLULES AMÉLIORÉS ==================== */
+.numeric-cell {
+    text-align: right !important;
+    font-family: var(--font-mono) !important;
+    font-weight: 500 !important;
+    color: var(--user-info) !important;
+    background: rgba(6, 182, 212, 0.05) !important;
+}
+
+.reference-cell {
+    font-style: italic !important;
+    color: var(--user-secondary) !important;
+    background: rgba(139, 92, 246, 0.05) !important;
+}
+
+.ingredient-cell {
+    font-weight: 500 !important;
+    color: var(--user-success) !important;
+    background: rgba(16, 185, 129, 0.05) !important;
+}
+
+.role-cell {
+    color: var(--user-warning) !important;
+    font-weight: 500 !important;
+    background: rgba(245, 158, 11, 0.05) !important;
+}
+
+/* ==================== AUTRES STYLES PRÉEXISTANTS ==================== */
+/* Conserver tous les autres styles existants... */
+.editor-main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    background: white;
+    min-height: 0;
+}
+
+.toc-panel {
+    width: 300px;
+    background: #fafbfc;
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    transition: var(--transition);
+    z-index: 50;
+}
+
+.toc-panel.collapsed {
+    width: 50px;
+}
+
+.toc-header {
+    padding: var(--spacing-md);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.toc-toggle {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+
+.toc-toggle:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.toc-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-md) 0;
+}
+
+.toc-item {
+    padding: var(--spacing-sm) var(--spacing-md);
+    cursor: pointer;
+    transition: var(--transition);
+    border-left: 3px solid transparent;
+    font-size: 0.875rem;
+    color: #4a5568;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.toc-item:hover {
+    background: rgba(116, 75, 162, 0.1);
+    border-left-color: var(--accent-color);
+}
+
+.toc-item.active {
+    background: rgba(116, 75, 162, 0.15);
+    border-left-color: var(--accent-color);
+    color: var(--accent-color);
+    font-weight: 500;
+}
+
+.toc-item.level-1 { margin-left: 0; font-weight: 600; }
+.toc-item.level-2 { margin-left: var(--spacing-md); }
+.toc-item.level-3 { margin-left: var(--spacing-xl); }
+.toc-item.level-4 { margin-left: calc(var(--spacing-xl) + var(--spacing-md)); }
+
+.toc-item-icon {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+/* Copilot panel styles */
+.copilot-panel {
+    width: 350px;
+    background: #fafbfc;
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    transition: var(--transition);
+    z-index: 30;
+}
+
+.copilot-panel.collapsed {
+    transform: translateX(100%);
+}
+
+.copilot-header {
+    padding: var(--spacing-md);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+}
+
+.copilot-content {
+    flex: 1;
+    padding: var(--spacing-md);
+    overflow-y: auto;
+}
+
+.copilot-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--user-success);
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--user-success);
+    animation: pulse 2s infinite;
+}
+
+.suggestion-item {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.suggestion-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--user-success);
+}
+
+.suggestion-item.warning::before { background: var(--user-warning); }
+.suggestion-item.error::before { background: var(--user-error); }
+
+.suggestion-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.suggestion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+    gap: var(--spacing-sm);
+}
+
+.suggestion-type {
+    font-weight: 600;
+    color: var(--user-primary);
+    font-size: 0.875rem;
+}
+
+.suggestion-confidence {
+    background: var(--light-bg);
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+.suggestion-message {
+    color: #4a5568;
+    font-size: 0.875rem;
+    margin-bottom: var(--spacing-md);
+}
+
+.suggestion-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.suggestion-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    background: white;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: var(--transition);
+}
+
+.suggestion-btn.primary {
+    background: var(--user-primary);
+    color: white;
+    border-color: var(--user-primary);
+}
+
+.suggestion-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.quick-actions {
+    margin-top: var(--spacing-md);
+}
+
+.quick-actions h6 {
+    margin-bottom: var(--spacing-md);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.quick-action-btn {
+    width: 100%;
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-color);
+    background: white;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    margin-bottom: var(--spacing-sm);
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.quick-action-btn:hover {
+    background: var(--light-bg);
+    border-color: var(--user-secondary);
+    color: var(--user-secondary);
+    transform: translateX(4px);
+}
+
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid var(--user-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.extraction-pending {
+    text-align: center;
+    padding: var(--spacing-2xl);
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: var(--radius-xl);
+    margin: var(--spacing-xl) 0;
+}
+
+.extraction-pending .document-icon {
+    width: 80px;
+    height: 80px;
+    font-size: 2rem;
+    margin: 0 auto var(--spacing-xl);
+}
+
+/* Notification styles */
+.notification {
+    position: fixed;
+    top: var(--spacing-xl);
+    right: var(--spacing-xl);
+    background: white;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-hover);
+    padding: var(--spacing-md) var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    z-index: 2000;
+    transform: translateX(100%);
+    transition: var(--transition);
+    max-width: 400px;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification.success {
+    border-left: 4px solid var(--user-success);
+}
+
+.notification.error {
+    border-left: 4px solid var(--user-error);
+}
+
+.notification.warning {
+    border-left: 4px solid var(--user-warning);
+}
+
+.notification.info {
+    border-left: 4px solid var(--user-info);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<div class="advanced-editor-container">
+    <!-- Header moderne -->
+    <div class="editor-header">
+        <div class="document-info">
+            <div class="document-icon {{ document.document_type }}">
+                {% if document.document_type == 'pdf' %}
+                    <i class="fas fa-file-pdf"></i>
+                {% elif document.document_type == 'docx' %}
+                    <i class="fas fa-file-word"></i>
+                {% elif document.document_type == 'xlsx' %}
+                    <i class="fas fa-file-excel"></i>
+                {% else %}
+                    <i class="fas fa-file"></i>
+                {% endif %}
+            </div>
+            
+            <div class="document-title">
+                <h1 class="document-name">{{ document.name }}</h1>
+                <div class="document-meta">
+                    <span><i class="fas fa-calendar me-1"></i>{{ document.created_at|date:"d/m/Y H:i" }}</span>
+                    <span><i class="fas fa-user me-1"></i>{{ document.submission.created_by.get_full_name|default:document.submission.created_by.username }}</span>
+                    {% if document.section %}
+                        <span class="section-badge">{{ document.section.module.code }}.{{ document.section.code }} {{ document.section.name }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="toolbar-group">
+            <button class="btn btn-outline-secondary interactive-element" onclick="window.history.back()">
+                <i class="fas fa-arrow-left me-2"></i>Retour
+            </button>
+            
+            <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle interactive-element" data-bs-toggle="dropdown">
+                    <i class="fas fa-cog me-2"></i>Actions
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{% url 'ctd_submission:document_view' document.id %}">
+                        <i class="fas fa-eye me-2"></i>Voir document
+                    </a></li>
+                    <li><a class="dropdown-item" href="{% url 'ctd_submission:document_template' document.id %}">
+                        <i class="fas fa-wpforms me-2"></i>Template
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" id="exportDocumentBtn">
+                        <i class="fas fa-download me-2"></i>Exporter document
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" id="validateDocumentBtn">
+                        <i class="fas fa-check-circle me-2"></i>Valider
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toolbar de formatage utilisateur -->
+    <div class="formatting-toolbar">
+        <!-- Groupe 1: Styles de texte -->
+        <div class="toolbar-group">
+            <div class="text-style-selector">
+                <div class="style-dropdown" id="styleDropdown">
+                    <span>Paragraphe</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="style-options" id="styleOptions">
+                    <div class="style-option" data-style="user-style-h1">
+                        <i class="fas fa-heading"></i>
+                        <span>Titre principal</span>
+                    </div>
+                    <div class="style-option" data-style="user-style-h2">
+                        <i class="fas fa-heading"></i>
+                        <span>Sous-titre</span>
+                    </div>
+                    <div class="style-option" data-style="user-style-h3">
+                        <i class="fas fa-heading"></i>
+                        <span>Titre niveau 3</span>
+                    </div>
+                    <div class="style-option active" data-style="user-style-paragraph">
+                        <i class="fas fa-paragraph"></i>
+                        <span>Paragraphe</span>
+                    </div>
+                    <div class="style-option" data-style="user-style-lead">
+                        <i class="fas fa-text-width"></i>
+                        <span>Texte d'introduction</span>
+                    </div>
+                    <div class="style-option" data-style="user-style-quote">
+                        <i class="fas fa-quote-left"></i>
+                        <span>Citation</span>
+                    </div>
+                    <div class="style-option" data-style="user-style-code">
+                        <i class="fas fa-code"></i>
+                        <span>Code inline</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="toolbar-divider"></div>
+        
+        <!-- Groupe 2: Formatage de base -->
+        <div class="toolbar-group">
+            <button class="format-btn" id="boldBtn" data-format="bold" title="Gras (Ctrl+B)">
+                <i class="fas fa-bold"></i>
+            </button>
+            <button class="format-btn" id="italicBtn" data-format="italic" title="Italique (Ctrl+I)">
+                <i class="fas fa-italic"></i>
+            </button>
+            <button class="format-btn" id="underlineBtn" data-format="underline" title="Souligné (Ctrl+U)">
+                <i class="fas fa-underline"></i>
+            </button>
+            <button class="format-btn" id="highlightBtn" data-format="highlight" title="Surligner">
+                <i class="fas fa-highlighter"></i>
+            </button>
+        </div>
+        
+        <div class="toolbar-divider"></div>
+        
+        <!-- Groupe 3: Palette de couleurs -->
+        <div class="toolbar-group">
+            <div class="color-palette">
+                <div class="color-swatch color-primary active" data-color="var(--user-primary)" title="Bleu principal"></div>
+                <div class="color-swatch color-secondary" data-color="var(--user-secondary)" title="Violet"></div>
+                <div class="color-swatch color-accent" data-color="var(--user-accent)" title="Rose"></div>
+                <div class="color-swatch color-success" data-color="var(--user-success)" title="Vert"></div>
+                <div class="color-swatch color-warning" data-color="var(--user-warning)" title="Orange"></div>
+                <div class="color-swatch color-error" data-color="var(--user-error)" title="Rouge"></div>
+                <div class="color-swatch color-info" data-color="var(--user-info)" title="Cyan"></div>
+                <div class="color-swatch color-dark" data-color="#1f2937" title="Sombre"></div>
+                <div class="color-swatch color-light" data-color="#f9fafb" title="Clair"></div>
+            </div>
+        </div>
+        
+        <div class="toolbar-divider"></div>
+        
+        <!-- Groupe 4: Modes d'affichage -->
+        <div class="toolbar-group">
+            <div class="mode-selector">
+                <button class="mode-btn active" data-mode="faithful">
+                    <i class="fas fa-file-pdf"></i>Fidèle
+                </button>
+                <button class="mode-btn" data-mode="text">
+                    <i class="fas fa-edit"></i>Texte
+                </button>
+                <button class="mode-btn" data-mode="visual">
+                    <i class="fas fa-paint-brush"></i>Visuel
+                </button>
+            </div>
+        </div>
+        
+        <!-- Groupe 5: Actions avancées -->
+        <div class="toolbar-group">
+            <button class="btn btn-success btn-sm interactive-element" id="applyTemplateBtn">
+                <i class="fas fa-magic me-2"></i>Template
+            </button>
+            <button class="btn btn-info btn-sm interactive-element" id="toggleCopilotBtn">
+                <i class="fas fa-robot me-2"></i>Assistant
+            </button>
+        </div>
+    </div>
+    
+    <!-- Interface principale -->
+    <div class="editor-main">
+        <!-- Table des matières -->
+        <div class="toc-panel" id="tocPanel">
+            <div class="toc-header">
+                <span><i class="fas fa-list me-2"></i>Navigation</span>
+                <button class="toc-toggle" id="tocToggle">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            </div>
+            <div class="toc-content" id="tocContent">
+                <div class="text-center text-muted py-4">
+                    <div class="spinner mb-3"></div>
+                    <p>Génération de la navigation...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Zone de contenu FIDÈLE -->
+        <div class="content-area">
+            <div class="document-viewer" id="documentViewer">
+                <!-- Indicateur de modifications -->
+                <div id="unsavedIndicator" class="unsaved-indicator" style="display: none;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>Modifications non sauvegardées</span>
+                </div>
+                
+                <!-- Contenu du document FIDÈLE -->
+                <div id="documentContent" class="document-content mode-faithful">
+                    {% if content and content.extracted %}
+                        <!-- Affichage fidèle du HTML généré par le processeur -->
+                        {% if content.html %}
+                            {{ content.html|safe }}
+                        {% else %}
+                            <!-- Contenu fidèle basique si pas de HTML -->
+                            <div class="pdf-document-faithful">
+                                <div class="pdf-page-faithful">
+                                    <!-- En-tête du document -->
+                                    <h3 class="faithful-heading user-style-h1 editable-element" 
+                                        contenteditable="true" 
+                                        data-element-id="document-title"
+                                        data-original-value="{{ document.name }}">
+                                        {{ document.name }}
+                                    </h3>
+                                    
+                                    {% if content.structure.tables %}
+                                        <!-- Afficher les tableaux fidèles simplifiés -->
+                                        {% for table in content.structure.tables %}
+                                            <div class="table-container-faithful table-theme-modern {{ table.structure.table_type|default:'general' }}">
+                                                <div class="table-header-faithful">
+                                                    <h6>
+                                                        <i class="fas fa-table me-2"></i>
+                                                        Tableau {{ forloop.counter }} - {{ table.structure.table_type|title|default:'Général' }}
+                                                        <small class="text-muted">({{ table.rows }}×{{ table.cols }})</small>
+                                                    </h6>
+                                                </div>
+                                                <div class="table-wrapper-faithful">
+                                                    <table class="table table-faithful table-faithful-{{ table.structure.table_type|default:'general' }}" 
+                                                           data-table-id="faithful-table-{{ forloop.counter0 }}">
+                                                        {% for row in table.data %}
+                                                            <tr class="{% if forloop.first and table.structure.header_info.has_header %}table-header-row{% else %}table-data-row{% endif %}">
+                                                                {% for cell in row %}
+                                                                    {% if forloop.parentloop.first and table.structure.header_info.has_header %}
+                                                                        <th class="table-cell-faithful" 
+                                                                            data-row="{{ forloop.parentloop.counter0 }}" 
+                                                                            data-col="{{ forloop.counter0 }}" 
+                                                                            data-original-value="{{ cell }}">
+                                                                            {{ cell }}
+                                                                        </th>
+                                                                    {% else %}
+                                                                        <td class="table-cell-faithful text-cell editable-element" 
+                                                                            contenteditable="true"
+                                                                            data-row="{{ forloop.parentloop.counter0 }}" 
+                                                                            data-col="{{ forloop.counter0 }}" 
+                                                                            data-original-value="{{ cell }}"
+                                                                            data-cell-type="text">
+                                                                            {{ cell }}
+                                                                        </td>
+                                                                    {% endif %}
+                                                                {% endfor %}
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        {% empty %}
+                                            <!-- Aucun tableau détecté -->
+                                            <div class="alert alert-info">
+                                                <i class="fas fa-info-circle me-2"></i>
+                                                Aucun tableau détecté dans ce document
+                                            </div>
+                                        {% endfor %}
+                                    {% endif %}
+                                    
+                                    {% if content.text %}
+                                        <!-- Afficher le texte fidèle -->
+                                        <div class="faithful-text-content">
+                                            {{ content.text|linebreaks|safe }}
+                                        </div>
+                                    {% else %}
+                                        <!-- Contenu vide - zone d'édition -->
+                                        <div class="faithful-text-content">
+                                            <p class="faithful-paragraph user-style-paragraph editable-element" 
+                                               contenteditable="true" 
+                                               data-element-id="empty-content" 
+                                               data-original-value="">
+                                                Commencez à taper le contenu de votre document ici...
+                                            </p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                    {% else %}
+                        <!-- Contenu non extrait -->
+                        <div class="extraction-pending">
+                            <div class="document-icon {{ document.document_type }}">
+                                {% if document.document_type == 'pdf' %}
+                                    <i class="fas fa-file-pdf"></i>
+                                {% elif document.document_type == 'docx' %}
+                                    <i class="fas fa-file-word"></i>
+                                {% elif document.document_type == 'xlsx' %}
+                                    <i class="fas fa-file-excel"></i>
+                                {% else %}
+                                    <i class="fas fa-file"></i>
+                                {% endif %}
+                            </div>
+                            <h5 class="mb-3">Processeur Fidèle Disponible</h5>
+                            <p class="text-muted mb-4">
+                                Ce document {{ document.get_document_type_display|lower }} peut être converti en mode éditable fidèle avec préservation complète de la structure et des tableaux.
+                            </p>
+                            
+                            <button class="btn btn-primary btn-lg mb-3 interactive-element" id="extractContentBtn">
+                                <i class="fas fa-magic me-2"></i>Convertir avec processeur fidèle
+                            </button>
+                            
+                            <!-- Si le document a déjà été extrait mais avec l'ancienne méthode -->
+                            {% if document.content_extracted and document.content_extracted.extraction_method != 'faithful_pymupdf' %}
+                            <div class="mt-4">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Document déjà extrait avec l'ancienne méthode. Le nouveau processeur fidèle offre une meilleure préservation des tableaux et de la mise en forme.
+                                </div>
+                                <button class="btn btn-warning interactive-element" id="reprocessFaithfulBtn">
+                                    <i class="fas fa-refresh me-2"></i>Retraiter avec processeur fidèle
+                                </button>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Éditeur basique en attendant -->
+                            <div class="mt-5">
+                                <h6>Ou commencer l'édition en mode basique :</h6>
+                                <div class="pdf-document-faithful mt-3">
+                                    <div class="pdf-page-faithful">
+                                        <h3 class="faithful-heading user-style-h2 editable-element" 
+                                            contenteditable="true" 
+                                            data-element-id="basic-title"
+                                            data-original-value="{{ document.name }}">
+                                            {{ document.name }}
+                                        </h3>
+                                        <p class="faithful-paragraph user-style-paragraph editable-element" 
+                                           contenteditable="true" 
+                                           data-element-id="basic-content"
+                                           data-original-value="">
+                                            Commencez à taper votre contenu ici...
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Panneau Copilot -->
+        <div class="copilot-panel collapsed" id="copilotPanel">
+            <div class="copilot-header">
+                <div>
+                    <i class="fas fa-robot me-2"></i>Assistant IA
+                    {% if copilot_enabled %}
+                        <span class="badge bg-success ms-2">Actif</span>
+                    {% else %}
+                        <span class="badge bg-warning ms-2">Limité</span>
+                    {% endif %}
+                </div>
+                <button class="btn btn-sm btn-link text-white p-0" id="closeCopilotBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="copilot-content">
+                <!-- Statut -->
+                <div class="copilot-status" id="copilotStatus">
+                    <div class="status-indicator"></div>
+                    <small>
+                        {% if copilot_enabled %}
+                            Assistant actif - Surveillance des modifications en temps réel
+                        {% else %}
+                            Mode limité - Fonctionnalités de base disponibles
+                        {% endif %}
+                    </small>
+                </div>
+                
+                <!-- Suggestions -->
+                <div class="mb-4">
+                    <h6 class="text-muted mb-3">
+                        <i class="fas fa-lightbulb me-2"></i>Suggestions intelligentes
+                    </h6>
+                    <div id="suggestionsContainer">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-magic fa-2x mb-3 text-primary"></i>
+                            <p class="small">Commencez à modifier le document pour recevoir des suggestions personnalisées</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Actions rapides -->
+                <div class="quick-actions">
+                    <h6>Actions rapides</h6>
+                    <button class="quick-action-btn" id="findReplaceBtn">
+                        <i class="fas fa-search"></i>
+                        <span>Rechercher & Remplacer</span>
+                    </button>
+                    <button class="quick-action-btn" id="spellCheckBtn">
+                        <i class="fas fa-spell-check"></i>
+                        <span>Vérification orthographique</span>
+                    </button>
+                    <button class="quick-action-btn" id="optimizeBtn">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                        <span>Optimiser le contenu</span>
+                    </button>
+                    <button class="quick-action-btn" id="generateTemplateBtn">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Générer template</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bouton de sauvegarde flottant -->
+    <button id="floatingSave" class="floating-save" style="display: none;">
+        <i class="fas fa-save"></i>
+        <span>Sauvegarder</span>
+    </button>
+</div>
+
+<!-- Zone de notifications -->
+<div id="notificationArea"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+// Configuration JavaScript mise à jour avec nouvelles fonctionnalités
+window.DOCUMENT_DATA = {
+    id: {{ document.id }},
+    name: "{{ document.name|escapejs }}",
+    type: "{{ document.document_type }}",
+    hasContent: {{ content.extracted|yesno:"true,false" }},
+    copilotEnabled: {{ copilot_enabled|yesno:"true,false" }},
+    extractionMethod: "{{ content.extraction_method|default:'none' }}",
+    urls: {
+        saveChanges: "{% url 'ctd_submission:document_save_changes' document.id %}",
+        copilotSuggestions: "{% url 'ctd_submission:copilot_suggestions' document.id %}",
+        applyTemplate: "{% url 'ctd_submission:apply_template_to_editor' document.id %}",
+        exportModified: "{% url 'ctd_submission:document_export_modified' document.id %}",
+        extractContent: "{% url 'ctd_submission:api_extract_content' document.id %}",
+        validateDocument: "{% url 'ctd_submission:validate_document_content' document.id %}",
+        reprocessFaithful: `/ctd_submission/document/${document.id}/reprocess_faithful/`
+    }
+};
+
+window.CSRF_TOKEN = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+// Variables globales
+let hasUnsavedChanges = false;
+let changeTimeout;
+let autoSaveInterval;
+let currentTextStyle = 'user-style-paragraph';
+let currentColor = 'var(--user-primary)';
+
+// Initialisation de l'éditeur amélioré
+document.addEventListener('DOMContentLoaded', function() {
+    initializeEnhancedEditor();
+});
+
+function initializeEnhancedEditor() {
+    console.log('🎨 Initialisation de l\'éditeur amélioré...');
+    
+    try {
+        // Fonctionnalités de base
+        initializeFaithfulEditor();
+        
+        // Nouvelles fonctionnalités utilisateur
+        initializeUserStyleSystem();
+        initializeFormattingToolbar();
+        initializeColorPalette();
+        initializeAdvancedInteractions();
+        
+        console.log('✅ Éditeur amélioré initialisé avec succès');
+        
+    } catch (error) {
+        console.error('❌ Erreur lors de l\'initialisation améliorée:', error);
+        showNotification('Erreur lors de l\'initialisation de l\'éditeur amélioré', 'error');
+    }
+}
+
+function initializeUserStyleSystem() {
+    const styleDropdown = document.getElementById('styleDropdown');
+    const styleOptions = document.getElementById('styleOptions');
+    
+    // Toggle dropdown
+    styleDropdown.addEventListener('click', function() {
+        styleOptions.classList.toggle('show');
+    });
+    
+    // Fermer dropdown en cliquant ailleurs
+    document.addEventListener('click', function(e) {
+        if (!styleDropdown.contains(e.target) && !styleOptions.contains(e.target)) {
+            styleOptions.classList.remove('show');
+        }
+    });
+    
+    // Sélection de style
+    document.querySelectorAll('.style-option').forEach(option => {
+        option.addEventListener('click', function() {
+            const style = this.getAttribute('data-style');
+            const styleName = this.querySelector('span').textContent;
+            
+            // Mettre à jour le dropdown
+            document.querySelectorAll('.style-option').forEach(opt => opt.classList.remove('active'));
+            this.classList.add('active');
+            styleDropdown.querySelector('span').textContent = styleName;
+            styleOptions.classList.remove('show');
+            
+            // Appliquer le style à la sélection
+            applyTextStyle(style);
+            currentTextStyle = style;
+        });
+    });
+}
+
+function initializeFormattingToolbar() {
+    // Boutons de formatage
+    document.querySelectorAll('.format-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const format = this.getAttribute('data-format');
+            applyFormatting(format);
+            
+            // Toggle active state pour certains boutons
+            if (['bold', 'italic', 'underline'].includes(format)) {
+                this.classList.toggle('active');
+            }
+        });
+    });
+    
+    // Raccourcis clavier
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.metaKey) {
+            switch(e.key.toLowerCase()) {
+                case 'b':
+                    e.preventDefault();
+                    applyFormatting('bold');
+                    document.getElementById('boldBtn').classList.toggle('active');
+                    break;
+                case 'i':
+                    e.preventDefault();
+                    applyFormatting('italic');
+                    document.getElementById('italicBtn').classList.toggle('active');
+                    break;
+                case 'u':
+                    e.preventDefault();
+                    applyFormatting('underline');
+                    document.getElementById('underlineBtn').classList.toggle('active');
+                    break;
+                case 's':
+                    e.preventDefault();
+                    if (hasUnsavedChanges) {
+                        saveDocument();
+                    }
+                    break;
+            }
+        }
+    });
+}
+
+function initializeColorPalette() {
+    document.querySelectorAll('.color-swatch').forEach(swatch => {
+        swatch.addEventListener('click', function() {
+            const color = this.getAttribute('data-color');
+            
+            // Mettre à jour les états actifs
+            document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Appliquer la couleur
+            applyTextColor(color);
+            currentColor = color;
+        });
+    });
+}
+
+function initializeAdvancedInteractions() {
+    // Amélioration des interactions existantes
+    document.addEventListener('mouseenter', function(e) {
+        if (e.target.matches('.editable-element')) {
+            e.target.style.transform = 'translateY(-1px)';
+        }
+    }, true);
+    
+    document.addEventListener('mouseleave', function(e) {
+        if (e.target.matches('.editable-element:not(:focus)')) {
+            e.target.style.transform = '';
+        }
+    }, true);
+    
+    // Animation lors du focus
+    document.addEventListener('focus', function(e) {
+        if (e.target.matches('.editable-element')) {
+            e.target.style.transform = 'translateY(-1px)';
+            addFocusAnimation(e.target);
+        }
+    }, true);
+    
+    document.addEventListener('blur', function(e) {
+        if (e.target.matches('.editable-element')) {
+            e.target.style.transform = '';
+            removeFocusAnimation(e.target);
+        }
+    }, true);
+}
+
+function applyTextStyle(styleClass) {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const selectedElement = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+        ? range.commonAncestorContainer.parentElement
+        : range.commonAncestorContainer;
+    
+    // Si c'est un élément éditable, appliquer la classe directement
+    if (selectedElement.classList.contains('editable-element')) {
+        // Retirer les anciennes classes de style
+        selectedElement.className = selectedElement.className.replace(/user-style-\w+/g, '');
+        selectedElement.classList.add(styleClass);
+        
+        // Marquer comme modifié
+        selectedElement.classList.add('modified');
+        hasUnsavedChanges = true;
+        showUnsavedIndicator();
+        showFloatingSave();
+        
+        showNotification(`Style "${getStyleDisplayName(styleClass)}" appliqué`, 'success');
+    }
+}
+
+function applyFormatting(format) {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return;
+    
+    try {
+        switch(format) {
+            case 'bold':
+                document.execCommand('bold', false, null);
+                break;
+            case 'italic':
+                document.execCommand('italic', false, null);
+                break;
+            case 'underline':
+                document.execCommand('underline', false, null);
+                break;
+            case 'highlight':
+                applyHighlight();
+                break;
+        }
+        
+        markSelectionAsModified();
+        showNotification(`Formatage "${format}" appliqué`, 'success');
+        
+    } catch (error) {
+        console.error('Erreur lors de l\'application du formatage:', error);
+        showNotification('Erreur lors de l\'application du formatage', 'error');
+    }
+}
+
+function applyTextColor(color) {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return;
+    
+    try {
+        document.execCommand('foreColor', false, color);
+        markSelectionAsModified();
+        showNotification('Couleur appliquée', 'success');
+    } catch (error) {
+        console.error('Erreur lors de l\'application de la couleur:', error);
+        showNotification('Erreur lors de l\'application de la couleur', 'error');
+    }
+}
+
+function applyHighlight() {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const span = document.createElement('span');
+    span.className = 'user-style-highlight';
+    
+    try {
+        range.surroundContents(span);
+        selection.removeAllRanges();
+    } catch (error) {
+        console.error('Erreur lors du surlignage:', error);
+        showNotification('Erreur lors du surlignage', 'error');
+    }
+}
+
+function markSelectionAsModified() {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const element = container.nodeType === Node.TEXT_NODE 
+        ? container.parentElement 
+        : container;
+    
+    if (element.closest('.editable-element')) {
+        const editableElement = element.closest('.editable-element');
+        editableElement.classList.add('modified');
+        hasUnsavedChanges = true;
+        showUnsavedIndicator();
+        showFloatingSave();
+    }
+}
+
+function addFocusAnimation(element) {
+    element.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.2)';
+    element.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+}
+
+function removeFocusAnimation(element) {
+    element.style.boxShadow = '';
+}
+
+function getStyleDisplayName(styleClass) {
+    const styleNames = {
+        'user-style-h1': 'Titre principal',
+        'user-style-h2': 'Sous-titre',
+        'user-style-h3': 'Titre niveau 3',
+        'user-style-paragraph': 'Paragraphe',
+        'user-style-lead': 'Texte d\'introduction',
+        'user-style-quote': 'Citation',
+        'user-style-code': 'Code inline'
+    };
+    return styleNames[styleClass] || styleClass;
+}
+
+// Amélioration des fonctions existantes
+function initializeFaithfulEditor() {
+    console.log('Initialisation de l\'éditeur fidèle...');
+    
+    try {
+        // Rendre le contenu texte éditable avec les nouvelles classes
+        makeFaithfulTextEditableEnhanced();
+        
+        // Génération de la table des matières
+        generateFaithfulTOC();
+        
+        // Gestion des modes d'édition améliorés
+        initializeModeSelector();
+        
+        // Initialisation du Copilot
+        initializeCopilot();
+        
+        // Gestion des événements d'édition fidèles
+        initializeFaithfulEditingEvents();
+        
+        // Auto-sauvegarde
+        initializeAutoSave();
+        
+        // Boutons d'action
+        initializeActionButtons();
+        
+        console.log('✅ Éditeur fidèle initialisé avec succès');
+        
+    } catch (error) {
+        console.error('❌ Erreur lors de l\'initialisation:', error);
+        showNotification('Erreur lors de l\'initialisation de l\'éditeur', 'error');
+    }
+}
+
+function makeFaithfulTextEditableEnhanced() {
+    // Rendre les paragraphes du contenu texte fidèle éditables avec styles
+    document.querySelectorAll('.faithful-text-content p').forEach((paragraph, index) => {
+        paragraph.setAttribute('contenteditable', 'true');
+        paragraph.setAttribute('data-element-id', `faithful-text-${index}`);
+        paragraph.setAttribute('data-original-value', paragraph.textContent || '');
+        paragraph.classList.add('faithful-paragraph', 'editable-element', 'user-style-paragraph');
+    });
+    
+    // Améliorer les cellules de tableau
+    document.querySelectorAll('.table-cell-faithful[contenteditable="true"]').forEach(cell => {
+        cell.classList.add('editable-element');
+    });
+    
+    // Améliorer les titres
+    document.querySelectorAll('.faithful-heading').forEach(heading => {
+        heading.classList.add('editable-element');
+        if (!heading.classList.contains('user-style-h1') && 
+            !heading.classList.contains('user-style-h2') && 
+            !heading.classList.contains('user-style-h3')) {
+            heading.classList.add('user-style-h2');
+        }
+    });
+}
+
+function generateFaithfulTOC() {
+    const tocContent = document.getElementById('tocContent');
+    const headers = document.querySelectorAll('#documentContent .faithful-heading, #documentContent .table-container-faithful');
+    
+    if (headers.length === 0) {
+        tocContent.innerHTML = generateBasicTOC();
+        return;
+    }
+    
+    let tocHTML = '';
+    headers.forEach((element, index) => {
+        let text, icon, level = 1;
+        
+        if (element.classList.contains('faithful-heading')) {
+            text = element.textContent.trim();
+            icon = 'bookmark';
+            // Déterminer le niveau basé sur les classes de style
+            if (element.classList.contains('user-style-h1')) level = 1;
+            else if (element.classList.contains('user-style-h2')) level = 2;
+            else if (element.classList.contains('user-style-h3')) level = 3;
+        } else if (element.classList.contains('table-container-faithful')) {
+            const tableHeader = element.querySelector('.table-header-faithful h6');
+            text = tableHeader ? tableHeader.textContent.trim() : `Tableau ${index + 1}`;
+            icon = 'table';
+            level = 2;
+        }
+        
+        const id = `element-${index}`;
+        element.setAttribute('id', id);
+        
+        tocHTML += `
+            <div class="toc-item level-${level}" data-target="${id}">
+                <i class="toc-item-icon fas fa-${icon}"></i>
+                <span>${text}</span>
+            </div>
+        `;
+    });
+    
+    tocContent.innerHTML = tocHTML;
+    
+    // Ajouter les événements de navigation avec animation
+    document.querySelectorAll('.toc-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const target = document.getElementById(targetId);
+            if (target) {
+                // Animation de scroll fluide
+                target.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start',
+                    inline: 'nearest'
+                });
+                
+                // Effet de surbrillance temporaire
+                target.style.boxShadow = '0 0 20px rgba(99, 102, 241, 0.3)';
+                setTimeout(() => {
+                    target.style.boxShadow = '';
+                }, 2000);
+                
+                // Mettre à jour l'état actif
+                document.querySelectorAll('.toc-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            }
+        });
+    });
+}
+
+function generateBasicTOC() {
+    const documentType = window.DOCUMENT_DATA.type;
+    
+    return `
+        <div class="toc-item level-1" data-section="document">
+            <i class="toc-item-icon fas fa-file-${documentType === 'pdf' ? 'pdf' : documentType === 'docx' ? 'word' : 'excel'}"></i>
+            <span>Document ${documentType.toUpperCase()}</span>
+        </div>
+        <div class="toc-item level-2" data-section="content">
+            <i class="toc-item-icon fas fa-edit"></i>
+            <span>Contenu éditable</span>
+        </div>
+        <div class="toc-item level-2" data-section="styles">
+            <i class="toc-item-icon fas fa-palette"></i>
+            <span>Styles disponibles</span>
+        </div>
+    `;
+}
+
+function initializeModeSelector() {
+    const modeButtons = document.querySelectorAll('.mode-btn');
+    const documentContent = document.getElementById('documentContent');
+    const modeSelector = document.querySelector('.mode-selector');
+    
+    modeButtons.forEach((btn, index) => {
+        btn.addEventListener('click', function() {
+            // Mettre à jour les boutons actifs
+            modeButtons.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Animer l'indicateur de position
+            const offset = index * 100;
+            modeSelector.style.setProperty('--mode-offset', `${offset}%`);
+            
+            // Changer le mode d'affichage
+            const mode = this.getAttribute('data-mode');
+            documentContent.className = `document-content mode-${mode}`;
+            
+            // Ajuster les styles selon le mode
+            adjustContentForMode(mode);
+            
+            showNotification(`Mode "${mode}" activé`, 'info');
+        });
+    });
+}
+
+function adjustContentForMode(mode) {
+    const tables = document.querySelectorAll('.table-container-faithful');
+    
+    switch(mode) {
+        case 'faithful':
+            tables.forEach(table => {
+                table.className = table.className.replace(/table-theme-\w+/g, '');
+                table.classList.add('table-theme-modern');
+            });
+            break;
+        case 'text':
+            tables.forEach(table => {
+                table.className = table.className.replace(/table-theme-\w+/g, '');
+                table.classList.add('table-theme-minimal');
+            });
+            break;
+        case 'visual':
+            tables.forEach(table => {
+                table.className = table.className.replace(/table-theme-\w+/g, '');
+                table.classList.add('table-theme-colorful');
+            });
+            break;
+    }
+}
+
+// Conserver toutes les autres fonctions existantes...
+function initializeCopilot() {
+    const toggleBtn = document.getElementById('toggleCopilotBtn');
+    const copilotPanel = document.getElementById('copilotPanel');
+    const closeBtn = document.getElementById('closeCopilotBtn');
+    
+    toggleBtn.addEventListener('click', () => {
+        copilotPanel.classList.toggle('collapsed');
+        
+        // Animation d'ouverture
+        if (!copilotPanel.classList.contains('collapsed')) {
+            copilotPanel.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                copilotPanel.style.transform = '';
+            }, 50);
+        }
+    });
+    
+    closeBtn.addEventListener('click', () => {
+        copilotPanel.classList.add('collapsed');
+    });
+}
+
+function initializeFaithfulEditingEvents() {
+    // Surveiller les modifications sur les éléments fidèles
+    document.addEventListener('input', function(e) {
+        if (e.target.matches('.editable-element[contenteditable="true"]')) {
+            hasUnsavedChanges = true;
+            showUnsavedIndicator();
+            showFloatingSave();
+            
+            // Marquer l'élément comme modifié
+            e.target.classList.add('modified');
+            
+            // Debounce pour les suggestions du copilot
+            clearTimeout(changeTimeout);
+            changeTimeout = setTimeout(() => {
+                requestCopilotSuggestions(e.target);
+            }, 1000);
+            
+            // Mise à jour immédiate de la TOC si nécessaire
+            if (e.target.classList.contains('faithful-heading') || 
+                e.target.closest('.table-container-faithful')) {
+                generateFaithfulTOC();
+            }
+        }
+    });
+    
+    // Gestion des focus/blur pour les éléments éditables fidèles
+    document.addEventListener('focus', function(e) {
+        if (e.target.matches('.editable-element[contenteditable="true"]')) {
+            e.target.classList.add('active');
+            addFocusAnimation(e.target);
+        }
+    }, true);
+    
+    document.addEventListener('blur', function(e) {
+        if (e.target.matches('.editable-element[contenteditable="true"]')) {
+            e.target.classList.remove('active');
+            removeFocusAnimation(e.target);
+        }
+    }, true);
+    
+    // Navigation au clavier dans les tableaux fidèles
+    document.addEventListener('keydown', function(e) {
+        if (e.target.matches('.table-cell-faithful[contenteditable="true"]')) {
+            handleFaithfulTableNavigation(e);
+        }
+    });
+    
+    // Sauvegarde
+    document.getElementById('floatingSave').addEventListener('click', saveDocument);
+}
+
+function handleFaithfulTableNavigation(e) {
+    const cell = e.target;
+    const row = parseInt(cell.getAttribute('data-row'));
+    const col = parseInt(cell.getAttribute('data-col'));
+    const table = cell.closest('.table-faithful');
+    let targetCell = null;
+
+    switch(e.key) {
+        case 'ArrowUp':
+            if (e.ctrlKey) {
+                targetCell = table.querySelector(`[data-row="${row - 1}"][data-col="${col}"][contenteditable="true"]`);
+            }
+            break;
+        case 'ArrowDown':
+            if (e.ctrlKey) {
+                targetCell = table.querySelector(`[data-row="${row + 1}"][data-col="${col}"][contenteditable="true"]`);
+            }
+            break;
+        case 'ArrowLeft':
+            if (e.ctrlKey) {
+                targetCell = table.querySelector(`[data-row="${row}"][data-col="${col - 1}"][contenteditable="true"]`);
+            }
+            break;
+        case 'ArrowRight':
+            if (e.ctrlKey) {
+                targetCell = table.querySelector(`[data-row="${row}"][data-col="${col + 1}"][contenteditable="true"]`);
+            }
+            break;
+        case 'Tab':
+            e.preventDefault();
+            if (e.shiftKey) {
+                targetCell = table.querySelector(`[data-row="${row}"][data-col="${col - 1}"][contenteditable="true"]`) || 
+                           table.querySelector(`[data-row="${row - 1}"][data-col="999"][contenteditable="true"]`);
+            } else {
+                targetCell = table.querySelector(`[data-row="${row}"][data-col="${col + 1}"][contenteditable="true"]`) || 
+                           table.querySelector(`[data-row="${row + 1}"][data-col="0"][contenteditable="true"]`);
+            }
+            break;
+    }
+
+    if (targetCell) {
+        e.preventDefault();
+        targetCell.focus();
+        
+        // Animation de transition
+        targetCell.style.transform = 'scale(1.02)';
+        setTimeout(() => {
+            targetCell.style.transform = '';
+        }, 150);
+    }
+}
+
+function initializeActionButtons() {
+    // Extraction de contenu fidèle
+    const extractBtn = document.getElementById('extractContentBtn');
+    if (extractBtn) {
+        extractBtn.addEventListener('click', extractFaithfulContent);
+    }
+    
+    // Retraitement fidèle
+    const reprocessBtn = document.getElementById('reprocessFaithfulBtn');
+    if (reprocessBtn) {
+        reprocessBtn.addEventListener('click', function() {
+            if (confirm('Voulez-vous retraiter ce document avec le nouveau processeur fidèle ? Cela remplacera le contenu actuel.')) {
+                reprocessDocumentFaithful();
+            }
+        });
+    }
+    
+    // Application de template
+    document.getElementById('applyTemplateBtn').addEventListener('click', applyTemplate);
+    
+    // Export de document
+    document.getElementById('exportDocumentBtn').addEventListener('click', exportDocument);
+    
+    // Validation de document
+    document.getElementById('validateDocumentBtn').addEventListener('click', validateDocument);
+    
+    // Actions rapides du copilot
+    document.getElementById('findReplaceBtn').addEventListener('click', () => {
+        openFindReplaceDialog();
+    });
+    
+    document.getElementById('spellCheckBtn').addEventListener('click', () => {
+        showNotification('Vérification orthographique en cours...', 'info');
+        requestSpellCheck();
+    });
+    
+    document.getElementById('optimizeBtn').addEventListener('click', () => {
+        showNotification('Optimisation du contenu en cours...', 'info');
+        optimizeContent();
+    });
+    
+    document.getElementById('generateTemplateBtn').addEventListener('click', () => {
+        generateDocumentTemplate();
+    });
+}
+
+function extractFaithfulContent() {
+    const extractBtn = document.getElementById('extractContentBtn');
+    const originalHTML = extractBtn.innerHTML;
+    
+    // Afficher le loading avec indication du processeur fidèle
+    extractBtn.innerHTML = '<div class="spinner me-2"></div>Conversion fidèle en cours...';
+    extractBtn.disabled = true;
+    
+    fetch(window.DOCUMENT_DATA.urls.extractContent, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.CSRF_TOKEN
+        },
+        body: JSON.stringify({
+            use_faithful_processor: true
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let message = 'Document converti avec succès (Processeur Fidèle)';
+            if (data.tables_count > 0) {
+                message += ` - ${data.tables_count} tableau(x) détecté(s) et préservé(s)`;
+            }
+            if (data.extraction_method === 'faithful_pymupdf') {
+                message += ' - Structure préservée';
+            }
+            showNotification(message + ' - Rechargement...', 'success');
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            throw new Error(data.message || 'Erreur lors de la conversion fidèle');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur conversion fidèle:', error);
+        showNotification('Erreur lors de la conversion fidèle: ' + error.message, 'error');
+        extractBtn.innerHTML = originalHTML;
+        extractBtn.disabled = false;
+    });
+}
+
+function reprocessDocumentFaithful() {
+    const btn = document.getElementById('reprocessFaithfulBtn');
+    const originalHTML = btn.innerHTML;
+    
+    btn.innerHTML = '<div class="spinner me-2"></div>Retraitement fidèle en cours...';
+    btn.disabled = true;
+    
+    fetch(window.DOCUMENT_DATA.urls.reprocessFaithful, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.CSRF_TOKEN
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Document retraité avec succès (Processeur Fidèle) - Rechargement...', 'success');
+            setTimeout(() => {
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    window.location.reload();
+                }
+            }, 1500);
+        } else {
+            throw new Error(data.message || 'Erreur lors du retraitement fidèle');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur retraitement fidèle:', error);
+        showNotification('Erreur lors du retraitement fidèle: ' + error.message, 'error');
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    });
+}
+
+function saveDocument() {
+    const content = document.getElementById('documentContent').innerHTML;
+    const changes = collectFaithfulChanges();
+    
+    const saveBtn = document.getElementById('floatingSave');
+    const originalHTML = saveBtn.innerHTML;
+    
+    saveBtn.innerHTML = '<div class="spinner me-2"></div>Sauvegarde...';
+    saveBtn.disabled = true;
+    
+    fetch(window.DOCUMENT_DATA.urls.saveChanges, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.CSRF_TOKEN
+        },
+        body: JSON.stringify({
+            content: content,
+            changes: changes,
+            faithful_mode: true,
+            user_styles: collectUserStyles(),
+            formatting_info: collectFormattingInfo()
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            hasUnsavedChanges = false;
+            hideUnsavedIndicator();
+            hideFloatingSave();
+            
+            // Marquer tous les éléments comme sauvegardés avec animation
+            document.querySelectorAll('.modified').forEach(el => {
+                el.classList.remove('modified');
+                el.classList.add('newly-saved');
+                
+                // Animation de sauvegarde réussie
+                setTimeout(() => {
+                    el.classList.remove('newly-saved');
+                }, 2000);
+                
+                // Mettre à jour la valeur originale
+                const currentValue = el.textContent || el.innerText || '';
+                el.setAttribute('data-original-value', currentValue);
+            });
+            
+            showNotification('Document sauvegardé avec succès (Mode Fidèle + Styles)', 'success');
+            
+            // Afficher les suggestions globales s'il y en a
+            if (data.global_suggestions && data.global_suggestions.length > 0) {
+                displayCopilotSuggestions(data.global_suggestions);
+            }
+        } else {
+            throw new Error(data.message || 'Erreur lors de la sauvegarde fidèle');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur sauvegarde fidèle:', error);
+        showNotification('Erreur lors de la sauvegarde fidèle: ' + error.message, 'error');
+    })
+    .finally(() => {
+        saveBtn.innerHTML = originalHTML;
+        saveBtn.disabled = false;
+    });
+}
+
+function collectFaithfulChanges() {
+    const changes = [];
+    
+    // Collecter les changements des cellules de tableaux fidèles
+    document.querySelectorAll('.table-cell-faithful.modified[contenteditable="true"]').forEach(cell => {
+        const original = cell.getAttribute('data-original-value') || '';
+        const current = cell.textContent || cell.innerText || '';
+        
+        if (original !== current) {
+            changes.push({
+                element_id: `table-${cell.closest('table').getAttribute('data-table-id') || 'unknown'}-${cell.getAttribute('data-row')}-${cell.getAttribute('data-col')}`,
+                element_type: 'faithful_table_cell',
+                table_id: cell.closest('table').getAttribute('data-table-id'),
+                row: parseInt(cell.getAttribute('data-row')),
+                col: parseInt(cell.getAttribute('data-col')),
+                cell_type: cell.getAttribute('data-cell-type') || 'text',
+                old_value: original,
+                new_value: current,
+                type: 'faithful_cell_change',
+                styles_applied: Array.from(cell.classList).filter(cls => cls.startsWith('user-style-'))
+            });
+        }
+    });
+    
+    // Collecter les changements des éléments de texte fidèles
+    document.querySelectorAll('.editable-element.modified[contenteditable="true"]').forEach(element => {
+        const original = element.getAttribute('data-original-value') || '';
+        const current = element.textContent || element.innerText || '';
+        
+        if (original !== current) {
+            changes.push({
+                element_id: element.getAttribute('data-element-id') || `text-${Math.random()}`,
+                element_type: element.classList.contains('faithful-heading') ? 'faithful_heading' : 
+                             element.closest('.faithful-text-content') ? 'faithful_text_paragraph' : 
+                             'faithful_paragraph',
+                old_value: original,
+                new_value: current,
+                type: 'faithful_text_change',
+                styles_applied: Array.from(element.classList).filter(cls => cls.startsWith('user-style-')),
+                formatting_info: extractFormattingInfo(element)
+            });
+        }
+    });
+    
+    return changes;
+}
+
+function collectUserStyles() {
+    const styles = {};
+    
+    document.querySelectorAll('.editable-element').forEach(element => {
+        const elementId = element.getAttribute('data-element-id') || element.getAttribute('data-table-id');
+        if (elementId) {
+            const userStyles = Array.from(element.classList).filter(cls => cls.startsWith('user-style-'));
+            if (userStyles.length > 0) {
+                styles[elementId] = userStyles;
+            }
+        }
+    });
+    
+    return styles;
+}
+
+function collectFormattingInfo() {
+    const formatting = {};
+    
+    document.querySelectorAll('.editable-element').forEach(element => {
+        const elementId = element.getAttribute('data-element-id') || element.getAttribute('data-table-id');
+        if (elementId) {
+            formatting[elementId] = extractFormattingInfo(element);
+        }
+    });
+    
+    return formatting;
+}
+
+function extractFormattingInfo(element) {
+    const computedStyle = window.getComputedStyle(element);
+    
+    return {
+        fontWeight: computedStyle.fontWeight,
+        fontStyle: computedStyle.fontStyle,
+        textDecoration: computedStyle.textDecoration,
+        color: computedStyle.color,
+        backgroundColor: computedStyle.backgroundColor,
+        fontSize: computedStyle.fontSize,
+        fontFamily: computedStyle.fontFamily,
+        textAlign: computedStyle.textAlign,
+        lineHeight: computedStyle.lineHeight,
+        hasHighlight: element.querySelector('.user-style-highlight') !== null,
+        customClasses: Array.from(element.classList).filter(cls => 
+            cls.startsWith('user-style-') || 
+            cls.startsWith('format-') || 
+            cls.startsWith('color-')
+        )
+    };
+}
+
+function requestCopilotSuggestions(element) {
+    if (!window.DOCUMENT_DATA.copilotEnabled) {
+        return;
+    }
+    
+    const content = element.textContent || element.innerText;
+    let elementType = 'text_change';
+    
+    if (element.classList.contains('table-cell-faithful')) {
+        elementType = 'faithful_cell_change';
+    } else if (element.classList.contains('faithful-heading')) {
+        elementType = 'faithful_heading_change';
+    } else if (element.classList.contains('faithful-paragraph') || element.closest('.faithful-text-content')) {
+        elementType = 'faithful_paragraph_change';
+    }
+    
+    fetch(window.DOCUMENT_DATA.urls.copilotSuggestions, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.CSRF_TOKEN
+        },
+        body: JSON.stringify({
+            type: elementType,
+            content: content,
+            context: {
+                element_id: element.getAttribute('data-element-id') || element.getAttribute('data-table-id'),
+                original_value: element.getAttribute('data-original-value'),
+                cell_type: element.getAttribute('data-cell-type'),
+                faithful_mode: true,
+                current_styles: Array.from(element.classList).filter(cls => cls.startsWith('user-style-')),
+                formatting_info: extractFormattingInfo(element)
+            }
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.suggestions) {
+            displayCopilotSuggestions(data.suggestions);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur copilot fidèle:', error);
+    });
+}
+
+function displayCopilotSuggestions(suggestions) {
+    const suggestionsContainer = document.getElementById('suggestionsContainer');
+    
+    if (!suggestions || suggestions.length === 0) {
+        return;
+    }
+    
+    let html = '';
+    suggestions.forEach((suggestion, index) => {
+        const confidencePercent = Math.round((suggestion.confidence || 0) * 100);
+        const priorityClass = suggestion.type === 'spelling_check' ? 'warning' : 
+                             suggestion.type === 'date_format' ? 'info' : 
+                             suggestion.type === 'table_structure' ? 'success' : 
+                             suggestion.type === 'style_improvement' ? 'info' : '';
+        
+        html += `
+            <div class="suggestion-item ${priorityClass}" data-suggestion-index="${index}">
+                <div class="suggestion-header">
+                    <span class="suggestion-type">${formatSuggestionType(suggestion.type)}</span>
+                    <span class="suggestion-confidence">${confidencePercent}%</span>
+                </div>
+                <div class="suggestion-message">${suggestion.message}</div>
+                ${suggestion.preview ? `<div class="suggestion-preview">${suggestion.preview}</div>` : ''}
+                <div class="suggestion-actions">
+                    <button class="suggestion-btn primary" onclick="applySuggestion(${index}, '${suggestion.action || 'apply'}')">
+                        Appliquer
+                    </button>
+                    <button class="suggestion-btn" onclick="dismissSuggestion(this.closest('.suggestion-item'))">
+                        Ignorer
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    suggestionsContainer.innerHTML = html;
+    
+    // Animation d'apparition des suggestions
+    setTimeout(() => {
+        document.querySelectorAll('.suggestion-item').forEach((item, index) => {
+            setTimeout(() => {
+                item.style.opacity = '0';
+                item.style.transform = 'translateY(20px)';
+                item.style.transition = 'all 0.3s ease-out';
+                setTimeout(() => {
+                    item.style.opacity = '1';
+                    item.style.transform = 'translateY(0)';
+                }, 100);
+            }, index * 100);
+        });
+    }, 50);
+}
+
+function formatSuggestionType(type) {
+    const typeNames = {
+        'spelling_check': 'Orthographe',
+        'date_format': 'Format de date',
+        'table_structure': 'Structure tableau',
+        'style_improvement': 'Amélioration style',
+        'formatting_suggestion': 'Suggestion de formatage',
+        'content_optimization': 'Optimisation contenu'
+    };
+    return typeNames[type] || type.replace('_', ' ').toUpperCase();
+}
+
+function applySuggestion(suggestionIndex, action) {
+    console.log('Application de la suggestion fidèle:', action, 'index:', suggestionIndex);
+    
+    // Animation d'application
+    const suggestionElement = document.querySelector(`[data-suggestion-index="${suggestionIndex}"]`);
+    if (suggestionElement) {
+        suggestionElement.style.background = 'linear-gradient(45deg, var(--user-success), #10b981)';
+        suggestionElement.style.color = 'white';
+        suggestionElement.style.transform = 'scale(0.95)';
+        
+        setTimeout(() => {
+            suggestionElement.remove();
+        }, 1000);
+    }
+    
+    showNotification('Suggestion appliquée (Mode Fidèle)', 'success');
+}
+
+function dismissSuggestion(element) {
+    element.style.opacity = '0';
+    element.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+        element.remove();
+    }, 300);
+}
+
+// Fonctions d'action améliorées
+function openFindReplaceDialog() {
+    // Créer une boîte de dialogue moderne pour rechercher/remplacer
+    const dialog = document.createElement('div');
+    dialog.className = 'find-replace-dialog';
+    dialog.innerHTML = `
+        <div class="dialog-overlay">
+            <div class="dialog-content">
+                <div class="dialog-header">
+                    <h6><i class="fas fa-search me-2"></i>Rechercher & Remplacer</h6>
+                    <button class="btn btn-sm btn-link" onclick="closeFindReplaceDialog()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="dialog-body">
+                    <div class="mb-3">
+                        <label class="form-label">Rechercher</label>
+                        <input type="text" class="form-control" id="findInput" placeholder="Texte à rechercher...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Remplacer par</label>
+                        <input type="text" class="form-control" id="replaceInput" placeholder="Nouveau texte...">
+                    </div>
+                    <div class="dialog-options">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="matchCase">
+                            <label class="form-check-label" for="matchCase">Respecter la casse</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="wholeWords">
+                            <label class="form-check-label" for="wholeWords">Mots entiers seulement</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="dialog-footer">
+                    <button class="btn btn-secondary" onclick="closeFindReplaceDialog()">Annuler</button>
+                    <button class="btn btn-primary" onclick="performFindReplace()">Remplacer tout</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Ajouter les styles CSS pour la boîte de dialogue
+    const styles = `
+        <style>
+        .find-replace-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10000;
+        }
+        .dialog-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease-out;
+        }
+        .dialog-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-hover);
+            width: 90%;
+            max-width: 500px;
+            animation: slideUp 0.3s ease-out;
+        }
+        .dialog-header {
+            padding: var(--spacing-lg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .dialog-body {
+            padding: var(--spacing-lg);
+        }
+        .dialog-footer {
+            padding: var(--spacing-lg);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: var(--spacing-sm);
+            justify-content: flex-end;
+        }
+        .dialog-options {
+            display: flex;
+            gap: var(--spacing-lg);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        </style>
+    `;
+    
+    document.head.insertAdjacentHTML('beforeend', styles);
+    document.body.appendChild(dialog);
+    
+    // Focus sur le champ de recherche
+    setTimeout(() => {
+        document.getElementById('findInput').focus();
+    }, 100);
+}
+
+function closeFindReplaceDialog() {
+    const dialog = document.querySelector('.find-replace-dialog');
+    if (dialog) {
+        dialog.style.opacity = '0';
+        setTimeout(() => {
+            dialog.remove();
+        }, 300);
+    }
+}
+
+function performFindReplace() {
+    const findText = document.getElementById('findInput').value;
+    const replaceText = document.getElementById('replaceInput').value;
+    const matchCase = document.getElementById('matchCase').checked;
+    const wholeWords = document.getElementById('wholeWords').checked;
+    
+    if (!findText) {
+        showNotification('Veuillez saisir un texte à rechercher', 'warning');
+        return;
+    }
+    
+    let replacements = 0;
+    const editableElements = document.querySelectorAll('.editable-element[contenteditable="true"]');
+    
+    editableElements.forEach(element => {
+        let content = element.textContent;
+        let flags = matchCase ? 'g' : 'gi';
+        let pattern = wholeWords ? `\\b${findText}\\b` : findText;
+        let regex = new RegExp(pattern, flags);
+        
+        if (regex.test(content)) {
+            const newContent = content.replace(regex, replaceText);
+            element.textContent = newContent;
+            element.classList.add('modified');
+            replacements++;
+        }
+    });
+    
+    if (replacements > 0) {
+        hasUnsavedChanges = true;
+        showUnsavedIndicator();
+        showFloatingSave();
+        showNotification(`${replacements} remplacement(s) effectué(s)`, 'success');
+    } else {
+        showNotification('Aucun texte trouvé', 'info');
+    }
+    
+    closeFindReplaceDialog();
+}
+
+function applyTemplate() {
+    showNotification('Application du template (Mode Fidèle)...', 'info');
+    
+    // Simuler l'application d'un template avec styles
+    setTimeout(() => {
+        const elements = document.querySelectorAll('.editable-element');
+        elements.forEach((element, index) => {
+            setTimeout(() => {
+                element.classList.add('newly-added');
+                if (element.classList.contains('faithful-heading')) {
+                    element.classList.add('user-style-h2');
+                } else {
+                    element.classList.add('user-style-paragraph');
+                }
+            }, index * 100);
+        });
+        
+        showNotification('Template appliqué avec succès', 'success');
+        generateFaithfulTOC();
+    }, 1500);
+}
+
+function exportDocument() {
+    showNotification('Préparation de l\'export avec styles...', 'info');
+    
+    setTimeout(() => {
+        window.open(window.DOCUMENT_DATA.urls.exportModified, '_blank');
+        showNotification('Document exporté avec styles fidèles', 'success');
+    }, 1000);
+}
+
+function validateDocument() {
+    showNotification('Validation du document fidèle...', 'info');
+    
+    setTimeout(() => {
+        const issues = [];
+        const editableElements = document.querySelectorAll('.editable-element');
+        
+        editableElements.forEach(element => {
+            const text = element.textContent.trim();
+            if (text.length === 0) {
+                issues.push('Éléments vides détectés');
+            }
+            if (text.length > 1000) {
+                issues.push('Éléments trop longs détectés');
+            }
+        });
+        
+        if (issues.length === 0) {
+            showNotification('✅ Document valide (Mode Fidèle)', 'success');
+        } else {
+            showNotification(`⚠️ ${issues.length} problème(s) détecté(s)`, 'warning');
+        }
+    }, 2000);
+}
+
+function requestSpellCheck() {
+    const editableElements = document.querySelectorAll('.editable-element[contenteditable="true"]');
+    let corrections = 0;
+    
+    editableElements.forEach(element => {
+        const text = element.textContent;
+        // Simuler une vérification orthographique
+        const commonErrors = {
+            'developement': 'développement',
+            'recomendation': 'recommandation',
+            'neccessaire': 'nécessaire',
+            'occassion': 'occasion'
+        };
+        
+        let correctedText = text;
+        Object.keys(commonErrors).forEach(error => {
+            if (correctedText.includes(error)) {
+                correctedText = correctedText.replace(new RegExp(error, 'gi'), commonErrors[error]);
+                corrections++;
+            }
+        });
+        
+        if (correctedText !== text) {
+            element.textContent = correctedText;
+            element.classList.add('modified');
+            element.style.background = 'rgba(16, 185, 129, 0.1)';
+            setTimeout(() => {
+                element.style.background = '';
+            }, 2000);
+        }
+    });
+    
+    if (corrections > 0) {
+        hasUnsavedChanges = true;
+        showUnsavedIndicator();
+        showFloatingSave();
+        showNotification(`${corrections} correction(s) orthographique(s) appliquée(s)`, 'success');
+    } else {
+        showNotification('Aucune erreur orthographique détectée', 'success');
+    }
+}
+
+function optimizeContent() {
+    const editableElements = document.querySelectorAll('.editable-element[contenteditable="true"]');
+    let optimizations = 0;
+    
+    editableElements.forEach(element => {
+        let text = element.textContent;
+        const originalText = text;
+        
+        // Optimisations de base
+        text = text.replace(/\s+/g, ' '); // Espaces multiples
+        text = text.replace(/\.\s+/g, '. '); // Espacement après points
+        text = text.replace(/,\s+/g, ', '); // Espacement après virgules
+        text = text.replace(/\s+\./g, '.'); // Espaces avant points
+        text = text.trim();
+        
+        if (text !== originalText) {
+            element.textContent = text;
+            element.classList.add('modified');
+            optimizations++;
+            
+            // Animation d'optimisation
+            element.style.background = 'rgba(99, 102, 241, 0.1)';
+            setTimeout(() => {
+                element.style.background = '';
+            }, 2000);
+        }
+    });
+    
+    if (optimizations > 0) {
+        hasUnsavedChanges = true;
+        showUnsavedIndicator();
+        showFloatingSave();
+        showNotification(`${optimizations} optimisation(s) de contenu appliquée(s)`, 'success');
+    } else {
+        showNotification('Contenu déjà optimisé', 'success');
+    }
+}
+
+function generateDocumentTemplate() {
+    showNotification('Génération de template fidèle en cours...', 'info');
+    
+    setTimeout(() => {
+        const templateData = {
+            styles: collectUserStyles(),
+            formatting: collectFormattingInfo(),
+            structure: analyzeDocumentStructure(),
+            timestamp: new Date().toISOString()
+        };
+        
+        console.log('Template généré:', templateData);
+        showNotification('Template fidèle généré avec succès', 'success');
+    }, 2000);
+}
+
+function analyzeDocumentStructure() {
+    const structure = {
+        headings: [],
+        paragraphs: 0,
+        tables: 0,
+        lists: 0
+    };
+    
+    document.querySelectorAll('.faithful-heading').forEach(heading => {
+        structure.headings.push({
+            level: heading.classList.contains('user-style-h1') ? 1 :
+                   heading.classList.contains('user-style-h2') ? 2 :
+                   heading.classList.contains('user-style-h3') ? 3 : 1,
+            text: heading.textContent.trim()
+        });
+    });
+    
+    structure.paragraphs = document.querySelectorAll('.faithful-paragraph').length;
+    structure.tables = document.querySelectorAll('.table-container-faithful').length;
+    
+    return structure;
+}
+
+function showUnsavedIndicator() {
+    const indicator = document.getElementById('unsavedIndicator');
+    indicator.style.display = 'flex';
+    indicator.style.animation = 'pulse 2s infinite';
+}
+
+function hideUnsavedIndicator() {
+    const indicator = document.getElementById('unsavedIndicator');
+    indicator.style.display = 'none';
+}
+
+function showFloatingSave() {
+    const saveBtn = document.getElementById('floatingSave');
+    saveBtn.style.display = 'flex';
+    saveBtn.style.animation = 'pulse 2s infinite';
+}
+
+function hideFloatingSave() {
+    const saveBtn = document.getElementById('floatingSave');
+    saveBtn.style.display = 'none';
+}
+
+function initializeAutoSave() {
+    // Auto-sauvegarde toutes les 3 minutes si il y a des modifications
+    autoSaveInterval = setInterval(() => {
+        if (hasUnsavedChanges) {
+            console.log('Auto-sauvegarde fidèle...');
+            saveDocument();
+        }
+    }, 180000); // 3 minutes
+}
+
+function showNotification(message, type = 'info') {
+    const notificationArea = document.getElementById('notificationArea');
+    const notification = document.createElement('div');
+    
+    const icons = {
+        success: 'check-circle',
+        error: 'exclamation-circle',
+        warning: 'exclamation-triangle',
+        info: 'info-circle'
+    };
+    
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${icons[type]} me-2"></i>
+        <span>${message}</span>
+    `;
+    
+    notificationArea.appendChild(notification);
+    
+    // Afficher la notification avec animation
+    setTimeout(() => notification.classList.add('show'), 100);
+    
+    // Masquer et supprimer après 5 secondes
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
+}
+
+// Gestion du toggle de la table des matières avec animation
+document.getElementById('tocToggle').addEventListener('click', function() {
+    const tocPanel = document.getElementById('tocPanel');
+    const icon = this.querySelector('i');
+    
+    tocPanel.classList.toggle('collapsed');
+    
+    if (tocPanel.classList.contains('collapsed')) {
+        icon.className = 'fas fa-chevron-right';
+        tocPanel.style.transform = 'translateX(-100%)';
+        setTimeout(() => {
+            tocPanel.style.transform = '';
+        }, 300);
+    } else {
+        icon.className = 'fas fa-chevron-left';
+    }
+});
+
+// Nettoyage lors de la fermeture de la page
+window.addEventListener('beforeunload', function(e) {
+    if (hasUnsavedChanges) {
+        const message = 'Vous avez des modifications non sauvegardées. Êtes-vous sûr de vouloir quitter ?';
+        e.returnValue = message;
+        return message;
+    }
+    
+    // Nettoyer les intervalles
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+    }
+});
+
+// Raccourcis clavier étendus
+document.addEventListener('keydown', function(e) {
+    // Ctrl+E pour ouvrir/fermer le copilot
+    if (e.ctrlKey && e.key === 'e') {
+        e.preventDefault();
+        document.getElementById('copilotPanel').classList.toggle('collapsed');
+    }
+    
+    // Ctrl+F pour recherche
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        openFindReplaceDialog();
+    }
+    
+    // Ctrl+H pour recherche/remplacement
+    if (e.ctrlKey && e.key === 'h') {
+        e.preventDefault();
+        openFindReplaceDialog();
+    }
+    
+    // Échap pour fermer les dialogues
+    if (e.key === 'Escape') {
+        closeFindReplaceDialog();
+        document.getElementById('styleOptions').classList.remove('show');
+    }
+});
+
+// Fonction utilitaire pour mettre en évidence les tableaux détectés
+function highlightDetectedTables() {
+    document.querySelectorAll('.table-container-faithful').forEach((container, index) => {
+        setTimeout(() => {
+            container.classList.add('newly-detected');
+            container.style.transform = 'scale(1.02)';
+            setTimeout(() => {
+                container.classList.remove('newly-detected');
+                container.style.transform = '';
+            }, 500);
+        }, index * 200);
+    });
+}
+
+// Appeler la fonction si des tableaux sont présents
+if (document.querySelectorAll('.table-container-faithful').length > 0) {
+    setTimeout(highlightDetectedTables, 1000);
+}
+
+// Animation d'entrée pour les éléments
+function animateElementsOnLoad() {
+    const editableElements = document.querySelectorAll('.editable-element');
+    editableElements.forEach((element, index) => {
+        element.style.opacity = '0';
+        element.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            element.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+            element.style.opacity = '1';
+            element.style.transform = 'translateY(0)';
+        }, index * 50);
+    });
+}
+
+// Lancer l'animation au chargement
+setTimeout(animateElementsOnLoad, 500);
+
+console.log('✅ Éditeur fidèle amélioré chargé - Extraction:', window.DOCUMENT_DATA.extractionMethod);
+console.log('🎨 Fonctionnalités utilisateur activées: styles, formatage, couleurs, interactions');
+</script>
+{% endblock %}
