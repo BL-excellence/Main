@@ -1263,164 +1263,85 @@ class MatrixBuilder {
     }
 
     updateDynamicFilters() {
-        const filtersContainer = document.getElementById('column-specific-filters');
-        const filterCount = document.getElementById('filter-count');
-        
-        if (!filtersContainer) return;
-        
-        // Clear existing filters
-        filtersContainer.innerHTML = '';
-        
-        let filterHtml = '';
-        let filterCounter = 0;
-        
-        console.log('🔍 Updating filters for columns:', this.selectedColumns);
-        console.log('🔍 Available window.filterOptions:', window.filterOptions);
+    const filtersContainer = document.getElementById('column-specific-filters');
+    const filterCount = document.getElementById('filter-count');
 
-        // Generate filters for selected columns
-        this.selectedColumns.forEach(column => {
-            const fieldName = column.name;
-            const fieldType = column.type;
-            const fieldLabel = column.label;
-            
-            console.log(`🔍 Processing column: ${fieldName} (${fieldType}) - ${fieldLabel}`);
-            const filterOptions = this.getFilterOptionsForField(fieldName, fieldType);
-            
-            console.log(`🔍 Filter options for ${fieldName}:`, filterOptions);
-            
-            if (filterOptions && filterOptions.length > 0) {
-                filterCounter++;
-                filterHtml += `
-                    <div class="filter-group column-filter" data-column="${fieldName}">
-                        <label>${this.getFilterIcon(fieldType)} ${fieldLabel}</label>
-                        <select name="filter_${fieldName}" class="filter-select">
-                            <option value="">Tous les ${fieldLabel.toLowerCase()}</option>
-                            ${filterOptions.map(option => `
-                                <option value="${option}">${option}</option>
-                            `).join('')}
-                        </select>
-                    </div>
-                `;
-            } else {
-                console.log(`❌ No filter options found for ${fieldName}`);
-            }   
-        });
-        
-        filtersContainer.innerHTML = filterHtml;
-        const newFilterSelects = filtersContainer.querySelectorAll('.filter-select');
-        newFilterSelects.forEach(select => {
-            select.addEventListener('change', () => {
-                console.log(`🔍 Filter changed: ${select.name} = ${select.value}`);
-                this.debouncedUpdateFilters();
-            });
-        });
-        // Update filter count
-        if (filterCount) {
-            filterCount.textContent = filterCounter > 0 ? `${filterCounter} filtres` : '0 filtres';
+    if (!filtersContainer) return;
+
+    // Clear existing filters
+    filtersContainer.innerHTML = '';
+
+    let filterHtml = '';
+    let filterCounter = 0;
+
+    console.log('Updating filters for columns:', this.selectedColumns);
+    console.log('Available window.filterOptions:', window.filterOptions);
+
+    this.selectedColumns.forEach(column => {
+        const fieldName = column.name;
+        const filterOptions = this.getFilterOptionsForField(fieldName);
+
+        if (filterOptions && filterOptions.length > 0) {
+            filterCounter++;
+            const displayName = column.label || fieldName.replace(/_/g, ' ').replace(/^(product|document|metadata|entity)_/, '');
+
+            filterHtml += `
+                <div class="filter-group">
+                    <label>${displayName}</label>
+                    <select name="${fieldName}" class="filter-select">
+                        <option value="">Toutes les valeurs</option>
+                        ${filterOptions.map(option => 
+                            `<option value="${option}">${option}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
         }
-        
-        // Show/hide clear button
-        const clearButton = document.getElementById('clear-filters');
-        if (clearButton) {
-            clearButton.style.display = filterCounter > 0 ? 'block' : 'none';
+    });
+
+    filtersContainer.innerHTML = filterHtml;
+
+    // Update filter count
+    if (filterCount) {
+        filterCount.textContent = `${filterCounter} filtres`;
+    }
+
+    // Show/hide clear filters button
+    const clearBtn = document.getElementById('clear-filters');
+    if (clearBtn) {
+        clearBtn.style.display = filterCounter > 0 ? 'block' : 'none';
+    }
+}
+
+getFilterOptionsForField(fieldName) {
+    const filterOptions = window.filterOptions || {};
+
+    // Try exact match first
+    if (filterOptions[fieldName]) {
+        return Array.isArray(filterOptions[fieldName]) ? filterOptions[fieldName] : [];
+    }
+
+    // Try without prefixes
+    const cleanName = fieldName.replace(/^(product|document|metadata|entity)_/, '');
+    if (filterOptions[cleanName]) {
+        return Array.isArray(filterOptions[cleanName]) ? filterOptions[cleanName] : [];
+    }
+
+    // For MongoDB fields, try to find in annotations
+    if (fieldName.startsWith('metadata_') || fieldName.startsWith('entity_')) {
+        const annotationName = cleanName;
+        if (filterOptions.annotations && filterOptions.annotations[annotationName]) {
+            return filterOptions.annotations[annotationName].options || [];
+        }
+
+        // For entity fields specifically, check if we have direct options
+        if (fieldName.startsWith('entity_') && filterOptions[fieldName]) {
+            return filterOptions[fieldName];
         }
     }
 
-    getFilterOptionsForField(fieldName, fieldType) {
-        console.log(`🔍 Looking for filter options for: ${fieldName} (type: ${fieldType})`);
-        
-        if (typeof window.filterOptions === 'undefined') {
-            console.log('❌ window.filterOptions not found');
-            return [];
-        }
-        
-        const options = window.filterOptions;
-        console.log('🔍 Available filter option keys:', Object.keys(options));
-        
-        let foundOptions = [];
-        
-        // 1. EXACT MATCH
-        if (options[fieldName] && Array.isArray(options[fieldName]) && options[fieldName].length > 0) {
-            foundOptions = options[fieldName];
-            console.log(`✅ EXACT match: ${fieldName}`);
-            return foundOptions;
-        }
-        
-        // 2. GENERATE ALL POSSIBLE VARIATIONS
-        const variations = [
-            fieldName + 's',                        // name -> names
-            fieldName + 'es',                       // dosage -> dosages  
-            fieldType + '_' + fieldName,            // product_name
-            fieldType + '_' + fieldName + 's',      // product_names
-            'doc_' + fieldName,                     // doc_title
-            'doc_' + fieldName + 's',               // doc_titles
-            fieldName.replace('_', ''),             // active_ingredient -> activeingredient
-            fieldName.replace('_', '') + 's',       // activeingredients
-            fieldName + '_type',                    // name_type
-            fieldName + '_types',                   // name_types
-            fieldName + '_name',                    // field_name
-            fieldName + '_names',                   // field_names
-        ];
-        
-        // Try all variations
-        for (const variation of variations) {
-            if (options[variation] && Array.isArray(options[variation]) && options[variation].length > 0) {
-                foundOptions = options[variation];
-                console.log(`✅ VARIATION match: ${fieldName} -> ${variation}`);
-                return foundOptions;
-            }
-        }
-        
-        // 3. HANDLE ADDITIONAL ANNOTATION FIELDS
-        if (fieldName.startsWith('additional_') && options.annotations) {
-            const annotationType = fieldName.replace('additional_', '');
-            console.log(`🔍 Checking annotation type: ${annotationType}`);
-            
-            if (options.annotations[annotationType] && options.annotations[annotationType].options) {
-                foundOptions = options.annotations[annotationType].options;
-                console.log(`✅ Found annotation options for ${annotationType}`);
-                return foundOptions;
-            }
-        }
-        
-        // 4. FUZZY SEARCH - Search through ALL keys
-        const allKeys = Object.keys(options);
-        for (const key of allKeys) {
-            // Skip non-array values
-            if (!Array.isArray(options[key]) || options[key].length === 0) continue;
-            
-            // Check if key contains field name (either direction)
-            if (key.toLowerCase().includes(fieldName.toLowerCase()) || 
-                fieldName.toLowerCase().includes(key.toLowerCase())) {
-                foundOptions = options[key];
-                console.log(`✅ FUZZY match: ${fieldName} -> ${key}`);
-                return foundOptions;
-            }
-        }
-        
-        // 5. LAST RESORT - Check for partial word matches
-        const fieldWords = fieldName.split('_');
-        for (const key of allKeys) {
-            if (!Array.isArray(options[key]) || options[key].length === 0) continue;
-            
-            const keyWords = key.split('_');
-            const hasCommonWord = fieldWords.some(word => 
-                keyWords.some(keyWord => 
-                    word.toLowerCase() === keyWord.toLowerCase() && word.length > 2
-                )
-            );
-            
-            if (hasCommonWord) {
-                foundOptions = options[key];
-                console.log(`✅ WORD match: ${fieldName} -> ${key}`);
-                return foundOptions;
-            }
-        }
-        
-        console.log(`❌ NO FILTER OPTIONS found for field: ${fieldName}`);
-        console.log(`🔍 Available keys were:`, Object.keys(options));
-        return [];
-    }
+    return [];
+}
     getFilterIcon(fieldType) {
         const icons = {
             'product': '🏥',

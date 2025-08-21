@@ -1,3 +1,6 @@
+<!-- Chemin d'intégration : templates/ctd_submission/dashboard.html -->
+<!-- Template principal du dashboard basé sur les captures d'écran -->
+
 {% extends 'client/ctd_submission/base.html' %}
 
 {% block title %}Dashboard - CTD Submission{% endblock %}
@@ -145,7 +148,7 @@
                         </div>
                         <div>
                             <h6 class="mb-1">
-                                <a href="{% url 'ctd_submission:submission_detail' submission.id %}" class="text-decoration-none">
+                                <a href="{% url 'client:ctd_submission:submission_detail' submission.id %}" class="text-decoration-none">
                                     {{ submission.name }}
                                 </a>
                             </h6>
@@ -161,7 +164,7 @@
                             {% endif %}
                         </span>
                         <div class="mt-2">
-                            <a href="{% url 'ctd_submission:submission_detail' submission.id %}" class="btn btn-outline-primary btn-sm">
+                            <a href="{% url 'client:ctd_submission:submission_detail' submission.id %}" class="btn btn-outline-primary btn-sm">
                                 <i class="fas fa-eye me-1"></i>Voir
                             </a>
                         </div>
@@ -192,7 +195,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="newSubmissionForm" method="post" action="{% url 'ctd_submission:submission_create' %}">
+            <form id="newSubmissionForm" method="post" action="{% url 'client:ctd_submission:submission_create' %}">
                 <div class="modal-body">
                     {% csrf_token %}
                     <div class="row">
@@ -282,7 +285,6 @@
 {% endblock %}
 
 {% block extra_js %}
-{{ block.super }}
 <script>
 $(document).ready(function() {
     // Génération de structure CTD intelligente
@@ -292,7 +294,7 @@ $(document).ready(function() {
             'region': $('#paysRegion').val(),
             'variation_type': $('#typeVariation').val(),
             'change_description': $('#changementDescription').val(),
-            'csrfmiddlewaretoken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value
+            'csrfmiddlewaretoken': getCsrfToken()
         };
         
         if (!formData.writing_name || !formData.region) {
@@ -304,7 +306,7 @@ $(document).ready(function() {
         
         // Simuler une création de soumission puis génération de structure
         $.ajax({
-            url: '{% url "ctd_submission:submission_create" %}',
+            url: '{% url "client:ctd_submission:submission_create" %}',
             method: 'POST',
             data: {
                 'name': formData.writing_name,
@@ -353,11 +355,7 @@ $(document).ready(function() {
             method: 'POST',
             data: $(this).serialize(),
             success: function(response) {
-                // Bootstrap 5 API pour fermer le modal
-                const modalEl = document.getElementById('newSubmissionModal');
-                const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-                modal.hide();
-                
+                $('#newSubmissionModal').modal('hide');
                 CTDSubmission.showNotification('Soumission créée avec succès!', 'success');
                 setTimeout(() => {
                     window.location.reload();

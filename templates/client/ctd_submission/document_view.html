@@ -8,9 +8,9 @@
 {% block breadcrumb %}
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'client:dashboard' %}">Dashboard</a></li>
         <li class="breadcrumb-item">
-            <a href="{% url 'submission_detail' document.submission.id %}">{{ document.submission.name }}</a>
+            <a href="{% url 'client:submission_detail' document.submission.id %}">{{ document.submission.name }}</a>
         </li>
         <li class="breadcrumb-item active">{{ document.name }}</li>
     </ol>
@@ -40,7 +40,7 @@
         </div>
     </div>
     <div class="btn-group">
-        <a href="{% url 'document_template' document.id %}" class="btn btn-success">
+        <a href="{% url 'client:document_template' document.id %}" class="btn btn-success">
             <i class="fas fa-edit me-2"></i>Mode Template
         </a>
         <button class="btn btn-outline-primary" onclick="downloadDocument()">
@@ -240,7 +240,7 @@
         <div class="alert alert-info">
             <i class="fas fa-info-circle me-2"></i>
             Ce document a été modifié via le mode Template. 
-            <a href="{% url 'document_template' document.id %}" class="alert-link">
+            <a href="{% url 'client:document_template' document.id %}" class="alert-link">
                 Voir les modifications dans le template
             </a>
         </div>

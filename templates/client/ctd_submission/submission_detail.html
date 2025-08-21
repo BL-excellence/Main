@@ -1,236 +1,605 @@
+<!-- Chemin d'intégration : templates/client/ctd_submission/submission_detail.html -->
+<!-- Template pour afficher la structure CTD générée avec les boutons Voir/Template -->
+
 {% extends 'client/ctd_submission/base.html' %}
 
-{% block title %}{{ submission.name }}{% endblock %}
+{% block title %}{{ submission.name }} - CTD Submission{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'client:ctd_submission:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">{{ submission.name }}</li>
+    </ol>
+</nav>
+{% endblock %}
 
 {% block content %}
 <!-- En-tête de la soumission -->
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-start mb-4">
     <div>
-        <h1 class="h2">
-            <i class="fas fa-file-medical text-primary"></i> {{ submission.name }}
-        </h1>
-        <div class="mb-2">
-            <span class="badge bg-info me-2">{{ submission.get_region_display }}</span>
-            <span class="badge bg-secondary me-2">{{ submission.get_variation_type_display }}</span>
-            <span class="badge 
-                {% if submission.status == 'draft' %}bg-secondary
-                {% elif submission.status == 'in_progress' %}bg-warning
-                {% elif submission.status == 'submitted' %}bg-primary
-                {% else %}bg-success
-                {% endif %}">
-                {{ submission.get_status_display }}
-            </span>
+        <h1 class="h3 mb-2">{{ submission.name }}</h1>
+        <div class="d-flex align-items-center gap-3">
+            <span class="badge bg-primary">{{ submission.get_region_display }}</span>
+            <span class="status-badge status-{{ submission.status }}">{{ submission.get_status_display }}</span>
+            <small class="text-muted">
+                <i class="fas fa-calendar me-1"></i>Créé le {{ submission.created_at|date:"d M Y" }}
+            </small>
         </div>
     </div>
-    <div class="text-end">
-        <button class="btn btn-primary" onclick="generateStructure()">
-            <i class="fas fa-magic"></i> Générer Structure CTD Intelligente
+    <div class="btn-group">
+        <button class="btn btn-outline-primary" id="uploadDocumentBtn">
+            <i class="fas fa-upload me-2"></i>Upload Document
+        </button>
+        <button class="btn btn-success" id="generateStructureBtn">
+            <i class="fas fa-magic me-2"></i>Générer Structure CTD Intelligente
         </button>
     </div>
 </div>
 
-<!-- Suggestions IA -->
-{% if suggestions %}
-<div class="suggestions-panel">
-    <h5><i class="fas fa-lightbulb"></i> Suggestions IA pour votre Soumission</h5>
-    <ul class="list-unstyled mb-3">
-        {% for suggestion in suggestions %}
-        <li class="mb-2">
-            <i class="fas fa-check-circle me-2"></i>{{ suggestion.title }}
-        </li>
-        {% endfor %}
-    </ul>
-    <div class="d-flex gap-2">
-        <button class="btn btn-light btn-sm" onclick="applySuggestions()">
-            <i class="fas fa-check"></i> Appliquer suggestions
+<!-- Informations de la soumission -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-title">Informations de la soumission</h6>
+                <div class="row">
+                    <div class="col-sm-6">
+                        <strong>Type de soumission:</strong><br>
+                        <span class="text-muted">{{ submission.submission_type }}</span>
+                    </div>
+                    <div class="col-sm-6">
+                        <strong>Type de variation:</strong><br>
+                        <span class="text-muted">{{ submission.variation_type|default:"Non spécifié" }}</span>
+                    </div>
+                </div>
+                {% if submission.change_description %}
+                <div class="mt-3">
+                    <strong>Description du changement:</strong><br>
+                    <span class="text-muted">{{ submission.get_change_description_display }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title">Progression</h6>
+                <div class="progress mb-2" style="height: 10px;">
+                    {% if submission.status == 'draft' %}
+                        <div class="progress-bar bg-warning" style="width: 25%"></div>
+                    {% elif submission.status == 'in_progress' %}
+                        <div class="progress-bar bg-info" style="width: 60%"></div>
+                    {% elif submission.status == 'completed' %}
+                        <div class="progress-bar bg-success" style="width: 100%"></div>
+                    {% endif %}
+                </div>
+                <small class="text-muted">
+                    {% if submission.status == 'draft' %}25% - Brouillon
+                    {% elif submission.status == 'in_progress' %}60% - En cours
+                    {% elif submission.status == 'completed' %}100% - Terminé
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Zone d'upload -->
+<div class="upload-zone mb-4" id="documentUploadZone" style="display: none;">
+    <form id="documentUploadForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="submission_id" value="{{ submission.id }}">
+        <div class="mb-3">
+            <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+            <h5>Glissez vos documents ici ou cliquez pour sélectionner</h5>
+            <input type="file" class="form-control" name="file" id="fileInput" 
+                   accept=".pdf,.docx,.doc,.xlsx,.xls" style="display: none;">
+            <input type="text" class="form-control mt-3" name="name" placeholder="Nom du document" required>
+        </div>
+        <div class="d-flex gap-2 justify-content-center">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-upload me-2"></i>Upload & Analyser
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="$('#documentUploadZone').hide()">
+                Annuler
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Structure CTD Générée -->
+{% if ctd_structure %}
+<div class="alert alert-success mb-4">
+    <h4 class="alert-heading">
+        <i class="fas fa-check-circle me-2"></i>Structure CTD Générée - {{ submission.get_region_display }}
+    </h4>
+    <p class="mb-0">La structure a été générée automatiquement en analysant le contenu de vos documents.</p>
+</div>
+
+{% for module_data in ctd_structure %}
+<div class="ctd-module mb-4">
+    <div class="ctd-module-header">
+        <i class="fas fa-folder me-2"></i>
+        {{ module_data.module.name }}
+        <span class="badge bg-light text-dark ms-2">{{ module_data.module.code }}</span>
+    </div>
+    
+    {% for section_data in module_data.sections %}
+    <div class="ctd-section">
+        <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1">
+                <h6 class="mb-2">
+                    <i class="fas fa-file-alt me-2 text-primary"></i>
+                    {{ section_data.section.code }} {{ section_data.section.name }}
+                </h6>
+                
+                <!-- Documents dans cette section -->
+                {% for document in section_data.documents %}
+                <div class="document-item">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            {% if document.document_type == 'pdf' %}
+                                <i class="fas fa-file-pdf text-danger fa-lg"></i>
+                            {% elif document.document_type == 'docx' %}
+                                <i class="fas fa-file-word text-primary fa-lg"></i>
+                            {% elif document.document_type == 'xlsx' %}
+                                <i class="fas fa-file-excel text-success fa-lg"></i>
+                            {% else %}
+                                <i class="fas fa-file text-secondary fa-lg"></i>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center">
+                                <strong>{{ document.name }}</strong>
+                                <!-- Badge de statut d'analyse IA -->
+                                {% if document.section %}
+                                    <span class="badge bg-success ms-2">
+                                        <i class="fas fa-robot me-1"></i>Auto-classé
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-warning ms-2">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>Non classé
+                                    </span>
+                                {% endif %}
+                                
+                                {% if document.ai_analysis %}
+                                    <span class="badge bg-info ms-1" title="Confiance de l'analyse IA">
+                                        IA: {{ document.ai_analysis.confidence_score|floatformat:0 }}%
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="small text-muted">
+                                <i class="fas fa-calendar me-1"></i>{{ document.created_at|date:"d M Y H:i" }}
+                                {% if document.section %}
+                                    <span class="ms-2">
+                                        <i class="fas fa-folder me-1"></i>{{ document.section.module.code }}.{{ document.section.code }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center">
+                        <a href="{% url 'client:ctd_submission:document_view' document.id %}" class="btn btn-view text-white">
+                            <i class="fas fa-eye me-1"></i>Voir
+                        </a>
+                        <a href="{% url 'client:ctd_submission:document_template' document.id %}" class="btn btn-template text-white">
+                            <i class="fas fa-edit me-1"></i>Template
+                        </a>
+                        
+                        <!-- Bouton pour forcer l'analyse IA si pas de section -->
+                        {% if not document.section %}
+                            <button class="btn btn-outline-primary btn-sm ms-2" 
+                                    onclick="forceAnalysis({{ document.id }})"
+                                    title="Forcer l'analyse IA">
+                                <i class="fas fa-robot"></i>
+                            </button>
+                        {% endif %}
+                        
+                        <div class="dropdown ms-2">
+                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
+                                    data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="#" onclick="downloadDocument({{ document.id }})">
+                                        <i class="fas fa-download me-2"></i>Télécharger
+                                    </a>
+                                </li>
+                                {% if not document.section %}
+                                <li>
+                                    <a class="dropdown-item" href="#" onclick="forceAnalysis({{ document.id }})">
+                                        <i class="fas fa-robot me-2"></i>Analyser avec IA
+                                    </a>
+                                </li>
+                                {% endif %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="#" 
+                                       onclick="deleteDocument({{ document.id }})">
+                                        <i class="fas fa-trash me-2"></i>Supprimer
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+
+{% else %}
+<!-- Aucune structure générée -->
+<div class="text-center py-5">
+    <i class="fas fa-folder-open fa-4x text-muted mb-4"></i>
+    <h4 class="text-muted mb-3">Aucune structure CTD générée</h4>
+    <p class="text-muted mb-4">
+        Uploadez vos documents puis cliquez sur "Générer Structure CTD Intelligente" 
+        pour analyser automatiquement le contenu et créer la structure appropriée.
+    </p>
+    <div class="d-flex gap-3 justify-content-center">
+        <button class="btn btn-primary" onclick="$('#documentUploadZone').show()">
+            <i class="fas fa-upload me-2"></i>Upload Documents
         </button>
-        <button class="btn btn-outline-light btn-sm">
-            Ignorer
+        <button class="btn btn-outline-secondary" id="generateEmptyStructure">
+            <i class="fas fa-magic me-2"></i>Générer Structure Vide
         </button>
     </div>
 </div>
 {% endif %}
 
-<!-- Structure CTD Générée -->
-<div class="card">
-    <div class="card-header">
-        <h4 class="mb-0">
-            <i class="fas fa-layer-group"></i> Structure CTD Générée - {{ submission.get_region_display }}
-        </h4>
-    </div>
-    <div class="card-body">
-        {% for module in modules %}
-        <div class="module-section mb-4">
-            <h5 class="text-primary border-bottom pb-2">
-                <i class="fas fa-folder"></i> {{ module.get_module_type_display }}
-                <span class="badge bg-light text-dark ms-2">{{ module.module_type }}</span>
-            </h5>
-            
-            <div class="sections-list">
-                {% for section in module.sections.all %}
-                <div class="section-item d-flex justify-content-between align-items-center">
-                    <div class="section-info">
-                        <h6 class="mb-1">{{ section.section_number }} {{ section.title }}</h6>
-                        {% if section.description %}
-                        <small class="text-muted">{{ section.description }}</small>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="action-buttons">
-                        {% if section.is_completed %}
-                        <span class="badge bg-success me-2">
-                            <i class="fas fa-check"></i> Complété
-                        </span>
-                        {% endif %}
-                        
-                        <a href="{% url 'ctd_submission:section_view' submission.pk module.pk section.pk %}" 
-                           class="btn btn-outline-secondary btn-sm">
-                            <i class="fas fa-eye"></i> Voir
-                        </a>
-                        
-                        <a href="{% url 'ctd_submission:section_template' submission.pk module.pk section.pk %}" 
-                           class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-file-alt"></i> Template
-                        </a>
+<!-- Modal de confirmation pour la génération -->
+<div class="modal fade" id="generateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-magic me-2"></i>Génération de Structure CTD
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <i class="fas fa-brain fa-3x text-primary mb-3"></i>
+                    <h5>Analyse Intelligente en cours...</h5>
+                    <p class="text-muted">
+                        L'IA analyse vos documents pour déterminer automatiquement 
+                        les modules et sections CTD appropriés.
+                    </p>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             style="width: 0%" id="analysisProgress"></div>
                     </div>
                 </div>
-                {% empty %}
-                <p class="text-muted">Aucune section disponible pour ce module.</p>
-                {% endfor %}
             </div>
         </div>
-        {% empty %}
-        <div class="text-center py-4">
-            <i class="fas fa-magic fa-3x text-muted mb-3"></i>
-            <h5 class="text-muted">Structure CTD non générée</h5>
-            <p class="text-muted">Cliquez sur "Générer Structure CTD Intelligente" pour créer automatiquement les modules et sections.</p>
-        </div>
-        {% endfor %}
     </div>
 </div>
 
-<!-- Soumissions Récentes -->
-<div class="mt-4">
-    <h5>Soumissions Récentes</h5>
-    <div class="row">
-        <div class="col-md-4 mb-3">
-            <div class="card border-0" style="background: #f8f9fa;">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="mb-1">EU-MAA-001</h6>
-                            <div>
-                                <span class="badge bg-secondary">EU</span>
-                                <span class="badge bg-info">En cours</span>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <small class="text-muted">Progression</small>
-                            <div><strong>75%</strong></div>
-                            <a href="#" class="btn btn-link btn-sm p-0">
-                                <i class="fas fa-external-link-alt"></i> Ouvrir
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4 mb-3">
-            <div class="card border-0" style="background: #f8f9fa;">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="mb-1">FDA-IND-002</h6>
-                            <div>
-                                <span class="badge bg-primary">US</span>
-                                <span class="badge bg-success">Soumis</span>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <small class="text-muted">Progression</small>
-                            <div><strong>100%</strong></div>
-                            <a href="#" class="btn btn-link btn-sm p-0">
-                                <i class="fas fa-external-link-alt"></i> Ouvrir
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4 mb-3">
-            <div class="card border-0" style="background: #f8f9fa;">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="mb-1">HC-NOC-003</h6>
-                            <div>
-                                <span class="badge bg-danger">CA</span>
-                                <span class="badge bg-warning">Draft</span>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <small class="text-muted">Progression</small>
-                            <div><strong>45%</strong></div>
-                            <a href="#" class="btn btn-link btn-sm p-0">
-                                <i class="fas fa-external-link-alt"></i> Ouvrir
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Résultats de l'analyse IA -->
+<div id="aiAnalysisResults" class="mt-4" style="display: none;"></div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function generateStructure() {
-    if (confirm('Voulez-vous regénérer la structure CTD ? Cela peut écraser les modifications existantes.')) {
-        fetch(`{% url 'ctd_submission:generate_ctd_structure' %}`, {
+$(document).ready(function() {
+    // Upload de document
+    $('#uploadDocumentBtn').click(function() {
+        $('#documentUploadZone').toggle();
+    });
+    
+    // Clic sur la zone d'upload
+    $('#documentUploadZone').click(function(e) {
+        if (e.target === this) {
+            $('#fileInput').click();
+        }
+    });
+    
+    // Changement de fichier
+    $('#fileInput').change(function() {
+        if (this.files.length > 0) {
+            const fileName = this.files[0].name;
+            const baseName = fileName.replace(/\.[^/.]+$/, ""); // Retirer l'extension
+            $('input[name="name"]').val(baseName);
+        }
+    });
+    
+    // Soumission du formulaire d'upload - MISE À JOUR avec analyse IA
+    $('#documentUploadForm').submit(function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitBtn = $(this).find('button[type="submit"]');
+        
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Upload & Analyse...');
+        
+        $.ajax({
+            url: '{% url "client:ctd_submission:document_upload" %}',
             method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    // Affichage enrichi avec les résultats d'analyse
+                    let message = response.message;
+                    if (response.analysis && response.analysis.has_section) {
+                        message += `<br><small class="text-success">🎯 Section assignée: ${response.analysis.section_name}</small>`;
+                    }
+                    
+                    CTDSubmission.showNotification(message, 'success');
+                    $('#documentUploadZone').hide();
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    CTDSubmission.showNotification(response.message, 'error');
+                }
             },
-            body: JSON.stringify({ submission_id: {{ submission.pk }} })
-        })
-        .then(response => {
-            if (response.ok) {
-                location.reload();
-            } else {
-                alert('Erreur lors de la génération de la structure.');
+            error: function() {
+                CTDSubmission.showNotification('Erreur lors de l\'upload', 'error');
+            },
+            complete: function() {
+                submitBtn.prop('disabled', false).html('<i class="fas fa-upload me-2"></i>Upload & Analyser');
             }
-        })
-        .catch(error => {
-            console.error('Erreur:', error);
-            alert('Erreur lors de la génération de la structure.');
         });
+    });
+    
+    // Génération de structure CTD intelligente
+    $('#generateStructureBtn').click(function() {
+        const btn = $(this);
+        
+        // Afficher le modal d'analyse
+        $('#generateModal').modal('show');
+        
+        // Animation de la barre de progression
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+            $('#analysisProgress').css('width', progress + '%');
+        }, 200);
+        
+        $.ajax({
+            url: '{% url "client:ctd_submission:generate_ctd_structure" %}',
+            method: 'POST',
+            data: {
+                'submission_id': {{ submission.id }},
+                'csrfmiddlewaretoken': getCsrfToken()
+            },
+            success: function(response) {
+                clearInterval(progressInterval);
+                $('#analysisProgress').css('width', '100%');
+                
+                setTimeout(() => {
+                    $('#generateModal').modal('hide');
+                    
+                    if (response.success) {
+                        // Afficher les résultats de l'analyse
+                        displayAnalysisResults(response.results);
+                        CTDSubmission.showNotification(response.message, 'success');
+                        
+                        setTimeout(() => window.location.reload(), 2000);
+                    } else {
+                        CTDSubmission.showNotification(response.message, 'error');
+                    }
+                }, 1000);
+            },
+            error: function() {
+                clearInterval(progressInterval);
+                $('#generateModal').modal('hide');
+                CTDSubmission.showNotification('Erreur lors de la génération', 'error');
+            }
+        });
+    });
+    
+    // Génération de structure vide
+    $('#generateEmptyStructure').click(function() {
+        CTDSubmission.confirmAction(
+            'Voulez-vous générer une structure CTD vide basée sur la région sélectionnée ?',
+            function() {
+                // Logique pour générer une structure vide
+                CTDSubmission.showNotification('Structure CTD vide générée', 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        );
+    });
+});
+
+// NOUVELLE FONCTION : Forcer l'analyse IA
+function forceAnalysis(documentId) {
+    const btn = $(`button[onclick="forceAnalysis(${documentId})"]`);
+    const originalContent = btn.html();
+    
+    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+    
+    $.ajax({
+        url: `/documents/${documentId}/force-analysis/`,
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken()
+        },
+        success: function(response) {
+            if (response.success) {
+                CTDSubmission.showNotification(
+                    `✅ ${response.message}`, 
+                    'success'
+                );
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                CTDSubmission.showNotification(
+                    `⚠️ ${response.message}`, 
+                    'warning'
+                );
+                btn.prop('disabled', false).html(originalContent);
+            }
+        },
+        error: function() {
+            CTDSubmission.showNotification('❌ Erreur lors de l\'analyse', 'error');
+            btn.prop('disabled', false).html(originalContent);
+        }
+    });
+}
+
+function displayAnalysisResults(results) {
+    if (!results || results.length === 0) return;
+    
+    let html = '<div class="ai-analysis-result alert alert-info"><h5><i class="fas fa-brain me-2"></i>Résultats de l\'Analyse IA</h5>';
+    
+    results.forEach(result => {
+        const confidenceColor = result.confidence >= 0.8 ? 'success' : result.confidence >= 0.6 ? 'warning' : 'danger';
+        html += `
+            <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                <div>
+                    <strong>${result.document_name}</strong><br>
+                    <small class="text-muted">→ ${result.module} / ${result.section}</small>
+                </div>
+                <span class="badge bg-${confidenceColor}">
+                    ${Math.round(result.confidence * 100)}% confiance
+                </span>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    $('#aiAnalysisResults').html(html).show();
+}
+
+function downloadDocument(documentId) {
+    window.location.href = `/documents/${documentId}/download/`;
+}
+
+function deleteDocument(documentId) {
+    CTDSubmission.confirmAction(
+        'Êtes-vous sûr de vouloir supprimer ce document ?',
+        function() {
+            $.ajax({
+                url: `/documents/${documentId}/delete/`,
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCsrfToken()
+                },
+                success: function() {
+                    CTDSubmission.showNotification('Document supprimé', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                },
+                error: function() {
+                    CTDSubmission.showNotification('Erreur lors de la suppression', 'error');
+                }
+            });
+        }
+    );
+}
+
+// Fonction utilitaire pour obtenir le token CSRF
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+</script>
+
+<style>
+/* Styles personnalisés pour l'affichage des documents */
+.document-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.2s ease;
+}
+
+.document-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-color: #007bff;
+}
+
+.btn-view {
+    background: linear-gradient(45deg, #007bff, #0056b3);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    margin-right: 5px;
+}
+
+.btn-template {
+    background: linear-gradient(45deg, #28a745, #1e7e34);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    margin-right: 5px;
+}
+
+.ctd-module-header {
+    background: linear-gradient(45deg, #6f42c1, #563d7c);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px 8px 0 0;
+    font-weight: 600;
+    font-size: 1.1em;
+}
+
+.ctd-section {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-top: none;
+    padding: 20px;
+}
+
+.ctd-section:last-child {
+    border-radius: 0 0 8px 8px;
+}
+
+.upload-zone {
+    border: 2px dashed #007bff;
+    border-radius: 10px;
+    padding: 40px;
+    text-align: center;
+    background: #f8f9ff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upload-zone:hover {
+    border-color: #0056b3;
+    background: #e7f3ff;
+}
+
+.ai-analysis-result {
+    animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 
-function applySuggestions() {
-    fetch(`{% url 'ctd_submission:copilot_suggestions' submission.id %}`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Erreur: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Erreur:', error);
-        alert('Erreur lors de l\'application des suggestions.');
-    });
+.badge {
+    font-size: 0.75em;
 }
-</script>
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.status-draft { background-color: #ffc107; color: #000; }
+.status-in_progress { background-color: #17a2b8; color: #fff; }
+.status-completed { background-color: #28a745; color: #fff; }
+.status-submitted { background-color: #6f42c1; color: #fff; }
+</style>
 {% endblock %}

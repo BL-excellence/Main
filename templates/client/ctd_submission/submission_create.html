@@ -13,7 +13,8 @@
         <li class="breadcrumb-item"><a href="{% url 'ctd_submission:dashboard' %}">Dashboard</a></li>
         {% if is_edit_mode %}
             <li class="breadcrumb-item">
-                <a href="{% url 'submission_detail' submission.id %}">{{ submission.name }}</a>
+                                <a href="{% url 'client:submission_detail' submission.id %}">{{ submission.name }}</a>
+            </div>
             </li>
             <li class="breadcrumb-item active">Modifier</li>
         {% else %}

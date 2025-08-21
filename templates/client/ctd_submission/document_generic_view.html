@@ -8,9 +8,9 @@
 {% block breadcrumb %}
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'ctd_submission:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'client:dashboard' %}">Dashboard</a></li>
         <li class="breadcrumb-item">
-            <a href="{% url 'ctd_submission:submission_detail' document.submission.id %}">{{ document.submission.name }}</a>
+            <a href="{% url 'client:submission_detail' document.submission.id %}">{{ document.submission.name }}</a>
         </li>
         <li class="breadcrumb-item active">Voir - {{ document.name }}</li>
     </ol>
@@ -37,11 +37,11 @@
                 <small class="badge bg-info">{{ document.get_document_type_display }}</small>
             </div>
             <div class="btn-group">
-                <a href="{% url 'ctd_submission:document_template' document.id %}" class="btn btn-primary">
+                <a href="{% url 'client:document_template' document.id %}" class="btn btn-primary">
                     <i class="fas fa-edit me-2"></i>Modifier (Template)
                 </a>
                 {% if document.file %}
-                <a href="{% url 'ctd_submission:document_download' document.id %}" class="btn btn-outline-secondary">
+                <a href="{% url 'client:document_download' document.id %}" class="btn btn-outline-secondary">
                     <i class="fas fa-download me-2"></i>Télécharger
                 </a>
                 {% endif %}
@@ -132,7 +132,7 @@
                     </p>
                 </div>
                 <div class="col-md-4 text-end">
-                    <a href="{% url 'ctd_submission:document_template' document.id %}" class="btn btn-success btn-sm">
+                    <a href="{% url 'client:document_template' document.id %}" class="btn btn-success btn-sm">
                         <i class="fas fa-edit me-1"></i>Modifier Template
                     </a>
                 </div>
@@ -284,7 +284,7 @@
                             <tr>
                                 <th>Soumission</th>
                                 <td>
-                                    <a href="{% url 'ctd_submission:submission_detail' document.submission.id %}">
+                                    <a href="{% url 'client:submission_detail' document.submission.id %}">
                                         {{ document.submission.name }}
                                     </a>
                                 </td>
@@ -432,7 +432,7 @@
                     <strong>{{ document.template_data|length }}</strong> champs modifiés via le template
                 </div>
                 <div class="mt-2">
-                    <a href="{% url 'ctd_submission:document_template' document.id %}" class="btn btn-outline-primary btn-sm">
+                    <a href="{% url 'client:document_template' document.id %}" class="btn btn-outline-primary btn-sm">
                         <i class="fas fa-edit me-1"></i>Voir Template
                     </a>
                 </div>
