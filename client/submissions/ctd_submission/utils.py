@@ -23,9 +23,11 @@ except Exception:
 # OCR removed (not used)
 OCR_AVAILABLE = False
 try:
-    from PIL import Image
+    from PIL import Image  # PIL module for image operations
+    from PIL.Image import Image as PILImageType  # Image class for type hints
 except Exception:
     Image = None
+    PILImageType = None
 
 # CORRECTION 1: Imports Django correctement gérés
 try:
@@ -174,7 +176,7 @@ class FaithfulPDFProcessor:
             'multiple_passes': True  # NOUVEAU: Plusieurs passes OCR
         }
 
-    def _enhance_image_for_technical_ocr(self, img: Image) -> List[Image]:
+    def _enhance_image_for_technical_ocr(self, img: PILImageType) -> List[PILImageType]:
         """
         Améliore l'image pour une meilleure détection OCR des éléments techniques
         Retourne plusieurs versions optimisées de l'image
@@ -909,7 +911,7 @@ class FaithfulPDFProcessor:
 
         return words
 
-    def _detect_technical_symbols(self, img: Image, W: float, H: float, xref: int) -> List[Dict]:
+    def _detect_technical_symbols(self, img: PILImageType, W: float, H: float, xref: int) -> List[Dict]:
         """
         Détection spécialisée pour les symboles techniques souvent manqués par l'OCR
         """
