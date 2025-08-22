@@ -11,7 +11,8 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from client.library.models import Document, DocumentCategory, RegulatoryAuthority, DocumentTranslation
-from rawdocs.models import RawDocument
+from rawdocs.models import RawDocument, DocumentPage
+from rawdocs.groq_annotation_system import GroqAnnotator
 import json
 import logging
 import os
@@ -230,7 +231,8 @@ def document_list(request):
             'status': validation_status,
         }
     }
-    return render(request, 'client/library/document_list.html', context)
+    # Remplacé: utiliser la vue horizontale par défaut
+    return render(request, 'client/library/document_list_horizontal.html', context)
 
 def documents_by_category(request, category):
     """Documents filtrés par catégorie de source (incluant les documents clients)"""

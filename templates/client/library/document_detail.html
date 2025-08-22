@@ -145,6 +145,28 @@
             transform: translateY(-2px);
         }
 
+        /* Compact icon actions to prevent overflow */
+        .document-actions.compact {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .document-actions.compact .btn {
+            width: 44px;
+            height: 44px;
+            padding: 10px;
+            border-radius: 10px;
+            justify-content: center;
+        }
+        .document-actions.compact .btn i {
+            font-size: 20px;
+            margin: 0;
+        }
+        .document-actions.compact .btn .text {
+            display: none;
+        }
+
         .status-badge {
             display: inline-flex;
             align-items: center;
@@ -509,30 +531,45 @@
             <p class="document-description">{{ document.context }}</p>
             {% endif %}
 
-            <div class="document-actions">
+            <div class="document-actions compact">
                 {% if document.is_validated %}
-                <span class="status-badge status-validated">
+                <span class="status-badge status-validated" title="Validé">
                     <i class="material-icons">verified</i>
-                    Validé
                 </span>
                 {% else %}
-                <span class="status-badge status-pending">
+                <span class="status-badge status-pending" title="En attente de validation">
                     <i class="material-icons">schedule</i>
-                    En attente de validation
                 </span>
                 {% endif %}
 
                 {% if document.file and document.is_validated %}
-                <a href="{% url 'client:library:download_document' document.pk %}" class="btn btn-primary">
+                <a href="{% url 'client:library:download_document' document.pk %}" class="btn btn-primary" title="Télécharger">
                     <i class="material-icons">download</i>
-                    Télécharger
+                    <span class="text">Télécharger</span>
                 </a>
                 {% endif %}
 
+                <a href="#" class="btn btn-primary" onclick="LibraryActions.analyze({{ document.pk }}); return false;" title="Analyser">
+                    <i class="material-icons">psychology</i>
+                    <span class="text">Analyser</span>
+                </a>
+                <a href="#" class="btn btn-primary" onclick="LibraryActions.summary({{ document.pk }}, false); return false;" title="Résumé">
+                    <i class="material-icons">summarize</i>
+                    <span class="text">Résumé</span>
+                </a>
+                <a href="#" class="btn btn-outline" onclick="LibraryActions.summary({{ document.pk }}, true); return false;" title="Régénérer le Résumé">
+                    <i class="material-icons">autorenew</i>
+                    <span class="text">Régénérer le Résumé</span>
+                </a>
+                <a href="#" class="btn btn-primary" onclick="LibraryActions.rawText({{ document.pk }}); return false;" title="Extraire texte brut">
+                    <i class="material-icons">text_snippet</i>
+                    <span class="text">Extraire texte brut</span>
+                </a>
+
                 {% if document.url_source or document.url %}
-                <a href="{{ document.url_source|default:document.url }}" target="_blank" class="btn btn-outline">
+                <a href="{{ document.url_source|default:document.url }}" target="_blank" class="btn btn-outline" title="Source">
                     <i class="material-icons">open_in_new</i>
-                    Source
+                    <span class="text">Source</span>
                 </a>
                 {% endif %}
             </div>

@@ -109,6 +109,29 @@
     transform: translateY(-2px);
 }
 
+/* Compact icon actions to prevent overflow */
+.document-actions.compact {
+    display: flex;
+    gap: 8px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.document-actions.compact .btn {
+    width: 44px;
+    height: 44px;
+    padding: 10px;
+    border-radius: 10px;
+    justify-content: center;
+}
+.document-actions.compact .btn i {
+    font-size: 20px;
+    margin: 0;
+}
+.document-actions.compact .btn .text {
+    display: none;
+}
+
 .info-cards-container {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -424,15 +447,19 @@
                 <span>Document Client</span>
             </div>
             
-            <div class="document-actions">
-                <a href="{% url 'client:library:download_client_document' document.pk %}" class="btn btn-primary">
+            <div class="document-actions compact">
+                <a href="{% url 'client:library:download_client_document' document.pk %}" class="btn btn-primary" title="Télécharger">
                     <i class="material-icons">download</i>
-                    Télécharger
+                    <span class="text">Télécharger</span>
                 </a>
-                <a href="{% url 'client:library:delete_client_document' document.pk %}" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce document ?')">
+                <a href="{% url 'client:library:delete_client_document' document.pk %}" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce document ?')" title="Supprimer">
                     <i class="material-icons">delete</i>
-                    Supprimer
+                    <span class="text">Supprimer</span>
                 </a>
+                <button type="button" class="btn btn-primary" style="background: rgba(255,255,255,0.2);" onclick="LibraryActions.rawText({{ document.pk }})" title="Extraire texte brut">
+                    <i class="material-icons">text_snippet</i>
+                    <span class="text">Extraire texte brut</span>
+                </button>
             </div>
         </div>
     </div>

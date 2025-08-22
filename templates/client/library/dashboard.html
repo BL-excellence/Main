@@ -612,7 +612,7 @@
                     <i class="material-icons">cloud_upload</i>
                     Uploader Document
                 </a>
-                <button class="btn btn-primary" onclick="location.href='{% url 'client:library:document_list' %}'">
+                <button class="btn btn-primary" onclick="location.href='{% url 'client:library:document_list_horizontal' %}'">
                     <i class="material-icons">library_books</i>
                     Parcourir Documents
                 </button>
@@ -720,7 +720,7 @@
         <div class="dashboard-section">
             <div class="section-header">
                 <h2>Documents récents</h2>
-                <a href="{% url 'client:library:document_list' %}" class="view-all">Voir tout</a>
+                <a href="{% url 'client:library:document_list_horizontal' %}" class="view-all">Voir tout</a>
             </div>
 
             <div class="documents-list">

@@ -840,7 +840,7 @@ def chatbot_api(request):
     # Models
     from client.products.models import Product, ManufacturingSite
     from rawdocs.models import RawDocument
-    from submissions.models import Submission
+    from client.submissions.ctd_submission.models import Submission
 
     produits_qs = Product.objects.all().prefetch_related('sites')
     docs_qs = RawDocument.objects.filter(is_validated=True).select_related('owner')

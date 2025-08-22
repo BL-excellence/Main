@@ -52,6 +52,26 @@ def client_upload_document(request):
                     raw_document.country = metadata.get('country', '')
                     raw_document.language = metadata.get('language', '')
                     raw_document.url_source = metadata.get('url_source', '')
+
+                    # EXTRACTION DU TEXTE DES PAGES (pour Analyse/Résumé)
+                    try:
+                        from rawdocs.annotation_utils import extract_pages_from_pdf
+                        from rawdocs.models import DocumentPage
+                        texts = extract_pages_from_pdf(raw_document.file.path)
+                        if texts:
+                            DocumentPage.objects.filter(document=raw_document).delete()
+                            for idx, t in enumerate(texts, start=1):
+                                t = (t or '').strip()
+                                DocumentPage.objects.create(
+                                    document=raw_document,
+                                    page_number=idx,
+                                    raw_text=t,
+                                    cleaned_text=t,
+                                )
+                            raw_document.total_pages = len(texts)
+                            raw_document.pages_extracted = True
+                    except Exception as ex:
+                        print(f"⚠️ Extraction du texte (pages) échouée pour document client {raw_document.pk}: {ex}")
                     
                     # Marquer comme validé automatiquement pour les clients
                     raw_document.is_validated = True
@@ -87,11 +107,64 @@ def client_upload_document(request):
 
 
 @login_required
+def extract_text_now(request, pk):
+    """Action manuelle pour extraire le texte des pages d'un document client."""
+    doc = get_object_or_404(RawDocument, pk=pk, owner=request.user, source='Client')
+    try:
+        from rawdocs.annotation_utils import extract_pages_from_pdf
+        from rawdocs.models import DocumentPage
+        texts = extract_pages_from_pdf(doc.file.path)
+        if texts:
+            DocumentPage.objects.filter(document=doc).delete()
+            for idx, t in enumerate(texts, start=1):
+                t = (t or '').strip()
+                DocumentPage.objects.create(
+                    document=doc,
+                    page_number=idx,
+                    raw_text=t,
+                    cleaned_text=t,
+                )
+            doc.total_pages = len(texts)
+            doc.pages_extracted = True
+            doc.save(update_fields=['total_pages', 'pages_extracted'])
+            messages.success(request, f"Texte extrait pour {len(texts)} pages.")
+        else:
+            messages.warning(request, "Aucun texte n'a pu être extrait de ce PDF.")
+    except Exception as e:
+        messages.error(request, f"Erreur d'extraction: {e}")
+    return redirect('client:library:client_document_detail', pk=pk)
+
+
+@login_required
 def client_document_detail(request, pk):
     """
     Détail d'un document uploadé par un client
     """
     document = get_object_or_404(RawDocument, pk=pk, owner=request.user, source='Client')
+
+    # Assurer que le texte est extrait (au cas où upload ancien)
+    try:
+        from rawdocs.models import DocumentPage
+        from rawdocs.annotation_utils import extract_pages_from_pdf
+        has_pages = DocumentPage.objects.filter(document=document).exists()
+        has_text = has_pages and DocumentPage.objects.filter(document=document).exclude(cleaned_text='').exists()
+        if not has_text:
+            texts = extract_pages_from_pdf(document.file.path)
+            if texts:
+                DocumentPage.objects.filter(document=document).delete()
+                for idx, t in enumerate(texts, start=1):
+                    t = (t or '').strip()
+                    DocumentPage.objects.create(
+                        document=document,
+                        page_number=idx,
+                        raw_text=t,
+                        cleaned_text=t,
+                    )
+                document.total_pages = len(texts)
+                document.pages_extracted = True
+                document.save(update_fields=['total_pages', 'pages_extracted'])
+    except Exception as ex:
+        print(f"⚠️ Extraction à l'ouverture du détail échouée pour doc {document.pk}: {ex}")
     
     # Préparer les métadonnées pour l'affichage
     metadata = {

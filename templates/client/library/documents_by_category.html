@@ -5,6 +5,7 @@
 {% block title %}{{ category_display }} - Documents{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/library/document-list.css' %}">
 <style>
 /* Container principal - centré et avec marges */
 .library-container {
@@ -543,84 +544,115 @@
     </div>
 
     {% if documents %}
-    <div class="cards-list">
-        {% for document in documents %}
-        <div class="document-card" onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
-
-            <!-- Ribbon Validé -->
-            {% if document.is_validated or document.validated %}
-            <span class="ribbon-validated">
-                <i class="material-icons">verified</i> Validé
-            </span>
-            {% endif %}
-
-            <!-- En-tête Document -->
-            <div class="document-card-header">
-                <div class="document-card-icon">
-                    <i class="material-icons">picture_as_pdf</i>
-                </div>
-                <div style="flex: 1 1 0%">
-                    <div class="document-card-title" title="{{ document|document_title }}">
-                        {{ document|document_title|truncatechars:50 }}
-                    </div>
-                    <div class="document-card-metas">
-                        <i class="material-icons">person</i>
-                        <span>{{ document.owner.username|default:"Anonyme" }}</span>
-                        <span class="w-1 h-1 rounded-full bg-gray-300" style="display:inline-block;width:6px;height:6px;"></span>
-                        <i class="material-icons">date_range</i>
-                        <span>{{ document.created_at|date:"d/m/Y" }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Corps de la carte -->
-            <div class="document-card-body">
-                <!-- Métadonnées principales en badges -->
-                <div class="document-card-badges">
-                    {% if document.doc_type %}
-                    <span class="card-badge badge-blue">
-                        <i class="material-icons text-xs">category</i>
-                        {{ document.doc_type|truncatechars:20 }}
-                    </span>
-                    {% endif %}
-                    {% if document.country %}
-                    <span class="card-badge badge-green">
-                        <i class="material-icons text-xs">public</i>
-                        {{ document.country|truncatechars:20 }}
-                    </span>
-                    {% endif %}
-                    {% if document.language %}
-                    <span class="card-badge badge-purple">
-                        <i class="material-icons text-xs">language</i>
-                        {{ document.language|truncatechars:20 }}
-                    </span>
-                    {% endif %}
-                    {% if document.source %}
-                    <span class="card-badge badge-orange">
-                        <i class="material-icons text-xs">source</i>
-                        {{ document.source|truncatechars:20 }}
-                    </span>
-                    {% endif %}
-                </div>
-
-                <!-- Contexte extrait -->
-                {% if document.context %}
-                <div class="document-card-context">
-                    <i class="material-icons text-base" style="vertical-align: middle; color:#4f46e5; margin-right: 0.5rem;">info</i>
-                    <span>{{ document.context|truncatechars:100 }}</span>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Actions -->
-            <div class="document-card-actions">
-                <a href="{% url 'client:library:download_document' document.pk %}" onclick="event.stopPropagation();">
-                    <i class="material-icons text-sm">download</i>
-                    Télécharger
-                </a>
-            </div>
+    <div class="table-wrap">
+        <div class="overflow-x-auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Document</th>
+                        <th>Type</th>
+                        <th>Source</th>
+                        <th>Pays</th>
+                        <th>Langue</th>
+                        <th>Métadonneur</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for document in documents %}
+                    <tr onclick="location.href='{% url 'client:library:document_detail' document.pk %}'">
+                        <td>
+                            <div class="document-icon-container">
+                                <div class="document-table-icon">
+                                    <i class="material-icons">picture_as_pdf</i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <span class="doc-title" title="{{ document|document_title }}">
+                                        {{ document|document_title|truncatechars:28 }}
+                                    </span>
+                                    {% if document.context %}
+                                    <div class="doc-context" title="{{ document.context }}">
+                                        {{ document.context|truncatechars:30 }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if document.doc_type %}
+                            <span class="badge-blue" title="{{ document.doc_type }}">
+                                {{ document.doc_type|truncatechars:15 }}
+                            </span>
+                            {% else %}
+                            <span class="badge-gray">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if document.source %}
+                            <span class="badge-green" title="{{ document.source }}">
+                                {{ document.source|truncatechars:12 }}
+                            </span>
+                            {% else %}
+                            <span class="badge-gray">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if document.country %}
+                            <span class="badge-orange" title="{{ document.country }}">
+                                {{ document.country|truncatechars:12 }}
+                            </span>
+                            {% else %}
+                            <span class="badge-gray">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if document.language %}
+                            <span class="badge-purple" title="{{ document.language }}">
+                                {{ document.language|upper|truncatechars:10 }}
+                            </span>
+                            {% else %}
+                            <span class="badge-gray">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="doc-meta-user">
+                                <span class="avatar">
+                                    <i class="material-icons">person</i>
+                                </span>
+                                <span>{{ document.owner.username|default:"Anonyme" }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div style="font-weight: 600; color: #374151;">{{ document.created_at|date:"d/m/Y" }}</div>
+                            <div class="text-xs text-gray-400">{{ document.created_at|date:"H:i" }}</div>
+                        </td>
+                        <td>
+                            <div class="doc-actions">
+                                <a href="{% url 'client:library:document_detail' document.pk %}" class="view" title="Voir le détail"
+                                   onclick="event.stopPropagation();">
+                                    <i class="material-icons">visibility</i>
+                                </a>
+                                <a href="#" class="analyze" title="Analyser" onclick="event.stopPropagation(); LibraryActions.analyze({{ document.pk }}); return false;">
+                                    <i class="material-icons">psychology</i>
+                                </a>
+                                <a href="#" class="summary" title="Résumé" onclick="event.stopPropagation(); LibraryActions.summary({{ document.pk }}, false); return false;">
+                                    <i class="material-icons">summarize</i>
+                                </a>
+                                <a href="#" class="rawtext" title="Texte brut" onclick="event.stopPropagation(); LibraryActions.rawText({{ document.pk }}); return false;">
+                                    <i class="material-icons">text_snippet</i>
+                                </a>
+                                <a href="{% url 'client:library:download_document' document.pk %}" class="download" title="Télécharger"
+                                   onclick="event.stopPropagation();">
+                                    <i class="material-icons">download</i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        {% endfor %}
     </div>
 
     <!-- Pagination -->

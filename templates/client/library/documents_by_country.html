@@ -5,6 +5,7 @@
 {% block title %}{{ country }} - Documents par Pays{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/library/document-list.css' %}">
 <style>
 /* Container principal - centré et avec marges */
 .library-container {
@@ -481,6 +482,14 @@
     box-shadow: 0 4px 12px rgba(5,150,105,0.2);
 }
 
+/* Extra actions */
+.table-wrap .doc-actions a.analyze { color:#7c3aed; background:rgba(124,58,237,0.1); }
+.table-wrap .doc-actions a.analyze:hover { background:linear-gradient(135deg,#ede9fe 0%,#ddd6fe 100%); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.2); }
+.table-wrap .doc-actions a.summary { color:#0ea5e9; background:rgba(14,165,233,0.1); }
+.table-wrap .doc-actions a.summary:hover { background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 100%); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(14,165,233,0.2); }
+.table-wrap .doc-actions a.rawtext { color:#f59e0b; background:rgba(245,158,11,0.1); }
+.table-wrap .doc-actions a.rawtext:hover { background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245,158,11,0.2); }
+
 /* Document icon in table */
 .document-icon-container {
     display: flex;
@@ -833,6 +842,15 @@
                                 <a href="{% url 'client:library:document_detail' document.pk %}" class="view" title="Voir le détail"
                                    onclick="event.stopPropagation();">
                                     <i class="material-icons">visibility</i>
+                                </a>
+                                <a href="#" class="analyze" title="Analyser" onclick="event.stopPropagation(); LibraryActions.analyze({{ document.pk }}); return false;">
+                                    <i class="material-icons">psychology</i>
+                                </a>
+                                <a href="#" class="summary" title="Résumé" onclick="event.stopPropagation(); LibraryActions.summary({{ document.pk }}, false); return false;">
+                                    <i class="material-icons">summarize</i>
+                                </a>
+                                <a href="#" class="rawtext" title="Texte brut" onclick="event.stopPropagation(); LibraryActions.rawText({{ document.pk }}); return false;">
+                                    <i class="material-icons">text_snippet</i>
                                 </a>
                                 <a href="{% url 'client:library:download_document' document.pk %}" class="download" title="Télécharger"
                                    onclick="event.stopPropagation();">
