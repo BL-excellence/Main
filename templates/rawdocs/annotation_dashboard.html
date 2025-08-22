@@ -279,6 +279,32 @@
         color: var(--text-secondary);
         white-space: nowrap;
     }
+
+    /* Limiter la largeur de la colonne "Document" et ajouter des points de suspension */
+    .annotation-table th:nth-child(2),
+    .annotation-table td:nth-child(2) {
+        max-width: 260px; /* ajuster si nécessaire */
+        width: 260px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    @media (max-width: 900px) {
+        .annotation-table th:nth-child(2),
+        .annotation-table td:nth-child(2) {
+            max-width: 200px;
+            width: 200px;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .annotation-table th:nth-child(2),
+        .annotation-table td:nth-child(2) {
+            max-width: 160px;
+            width: 160px;
+        }
+    }
     /* Responsive */
     @media (max-width: 900px) {
         .annotation-table th, .annotation-table td { padding: 0.7rem 0.5rem; }
