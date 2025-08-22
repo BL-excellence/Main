@@ -17,23 +17,23 @@
     table-layout: fixed;
 }
 
-/* Largeurs de colonnes optimisées */
+/* Largeurs de colonnes optimisées - ajustées pour une meilleure distribution */
 .table-wrap th:nth-child(1),
-.table-wrap td:nth-child(1) { width: 280px; } /* Document */
+.table-wrap td:nth-child(1) { width: 220px; } /* Document */
 .table-wrap th:nth-child(2),
-.table-wrap td:nth-child(2) { width: 130px; } /* Type */
+.table-wrap td:nth-child(2) { width: 100px; } /* Type */
 .table-wrap th:nth-child(3),
-.table-wrap td:nth-child(3) { width: 120px; } /* Source */
+.table-wrap td:nth-child(3) { width: 90px; } /* Source */
 .table-wrap th:nth-child(4),
-.table-wrap td:nth-child(4) { width: 120px; } /* Pays */
+.table-wrap td:nth-child(4) { width: 90px; } /* Pays */
 .table-wrap th:nth-child(5),
-.table-wrap td:nth-child(5) { width: 100px; } /* Langue */
+.table-wrap td:nth-child(5) { width: 70px; } /* Langue */
 .table-wrap th:nth-child(6),
-.table-wrap td:nth-child(6) { width: 150px; } /* Métadonneur */
+.table-wrap td:nth-child(6) { width: 120px; } /* Métadonneur */
 .table-wrap th:nth-child(7),
-.table-wrap td:nth-child(7) { width: 120px; } /* Date */
+.table-wrap td:nth-child(7) { width: 90px; } /* Date */
 .table-wrap th:nth-child(8),
-.table-wrap td:nth-child(8) { width: 100px; } /* Actions */
+.table-wrap td:nth-child(8) { width: 200px; } /* Actions */
 
 /* En-tête de table amélioré */
 .table-wrap thead {
@@ -207,21 +207,24 @@
 /* Actions Buttons */
 .doc-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.4rem; /* Réduit l'espace entre les boutons */
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start; /* Aligne à gauche pour optimiser l'espace */
+    padding: 0.25rem;
 }
 
 .doc-actions a {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 10px;
+    border-radius: 8px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    padding: 0.5rem;
-    font-size: 1.2rem;
+    padding: 0.5rem; /* Réduit le padding */
+    font-size: 1.2rem; /* Réduit la taille des icônes */
     position: relative;
     overflow: hidden;
+    min-width: 32px; /* Réduit la taille minimale */
+    min-height: 32px; /* Réduit la taille minimale */
 }
 
 .doc-actions a::before {
@@ -325,12 +328,19 @@
 /* Responsive Design */
 @media (max-width: 1200px) {
     .table-wrap table {
-        min-width: 700px;
+        min-width: 900px; /* Augmenté pour mieux gérer les colonnes plus larges */
     }
     
     .doc-actions {
-        flex-wrap: wrap;
+        flex-wrap: nowrap; /* Empêche le retour à la ligne des boutons */
+        justify-content: flex-start; /* Aligne à gauche en responsive */
     }
+
+    /* Ajuste les largeurs des colonnes en responsive */
+    .table-wrap th:nth-child(1),
+    .table-wrap td:nth-child(1) { width: 200px; }
+    .table-wrap th:nth-child(8),
+    .table-wrap td:nth-child(8) { width: 200px; }
 }
 
 @media (max-width: 768px) {
@@ -339,19 +349,44 @@
         max-width: 120px;
     }
     
+    .doc-actions {
+        gap: 0.5rem; /* Réduit l'espace entre les boutons */
+    }
+    
     .doc-actions a {
-        padding: 0.4rem;
-        font-size: 1.1rem;
+        padding: 0.6rem; /* Légèrement réduit mais reste confortable */
+        font-size: 1.3rem; /* Légèrement réduit mais reste visible */
+        min-width: 38px;
+        min-height: 38px;
+    }
+
+    /* Masque certains labels en responsive */
+    .table-wrap th:nth-child(3),
+    .table-wrap td:nth-child(3),
+    .table-wrap th:nth-child(4),
+    .table-wrap td:nth-child(4) {
+        display: none;
     }
 }
 
 @media (max-width: 480px) {
     .table-wrap th,
     .table-wrap td {
-        padding: 1rem 0.75rem;
+        padding: 1rem 0.5rem;
     }
     
     .doc-meta-user span {
         max-width: 60px;
+    }
+
+    .doc-actions {
+        gap: 0.25rem; /* Encore plus compact sur mobile */
+    }
+    
+    .doc-actions a {
+        padding: 0.5rem;
+        font-size: 1.2rem;
+        min-width: 34px;
+        min-height: 34px;
     }
 }
