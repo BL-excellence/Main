@@ -548,10 +548,10 @@
                     <i class="fas fa-highlighter text-white"></i>
                 </div>
                 <div class="stat-value" style="color:#10b981">{{ validated_documents_count|default:0 }}</div>
-                <div class="stat-label">documents prêts pour annotation expert</div>
+                <div class="stat-label">documents complètement validés</div>
                 <div class="progress-container">
                     <div class="progress-bar"
-                         style="width: 85%; background: linear-gradient(90deg, #10b981 0%, #34d399 100%);"></div>
+                         style="width: {% if total_documents > 0 %}{% widthratio validated_documents_count total_documents 100 %}%{% else %}0%{% endif %}; background: linear-gradient(90deg, #10b981 0%, #34d399 100%);"></div>
                 </div>
                 <div class="mt-4">
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-500/10 text-emerald-400">
@@ -636,7 +636,7 @@
                             </td>
                             <td>
                                 <span class="badge" style="background:rgba(245,158,11,0.11);color:#f59e0b;">
-                                    <i class="fas fa-pen"></i> {{ doc.annotations.count }}
+                                    <i class="fas fa-pen"></i> {{ doc.total_annotations }}
                                 </span>
                             </td>
                             <td class="date">
@@ -718,12 +718,10 @@
                                 <span class="font-medium">{{ doc.pages.count }}</span>
                             </td>
                             <td>
-                                {% with annotations_count=doc.annotations.count %}
                                 <div class="text-sm">
-                                    <div>{{ annotations_count }} annotations</div>
+                                    <div>{{ doc.total_annotations }} annotations</div>
                                     <div class="text-gray-500">{{ doc.pages.count }} pages</div>
                                 </div>
-                                {% endwith %}
                             </td>
                             <td class="date">
                                 {{ doc.updated_at|date:"d/m/Y H:i" }}
@@ -1009,7 +1007,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Bar Chart - Review Activity
         const reviewBarData = [
-            {{ ready_documents_count|default:0 }},
+            {{ to_review_count|default:0 }},
             {{ in_progress_reviews|default:0 }},
             {{ completed_reviews|default:0 }},
             {{ rejected_documents|default:0 }}
@@ -1072,7 +1070,7 @@
 
         // Pie Chart - Document Status
         const pieData = [
-            {{ ready_documents_count|default:0 }},
+            {{ to_review_count|default:0 }},
             {{ completed_reviews|default:0 }},
             {{ rejected_documents|default:0 }}
         ];

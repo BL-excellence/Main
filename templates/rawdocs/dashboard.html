@@ -562,18 +562,16 @@
                 </div>
             </div>
 
-            <!-- Documents Refusés -->
+            <!-- KPI Métadonneur: En attente de validation -->
             <div class="card animate-fade-in" style="animation-delay: 0.3s">
-                <div class="stat-icon refused">
-                    <i class="fas fa-exclamation-triangle text-white"></i>
+                <div class="stat-icon progress">
+                    <i class="fas fa-clock text-white"></i>
                 </div>
-                <div class="stat-value">{{ documents_refused|default:0 }}</div>
-                <div class="stat-label">Documents nécessitant une correction</div>
-                <div class="mt-4">
-                    <div class="status-badge attention">
-                        <i class="fas fa-bell"></i>
-                        Attention requise
-                    </div>
+                <div class="stat-value">{{ pending_validation_count|default:0 }}</div>
+                <div class="stat-label">En attente de validation</div>
+                <div class="progress-container">
+                    <div class="progress-bar bg-gradient-to-r from-amber-500 to-yellow-400"
+                         style="width: {% if total_imported > 0 %}{% widthratio pending_validation_count total_imported 100 %}%{% else %}0%{% endif %}"></div>
                 </div>
             </div>
         </div>
@@ -663,9 +661,12 @@
 
     <!-- Metadata Validation Tab -->
     <div id="metadata-tab" class="tab-content hidden">
-        <div class="flex justify-end mb-2">
+        <div class="flex justify-between items-center mb-2" style="gap:0.5rem; flex-wrap:wrap;">
             <a href="{% url 'rawdocs:document_list' %}" class="btn btn-primary text-sm px-3 py-2 rounded-md">
                 <i class="fas fa-list"></i> Voir tous les documents
+            </a>
+            <a href="{% url 'rawdocs:upload' %}" class="btn btn-primary text-sm px-3 py-2 rounded-md">
+                <i class="fas fa-upload"></i> Importer un nouveau PDF
             </a>
         </div>    
         <div class="card">
@@ -747,13 +748,6 @@
                     <p class="text-sm text-gray-500">Commencez par importer vos premiers documents PDF</p>
                 </div>
             {% endif %}
-
-            <div class="mt-6">
-                <a href="{% url 'rawdocs:upload' %}" class="btn btn-primary">
-                    <i class="fas fa-upload"></i>
-                    Importer un nouveau PDF
-                </a>
-            </div>
         </div>
     </div>
 </div>

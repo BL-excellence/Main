@@ -154,14 +154,22 @@ def register(request):
 @user_passes_test(is_metadonneur)
 def dashboard_view(request):
     docs = RawDocument.objects.filter(owner=request.user).order_by('-created_at')
+    # KPI calculés pour métadonneur
+    total_imported = docs.count()
+    validated_count = docs.filter(is_validated=True).count()
+    pending_validation_count = docs.filter(is_validated=False).count()
+
     context = {
         'documents': docs,
-        'total_scrapped': docs.count(),
+        'total_scrapped': total_imported,
         'total_planned': 150,
-        'total_completed': 0,
-        'in_progress': 12,
+        'total_completed': validated_count,
+        'in_progress': pending_validation_count,
+        'pending_validation_count': pending_validation_count,
+        'total_imported': total_imported,
+        # Placeholder charts (peuvent être ajustés plus tard)
         'pie_data': json.dumps([15, 8, 12, 5, 3]),
-        'bar_data': json.dumps([150, docs.count(), 0, 12]),
+        'bar_data': json.dumps([150, total_imported, validated_count, pending_validation_count]),
     }
     return render(request, 'rawdocs/dashboard.html', context)
 
@@ -461,17 +469,63 @@ def validate_document(request, doc_id):
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_annotateur)
 def annotation_dashboard(request):
+    # Base queryset: documents prêts pour annotation
     docs = RawDocument.objects.filter(
         is_validated=True,
         pages_extracted=True
     ).order_by('-validated_at')
 
-    paginator = Paginator(docs, 10)
-    page = request.GET.get('page')
+    from django.db.models import Q, F, Count, Sum
 
-    return render(request, 'rawdocs/annotation_dashboard.html', {
-        'documents': paginator.get_page(page)
-    })
+    # Annoter la queryset avec le nombre de pages annotées par document
+    docs_with_progress = docs.annotate(
+        annotated_pages_count=Count('pages', filter=Q(pages__is_annotated=True))
+    )
+
+    # Pagination pour le tableau (sur la queryset annotée)
+    paginator = Paginator(docs_with_progress, 10)
+    page = request.GET.get('page')
+    documents_page = paginator.get_page(page)
+
+    # KPI dynamiques
+    total_documents = docs_with_progress.count()
+    total_pages = docs_with_progress.aggregate(total=Sum('total_pages'))['total'] or 0
+
+    # Nombre de pages annotées (toutes docs confondues)
+    total_annotated_pages = DocumentPage.objects.filter(
+        document__in=docs_with_progress,
+        is_annotated=True
+    ).count()
+
+    # Documents complétés: toutes les pages annotées
+    completed_count = docs_with_progress.filter(
+        total_pages__gt=0,
+        annotated_pages_count=F('total_pages')
+    ).count()
+
+    # Documents en cours: au moins 1 page annotée mais pas toutes
+    in_progress_count = docs_with_progress.filter(
+        annotated_pages_count__gt=0
+    ).exclude(
+        annotated_pages_count=F('total_pages')
+    ).count()
+
+    to_annotate_count = max(0, total_documents - in_progress_count - completed_count)
+
+    avg_annotated_pages_per_doc = (total_annotated_pages / total_documents) if total_documents > 0 else 0
+
+    context = {
+        'documents': documents_page,
+        'total_documents': total_documents,
+        'total_pages': total_pages,
+        'total_annotated_pages': total_annotated_pages,
+        'in_progress_count': in_progress_count,
+        'completed_count': completed_count,
+        'to_annotate_count': to_annotate_count,
+        'avg_annotated_pages_per_doc': avg_annotated_pages_per_doc,
+    }
+
+    return render(request, 'rawdocs/annotation_dashboard.html', context)
 
 
 @login_required(login_url='rawdocs:login')

@@ -53,47 +53,76 @@ class ExpertDashboardView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Documents ready for expert review with annotator info
-        ready_documents = RawDocument.objects.filter(
+        from django.db.models import Count, Q, F
+
+        # Base queryset: documents prêts pour révision expert
+        docs_qs = RawDocument.objects.filter(
             is_ready_for_expert=True
-        ).select_related('owner').prefetch_related('pages__annotations')
+        ).select_related('owner').prefetch_related('pages__annotations')\
+         .annotate(
+            total_ann=Count('pages__annotations'),
+            validated_ann=Count('pages__annotations', filter=Q(pages__annotations__validation_status='validated')),
+            pending_ann=Count('pages__annotations', filter=Q(pages__annotations__validation_status='pending')),
+            rejected_ann=Count('pages__annotations', filter=Q(pages__annotations__validation_status='rejected')),
+            latest_annotation=Max('pages__annotations__created_at'),
+        ).order_by('-expert_ready_at')
 
-        # Count pending annotations across all documents
-        pending_annotations = Annotation.objects.filter(
-            validation_status='pending'
-        ).count()
+        total_documents = docs_qs.count()
 
-        # Enrich documents with annotation stats
-        enriched_documents = []
-        for doc in ready_documents.order_by('-expert_ready_at')[:5]:
-            doc.annotator = doc.owner  # Add annotator field
-            doc.total_annotations = sum(page.annotations.count() for page in doc.pages.all())
-            doc.pending_annotations = sum(
-                page.annotations.filter(validation_status='pending').count() for page in doc.pages.all())
-            doc.validated_annotations = sum(
-                page.annotations.filter(validation_status='validated').count() for page in doc.pages.all())
+        # Aggregates for annotations (limités aux docs prêts)
+        ann_qs = Annotation.objects.filter(page__document__in=docs_qs)
+        total_annotations = ann_qs.count()
+        validated_annotations = ann_qs.filter(validation_status='validated').count()
+        pending_annotations = ann_qs.filter(validation_status='pending').count()
+        rejected_annotations = ann_qs.filter(validation_status='rejected').count()
 
-            # Find the latest annotation date in an optimized way
-            latest_annotation_date = Annotation.objects.filter(
-                page__document=doc
-            ).aggregate(
-                latest_date=Max('created_at')
-            )['latest_date']
+        # Répartition des documents par statut de révision
+        completed_reviews = docs_qs.filter(total_ann__gt=0, validated_ann=F('total_ann')).count()
+        # Documents avec annotations mais non totalement validés (inclut potentiellement des rejetés)
+        in_progress_reviews = docs_qs.filter(total_ann__gt=0).exclude(validated_ann=F('total_ann')).count()
+        # Documents ayant au moins une annotation rejetée
+        rejected_documents = docs_qs.filter(rejected_ann__gt=0).count()
+        # Documents sans aucune annotation encore
+        to_review_count = docs_qs.filter(total_ann=0).count()
 
-            # Use the latest annotation date or a fallback date
-            if latest_annotation_date:
-                doc.updated_at = latest_annotation_date
-            elif hasattr(doc, 'expert_ready_at') and doc.expert_ready_at:
+        # KPI dérivés
+        total_reviews = total_documents
+        validation_rate = round((validated_annotations / total_annotations) * 100) if total_annotations > 0 else 0
+        validated_documents_count = completed_reviews
+
+        # Pagination des documents pour l'onglet "Documents"
+        paginator = Paginator(docs_qs, 12)
+        page_number = self.request.GET.get('page')
+        recent_documents = paginator.get_page(page_number)
+
+        # Completer quelques champs attendus par le template
+        for doc in recent_documents:
+            doc.annotator = doc.owner
+            # updated_at basé sur la dernière annotation sinon fallback
+            if getattr(doc, 'latest_annotation', None):
+                doc.updated_at = doc.latest_annotation
+            elif getattr(doc, 'expert_ready_at', None):
                 doc.updated_at = doc.expert_ready_at
             else:
                 doc.updated_at = doc.created_at
-
-            enriched_documents.append(doc)
+            # exposer total_annotations attendu par le template
+            doc.total_annotations = getattr(doc, 'total_ann', 0)
+            doc.pending_annotations = getattr(doc, 'pending_ann', 0)
+            doc.validated_annotations = getattr(doc, 'validated_ann', 0)
 
         context.update({
-            'ready_documents_count': ready_documents.count(),
+            'ready_documents_count': total_documents,
             'pending_annotations': pending_annotations,
-            'recent_documents': enriched_documents,
+            'recent_documents': recent_documents,
+            'total_documents': total_documents,
+            'total_annotations': total_annotations,
+            'completed_reviews': completed_reviews,
+            'in_progress_reviews': in_progress_reviews,
+            'rejected_documents': rejected_documents,
+            'total_reviews': total_reviews,
+            'validation_rate': validation_rate,
+            'validated_documents_count': validated_documents_count,
+            'to_review_count': to_review_count,
         })
         return context
 

@@ -145,217 +145,53 @@
         font-size: 1rem;
     }
 
-    .stat-icon.validated {
-        background: linear-gradient(135deg, #0ea5e9, #38bdf8);
-        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
-    }
-    .stat-icon.annotated {
-        background: linear-gradient(135deg, #f59e0b, #fbbf24);
-        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-    }
-    .stat-icon.in-progress {
-        background: linear-gradient(135deg, #10b981, #34d399);
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-    }
-    .stat-icon.completed {
-        background: linear-gradient(135deg, #8b5cf6, #a78bfa);
-        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
-    }
+    .stat-icon.validated { background: linear-gradient(135deg, #0ea5e9, #38bdf8); box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3); }
+    .stat-icon.annotated { background: linear-gradient(135deg, #f59e0b, #fbbf24); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+    .stat-icon.in-progress { background: linear-gradient(135deg, #10b981, #34d399); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+    .stat-icon.completed { background: linear-gradient(135deg, #8b5cf6, #a78bfa); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3); }
 
-    .progress-container {
-        background: rgba(255, 255, 255, 0.08);
-        border-radius: 6px;
-        height: 6px;
-        margin-top: 1rem;
-        overflow: hidden;
-        position: relative;
-    }
-    .progress-bar {
-        height: 100%;
-        border-radius: 6px;
-        transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
-    }
-    .progress-bar::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-        animation: shimmer 2s infinite;
-    }
-    @keyframes shimmer {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-    }
+    .progress-container { background: rgba(255, 255, 255, 0.08); border-radius: 6px; height: 6px; margin-top: 1rem; overflow: hidden; position: relative; }
+    .progress-bar { height: 100%; border-radius: 6px; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }
+    .progress-bar::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent); animation: shimmer 2s infinite; }
+    @keyframes shimmer { 0% { transform: translateX(-100%);} 100% { transform: translateX(100%);} }
 
-    /* Badges statut custom */
-    .badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35em;
-        padding: 0.33em 0.9em;
-        border-radius: 12px;
-        font-size: 0.89em;
-        font-weight: 600;
-        line-height: 1.1;
-    }
-    .badge.validated {
-        background: rgba(16, 185, 129, 0.15);
-        color: #059669;
-    }
-    .badge.in-progress {
-        background: rgba(245, 158, 11, 0.15);
-        color: #f59e0b;
-    }
-    .badge.completed {
-        background: rgba(139, 92, 246, 0.18);
-        color: #8b5cf6;
-    }
-    .badge.pending {
-        background: rgba(14, 165, 233, 0.13);
-        color: #0ea5e9;
-    }
-    .badge.rejected {
-        background: rgba(220, 38, 38, 0.15);
-        color: #dc2626;
-    }
+    /* Badges statut */
+    .badge { display: inline-flex; align-items: center; gap: 0.35em; padding: 0.33em 0.9em; border-radius: 12px; font-size: 0.89em; font-weight: 600; line-height: 1.1; }
+    .badge.validated { background: rgba(16, 185, 129, 0.15); color: #059669; }
+    .badge.in-progress { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+    .badge.completed { background: rgba(139, 92, 246, 0.18); color: #8b5cf6; }
+    .badge.pending { background: rgba(14, 165, 233, 0.13); color: #0ea5e9; }
+    .badge.rejected { background: rgba(220, 38, 38, 0.15); color: #dc2626; }
 
-    /* Table documents style ligne */
-    .annotation-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 1.5rem;
-        background: var(--card-bg);
-        border-radius: 14px;
-        overflow: hidden;
-        box-shadow: 0 2px 6px rgba(14, 165, 233, 0.04);
-    }
-    .annotation-table th, .annotation-table td {
-        padding: 1rem 1.2rem;
-        text-align: left;
-        border-bottom: 1px solid rgba(14, 165, 233, 0.06);
-        font-size: 0.95rem;
-        vertical-align: middle;
-    }
-    .annotation-table th {
-        background: rgba(14, 165, 233, 0.08);
-        font-weight: 600;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        font-size: 0.85rem;
-    }
-    .annotation-table tr:hover td {
-        background: var(--hover-bg);
-        transition: all 0.2s;
-    }
-    .annotation-table .action-cell {
-        min-width: 130px;
-    }
-    .annotation-table .action-btn {
-        padding: 0.5rem 1rem;
-        font-size: 0.95em;
-        border-radius: 8px;
-        background: linear-gradient(135deg, var(--primary), var(--primary-light));
-        color: white;
-        border: none;
-        transition: box-shadow 0.2s, transform 0.2s;
-        cursor: pointer;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35em;
-    }
-    .annotation-table .action-btn:hover {
-        box-shadow: 0 2px 12px rgba(14, 165, 233, 0.15);
-        transform: translateY(-2px);
-    }
-    .annotation-table .date {
-        font-size: 0.92em;
-        color: var(--text-secondary);
-        white-space: nowrap;
-    }
+    /* Table documents */
+    .annotation-table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; background: var(--card-bg); border-radius: 14px; overflow: hidden; box-shadow: 0 2px 6px rgba(14, 165, 233, 0.04); }
+    .annotation-table th, .annotation-table td { padding: 1rem 1.2rem; text-align: left; border-bottom: 1px solid rgba(14, 165, 233, 0.06); font-size: 0.95rem; vertical-align: middle; }
+    .annotation-table th { background: rgba(14, 165, 233, 0.08); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; font-size: 0.85rem; }
+    .annotation-table tr:hover td { background: var(--hover-bg); transition: all 0.2s; }
+    .annotation-table .action-cell { min-width: 130px; }
+    .annotation-table .action-btn { padding: 0.5rem 1rem; font-size: 0.95em; border-radius: 8px; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; border: none; transition: box-shadow 0.2s, transform 0.2s; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35em; }
+    .annotation-table .action-btn:hover { box-shadow: 0 2px 12px rgba(14, 165, 233, 0.15); transform: translateY(-2px); }
+    .annotation-table .date { font-size: 0.92em; color: var(--text-secondary); white-space: nowrap; }
 
-    /* Limiter la largeur de la colonne "Document" et ajouter des points de suspension */
-    .annotation-table th:nth-child(2),
-    .annotation-table td:nth-child(2) {
-        max-width: 260px; /* ajuster si nécessaire */
-        width: 260px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+    /* Colonne Document avec ellipsis */
+    .annotation-table th:nth-child(2), .annotation-table td:nth-child(2) { max-width: 260px; width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 900px) { .annotation-table th:nth-child(2), .annotation-table td:nth-child(2) { max-width: 200px; width: 200px; } }
+    @media (max-width: 640px) { .annotation-table th:nth-child(2), .annotation-table td:nth-child(2) { max-width: 160px; width: 160px; } }
 
-    @media (max-width: 900px) {
-        .annotation-table th:nth-child(2),
-        .annotation-table td:nth-child(2) {
-            max-width: 200px;
-            width: 200px;
-        }
-    }
-
-    @media (max-width: 640px) {
-        .annotation-table th:nth-child(2),
-        .annotation-table td:nth-child(2) {
-            max-width: 160px;
-            width: 160px;
-        }
-    }
     /* Responsive */
-    @media (max-width: 900px) {
-        .annotation-table th, .annotation-table td { padding: 0.7rem 0.5rem; }
-    }
-    @media (max-width: 640px) {
-        .annotation-table { font-size: 0.95em; }
-        .annotation-table th, .annotation-table td { padding: 0.55rem 0.3rem; }
-        .annotation-table .action-cell { min-width: 90px;}
-    }
-    /* ... responsive pour stats et autres éléments inchangés ... */
-    /* ... animations inchangées ... */
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(20px);}
-        to   { opacity: 1; transform: translateY(0);}
-    }
-    @keyframes fadeIn {
-        from { opacity: 0;}
-        to   { opacity: 1;}
-    }
-    .animate-fade-in {
-        animation: fadeIn 0.6s ease-out;
-    }
-    .animate-slide-up {
-        animation: fadeInUp 0.5s ease-out;
-    }
-    .main-title {
-        font-size: 2rem;
-        font-weight: 700;
-        color: var(--text);
-        margin-bottom: 2rem;
-        background: linear-gradient(135deg, var(--primary), var(--accent));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-    .charts-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-    .chart-container {
-        position: relative;
-        height: 280px;
-    }
+    @media (max-width: 900px) { .annotation-table th, .annotation-table td { padding: 0.7rem 0.5rem; } }
+    @media (max-width: 640px) { .annotation-table { font-size: 0.95em; } .annotation-table th, .annotation-table td { padding: 0.55rem 0.3rem; } .annotation-table .action-cell { min-width: 90px; } }
+
+    /* Animations */
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px);} to { opacity: 1; transform: translateY(0);} }
+    @keyframes fadeIn { from { opacity: 0;} to { opacity: 1;} }
+    .animate-fade-in { animation: fadeIn 0.6s ease-out; }
+    .animate-slide-up { animation: fadeInUp 0.5s ease-out; }
+
+    .main-title { font-size: 2rem; font-weight: 700; color: var(--text); margin-bottom: 2rem; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .chart-container { position: relative; height: 280px; }
 </style>
 
 <div class="dashboard-container">
@@ -376,80 +212,53 @@
         <h1 class="main-title">Tableau de bord Annotation</h1>
         <div class="stats-grid">
             <div class="card animate-fade-in cursor-pointer" onclick="switchToAnnotationTab()">
-
-                <div class="stat-icon validated">
-                    <i class="fas fa-check-circle text-white"></i>
-                </div>
-                <div class="stat-value">{{ documents|length }}</div>
+                <div class="stat-icon validated"><i class="fas fa-check-circle text-white"></i></div>
+                <div class="stat-value">{{ total_documents }}</div>
                 <div class="stat-label">Documents validés prêts pour annotation</div>
                 <div class="progress-container">
-                    <div class="progress-bar bg-gradient-to-r from-sky-500 to-sky-400"
-                         style="width: {% if total_documents > 0 %}{% widthratio documents|length total_documents 100 %}%{% else %}0%{% endif %}"></div>
+                    <div class="progress-bar bg-gradient-to-r from-sky-500 to-sky-400" style="width: {% if total_documents > 0 %}100%{% else %}0%{% endif %}"></div>
                 </div>
             </div>
             <div class="card animate-fade-in" style="animation-delay: 0.1s">
-                <div class="stat-icon annotated">
-                    <i class="fas fa-highlighter text-white"></i>
-                </div>
+                <div class="stat-icon annotated"><i class="fas fa-highlighter text-white"></i></div>
                 <div class="stat-value">{{ total_annotated_pages }}</div>
                 <div class="stat-label">Pages annotées sur {{ total_pages }}</div>
                 <div class="progress-container">
-                    <div class="progress-bar bg-gradient-to-r from-amber-500 to-yellow-400"
-                         style="width: {% if total_pages > 0 %}{% widthratio total_annotated_pages total_pages 100 %}%{% else %}0%{% endif %}"></div>
+                    <div class="progress-bar bg-gradient-to-r from-amber-500 to-yellow-400" style="width: {% if total_pages > 0 %}{% widthratio total_annotated_pages total_pages 100 %}%{% else %}0%{% endif %}"></div>
                 </div>
             </div>
             <div class="card animate-fade-in" style="animation-delay: 0.2s">
-                <div class="stat-icon in-progress">
-                    <i class="fas fa-spinner text-white"></i>
-                </div>
+                <div class="stat-icon in-progress"><i class="fas fa-spinner text-white"></i></div>
                 <div class="stat-value">{{ in_progress_count }}</div>
                 <div class="stat-label">Documents en cours d'annotation</div>
                 <div class="progress-container">
-                    <div class="progress-bar bg-gradient-to-r from-emerald-500 to-teal-400"
-                         style="width: {% if documents|length > 0 %}{% widthratio in_progress_count documents|length 100 %}%{% else %}0%{% endif %}"></div>
+                    <div class="progress-bar bg-gradient-to-r from-emerald-500 to-teal-400" style="width: {% if total_documents > 0 %}{% widthratio in_progress_count total_documents 100 %}%{% else %}0%{% endif %}"></div>
                 </div>
             </div>
             <div class="card animate-fade-in" style="animation-delay: 0.3s">
-                <div class="stat-icon completed">
-                    <i class="fas fa-clipboard-check text-white"></i>
-                </div>
+                <div class="stat-icon completed"><i class="fas fa-clipboard-check text-white"></i></div>
                 <div class="stat-value">{{ completed_count }}</div>
-                <div class="stat-label">Documents complètement annotés</div>
-                <div class="mt-4">
-                    <div class="badge completed">
-                        <i class="fas fa-trophy"></i>
-                        Progression
-                    </div>
+                <div class="stat-label">Documents complétés</div>
+                <div class="progress-container">
+                    <div class="progress-bar bg-gradient-to-r from-violet-500 to-purple-400" style="width: {% if total_documents > 0 %}{% widthratio completed_count total_documents 100 %}%{% else %}0%{% endif %}"></div>
                 </div>
             </div>
         </div>
+
         <div class="charts-grid">
             <div class="card animate-slide-up">
-                <div class="card-title">
-                    <i class="fas fa-chart-bar text-sky-400"></i>
-                    Progression des Annotations
-                </div>
-                <div class="chart-container">
-                    <canvas id="annotationChart"></canvas>
-                </div>
+                <h2 class="card-title"><i class="fas fa-chart-bar text-blue-400"></i> Distribution Annotation</h2>
+                <div class="chart-container"><canvas id="annotationChart"></canvas></div>
             </div>
             <div class="card animate-slide-up" style="animation-delay: 0.1s">
-                <div class="card-title">
-                    <i class="fas fa-chart-pie text-emerald-400"></i>
-                    Répartition des Documents
-                </div>
-                <div class="chart-container">
-                    <canvas id="documentPieChart"></canvas>
-                </div>
+                <h2 class="card-title"><i class="fas fa-chart-pie text-emerald-400"></i> Répartition Documents</h2>
+                <div class="chart-container"><canvas id="documentPieChart"></canvas></div>
             </div>
         </div>
 
         <!-- TABLEAU - Derniers documents validés -->
         <div class="card animate-slide-up" style="animation-delay: 0.2s">
-            <h2 class="card-title">
-                <i class="fas fa-file-alt text-blue-400"></i>
-                Derniers Documents Validés
-            </h2>
+            <h2 class="card-title"><i class="fas fa-file-alt text-blue-400"></i> Derniers Documents Validés</h2>
             {% if documents %}
                 <div class="overflow-x-auto">
                     <table class="annotation-table">
@@ -468,33 +277,32 @@
                             {% for doc in documents|slice:":4" %}
                             <tr>
                                 <td>
-                                    <span class="badge validated">
-                                        <i class="fas fa-check-circle"></i> Validé
-                                    </span>
+                                    {% with annotated_count=doc.annotated_pages_count total_count=doc.total_pages %}
+                                        {% if total_count > 0 and annotated_count >= total_count %}
+                                            <span class="badge completed"><i class="fas fa-clipboard-check"></i> Complété</span>
+                                        {% elif annotated_count > 0 %}
+                                            <span class="badge in-progress"><i class="fas fa-spinner"></i> En cours</span>
+                                        {% else %}
+                                            <span class="badge validated"><i class="fas fa-check-circle"></i> Validé</span>
+                                        {% endif %}
+                                    {% endwith %}
                                 </td>
-                                <td>{{ doc.file.name|basename }}</td>
+                                <td title="{{ doc.file.name|basename }}">{{ doc.file.name|basename }}</td>
                                 <td>{{ doc.total_pages }}</td>
+                                <td><i class="fas fa-user"></i> {{ doc.owner.username }}</td>
                                 <td>
-                                    <i class="fas fa-user"></i> {{ doc.owner.username }}
-                                </td>
-                                <td>
-                                    {% with annotated_count=doc.pages.filter|length total_count=doc.total_pages %}
+                                    {% with annotated_count=doc.annotated_pages_count total_count=doc.total_pages %}
                                     <div style="font-size:0.98em">
-                                        {% widthratio annotated_count total_count 100 %}%<br>
+                                        {% if total_count > 0 %}{% widthratio annotated_count total_count 100 %}%{% else %}0%{% endif %}<br>
                                         <div class="progress-container" style="margin-top: 0.35em;">
-                                            <div class="progress-bar" style="width: {% widthratio annotated_count total_count 100 %}%"></div>
+                                            <div class="progress-bar" style="width: {% if total_count > 0 %}{% widthratio annotated_count total_count 100 %}%{% else %}0%{% endif %}"></div>
                                         </div>
                                     </div>
                                     {% endwith %}
                                 </td>
-                                <td class="date">
-                                    <i class="fas fa-calendar-check"></i>
-                                    {{ doc.validated_at|date:"d/m/Y" }}
-                                </td>
+                                <td class="date"><i class="fas fa-calendar-check"></i> {{ doc.validated_at|date:"d/m/Y" }}</td>
                                 <td class="action-cell">
-                                    <a href="{% url 'rawdocs:annotate_document' doc.id %}" class="action-btn">
-                                        <i class="fas fa-highlighter"></i> Annoter
-                                    </a>
+                                    <a href="{% url 'rawdocs:annotate_document' doc.id %}" class="action-btn"><i class="fas fa-highlighter"></i> Annoter</a>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -502,9 +310,7 @@
                     </table>
                 </div>
                 <div class="mt-6 text-center">
-                    <a href="#annotation-tab" class="btn btn-primary" onclick="switchToAnnotationTab()">
-                        <i class="fas fa-list"></i> Voir tous les documents
-                    </a>
+                    <a href="#annotation-tab" class="btn btn-primary" onclick="switchToAnnotationTab()"><i class="fas fa-list"></i> Voir tous les documents</a>
                 </div>
             {% else %}
                 <div class="text-center py-8">
@@ -519,10 +325,7 @@
     <!-- TAB ANNOTATION (tableau ligne) -->
     <div id="annotation-tab" class="tab-content hidden">
         <div class="card">
-            <h2 class="card-title">
-                <i class="fas fa-highlighter text-amber-400"></i>
-                Documents à Annoter
-            </h2>
+            <h2 class="card-title"><i class="fas fa-highlighter text-amber-400"></i> Documents à Annoter</h2>
             {% if documents %}
                 <div class="overflow-x-auto">
                     <table class="annotation-table">
@@ -541,41 +344,32 @@
                             {% for doc in documents %}
                             <tr>
                                 <td>
-                                    {% if doc.status == "completed" %}
-                                        <span class="badge completed"><i class="fas fa-clipboard-check"></i> Complété</span>
-                                    {% elif doc.status == "in_progress" %}
-                                        <span class="badge in-progress"><i class="fas fa-spinner"></i> En cours</span>
-                                    {% elif doc.status == "pending" %}
-                                        <span class="badge pending"><i class="fas fa-hourglass-half"></i> En attente</span>
-                                    {% elif doc.status == "rejected" %}
-                                        <span class="badge rejected"><i class="fas fa-times-circle"></i> Rejeté</span>
-                                    {% else %}
-                                        <span class="badge validated"><i class="fas fa-check-circle"></i> Validé</span>
-                                    {% endif %}
+                                    {% with annotated_count=doc.annotated_pages_count total_count=doc.total_pages %}
+                                        {% if total_count > 0 and annotated_count >= total_count %}
+                                            <span class="badge completed"><i class="fas fa-clipboard-check"></i> Complété</span>
+                                        {% elif annotated_count > 0 %}
+                                            <span class="badge in-progress"><i class="fas la-spinner"></i> En cours</span>
+                                        {% else %}
+                                            <span class="badge validated"><i class="fas fa-check-circle"></i> Validé</span>
+                                        {% endif %}
+                                    {% endwith %}
                                 </td>
-                                <td>{{ doc.file.name|basename }}</td>
+                                <td title="{{ doc.file.name|basename }}">{{ doc.file.name|basename }}</td>
                                 <td>{{ doc.total_pages }}</td>
+                                <td><i class="fas fa-user"></i> {{ doc.owner.username }}</td>
                                 <td>
-                                    <i class="fas fa-user"></i> {{ doc.owner.username }}
-                                </td>
-                                <td>
-                                    {% with annotated_count=doc.pages.filter|length total_count=doc.total_pages %}
+                                    {% with annotated_count=doc.annotated_pages_count total_count=doc.total_pages %}
                                     <div style="font-size:0.98em">
-                                        {% widthratio annotated_count total_count 100 %}%<br>
+                                        {% if total_count > 0 %}{% widthratio annotated_count total_count 100 %}%{% else %}0%{% endif %}<br>
                                         <div class="progress-container" style="margin-top: 0.35em;">
-                                            <div class="progress-bar" style="width: {% widthratio annotated_count total_count 100 %}%"></div>
+                                            <div class="progress-bar" style="width: {% if total_count > 0 %}{% widthratio annotated_count total_count 100 %}%{% else %}0%{% endif %}"></div>
                                         </div>
                                     </div>
                                     {% endwith %}
                                 </td>
-                                <td class="date">
-                                    <i class="fas fa-calendar-check"></i>
-                                    {{ doc.validated_at|date:"d/m/Y" }}
-                                </td>
+                                <td class="date"><i class="fas fa-calendar-check"></i> {{ doc.validated_at|date:"d/m/Y" }}</td>
                                 <td class="action-cell">
-                                    <a href="{% url 'rawdocs:annotate_document' doc.id %}" class="action-btn">
-                                        <i class="fas fa-highlighter"></i> Annoter
-                                    </a>
+                                    <a href="{% url 'rawdocs:annotate_document' doc.id %}" class="action-btn"><i class="fas fa-highlighter"></i> Annoter</a>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -585,23 +379,13 @@
                 {% if documents.has_other_pages %}
                 <div class="flex justify-center mt-6 space-x-2">
                     {% if documents.has_previous %}
-                        <a href="?page=1" class="btn btn-primary">
-                            <i class="fas fa-angle-double-left"></i>
-                        </a>
-                        <a href="?page={{ documents.previous_page_number }}" class="btn btn-primary">
-                            <i class="fas fa-angle-left"></i>
-                        </a>
+                        <a href="?page=1" class="btn btn-primary"><i class="fas fa-angle-double-left"></i></a>
+                        <a href="?page={{ documents.previous_page_number }}" class="btn btn-primary"><i class="fas fa-angle-left"></i></a>
                     {% endif %}
-                    <span class="flex items-center px-4 py-2 text-sm text-gray-500">
-                        Page {{ documents.number }} sur {{ documents.paginator.num_pages }}
-                    </span>
+                    <span class="flex items-center px-4 py-2 text-sm text-gray-500">Page {{ documents.number }} sur {{ documents.paginator.num_pages }}</span>
                     {% if documents.has_next %}
-                        <a href="?page={{ documents.next_page_number }}" class="btn btn-primary">
-                            <i class="fas fa-angle-right"></i>
-                        </a>
-                        <a href="?page={{ documents.paginator.num_pages }}" class="btn btn-primary">
-                            <i class="fas fa-angle-double-right"></i>
-                        </a>
+                        <a href="?page={{ documents.next_page_number }}" class="btn btn-primary"><i class="fas fa-angle-right"></i></a>
+                        <a href="?page={{ documents.paginator.num_pages }}" class="btn btn-primary"><i class="fas fa-angle-double-right"></i></a>
                     {% endif %}
                 </div>
                 {% endif %}
@@ -636,22 +420,20 @@
         document.getElementById('tab-dashboard').classList.add('active');
         document.getElementById('tab-annotation').classList.remove('active');
     });
-    document.getElementById('tab-annotation').addEventListener('click', () => {
-        switchToAnnotationTab();
-    });
+    document.getElementById('tab-annotation').addEventListener('click', () => { switchToAnnotationTab(); });
 
     // Bar chart
     const annotationCtx = document.getElementById('annotationChart').getContext('2d');
     new Chart(annotationCtx, {
         type: 'bar',
         data: {
-            labels: ['Validés', 'En cours', 'Annotés', 'Complétés'],
+            labels: ['À annoter', 'En cours', 'Pages annotées (moyenne/doc)', 'Complétés'],
             datasets: [{
-                label: 'Documents',
+                label: 'KPI',
                 data: [
-                    {{ documents|length }},
+                    {{ to_annotate_count }},
                     {{ in_progress_count }},
-                    {{ in_progress_count }},
+                    {{ avg_annotated_pages_per_doc|floatformat:1 }},
                     {{ completed_count }}
                 ],
                 backgroundColor: [
@@ -687,15 +469,8 @@
                 }
             },
             scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#6b7280' }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#6b7280' }
-                }
+                y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#6b7280' } },
+                x: { grid: { display: false }, ticks: { color: '#6b7280' } }
             }
         }
     });
@@ -705,10 +480,10 @@
     new Chart(documentPieCtx, {
         type: 'doughnut',
         data: {
-            labels: ['Validés', 'En annotation', 'Complétés'],
+            labels: ['À annoter', 'En annotation', 'Complétés'],
             datasets:[{
                 data: [
-                    {{ documents|length }},
+                    {{ to_annotate_count }},
                     {{ in_progress_count }},
                     {{ completed_count }}
                 ],
@@ -728,13 +503,7 @@
             plugins: {
                 legend: {
                     position: 'bottom',
-                    labels: {
-                        color: '#6b7280',
-                        font: { size: 11 },
-                        padding: 20,
-                        usePointStyle: true,
-                        pointStyle: 'circle'
-                    }
+                    labels: { color: '#6b7280', font: { size: 11 }, padding: 20, usePointStyle: true, pointStyle: 'circle' }
                 },
                 tooltip: {
                     backgroundColor: 'rgba(15, 23, 42, 0.9)',
