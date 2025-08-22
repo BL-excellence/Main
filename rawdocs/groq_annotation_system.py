@@ -47,76 +47,143 @@ class GroqAnnotator:
             print(f"❌ GROQ connection error: {e}")
             return False
 
-    def annotate_page_with_groq(self, page_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Use GROQ Llama 3.1 70B for annotation - Claude-level quality"""
+
+    def generate_random_color(self) -> str:
+        """Generate a random color for new annotation types"""
+        import random
+        colors = [
+            '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', 
+            '#ff9ff3', '#54a0ff', '#ff7675', '#fdcb6e', '#6c5ce7',
+            '#a29bfe', '#fd79a8', '#00b894', '#00cec9', '#e84393',
+            '#2d3436', '#636e72', '#b2bec3', '#ddd', '#74b9ff'
+        ]
+        return random.choice(colors)
+
+    def annotate_page_with_groq(self, page_data: Dict[str, Any]) -> tuple:
 
         text = page_data['text']
+
         page_num = page_data['page_num']
 
-        if len(text.strip()) < 50:  # Skip empty pages
-            return []
+        if len(text.strip()) < 50:
 
-        print(f"🧠 Processing page {page_num} with GROQ Llama 3.3 70B...")
+            return [], []
 
-        # Create Claude-level expert prompt
-        prompt = self.create_expert_prompt(text)
+        print(f"🧠 Processing page {page_num} with GROQ ")
 
-        try:
-            # Call GROQ API
-            response = self.call_groq_api(prompt)
+        # Step 1: Let AI analyze the document and suggest annotation types
 
-            if response:
-                # Parse the response
-                annotations = self.parse_groq_response(response, page_num)
-                return annotations
-            else:
-                print(f"❌ No response for page {page_num}")
-                return []
+        analysis_prompt = f"""Analyze this document text and suggest annotation types that would be most useful for this specific content.
 
-        except Exception as e:
-            print(f"❌ Error processing page {page_num}: {e}")
-            return []
+    Document text: {text[:2000]}
 
-    def create_expert_prompt(self, text: str) -> str:
-        """Create EXPERT-LEVEL prompt for Claude-quality results - NO EXAMPLES TO CONFUSE MODEL"""
+    Based on the content, suggest 5-10 annotation types that would capture the key information in this document.
 
-        return f"""You are an expert regulatory document analyst. Your ONLY job is to find entities that LITERALLY EXIST in the document text below.
+    Return JSON: {{"suggested_types": ["type1", "type2", "type3"]}}
 
-**CRITICAL RULES:**
-1. ONLY extract text that is PHYSICALLY PRESENT in the document below
-2. DO NOT use any examples from this prompt
-3. DO NOT extract "Documents", "Conditions", "1.", "2.", "3." or other headers
-4. DO NOT make up or imagine anything
-5. Extract COMPLETE sentences for conditions and documents
+    Focus on what's actually in the text, not generic categories."""
 
-**ENTITY TYPES TO FIND:**
+        analysis_response = self.call_groq_api(analysis_prompt, max_tokens=300)
 
-**VARIATION_CODE**: Regulatory codes like C.I.6, C.I.7, etc.
-**PROCEDURE_TYPE**: Procedure codes like IA, IB, II, Type IA, etc.
-**AUTHORITY**: Regulatory bodies like EMA, CHMP, ICH, FDA, etc.
-**LEGAL_REFERENCE**: Legal citations, document codes, annexes, articles
-**REQUIRED_CONDITION**: COMPLETE sentences describing requirements
-**REQUIRED_DOCUMENT**: Specific document names (not headers)
-**DELAY**: exemple : "within 30 days", "by 31 December", "dans 15 jours", ect..
+        suggested_types = []
 
-**VALIDATION CHECKLIST:**
-- Is this text EXACTLY in the document below? ✓
-- Is this a header like "Documents" or "Conditions"? ✗ SKIP
-- Is this a number like "1." or "2."? ✗ SKIP  
-- Is this from the prompt examples? ✗ SKIP
-- Is this a complete sentence for conditions/documents? ✓
+        
 
-**DOCUMENT TEXT:**
-```
-{text}
-```
+        if analysis_response:
 
-**TASK:** Find ONLY entities that are LITERALLY in the document above.
+            try:
 
-Return JSON array:
-[{{"text": "exact text from document", "start_pos": 123, "end_pos": 130, "type": "variation_code|procedure_type|authority|legal_reference|required_condition|required_document|delay", "confidence": 0.95, "reasoning": "found this exact text in document"}}]
+                analysis_data = self.extract_json_from_response(analysis_response)
 
-**NO EXAMPLES - ONLY REAL TEXT FROM DOCUMENT ABOVE**"""
+                suggested_types = analysis_data.get('suggested_types', []) if analysis_data else []
+
+            except:
+
+                pass
+
+        # Step 2: Generate annotation schema for suggested types
+
+        schema = []
+
+        for annotation_type in suggested_types:
+
+            schema.append({
+
+                'name': annotation_type.lower().replace(' ', '_'),
+
+                'color': self.get_color_for_type(annotation_type)
+
+            })
+
+        # Step 3: Create completely dynamic prompt
+
+        if suggested_types:
+
+            types_list = ', '.join(suggested_types)
+
+            prompt = f"""Extract entities from this document. Look for these types of information: {types_list}
+
+    Find EXACT text spans that match these categories. Only extract text that physically exists in the document.
+
+    Document: {text}
+
+    Return JSON array: [{{"text": "exact_text", "type": "type_name", "start_pos": 0, "end_pos": 10, "confidence": 0.9, "reasoning": "why"}}]"""
+
+        else:
+
+            # Fallback: completely open-ended extraction
+
+            prompt = f"""Analyze this document and extract any important entities, data points, or key information.
+
+    Determine what types of information are present and extract them with appropriate type names.
+
+    Document: {text}
+
+    Return JSON array: [{{"text": "exact_text", "type": "type_you_determine", "start_pos": 0, "end_pos": 10, "confidence": 0.9, "reasoning": "why"}}]"""
+
+        # Step 4: Process with Groq
+
+        response = self.call_groq_api(prompt)
+
+        annotations = self.parse_groq_response(response, page_num) if response else []
+
+        
+
+        # Step 5: Generate schema for any types we didn't predict
+
+        all_types = set(suggested_types)
+
+        for ann in annotations:
+
+            all_types.add(ann.get('type', ''))
+
+        
+
+        # Update schema with any new types found
+
+        schema = []
+
+        for annotation_type in all_types:
+
+            if annotation_type:
+
+                schema.append({
+
+                    'name': annotation_type.lower().replace(' ', '_'),
+
+                    'color': self.generate_random_color()
+
+                })
+
+        return annotations, schema
+
+    def get_color_for_type(self, annotation_type: str) -> str:
+        """Generate consistent color for annotation type"""
+        import hashlib
+        # Generate consistent color based on type name
+        hash_object = hashlib.md5(annotation_type.encode())
+        hex_dig = hash_object.hexdigest()
+        return f"#{hex_dig[:6]}"
 
     def call_groq_api(self, prompt: str, max_tokens: int = 4000) -> Optional[str]:
         """Call GROQ API with optimized settings"""
@@ -259,90 +326,3 @@ Return JSON array:
             'quality_grade': 'A' if avg_confidence > 0.85 else 'B+' if avg_confidence > 0.75 else 'B'
         }
 
-
-@login_required
-@csrf_exempt
-def ai_annotate_page_groq(request, page_id):
-    """Django view for FREE GROQ annotation - Claude-level quality"""
-
-    if request.method != 'POST':
-        return JsonResponse({'error': 'POST required'}, status=405)
-
-    try:
-        page = get_object_or_404(DocumentPage, id=page_id)
-
-        # Initialize GROQ annotator
-        try:
-            annotator = GroqAnnotator()
-        except ValueError as e:
-            return JsonResponse({
-                'error': 'GROQ API key not set. Get free key from https://console.groq.com/',
-                'details': str(e)
-            }, status=500)
-
-        print(f"🚀 Processing page {page.page_number} with FREE GROQ...")
-
-        # Create page data
-        page_data = {
-            'page_num': page.page_number,
-            'text': page.cleaned_text,
-            'char_count': len(page.cleaned_text)
-        }
-
-        # Process with GROQ
-        annotations = annotator.annotate_page_with_groq(page_data)
-
-        # Save to database
-        saved_count = 0
-        for ann_data in annotations:
-            try:
-                # Get annotation type
-                ann_type, created = AnnotationType.objects.get_or_create(
-                    name=ann_data['type'],
-                    defaults={
-                        'display_name': ann_data['type'].replace('_', ' ').title(),
-                        'color': '#3b82f6',  # Blue for GROQ
-                        'description': f"GROQ Llama 3.3 70B detected {ann_data['type']}"
-                    }
-                )
-
-                # Create annotation
-                annotation = Annotation.objects.create(
-                    page=page,
-                    annotation_type=ann_type,
-                    start_pos=ann_data.get('start_pos', 0),
-                    end_pos=ann_data.get('end_pos', 0),
-                    selected_text=ann_data.get('text', ''),
-                    confidence_score=ann_data.get('confidence', 0.8) * 100,
-                    ai_reasoning=ann_data.get('reasoning', 'GROQ Llama 3.3 70B FREE classification'),
-                    created_by=request.user
-                )
-                saved_count += 1
-
-            except Exception as e:
-                print(f"❌ Error saving annotation: {e}")
-                continue
-
-        # Update page status
-        if saved_count > 0:
-            page.is_annotated = True
-            page.annotated_at = datetime.now()
-            page.annotated_by = request.user
-            page.save()
-
-        return JsonResponse({
-            'success': True,
-            'annotations_created': saved_count,
-            'message': f'{saved_count} annotations créées avec GROQ FREE!',
-            'cost_estimate': 0.0  # FREE!
-        })
-
-    except Exception as e:
-        print(f"❌ GROQ annotation error: {e}")
-        return JsonResponse({
-            'error': f'Erreur GROQ: {str(e)}'
-        }, status=500)
-
-
-if __name__ == "__main__":
-    setup_groq()

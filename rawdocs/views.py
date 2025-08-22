@@ -1,6 +1,7 @@
 # rawdocs/views.py
 from django.utils import timezone  # AJOUT pour corriger le timezone warning
 import time
+from .groq_annotation_system import GroqAnnotator
 import os
 import json
 import requests
@@ -431,25 +432,6 @@ def validate_document(request, doc_id):
                     document.total_pages = len(pages_text)
                     document.pages_extracted = True
 
-                    # Create standard annotation types
-                    types_data = [
-                        ('procedure_type', 'Code de Variation', '#3b82f6'),
-                        ('authority', 'Autorité', '#8b5cf6'),
-                        ('legal_reference', 'Référence Légale', '#f59e0b'),
-                        ('required_document', 'Document Requis', '#ef4444'),
-                        ('required_condition', 'Condition Requise', '#06b6d4'),
-                        ('delay', 'Délai', '#84cc16'),
-                    ]
-
-                    for name, display_name, color in types_data:
-                        AnnotationType.objects.get_or_create(
-                            name=name,
-                            defaults={
-                                'display_name': display_name,
-                                'color': color
-                            }
-                        )
-
                     document.is_validated = True
                     document.validated_at = datetime.now()
                     document.save()
@@ -736,13 +718,17 @@ def ai_annotate_page_groq(request, page_id):
         page.annotations.all().delete()
 
         # Initialize RLHF annotator
-        rlhf_annotator = RLHFGroqAnnotator()
+        groq_annotator = GroqAnnotator()
 
-        # Create adaptive prompt and call GROQ
-        adaptive_prompt = rlhf_annotator.create_adaptive_prompt(page.cleaned_text)
-        response = rlhf_annotator.call_groq_api(adaptive_prompt)
+        # Create page data for dynamic annotation
+        page_data = {
+            'page_num': page.page_number,
+            'text': page.cleaned_text,
+            'char_count': len(page.cleaned_text)
+        }
 
-        annotations = rlhf_annotator.parse_groq_response(response, page.page_number) if response else []
+        # Get annotations with dynamic schema
+        annotations, schema = groq_annotator.annotate_page_with_groq(page_data)
 
         # Store in session for feedback processing
         request.session[f'ai_annotations_{page_id}'] = annotations
