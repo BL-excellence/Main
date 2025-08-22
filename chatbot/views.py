@@ -96,9 +96,18 @@ LIST_PAT = re.compile(
 def is_list_intent_text(q: str) -> bool:
     return bool(LIST_PAT.search(_norm_txt(q)))
 def mentions_plural_entity(q: str) -> bool:
-    return bool(re.search(r"\b(produits|documents|sites)\b", _norm_txt(q)))
+    return bool(re.search(r"\b(produits|produit|m[eé]dicaments?|drugs?|medicines?|documents?|guidances?|guidelines?|sites?|usines?|facilities?|plants?)\b", _norm_txt(q)))
 def has_any_filter_detected(prod_filters: list, doc_filters: list) -> bool:
     return bool(prod_filters or doc_filters)
+
+# Paraphrase-friendly detection for annotations and "required documents"
+# Use accent-stripped, lower-cased text (q_lower) with ASCII-only regex
+ANNOTATION_KEYWORDS_PAT = re.compile(r"\b(annotations?|entites?|labels?)\b", re.I)
+REQDOC_KEYWORDS_PAT = re.compile(
+    r"\b((required\s+documents?|required\s+document|supporting\s+documents?|attachments?|annex(?:e|es)s?)|"
+    r"(documents?\s+(?:requis|exiges?|obligatoires?|necessaires|nécessaires)|pi[eè]ces\s+justificatives?|justificatifs?))\b",
+    re.I,
+)
 
 DOC_ALIAS_TO_FIELD = {
     "type": "doc_type",
@@ -114,14 +123,38 @@ DOC_ALIAS_TO_FIELD = {
 }
 
 PROD_ALIAS_TO_FIELD = {
+    # Form/type
     "type": "form",
     "forme": "form",
+    "form": "form",
+    "galenique": "form",
+    "galénique": "form",
+    "galenic form": "form",
+    # Status
     "statut": "status",
+    "etat": "status",
+    "état": "status",
+    "status": "status",
+    "state": "status",
+    "market status": "status",
+    # Active ingredient
     "principe actif": "active_ingredient",
     "principe": "active_ingredient",
     "actif": "active_ingredient",
+    "active": "active_ingredient",
+    "active ingredient": "active_ingredient",
+    "substance active": "active_ingredient",
+    "ingredient actif": "active_ingredient",
+    # Dosage/strength
     "dosage": "dosage",
+    "dosage/force": "dosage",
+    "force": "dosage",
+    "strength": "dosage",
+    "posologie": "dosage",
+    # Name
     "nom": "name",
+    "name": "name",
+    "designation": "name",
 }
 
 DOC_FIELD_MAP = DOC_ALIAS_TO_FIELD
@@ -152,7 +185,7 @@ def _guess_fields(q_lower: str, alias_map: dict, threshold: int = 85) -> List[st
 # =============================
 
 DOC_ATTR_RE = re.compile(
-    r"\b(?:donner|donne|afficher|affiche)\s+(?:le|la|les)?\s*(?P<fields>.+?)\s+de\s+(?:du|de\s+la|des)?\s*document\s+(?P<title>.+)$",
+    r"\b(?:donner|donne|afficher|affiche|montre(?:r)?|montre-moi|liste(?:r)?)\s+(?:le|la|les)?\s*(?P<fields>.+?)\s+(?:du|de\s+la|des|pour\s+le|pour\s+la|pour\s+les)?\s*document\s+(?P<title>.+)$",
     re.IGNORECASE
 )
 PROD_ATTR_RE = re.compile(
@@ -255,6 +288,7 @@ def _infer_status_filter(q_lower: str, Product):
 
 def _infer_form_filter(q_lower: str):
     mapping = {
+        # FR
         "comprime": "Comprimé", "comprimé": "Comprimé",
         "sirop": "Sirop",
         "gelule": "Gélule", "gélule": "Gélule",
@@ -263,6 +297,21 @@ def _infer_form_filter(q_lower: str):
         "pommade": "Pommade",
         "creme": "Crème", "crème": "Crème",
         "suspension": "Suspension",
+        "injectable": "Solution",
+        # EN
+        "tablet": "Comprimé",
+        "syrup": "Sirop",
+        "capsule": "Capsule",
+        "gelcap": "Capsule",
+        "ointment": "Pommade",
+        "cream": "Crème",
+        "lotion": "Solution",
+        "solution": "Solution",
+        "suspension": "Suspension",
+        "injection": "Solution",
+        # Other common
+        "spray": "Solution",
+        "drops": "Solution",
     }
     txt = _norm_txt(q_lower)
     for k, label in mapping.items():
@@ -272,30 +321,43 @@ def _infer_form_filter(q_lower: str):
 
 def _infer_active_ingredient_filter(q_lower: str):
     txt = _norm_txt(q_lower)
-    m = re.search(r"(?:principe\s+actif\s+(?:est|=|de|:)?\s*|contien(?:t|nent)\s+|avec\s+du\s+|avec\s+de\s+)([a-z0-9\-\s]+)", txt, re.I)
-    if m:
-        val = m.group(1).strip()
-        if len(val) >= 3:
-            return ("active_ingredient", val)
-    if "principe actif non specifie" in txt or "principe actif non precise" in txt:
+    patterns = [
+        r"(?:principe\s+actif\s+(?:est|=|de|:)?\s*)([a-z0-9\-\s]+)",
+        r"(?:substance\s+active\s+(?:est|=|de|:)?\s*)([a-z0-9\-\s]+)",
+        r"(?:active\s+ingredient\s*(?:is|=|of|:)?\s*)([a-z0-9\-\s]+)",
+        r"contien(?:t|nent)\s+([a-z0-9\-\s]+)",
+        r"avec\s+(?:du|de|des)\s+([a-z0-9\-\s]+)",
+        r"with\s+(?:an|the)?\s*([a-z0-9\-\s]+)"
+    ]
+    for pat in patterns:
+        m = re.search(pat, txt, re.I)
+        if m:
+            val = m.group(1).strip()
+            if len(val) >= 3:
+                return ("active_ingredient", val)
+    if "principe actif non specifie" in txt or "principe actif non precise" in txt or "active ingredient not specified" in txt:
         return ("active_ingredient", "__NULL__")
     return None
 
 def _infer_dosage_filter(q_lower: str):
     txt = _norm_txt(q_lower).replace(",", ".")
-    m = re.search(r"\b(\d+(?:\.\d+)?)\s*(mg|g|ml)\b", txt)
+    # Accept common dosage units and separators
+    m = re.search(r"\b(\d+(?:\.\d+)?)\s*(mg|g|mcg|µg|ml|mL|IU|UI)\b", txt, re.I)
     if m:
-        val, unit = m.group(1), m.group(2)
+        val, unit = m.group(1), m.group(2).lower()
+        unit = unit.replace('µg', 'mcg').replace('ui', 'IU')
         return ("dosage", f"{val} {unit}")
-    if "dosage non specifie" in txt or "dosage non precise" in txt:
+    if re.search(r"\b(strength|force|posologie)\b.*\bnon\s+(specifie[e]?|precise[e]?)\b", txt) or \
+       "dosage non specifie" in txt or "dosage non precise" in txt:
         return ("dosage", "__NULL__")
     return None
 
 def _infer_country_filter_for_products(q_lower: str):
     txt = _norm_txt(q_lower)
-    m = re.search(r"\ben\s+([a-z\-]+)\b|\bau[x]?\s+([a-z\-]+)\b", txt)
+    # Examples: "en france", "au maroc", "in france", "in the united states"
+    m = re.search(r"\b(?:en|au|aux|in(?:\s+the)?)\s+([a-z\-\s]+)\b", txt)
     if m:
-        c = (m.group(1) or m.group(2) or "").strip()
+        c = (m.group(1) or "").strip()
         if c:
             return ("__site_country__", c)
     return None
@@ -347,9 +409,9 @@ def parse_request(question: str, intent: str, produits_qs, docs_qs):
         return {"entity":"product","mode":"detail","filters":[], "fields":fields, "title":None, "name":name, "site_name":None}
 
     # 1) Keyword entity detection
-    is_prod = bool(re.search(r"\bproduits?\b", ql))
-    is_doc  = bool(re.search(r"\bdocuments?\b|\bguidances?\b|\bguidelines?\b", ql))
-    is_site = bool(re.search(r"\bsites?\b", ql))
+    is_prod = bool(re.search(r"\b(produits?|m[eé]dicaments?|drug[s]?|medicine[s]?|produits?\s+pharmaceutiques?)\b", ql))
+    is_doc  = bool(re.search(r"\b(documents?|guidances?|guidelines?|guides?|normes?|standards?|r[eé]glement[s]?|regulations?)\b", ql))
+    is_site = bool(re.search(r"\b(sites?|usines?|manufacturing\s+site[s]?|facilit(?:y|ies)|plants?)\b", ql))
     entity = "product" if is_prod else "library" if is_doc else "site" if is_site else None
 
     # Intent liste robuste
@@ -358,6 +420,11 @@ def parse_request(question: str, intent: str, produits_qs, docs_qs):
     # Named target via quotes
     quoted = _extract_quoted(q_raw)
     name_or_title_hint = quoted[0].strip() if quoted else None
+    # If not quoted, also try patterns like: "... pour le document X" (document title as tail)
+    if not name_or_title_hint:
+        m_title = re.search(r"(?:pour|du|de|des|d[u|e]\s+la|pour\s+le|pour\s+la|concernant|au\s+sujet\s+du|au\s+sujet\s+de)\s+document\s+(.+)$", q_raw, re.I)
+        if m_title:
+            name_or_title_hint = _normalize_target(m_title.group(1))
 
     if not entity and name_or_title_hint:
         best_prod = find_best_product(name_or_title_hint, produits_qs)
@@ -747,6 +814,13 @@ def list_annotations_mongo(question: str, docs_qs, page: int = 1, page_size: int
     title_hint = quoted[0] if quoted else None
     text_hint = quoted[1] if quoted and len(quoted) > 1 else None
 
+    # Title extraction when user says: "... pour le document X" without quotes
+    if not title_hint:
+        m = re.search(r"(?:pour|du|de|des|d[u|e]\s+la|pour\s+le|pour\s+la|concernant|au\s+sujet\s+du|au\s+sujet\s+de)\s+document\s+(.+)$", q_raw, re.I)
+        if m:
+            # Keep raw tail as potential title; also strip trailing punctuation
+            title_hint = _normalize_target(m.group(1))
+
     doc_id = None
     if title_hint:
         doc_id = _find_doc_id_by_title(docs_qs, title_hint)
@@ -773,15 +847,15 @@ def list_annotations_mongo(question: str, docs_qs, page: int = 1, page_size: int
     # Détection d'entité ciblée depuis la question si non fournie par guillemets
     if not entity_key:
         ENTITY_PATTERNS = [
-            ("required document", r"\brequired\s+documents?\b|\bdocuments?\s+(requis|exig[eé]s?)\b"),
-            ("authority", r"\bautorité\b|\bauthorit(?:y|ies)\b"),
-            ("delay", r"\b(delay|deadline|d[eé]lai[s]?)\b"),
+            ("required document", r"\b(required\s+documents?|required\s+document|documents?\s+(requis|exig[eé]s?|obligatoires?))\b"),
+            ("authority", r"\bautorites?\b|\bauthorit(?:y|ies)\b|\bagence\b"),
+            ("delay", r"\b(delay|delays|deadline|d[eé]lai[s]?)\b"),
             ("legal reference", r"\blegal\s+references?\b|\br[eé]f[eé]rences?\s+l[eé]gales?\b|\br[eé]f[eé]rence\s+l[eé]gale\b"),
-            ("site", r"\bsites?\b|\blocation\b"),
+            ("site", r"\bsites?\b|\blocation\b|\blieu\b"),
             ("code", r"\bcode\b|\buuid\b|\bidentifiant\b|\bid\b"),
         ]
         for canon, pat in ENTITY_PATTERNS:
-            if re.search(pat, ql):
+            if re.search(pat, ql) or re.search(pat, q_raw, re.I):
                 entity_key = canon
                 break
 
@@ -807,12 +881,21 @@ def list_annotations_mongo(question: str, docs_qs, page: int = 1, page_size: int
 
     # Flatten annotations avec mapping de synonymes pour cibler des entités
     ENTITY_SYNONYMS = {
-        "required document": ["required document", "required documents", "required_document", "required documents"],
-        "authority": ["authority", "autorité", "authorities"],
-        "delay": ["delay", "deadline", "delai", "délai"],
-        "legal reference": ["legal reference", "legal_reference", "reference", "référence"],
-        "site": ["site", "location"],
-        "code": ["code", "id", "uuid"],
+        "required document": [
+            "required document", "required documents", "required_document",
+            "mandatory document", "mandatory documents",
+            "supporting document", "supporting documents",
+            "required attachment", "required attachments", "attachments required",
+            "required annex", "required annexes", "annexes requises", "annexe requise",
+            "documents requis", "document requis", "documents exiges", "documents obligatoires",
+            "documents necessaires", "documents nécessaires",
+            "pieces requises", "pièces requises", "pieces justificatives", "pièces justificatives", "justificatifs"
+        ],
+        "authority": ["authority", "autorite", "autorité", "authorities", "agence", "authority body", "regulator", "competent authority", "autorité compétente"],
+        "delay": ["delay", "delays", "deadline", "due date", "timeline", "delai", "delais", "délai", "délai(s)"],
+        "legal reference": ["legal reference", "legal_reference", "reference", "référence", "references legales", "références légales", "legal basis", "base légale"],
+        "site": ["site", "location", "lieu", "emplacement", "factory", "usine", "plant", "manufacturing site"],
+        "code": ["code", "id", "uuid", "identifiant", "identifier", "reference code", "ref"],
     }
     def match_entity_key(ent_name: str, target: str | None) -> bool:
         if not target:
@@ -898,10 +981,9 @@ def list_annotations_mongo(question: str, docs_qs, page: int = 1, page_size: int
             for ent, bucket in sorted(info["entities"].items(), key=lambda kv: kv[0].lower()):
                 vals = bucket["vals"]
                 count = bucket["count"]
-                # Markdown entity title
-                parts_md.append(f"**{ent}** — {count} occurrence(s):")
-                # HTML entity title
-                parts_html.append(f"<div><strong>{html.escape(ent)}</strong> — {count} occurrence(s):</div>")
+                # Entity title without occurrences count for a cleaner, professional look
+                parts_md.append(f"**{ent}**")
+                parts_html.append(f"<div><strong>{html.escape(ent)}</strong></div>")
                 # Limiter l'affichage si trop long, puis indiquer le reste
                 MAX_SHOW = 40
                 to_show = vals[:MAX_SHOW]
@@ -1367,7 +1449,14 @@ def chatbot_api(request):
 
     # Interception annotations prioritaire (même si entity=library)
     # Détection de ciblage: si l’utilisateur demande une entité spécifique (ex: Required Document/Authority/Delay)
-    if (entity == 'library' or re.search(r"\bdocuments?\b|\bdocument\b", q_lower)) and re.search(r"\bannotations?\b|\bentit[eé]s?\b|\blabels?\b|\brequired\s+documents?\b|\bauthorit[y|e]\b|\bdelay\b|\blegal\s+reference\b|\bsite\b|\bcode\b", q_lower):
+    if (
+        (entity == 'library' or re.search(r"\bdocuments?\b|\bdocument\b", q_lower))
+        and (
+            ANNOTATION_KEYWORDS_PAT.search(q_lower)
+            or REQDOC_KEYWORDS_PAT.search(q_lower)
+            or re.search(r"\bauthorit[y|e]\b|\bdelays?\b|\bd[eé]lais?\b|\blegal\s+references?\b|\bsites?\b|\bcodes?\b|\bidentifiants?\b|\buuid\b", q_lower)
+        )
+    ):
         payload = list_annotations_mongo(question, docs_qs, page, page_size)
         payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
         return JsonResponse(payload)
