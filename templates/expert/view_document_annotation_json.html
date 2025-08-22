@@ -10,6 +10,13 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
 
+<!-- JSON DATA SAFE PASSING -->
+{% if global_annotations_json %}
+{{ global_annotations_json|json_script:"json-data" }}
+{% else %}
+<script id="json-data" type="application/json">{}</script>
+{% endif %}
+
 <style>
 :root {
     --pharma-primary: #3b82f6;
@@ -146,32 +153,32 @@ body {
 }
 
 /* Syntax Highlighting for JSON - Style MongoDB/VS Code */
-.json-display .json-key { 
-    color: #0451a5; 
-    font-weight: 600; 
-}
-.json-display .json-string { 
-    color: #0a7d0a; 
-}
-.json-display .json-number { 
-    color: #098658; 
-    font-weight: 500;
-}
-.json-display .json-boolean { 
-    color: #0000ff; 
+.json-display .json-key {
+    color: #0451a5;
     font-weight: 600;
 }
-.json-display .json-null { 
-    color: #0000ff; 
+.json-display .json-string {
+    color: #0a7d0a;
+}
+.json-display .json-number {
+    color: #098658;
+    font-weight: 500;
+}
+.json-display .json-boolean {
+    color: #0000ff;
+    font-weight: 600;
+}
+.json-display .json-null {
+    color: #0000ff;
     font-weight: 600;
     font-style: italic;
 }
-.json-display .json-bracket { 
-    color: #000000; 
+.json-display .json-bracket {
+    color: #000000;
     font-weight: bold;
 }
-.json-display .json-comma { 
-    color: #000000; 
+.json-display .json-comma {
+    color: #000000;
 }
 
 /* Numéros de ligne */
@@ -401,7 +408,7 @@ body {
     .stats-grid {
         grid-template-columns: 1fr 1fr;
     }
-    
+
     .page-nav-grid {
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     }
@@ -419,6 +426,73 @@ body {
     .page-nav-grid {
         grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     }
+}
+
+/* Summary Editor Styles */
+.summary-editor-container {
+    position: relative;
+}
+
+.summary-editor {
+    width: 100%;
+    min-height: 200px;
+    padding: 1rem;
+    border: 2px solid var(--pharma-border);
+    border-radius: var(--pharma-radius-sm);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: var(--pharma-text);
+    background: #ffffff;
+    resize: vertical;
+    transition: var(--pharma-transition);
+}
+
+.summary-editor:focus {
+    outline: none;
+    border-color: var(--pharma-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.summary-editor.modified {
+    border-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.summary-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.entity-extraction-preview {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: var(--pharma-radius-sm);
+    border: 1px solid var(--pharma-border);
+}
+
+.entity-tag {
+    display: inline-block;
+    background: var(--pharma-primary);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin: 0.2rem;
+    font-weight: 500;
+}
+
+.entity-tag.new {
+    background: #22c55e;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 
 /* Alert Styles */
@@ -517,15 +591,33 @@ body {
   </div>
 </div>
 
-<!-- Résumé global en langage naturel -->
+<!-- Résumé global en langage naturel ÉDITABLE -->
 {% if global_annotations_summary %}
 <section class="summary-container">
   <h3><i class="fas fa-file-text"></i> Résumé Global du Document (Expert)</h3>
   <div class="summary-text">
     <div class="alert alert-info" style="margin-bottom: 1.5rem;">
-      <i class="fas fa-info-circle"></i> Ce résumé global a été généré automatiquement à partir de toutes les annotations validées par l'expert dans le document.
+      <i class="fas fa-info-circle"></i> Ce résumé est éditable. Les modifications mettront automatiquement à jour les entités dans le JSON ci-dessous.
     </div>
-    {{ global_annotations_summary|linebreaks }}
+
+    <!-- Zone d'édition du résumé -->
+    <div class="summary-editor-container">
+      <textarea
+        id="summary-editor"
+        class="summary-editor"
+        placeholder="Modifiez le résumé du document..."
+        rows="8">{{ global_annotations_summary }}</textarea>
+
+      <div class="summary-actions" style="margin-top: 1rem;">
+        <button class="copy-btn" onclick="saveSummaryChanges()" style="background: #22c55e;">
+          <i class="fas fa-save"></i> Sauvegarder le résumé
+        </button>
+        <button class="copy-btn" onclick="extractEntitiesFromSummary()" style="background: #3b82f6;">
+          <i class="fas fa-sync-alt"></i> Extraire les entités
+        </button>
+        <span id="summary-status" class="text-muted" style="margin-left: 1rem; font-size: 0.9rem;"></span>
+      </div>
+    </div>
   </div>
 </section>
 {% endif %}
@@ -533,7 +625,7 @@ body {
 <!-- JSON structuré global -->
 <section class="json-container">
   <h3><i class="fas fa-code"></i> JSON Global du Document (Expert)</h3>
-  {% if global_annotations_json %}
+  {% if global_annotations_json and global_annotations_json.entities %}
   <div class="alert alert-info" style="margin-bottom: 1.5rem;">
     <i class="fas fa-info-circle"></i> Ce JSON contient toutes les annotations validées par l'expert pour l'ensemble du document, organisées par entités.
   </div>
@@ -541,9 +633,10 @@ body {
   <div id="monaco-editor" style="height: 600px; border: 2px solid #e9ecef; border-radius: 8px;"></div>
 
   <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-    <button class="copy-btn" onclick="copyJsonToClipboard()">
-      <i class="fas fa-copy"></i> Copier le JSON
+    <button class="copy-btn" onclick="copyJsonToClipboard(event)">
+        <i class="fas fa-copy"></i> Copier le JSON
     </button>
+
     <button class="copy-btn" onclick="saveJsonChanges()" style="background: #22c55e;">
       <i class="fas fa-save"></i> Sauvegarder
     </button>
@@ -554,7 +647,7 @@ body {
       <i class="fas fa-download"></i> Télécharger JSON
     </button>
   </div>
-  
+
   <div id="save-status" class="alert alert-success" style="display: none; margin-top: 1rem;">
     <i class="fas fa-check-circle"></i>
     <span></span>
@@ -562,7 +655,7 @@ body {
   {% else %}
   <div class="alert alert-warning">
     <i class="fas fa-exclamation-triangle"></i>
-    Aucun JSON global généré pour ce document. 
+    Aucun JSON global généré pour ce document ou aucune entité trouvée.
     <a href="{% url 'expert:generate_document_annotation_summary' document.id %}" onclick="generateSummary(event)" style="color: #92400e; text-decoration: underline;">
       Cliquez ici pour le générer
     </a>
@@ -622,61 +715,87 @@ require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-edi
 
 // Initialisation du Monaco Editor
 require(['vs/editor/editor.main'], function() {
-    // Créer l'éditeur
-    const jsonData = {{ global_annotations_json|safe }} || {};
-    editor = monaco.editor.create(document.getElementById('monaco-editor'), {
-        value: JSON.stringify(jsonData, null, 2),
-        language: 'json',
-        theme: 'vs',
-        automaticLayout: true,
-        minimap: { enabled: true },
-        scrollBeyondLastLine: false,
-        fontSize: 14,
-        lineNumbers: 'on',
-        renderLineHighlight: 'all',
-        roundedSelection: false,
-        selectOnLineNumbers: true,
-        formatOnPaste: true,
-        formatOnType: true
-    });
+    try {
+        // Récupérer le JSON de manière sécurisée
+        const jsonDataElement = document.getElementById('json-data');
+        let jsonData = {};
 
-    // Ajouter la validation automatique du JSON
-    let decorations = [];
-    editor.onDidChangeModelContent(() => {
-        const model = editor.getModel();
-        try {
-            const content = model.getValue();
-            JSON.parse(content);
-            // Si le JSON est valide, effacer les décorations d'erreur
-            decorations = editor.deltaDecorations(decorations, []);
-        } catch (e) {
-            // Si le JSON est invalide, ajouter une décoration d'erreur
-            const match = e.message.match(/at position (\d+)/);
-            if (match) {
-                const pos = parseInt(match[1]);
-                const position = model.getPositionAt(pos);
-                decorations = editor.deltaDecorations(decorations, [{
-                    range: new monaco.Range(
-                        position.lineNumber,
-                        position.column,
-                        position.lineNumber,
-                        position.column + 1
-                    ),
-                    options: {
-                        inlineClassName: 'squiggly-error',
-                        hoverMessage: { value: e.message }
-                    }
-                }]);
+        if (jsonDataElement && jsonDataElement.textContent.trim()) {
+            try {
+                jsonData = JSON.parse(jsonDataElement.textContent);
+            } catch (e) {
+                console.error('Erreur parsing JSON data:', e);
+                jsonData = {};
             }
         }
-    });
+
+        // Créer l'éditeur
+        editor = monaco.editor.create(document.getElementById('monaco-editor'), {
+            value: JSON.stringify(jsonData, null, 2),
+            language: 'json',
+            theme: 'vs',
+            automaticLayout: true,
+            minimap: { enabled: true },
+            scrollBeyondLastLine: false,
+            fontSize: 14,
+            lineNumbers: 'on',
+            renderLineHighlight: 'all',
+            roundedSelection: false,
+            selectOnLineNumbers: true,
+            formatOnPaste: true,
+            formatOnType: true
+        });
+
+        // Ajouter la validation automatique du JSON
+        let decorations = [];
+        editor.onDidChangeModelContent(() => {
+            const model = editor.getModel();
+            try {
+                const content = model.getValue();
+                JSON.parse(content);
+                // Si le JSON est valide, effacer les décorations d'erreur
+                decorations = editor.deltaDecorations(decorations, []);
+            } catch (e) {
+                // Si le JSON est invalide, ajouter une décoration d'erreur
+                const match = e.message.match(/at position (\d+)/);
+                if (match) {
+                    const pos = parseInt(match[1]);
+                    const position = model.getPositionAt(pos);
+                    decorations = editor.deltaDecorations(decorations, [{
+                        range: new monaco.Range(
+                            position.lineNumber,
+                            position.column,
+                            position.lineNumber,
+                            position.column + 1
+                        ),
+                        options: {
+                            inlineClassName: 'squiggly-error',
+                            hoverMessage: { value: e.message }
+                        }
+                    }]);
+                }
+            }
+        });
+
+        console.log('Monaco Editor initialisé avec succès');
+    } catch (error) {
+        console.error('Erreur lors de l\'initialisation de Monaco Editor:', error);
+        // Fallback en cas d'erreur
+        document.getElementById('monaco-editor').innerHTML =
+            '<div class="alert alert-danger">Erreur lors du chargement de l\'éditeur JSON. Veuillez recharger la page.</div>';
+    }
 });
 
 // Sauvegarder les modifications du JSON
 async function saveJsonChanges() {
+    if (!editor) {
+        showSaveStatus('❌ Éditeur non initialisé', 'error');
+        return;
+    }
+
     try {
         const jsonContent = editor.getValue();
-        
+
         // Valider que le JSON est bien formaté
         JSON.parse(jsonContent);
 
@@ -696,7 +815,7 @@ async function saveJsonChanges() {
             showSaveStatus('✅ JSON sauvegardé avec succès !', 'success');
         } else {
             const error = await response.json();
-            throw new Error(error.message || 'Erreur lors de la sauvegarde');
+            throw new Error(error.error || 'Erreur lors de la sauvegarde');
         }
     } catch (error) {
         showSaveStatus('❌ ' + error.message, 'error');
@@ -709,7 +828,7 @@ function showSaveStatus(message, type) {
     statusDiv.className = 'alert alert-' + (type === 'success' ? 'success' : 'danger');
     statusDiv.querySelector('span').textContent = message;
     statusDiv.style.display = 'flex';
-    
+
     setTimeout(() => {
         statusDiv.style.display = 'none';
     }, 3000);
@@ -717,14 +836,19 @@ function showSaveStatus(message, type) {
 
 // Copier le JSON dans le presse-papiers
 function copyJsonToClipboard() {
+    if (!editor) {
+        alert('Éditeur non initialisé');
+        return;
+    }
+
     const jsonContent = editor.getValue();
-    
+
     navigator.clipboard.writeText(jsonContent).then(function() {
         const btn = event.target.closest('.copy-btn');
         const originalText = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-check"></i> Copié !';
         btn.style.background = '#22c55e';
-        
+
         setTimeout(() => {
             btn.innerHTML = originalText;
             btn.style.background = '#10b981';
@@ -737,8 +861,13 @@ function copyJsonToClipboard() {
 
 // Télécharger le JSON
 function downloadJson() {
+    if (!editor) {
+        alert('Éditeur non initialisé');
+        return;
+    }
+
     const jsonContent = editor.getValue();
-    
+
     const blob = new Blob([jsonContent], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -756,11 +885,11 @@ function generateSummary(event) {
     const btn = event.target.closest('a');
     const originalText = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération...';
-    
+
     fetch(btn.href, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || getCookie('csrftoken')
+            'X-CSRFToken': getCookie('csrftoken')
         }
     })
     .then(response => response.json())
@@ -769,7 +898,7 @@ function generateSummary(event) {
             alert('Résumé et JSON globaux générés avec succès!');
             location.reload();
         } else {
-            alert('Erreur: ' + data.error);
+            alert('Erreur: ' + (data.error || 'Erreur inconnue'));
         }
     })
     .catch(error => {
@@ -812,100 +941,142 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// Formatage JSON avancé avec coloration syntaxique améliorée
-function formatJsonAdvanced(jsonElement) {
-    if (!jsonElement || !jsonElement.textContent) return;
-    
-    try {
-        const jsonContent = jsonElement.textContent.trim();
-        const parsedJson = JSON.parse(jsonContent);
-
-        // Format avec indentation de 2 espaces
-        const formattedJson = JSON.stringify(parsedJson, null, 2);
-
-        // Coloration syntaxique avancée
-        let highlightedJson = formattedJson
-            // Clés d'objet (propriétés)
-            .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")(\s*:)/g, '<span class="json-key">$1</span>$3')
-            // Chaînes de caractères
-            .replace(/:\s*("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")/g, ': <span class="json-string">$1</span>')
-            // Nombres (entiers et décimaux)
-            .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
-            // Booléens
-            .replace(/:\s*(true|false)/g, ': <span class="json-boolean">$1</span>')
-            // Null
-            .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>')
-            // Crochets et accolades
-            .replace(/([{}[\]])/g, '<span class="json-bracket">$1</span>')
-            // Virgules
-            .replace(/(,)$/gm, '<span class="json-comma">$1</span>');
-
-        jsonElement.innerHTML = highlightedJson;
-        
-        // Ajouter des numéros de ligne
-        addLineNumbers(jsonElement);
-        
-    } catch (e) {
-        console.log('JSON invalide ou déjà formaté:', e);
-        // En cas d'erreur, on laisse le contenu tel quel
-    }
-}
-
-// Ajouter des numéros de ligne au JSON
-function addLineNumbers(jsonElement) {
-    const lines = jsonElement.innerHTML.split('\n');
-    const numberedLines = lines.map((line, index) => {
-        const lineNumber = (index + 1).toString().padStart(3, ' ');
-        return `<span class="line-number">${lineNumber}</span><span class="line-content">${line}</span>`;
-    }).join('\n');
-    
-    jsonElement.innerHTML = numberedLines;
-    jsonElement.classList.add('json-with-lines');
-}
-
-// Initialisation au chargement de la page
+// Debug: Vérifier si le JSON est présent
 document.addEventListener('DOMContentLoaded', function() {
-    const jsonDisplay = document.getElementById('json-display');
-    if (jsonDisplay) {
-        // Le JSON est déjà formaté par le filtre Django, on applique juste la coloration syntaxique
-        applySyntaxHighlighting(jsonDisplay);
+    const jsonDataElement = document.getElementById('json-data');
+    if (jsonDataElement) {
+        console.log('JSON data element found, content length:', jsonDataElement.textContent.length);
+    } else {
+        console.log('JSON data element not found');
     }
 });
 
-// Apply syntax highlighting to already formatted JSON
-function applySyntaxHighlighting(jsonElement) {
-    if (!jsonElement || !jsonElement.textContent) return;
-    
-    try {
-        const jsonContent = jsonElement.textContent.trim();
-        
-        // Coloration syntaxique avancée
-        let highlightedJson = jsonContent
-            // Clés d'objet (propriétés)
-            .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")(\s*:)/g, '<span class="json-key">$1</span>$3')
-            // Chaînes de caractères
-            .replace(/:\s*("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")/g, ': <span class="json-string">$1</span>')
-            // Nombres (entiers et décimaux)
-            .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
-            // Booléens
-            .replace(/:\s*(true|false)/g, ': <span class="json-boolean">$1</span>')
-            // Null
-            .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>')
-            // Crochets et accolades
-            .replace(/([{}[\]])/g, '<span class="json-bracket">$1</span>')
-            // Virgules
-            .replace(/(,)$/gm, '<span class="json-comma">$1</span>');
 
-        jsonElement.innerHTML = highlightedJson;
-        
-        // Ajouter des numéros de ligne
-        addLineNumbers(jsonElement);
-        
-    } catch (e) {
-        console.log('Erreur lors de l\'application de la coloration syntaxique:', e);
-        // En cas d'erreur, on laisse le contenu tel quel
+// ---- Résumé : changements UI de base ----
+(function () {
+  const summaryEl = document.getElementById('summary-editor');
+  const statusEl = document.getElementById('summary-status');
+
+  function setStatus(msg, ok = true) {
+    if (!statusEl) return;
+    statusEl.textContent = msg;
+    statusEl.style.color = ok ? '#059669' : '#dc2626';
+  }
+
+  if (summaryEl) {
+    const original = summaryEl.value;
+    summaryEl.addEventListener('input', () => {
+      summaryEl.classList.toggle('modified', summaryEl.value !== original);
+      setStatus('Non sauvegardé…', true);
+    });
+  }
+
+  // --------- 1) SAUVEGARDE DU RÉSUMÉ ----------
+  window.saveSummaryChanges = async function () {
+  const el = document.getElementById('summary-editor');
+  const statusEl = document.getElementById('summary-status');
+  const setStatus = (m, ok=true)=>{ if(statusEl){ statusEl.textContent=m; statusEl.style.color=ok?'#059669':'#dc2626'; } };
+
+  const content = (el?.value || '').trim();
+  if (!content) { setStatus('Le résumé est vide.', false); return; }
+
+  try {
+    setStatus('Analyse IA et sauvegarde…');
+    const res = await fetch(`/expert/annotation/document/{{ document.id }}/save-summary/`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
+      body: JSON.stringify({ summary_content: content })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Erreur');
+
+    if (data.updated_json && window.editor) {
+      window.editor.setValue(JSON.stringify(data.updated_json, null, 2));
     }
-}
+    const changed = (data.changed_keys || []).join(', ');
+    setStatus(changed ? `Résumé sauvegardé • Entités mises à jour: ${changed}` : 'Résumé sauvegardé • Aucune entité modifiée');
+  } catch (e) {
+    console.error(e); setStatus(e.message, false);
+  }
+};
+
+
+
+  // --------- 2) EXTRACTION D’ENTITÉS (aperçu client) ----------
+  window.extractEntitiesFromSummary = function extractEntitiesFromSummary() {
+    if (!summaryEl) return;
+    const text = summaryEl.value;
+
+    const patterns = {
+      'product': [
+        /(?:produit|m[ée]dicament)\s*:?\s*([A-Z][\wÀ-ÿ\s\-\/]{2,40})/gi,
+        /^([A-Z][\wÀ-ÿ\s\-\/]{3,40})\s+(?:est|sera|contient)/gim
+      ],
+      'dosage': [
+        /([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|µg|%|UI))/gi
+      ],
+      'substance_active': [
+        /(?:substance active|principe actif)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,40})/gi,
+        /(?:contient|à base de)\s+([A-Z][\wÀ-ÿ\s\-]{3,40})/gi
+      ],
+      'site': [
+        /(?:site|usine|fabricant)\s*:?\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})/gi,
+        /(?:fabriqu[ée]|produit)\s*(?:à|par)\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})/gi
+      ],
+      'pays': [
+        /(?:pays|country)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,30})/gi,
+        /(?:en|au|aux)\s+([A-Z][\wÀ-ÿ\s\-]{4,25})(?=[\s,\.]|$)/gi
+      ]
+    };
+
+    const found = {};
+    for (const [type, regs] of Object.entries(patterns)) {
+      const vals = new Set();
+      regs.forEach(re => {
+        let m;
+        while ((m = re.exec(text)) !== null) {
+          const v = (m[1] || '').trim().replace(/[.,;:]$/, '');
+          if (v.length > 1) vals.add(v);
+        }
+      });
+      if (vals.size) found[type] = Array.from(vals);
+    }
+
+    // Affiche un petit aperçu sous l’éditeur
+    let box = document.querySelector('.entity-extraction-preview');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'entity-extraction-preview';
+      summaryEl.parentNode.appendChild(box);
+    }
+    if (!Object.keys(found).length) {
+      box.innerHTML = '<small class="text-muted">Aucune entité détectée…</small>';
+      return found;
+    }
+    box.innerHTML = Object.entries(found)
+      .map(([k, arr]) => `<div><strong>${k}</strong> : ${arr.map(v => `<span class="entity-tag new">${v}</span>`).join(' ')}</div>`)
+      .join('');
+    setStatus('Aperçu des entités mis à jour.', true);
+    return found;
+  };
+
+  // ---- petite amélioration : corriger l’usage d’event dans le bouton Copier ----
+  window.copyJsonToClipboard = function copyJsonToClipboard(evt) {
+    if (!editor) { alert('Éditeur non initialisé'); return; }
+    navigator.clipboard.writeText(editor.getValue()).then(() => {
+      const btn = evt?.target?.closest('.copy-btn');
+      if (!btn) return;
+      const original = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-check"></i> Copié !';
+      btn.style.background = '#22c55e';
+      setTimeout(() => { btn.innerHTML = original; btn.style.background = '#10b981'; }, 2000);
+    }).catch(err => {
+      console.error('Erreur de copie:', err);
+      alert('Erreur lors de la copie dans le presse-papiers');
+    });
+  };
+})();
+
 </script>
 
 {% endblock %}

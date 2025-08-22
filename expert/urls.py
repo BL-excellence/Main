@@ -59,4 +59,7 @@ urlpatterns = [
     
     # Sauvegarde du JSON modifié d'une page
     path('annotation/page/<int:page_id>/save-json/', views.save_page_json, name='save_page_json'),
+
+    # Sauvegarde du résumé modifié
+    path('annotation/document/<int:doc_id>/save-summary/', views.save_summary_changes, name='save_summary_changes'),
 ]

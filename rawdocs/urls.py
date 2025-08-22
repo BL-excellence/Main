@@ -267,4 +267,38 @@ path(
     views.view_document_annotation_json,
     name='view_document_annotation_json'
 ),
+
+# Édition du résumé global par l'expert
+path(
+    'annotation/document/<int:doc_id>/edit-summary/',
+    views.edit_global_summary,
+    name='edit_global_summary'
+),
+
+# Historique des modifications du résumé global
+path(
+    'annotation/document/<int:doc_id>/summary-history/',
+    views.get_global_summary_history,
+    name='get_global_summary_history'
+),
+
+# Validation du résumé global par l'expert
+path(
+    'annotation/document/<int:doc_id>/validate-summary/',
+    views.validate_global_summary,
+    name='validate_global_summary'
+),
+
+    #########################edit###############
+    # Nouvelles URLs pour l'édition d'annotations
+    path(
+        'annotation/<int:annotation_id>/edit/',
+        views.edit_annotation,
+        name='edit_annotation'
+    ),
+    path(
+        'annotation/<int:annotation_id>/details/',
+        views.get_annotation_details,
+        name='get_annotation_details'
+    ),
 ]

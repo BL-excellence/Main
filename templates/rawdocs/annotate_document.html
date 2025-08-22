@@ -1,3 +1,4 @@
+{#template/rawdocs/annotate_document.html#}
 {% extends "base.html" %}
 {% load rawdocs_extras %}
 {% load static %}
@@ -1292,6 +1293,114 @@ body {
   from { opacity: 0; transform: translateY(40px);}
   to   { opacity: 1; transform: translateY(0);}
 }
+
+/* Styles pour le bouton d'édition */
+.edit-annotation {
+  background: none;
+  border: none;
+  color: var(--pharma-primary);
+  cursor: pointer;
+  padding: 0.3rem 0.7rem;
+  border-radius: 7px;
+  transition: background .13s;
+  margin-right: 0.5rem;
+}
+
+.edit-annotation:hover {
+  background: #e0f2fe;
+  color: var(--pharma-primary-dark);
+}
+
+/* Indicateur de modification humaine */
+.human-modified-indicator {
+  font-size: 0.85rem;
+  color: var(--pharma-accent);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  background: #d1fae5;
+  border-radius: 6px;
+  border-left: 3px solid var(--pharma-accent);
+}
+
+/* Styles pour le modal d'édition */
+.modal-lg {
+  max-width: 800px;
+}
+
+.annotation-info-panel {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Amélioration des champs du formulaire d'édition */
+#edit-selected-text {
+  font-family: 'Courier New', monospace;
+  border: 2px solid var(--pharma-border);
+  transition: border-color 0.3s ease;
+}
+
+#edit-selected-text:focus {
+  border-color: var(--pharma-primary);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
+#edit-annotation-type {
+  border: 2px solid var(--pharma-border);
+  transition: border-color 0.3s ease;
+}
+
+#edit-annotation-type:focus {
+  border-color: var(--pharma-primary);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
+/* Style pour les champs de position */
+#edit-start-pos, #edit-end-pos {
+  background-color: #f8f9fa;
+  color: #6c757d;
+}
+
+/* Amélioration du panel d'information */
+.annotation-meta > div {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
+}
+
+.annotation-meta > div:not(:last-child) {
+  border-bottom: 1px solid #e9ecef;
+}
+
+/* Animation pour le modal */
+.modal.fade .modal-dialog {
+  transition: transform 0.3s ease-out;
+  transform: translate(0, -50px);
+}
+
+.modal.show .modal-dialog {
+  transform: none;
+}
+
+/* Style pour les boutons du footer du modal */
+.modal-footer .btn {
+  min-width: 120px;
+  font-weight: 600;
+}
+
+.modal-footer .btn-primary {
+  background: linear-gradient(90deg, var(--pharma-primary), var(--pharma-accent));
+  border: none;
+}
+
+.modal-footer .btn-primary:hover {
+  background: linear-gradient(90deg, var(--pharma-accent), var(--pharma-primary));
+}
 </style>
 
 <!-- Annotation Header -->
@@ -1722,17 +1831,33 @@ body {
           {{ annotation.annotation_type.display_name }}
         </span>
         <span class="annotation-confidence">{{ annotation.confidence_score|floatformat:0 }}%</span>
+
+        <!-- NOUVEAU: Bouton d'édition -->
+        <button class="edit-annotation" onclick="openEditAnnotationModal({{ annotation.id }})"
+                title="Modifier cette annotation">
+          <i class="fas fa-edit"></i>
+        </button>
+
         <button class="delete-annotation" onclick="deleteAnnotation({{ annotation.id }})">
           <i class="fas fa-trash"></i>
         </button>
       </div>
+
       <div class="annotation-text annotation-text-clickable"
         onclick="highlightTextInDocument('{{ annotation.selected_text|escapejs }}', {{ annotation.start_pos }}, {{ annotation.end_pos }})"
         style="cursor: pointer; color: var(--pharma-primary-dark); text-decoration: underline;"
         title="Cliquez pour voir dans le texte">"{{ annotation.selected_text }}"</div>
+
       {% if annotation.ai_reasoning %}
       <div class="annotation-reasoning">
         <i class="fas fa-lightbulb"></i> {{ annotation.ai_reasoning }}
+      </div>
+      {% endif %}
+
+      <!-- NOUVEAU: Indicateur si modifié par humain -->
+      {% if annotation.modified_by_human %}
+      <div class="human-modified-indicator">
+        <i class="fas fa-user-edit"></i> Modifié par {{ annotation.last_modified_by.username|default:"humain" }}
       </div>
       {% endif %}
     </div>
@@ -1763,6 +1888,106 @@ body {
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="createAnnotationType()">
                     Create Type
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal pour éditer une annotation -->
+<div class="modal fade" id="editAnnotationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit"></i> Modifier l'Annotation
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Texte sélectionné -->
+                <div class="mb-3">
+                    <label for="edit-selected-text" class="form-label">
+                        <i class="fas fa-quote-right"></i> Texte Sélectionné
+                    </label>
+                    <textarea class="form-control" id="edit-selected-text" rows="3"
+                             placeholder="Texte à annoter..."></textarea>
+                    <div class="form-text">
+                        Vous pouvez modifier le texte sélectionné pour corriger l'IA
+                    </div>
+                </div>
+
+                <!-- Type d'annotation -->
+                <div class="mb-3">
+                    <label for="edit-annotation-type" class="form-label">
+                        <i class="fas fa-tags"></i> Type d'Annotation
+                    </label>
+                    <select class="form-control" id="edit-annotation-type">
+                        <option value="">Sélectionner un type...</option>
+                        {% for ann_type in annotation_types %}
+                        <option value="{{ ann_type.id }}" data-color="{{ ann_type.color }}">
+                            {{ ann_type.display_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Positions (pour les utilisateurs avancés) -->
+                <div class="mb-3">
+                    <label class="form-label">
+                        <i class="fas fa-crosshairs"></i> Positions dans le texte
+                    </label>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <input type="number" class="form-control" id="edit-start-pos"
+                                   placeholder="Position début" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <input type="number" class="form-control" id="edit-end-pos"
+                                   placeholder="Position fin" readonly>
+                        </div>
+                    </div>
+                    <div class="form-text">
+                        Les positions sont automatiquement calculées
+                    </div>
+                </div>
+
+                <!-- Informations sur l'annotation -->
+                <div class="mb-3">
+                    <div class="annotation-info-panel" style="
+                        background: #f8f9fa;
+                        border: 1px solid #dee2e6;
+                        border-radius: 8px;
+                        padding: 1rem;
+                    ">
+                        <div class="annotation-meta">
+                            <div><strong>Créée par:</strong> <span id="edit-created-by">-</span></div>
+                            <div><strong>Confiance IA:</strong> <span id="edit-confidence">-</span>%</div>
+                            <div><strong>Raisonnement IA:</strong></div>
+                            <div id="edit-ai-reasoning" style="
+                                font-style: italic;
+                                color: #6c757d;
+                                margin-top: 0.5rem;
+                                padding: 0.5rem;
+                                background: #e9ecef;
+                                border-radius: 4px;
+                            ">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Message d'aide -->
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Conseil:</strong> Modifiez le texte et/ou le type pour corriger les erreurs de l'IA.
+                    Vos corrections aident l'IA à s'améliorer!
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveAnnotationChanges()">
+                    <i class="fas fa-save"></i> Sauvegarder les Modifications
                 </button>
             </div>
         </div>
@@ -2908,5 +3133,323 @@ function annotateWithGroq() {
     }
 }
 
+
+// Variables globales pour l'édition
+let currentEditingAnnotationId = null;
+let editModal = null;
+
+// Initialiser le modal d'édition au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialiser le modal d'édition (s'il existe)
+    const editModalElement = document.getElementById('editAnnotationModal');
+    if (editModalElement) {
+        editModal = new bootstrap.Modal(editModalElement, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
+    }
+});
+
+/**
+ * Ouvre le modal d'édition pour une annotation spécifique
+ */
+function openEditAnnotationModal(annotationId) {
+    console.log('🖊️ Ouverture du modal d\'édition pour annotation:', annotationId);
+
+    if (!editModal) {
+        alert('Modal d\'édition non disponible');
+        return;
+    }
+
+    // Stocker l'ID de l'annotation en cours d'édition
+    currentEditingAnnotationId = annotationId;
+
+    // Charger les détails de l'annotation
+    loadAnnotationDetails(annotationId);
+}
+
+/**
+ * Charge les détails d'une annotation depuis le serveur
+ */
+function loadAnnotationDetails(annotationId) {
+    // Afficher un indicateur de chargement
+    showEditModalLoading(true);
+
+    fetch(`/annotation/${annotationId}/details/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            populateEditModal(data.annotation);
+            editModal.show();
+        } else {
+            alert('Erreur lors du chargement des détails: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur chargement annotation:', error);
+        alert('Erreur lors du chargement des détails de l\'annotation');
+    })
+    .finally(() => {
+        showEditModalLoading(false);
+    });
+}
+
+/**
+ * Remplit le modal d'édition avec les données de l'annotation
+ */
+function populateEditModal(annotation) {
+    // Remplir les champs du formulaire
+    document.getElementById('edit-selected-text').value = annotation.selected_text || '';
+    document.getElementById('edit-annotation-type').value = annotation.annotation_type.id || '';
+    document.getElementById('edit-start-pos').value = annotation.start_pos || '';
+    document.getElementById('edit-end-pos').value = annotation.end_pos || '';
+
+    // Remplir les informations sur l'annotation
+    document.getElementById('edit-created-by').textContent = annotation.created_by || 'IA';
+    document.getElementById('edit-confidence').textContent = Math.round(annotation.confidence_score || 0);
+    document.getElementById('edit-ai-reasoning').textContent = annotation.ai_reasoning || 'Aucun raisonnement disponible';
+
+    // Mettre en surbrillance si modifié par humain
+    if (annotation.modified_by_human) {
+        const infoPanel = document.querySelector('.annotation-info-panel');
+        if (infoPanel) {
+            infoPanel.style.borderLeft = '4px solid var(--pharma-accent)';
+            infoPanel.style.backgroundColor = '#f0fdf4';
+        }
+    }
+
+    console.log('✅ Modal d\'édition rempli avec les données de l\'annotation');
+}
+
+/**
+ * Sauvegarde les modifications de l'annotation
+ */
+function saveAnnotationChanges() {
+    if (!currentEditingAnnotationId) {
+        alert('Aucune annotation sélectionnée pour modification');
+        return;
+    }
+
+    // Récupérer les valeurs du formulaire
+    const selectedText = document.getElementById('edit-selected-text').value.trim();
+    const annotationTypeId = document.getElementById('edit-annotation-type').value;
+    const startPos = parseInt(document.getElementById('edit-start-pos').value) || 0;
+    const endPos = parseInt(document.getElementById('edit-end-pos').value) || 0;
+
+    // Validation basique
+    if (!selectedText) {
+        alert('Le texte sélectionné ne peut pas être vide');
+        return;
+    }
+
+    if (!annotationTypeId) {
+        alert('Veuillez sélectionner un type d\'annotation');
+        return;
+    }
+
+    // Préparer les données à envoyer
+    const editData = {
+        selected_text: selectedText,
+        annotation_type_id: parseInt(annotationTypeId),
+        start_pos: startPos,
+        end_pos: endPos
+    };
+
+    // Désactiver le bouton de sauvegarde pendant la requête
+    const saveButton = document.querySelector('#editAnnotationModal .btn-primary');
+    const originalText = saveButton.innerHTML;
+    saveButton.disabled = true;
+    saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...';
+
+    // Envoyer la requête de modification
+    fetch(`/annotation/${currentEditingAnnotationId}/edit/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Afficher le succès
+            showEditSuccess(data.message);
+
+            // Fermer le modal
+            editModal.hide();
+
+            // Mettre à jour l'affichage de l'annotation dans la liste
+            updateAnnotationInList(data.annotation);
+
+            // Réinitialiser l'ID d'édition
+            currentEditingAnnotationId = null;
+        } else {
+            alert('Erreur lors de la sauvegarde: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur sauvegarde annotation:', error);
+        alert('Erreur lors de la sauvegarde des modifications');
+    })
+    .finally(() => {
+        // Restaurer le bouton
+        saveButton.disabled = false;
+        saveButton.innerHTML = originalText;
+    });
+}
+
+/**
+ * Met à jour l'affichage d'une annotation dans la liste après modification
+ */
+function updateAnnotationInList(updatedAnnotation) {
+    const annotationElement = document.querySelector(`[data-annotation-id="${updatedAnnotation.id}"]`);
+    if (!annotationElement) {
+        console.error('Élément d\'annotation non trouvé dans la liste');
+        return;
+    }
+
+    // Mettre à jour le type d'annotation
+    const typeElement = annotationElement.querySelector('.annotation-type');
+    if (typeElement) {
+        typeElement.textContent = updatedAnnotation.annotation_type.display_name;
+        typeElement.style.background = updatedAnnotation.annotation_type.color;
+    }
+
+    // Mettre à jour le texte sélectionné
+    const textElement = annotationElement.querySelector('.annotation-text');
+    if (textElement) {
+        textElement.textContent = `"${updatedAnnotation.selected_text}"`;
+
+        // Mettre à jour l'événement onclick avec les nouvelles positions
+        textElement.onclick = function() {
+            highlightTextInDocument(
+                updatedAnnotation.selected_text,
+                updatedAnnotation.start_pos,
+                updatedAnnotation.end_pos
+            );
+        };
+    }
+
+    // Ajouter ou mettre à jour l'indicateur de modification humaine
+    let humanIndicator = annotationElement.querySelector('.human-modified-indicator');
+    if (!humanIndicator) {
+        humanIndicator = document.createElement('div');
+        humanIndicator.className = 'human-modified-indicator';
+        annotationElement.appendChild(humanIndicator);
+    }
+    humanIndicator.innerHTML = '<i class="fas fa-user-edit"></i> Modifié par vous';
+
+    // Ajouter une animation de mise à jour
+    annotationElement.style.animation = 'highlight-pulse 1s ease-in-out';
+    setTimeout(() => {
+        annotationElement.style.animation = '';
+    }, 1000);
+
+    console.log('✅ Annotation mise à jour dans la liste');
+}
+
+/**
+ * Affiche un message de succès après modification
+ */
+function showEditSuccess(message) {
+    const successDiv = document.createElement('div');
+    successDiv.className = 'validation-success';
+    successDiv.innerHTML = `
+        <i class="fas fa-edit" style="font-size: 1.5rem;"></i>
+        <div>
+            <strong>✅ ${message}</strong>
+            <div style="font-size: 0.9rem; opacity: 0.9;">
+                L'annotation a été mise à jour avec vos corrections
+            </div>
+        </div>
+    `;
+
+    // Insérer avant le contenu principal
+    const mainContent = document.querySelector('.text-content-card');
+    if (mainContent) {
+        mainContent.parentNode.insertBefore(successDiv, mainContent);
+
+        // Supprimer après 4 secondes
+        setTimeout(() => {
+            successDiv.remove();
+        }, 4000);
+    }
+}
+
+/**
+ * Affiche/cache l'indicateur de chargement dans le modal d'édition
+ */
+function showEditModalLoading(show) {
+    // Cette fonction peut être utilisée pour ajouter des indicateurs de chargement
+    // si nécessaire dans le futur
+    console.log(show ? '⏳ Chargement...' : '✅ Chargement terminé');
+}
+
+/**
+ * Réinitialise le formulaire d'édition
+ */
+function resetEditModal() {
+    document.getElementById('edit-selected-text').value = '';
+    document.getElementById('edit-annotation-type').value = '';
+    document.getElementById('edit-start-pos').value = '';
+    document.getElementById('edit-end-pos').value = '';
+    document.getElementById('edit-created-by').textContent = '-';
+    document.getElementById('edit-confidence').textContent = '-';
+    document.getElementById('edit-ai-reasoning').textContent = '-';
+
+    // Restaurer le style du panel d'information
+    const infoPanel = document.querySelector('.annotation-info-panel');
+    if (infoPanel) {
+        infoPanel.style.borderLeft = '1px solid #dee2e6';
+        infoPanel.style.backgroundColor = '#f8f9fa';
+    }
+
+    currentEditingAnnotationId = null;
+}
+
+// Événement pour réinitialiser le modal quand il se ferme
+document.addEventListener('DOMContentLoaded', function() {
+    const editModalElement = document.getElementById('editAnnotationModal');
+    if (editModalElement) {
+        editModalElement.addEventListener('hidden.bs.modal', function() {
+            resetEditModal();
+        });
+    }
+});
+
+/**
+ * Auto-calcul des positions lors de la modification du texte
+ * (Fonction avancée - optionnelle)
+ */
+function recalculatePositions() {
+    const selectedText = document.getElementById('edit-selected-text').value.trim();
+    const pageText = document.getElementById('text-content').textContent;
+
+    if (selectedText && pageText) {
+        const startPos = pageText.indexOf(selectedText);
+        if (startPos !== -1) {
+            document.getElementById('edit-start-pos').value = startPos;
+            document.getElementById('edit-end-pos').value = startPos + selectedText.length;
+        }
+    }
+}
+
+// Optionnel: Auto-recalcul des positions quand le texte change
+document.addEventListener('DOMContentLoaded', function() {
+    const textArea = document.getElementById('edit-selected-text');
+    if (textArea) {
+        textArea.addEventListener('blur', recalculatePositions);
+    }
+});
+
+console.log('📝 Fonctions d\'édition d\'annotations chargées avec succès');
 </script>
 {% endblock %}
