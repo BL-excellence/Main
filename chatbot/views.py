@@ -4,6 +4,30 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.db.models import Q
+from pymongo import MongoClient
+
+# Reuse Mongo settings defined in settings and expert app
+MONGO_URI = getattr(settings, "MONGO_URI", "mongodb://localhost:27017/")
+MONGO_DB = getattr(settings, "MONGO_DB", "annotations_db")
+MONGO_COLLECTION = getattr(settings, "MONGO_COLLECTION", "documents")
+
+_mongo_client: MongoClient | None = None
+_mongo_coll = None
+
+def _get_mongo_collection():
+    global _mongo_client, _mongo_coll
+    if _mongo_coll is not None:
+        return _mongo_coll
+    try:
+        _mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
+        db = _mongo_client[MONGO_DB]
+        _mongo_coll = db[MONGO_COLLECTION]
+        # ping once to ensure connectivity
+        _mongo_client.admin.command('ping')
+        return _mongo_coll
+    except Exception:
+        logger.exception("Mongo connection failed")
+        return None
 
 import json
 import os
@@ -13,6 +37,7 @@ import unicodedata
 import logging
 import requests
 import sqlite3
+import html
 from typing import List, Tuple, Dict, Any
 
 # Local utils (conservés)
@@ -682,6 +707,364 @@ def list_sites(qs, filters, clean, as_md, page=1, page_size=50):
     }
 
 # =============================
+# Annotations (MongoDB)
+# =============================
+
+def _find_doc_id_by_title(docs_qs, title_hint: str) -> str | None:
+    if not title_hint:
+        return None
+    try:
+        # Try exact icontains, else fuzzy via helper
+        doc = docs_qs.filter(title__icontains=title_hint).first()
+        if not doc:
+            doc = find_best_document(title_hint, docs_qs)
+        return str(doc.id) if doc else None
+    except Exception:
+        return None
+
+
+def list_annotations_mongo(question: str, docs_qs, page: int = 1, page_size: int = 50):
+    coll = _get_mongo_collection()
+    if coll is None:
+        return {"ok": False, "entity": "annotation", "mode": "list",
+                "render": {"markdown": "Connexion MongoDB indisponible."},
+                "meta": {"page": 1, "page_size": 0, "total": 0}}
+
+    q_raw = question or ""
+    ql = _norm_txt(q_raw)
+
+    # Heuristiques simples: titre/document_id/validé/entity_key/texte
+    quoted = _extract_quoted(q_raw)
+    title_hint = quoted[0] if quoted else None
+    text_hint = quoted[1] if quoted and len(quoted) > 1 else None
+
+    doc_id = None
+    if title_hint:
+        doc_id = _find_doc_id_by_title(docs_qs, title_hint)
+
+    # Document ID explicite (ex: document 144 / id 144)
+    if not doc_id:
+        m = re.search(r"\b(?:document\s*(?:id)?\s*|id\s*)(\d{1,10})\b", ql)
+        if m:
+            doc_id = m.group(1)
+
+    validated = None
+    if re.search(r"\bvalid[ée]e?s?\b", ql):
+        validated = True
+    elif re.search(r"\bnon\s+valid[ée]e?\b|\brejet[ée]e?s?\b", ql):
+        validated = False
+
+    # Entity key (si question contient un mot/phrase d'entité entre guillemets)
+    entity_key = None
+    # Autoriser des entités multi-mots (<= 4 mots)
+    if text_hint and len(text_hint.split()) <= 4:
+        entity_key = text_hint.strip()
+        text_hint = None
+
+    # Détection d'entité ciblée depuis la question si non fournie par guillemets
+    if not entity_key:
+        ENTITY_PATTERNS = [
+            ("required document", r"\brequired\s+documents?\b|\bdocuments?\s+(requis|exig[eé]s?)\b"),
+            ("authority", r"\bautorité\b|\bauthorit(?:y|ies)\b"),
+            ("delay", r"\b(delay|deadline|d[eé]lai[s]?)\b"),
+            ("legal reference", r"\blegal\s+references?\b|\br[eé]f[eé]rences?\s+l[eé]gales?\b|\br[eé]f[eé]rence\s+l[eé]gale\b"),
+            ("site", r"\bsites?\b|\blocation\b"),
+            ("code", r"\bcode\b|\buuid\b|\bidentifiant\b|\bid\b"),
+        ]
+        for canon, pat in ENTITY_PATTERNS:
+            if re.search(pat, ql):
+                entity_key = canon
+                break
+
+    # Build Mongo query
+    query: Dict[str, Any] = {}
+    if doc_id:
+        query["document_id"] = str(doc_id)
+    if title_hint and not doc_id:
+        query["title"] = {"$regex": title_hint, "$options": "i"}
+    if validated is not None:
+        query["validated"] = bool(validated)
+
+    projection = {"title": 1, "document_id": 1, "entities": 1, "json.entities": 1, "validated": 1}
+
+    try:
+        # On récupère des documents correspondant (on limite avant le flatten)
+        cursor = coll.find(query, projection).limit(3000)
+        docs = list(cursor)
+    except Exception as e:
+        return {"ok": False, "entity": "annotation", "mode": "list",
+                "render": {"markdown": f"Erreur MongoDB: {e}"},
+                "meta": {"page": 1, "page_size": 0, "total": 0}}
+
+    # Flatten annotations avec mapping de synonymes pour cibler des entités
+    ENTITY_SYNONYMS = {
+        "required document": ["required document", "required documents", "required_document", "required documents"],
+        "authority": ["authority", "autorité", "authorities"],
+        "delay": ["delay", "deadline", "delai", "délai"],
+        "legal reference": ["legal reference", "legal_reference", "reference", "référence"],
+        "site": ["site", "location"],
+        "code": ["code", "id", "uuid"],
+    }
+    def match_entity_key(ent_name: str, target: str | None) -> bool:
+        if not target:
+            return True
+        en = _norm_txt(ent_name)
+        tg = _norm_txt(target)
+        if en == tg:
+            return True
+        # synonym match
+        for canon, syns in ENTITY_SYNONYMS.items():
+            if tg == _norm_txt(canon) and en in [_norm_txt(s) for s in syns]:
+                return True
+        return False
+
+    rows_all: List[Dict[str, Any]] = []
+    for d in docs:
+        title = d.get("title") or d.get("metadata", {}).get("title") or ""
+        did = d.get("document_id") or d.get("json", {}).get("document", {}).get("id") or ""
+        ents = d.get("entities") or d.get("json", {}).get("entities") or {}
+        if not isinstance(ents, dict):
+            continue
+        for k, values in ents.items():
+            if entity_key and not match_entity_key(k, entity_key):
+                continue
+            if not isinstance(values, (list, tuple)):
+                values = [values]
+            for v in values:
+                sv = str(v)
+                if text_hint and _norm_txt(text_hint) not in _norm_txt(sv):
+                    continue
+                rows_all.append({
+                    "Document": clean(title),
+                    "Document ID": clean(did),
+                    "Entité": clean(k),
+                    "Valeur": clean(sv),
+                    "Validé": "Oui" if d.get("validated") else "Non",
+                })
+
+    # Pagination (après flatten)
+    page = max(int(page or 1), 1)
+    page_size = min(max(int(page_size or 50), 1), 200)
+    total = len(rows_all)
+    start = (page - 1) * page_size
+    end = start + page_size
+    rows = rows_all[start:end]
+
+    cols = ["Document", "Document ID", "Entité", "Valeur", "Validé"]
+
+    def as_md_grouped_annotations(rows_subset: List[Dict[str, Any]]) -> str:
+        # Group by (Document ID -> Entité -> [Valeurs]) preserving order
+        from collections import OrderedDict
+        docs_map: "OrderedDict[str, dict]" = OrderedDict()
+        for r in rows_subset:
+            did = r.get("Document ID", "")
+            if did not in docs_map:
+                docs_map[did] = {
+                    "title": r.get("Document", ""),
+                    "entities": OrderedDict(),
+                }
+            ent = r.get("Entité", "")
+            val = r.get("Valeur", "")
+            val_status = r.get("Validé", "")
+            ents = docs_map[did]["entities"]
+            if ent not in ents:
+                ents[ent] = {"vals": [], "count": 0}
+            bucket = ents[ent]
+            # Dédoublonnage par valeur (sans le suffixe (Oui/Non))
+            base_val = val.strip()
+            if base_val not in bucket["vals"]:
+                bucket["vals"].append(base_val)
+            bucket["count"] += 1  # nombre total d'occurrences pour l'entité
+        if not docs_map:
+            return "Aucune annotation trouvée."
+        parts_md: List[str] = []
+        parts_html: List[str] = []
+        for did, info in docs_map.items():
+            title = info.get("title") or "Document"
+            # Markdown header
+            parts_md.append(f"### {title} (ID: {did})\n")
+            # HTML header
+            parts_html.append(f"<h3 style=\"margin:10px 0\">{html.escape(title)} (ID: {html.escape(str(did))})</h3>")
+            # Tri alphabétique des entités pour lisibilité
+            for ent, bucket in sorted(info["entities"].items(), key=lambda kv: kv[0].lower()):
+                vals = bucket["vals"]
+                count = bucket["count"]
+                # Markdown entity title
+                parts_md.append(f"**{ent}** — {count} occurrence(s):")
+                # HTML entity title
+                parts_html.append(f"<div><strong>{html.escape(ent)}</strong> — {count} occurrence(s):</div>")
+                # Limiter l'affichage si trop long, puis indiquer le reste
+                MAX_SHOW = 40
+                to_show = vals[:MAX_SHOW]
+                for v in to_show:
+                    parts_md.append(f"- {v}")
+                    parts_html.append(f"<li>{html.escape(v)}</li>")
+                if len(vals) > MAX_SHOW:
+                    parts_md.append(f"… et {len(vals) - MAX_SHOW} autre(s) valeur(s)")
+                    parts_html.append(f"<div>… et {len(vals) - MAX_SHOW} autre(s) valeur(s)</div>")
+                parts_md.append("")
+                parts_html.append("")
+            parts_md.append("")
+        md_out = "\n".join(parts_md).strip()
+        html_out = "\n".join(parts_html).strip()
+        return md_out, html_out
+
+    # Choose grouped markdown/html by default for readability
+    if rows:
+        md, html_out = as_md_grouped_annotations(rows)
+    else:
+        md, html_out = "Aucune annotation trouvée.", "<div>Aucune annotation trouvée.</div>"
+    return {
+        "ok": True,
+        "entity": "annotation",
+        "mode": "list",
+        "data": {"cols": cols, "rows": rows},
+        "render": {"markdown": md, "html": html_out},
+        "meta": {"page": page, "page_size": page_size, "total": total},
+    }
+
+
+def list_annotation_stats_mongo(question: str, docs_qs, page: int = 1, page_size: int = 50):
+    """Statistiques sur les annotations: group by entité, ou entité+valeur.
+    Détection simple des mots-clés: 'par entité' => group entité; 'par valeur' ou 'top' => entité + valeur.
+    """
+    coll = _get_mongo_collection()
+    if coll is None:
+        return {"ok": False, "entity": "annotation", "mode": "stats",
+                "render": {"markdown": "Connexion MongoDB indisponible."},
+                "meta": {"page": 1, "page_size": 0, "total": 0}}
+
+    q_raw = question or ""
+    ql = _norm_txt(q_raw)
+
+    quoted = _extract_quoted(q_raw)
+    title_hint = quoted[0] if quoted else None
+    text_hint = quoted[1] if quoted and len(quoted) > 1 else None
+
+    doc_id = None
+    if title_hint:
+        doc_id = _find_doc_id_by_title(docs_qs, title_hint)
+    if not doc_id:
+        m = re.search(r"\b(?:document\s*(?:id)?\s*|id\s*)(\d{1,10})\b", ql)
+        if m:
+            doc_id = m.group(1)
+
+    validated = None
+    if re.search(r"\bvalid[ée]e?s?\b", ql):
+        validated = True
+    elif re.search(r"\bnon\s+valid[ée]e?\b|\brejet[ée]e?s?\b", ql):
+        validated = False
+
+    entity_key = None
+    if text_hint and len(text_hint.split()) <= 4 and not re.search(r"\s", text_hint.strip()):
+        entity_key = text_hint
+        text_hint = None
+
+    # Déterminer regroupement
+    group_by_value = bool(re.search(r"\b(par\s+valeur|top)\b", ql))
+    # Si pas explicite mais il y a un texte libre, on fait par valeur
+    if text_hint:
+        group_by_value = True
+
+    base_match: Dict[str, Any] = {}
+    if doc_id:
+        base_match["document_id"] = str(doc_id)
+    if title_hint and not doc_id:
+        base_match["title"] = {"$regex": title_hint, "$options": "i"}
+    if validated is not None:
+        base_match["validated"] = bool(validated)
+
+    # Construit pipeline d'agrégation
+    pipeline = []
+    if base_match:
+        pipeline.append({"$match": base_match})
+    pipeline.extend([
+        {"$project": {
+            "title": 1,
+            "document_id": 1,
+            "validated": 1,
+            "ents": {"$ifNull": ["$entities", "$json.entities"]}
+        }},
+        {"$project": {"title": 1, "document_id": 1, "validated": 1, "ents": {"$objectToArray": "$ents"}}},
+        {"$unwind": "$ents"},
+        {"$project": {"title": 1, "document_id": 1, "validated": 1, "entity": "$ents.k", "values": "$ents.v"}},
+        {"$unwind": "$values"},
+    ])
+
+    # Filtres supplémentaires
+    match_more: Dict[str, Any] = {}
+    if entity_key:
+        match_more["entity"] = {"$regex": f"^{re.escape(entity_key)}$", "$options": "i"}
+    if text_hint:
+        match_more["values"] = {"$regex": text_hint, "$options": "i"}
+    if match_more:
+        pipeline.append({"$match": match_more})
+
+    if group_by_value:
+        pipeline.extend([
+            {"$group": {
+                "_id": {"Entité": "$entity", "Valeur": "$values"},
+                "Occurrences": {"$sum": 1}
+            }},
+            {"$sort": {"Occurrences": -1}},
+            {"$limit": 500}
+        ])
+    else:
+        pipeline.extend([
+            {"$group": {
+                "_id": {"Entité": "$entity"},
+                "Occurrences": {"$sum": 1}
+            }},
+            {"$sort": {"Occurrences": -1}},
+            {"$limit": 500}
+        ])
+
+    try:
+        agg = list(coll.aggregate(pipeline, allowDiskUse=True))
+    except Exception as e:
+        return {"ok": False, "entity": "annotation", "mode": "stats",
+                "render": {"markdown": f"Erreur MongoDB: {e}"},
+                "meta": {"page": 1, "page_size": 0, "total": 0}}
+
+    # Mise en forme
+    rows_all: List[Dict[str, Any]] = []
+    if group_by_value:
+        cols = ["Entité", "Valeur", "Occurrences"]
+        for it in agg:
+            _id = it.get("_id", {})
+            rows_all.append({
+                "Entité": clean(_id.get("Entité", "")),
+                "Valeur": clean(_id.get("Valeur", "")),
+                "Occurrences": it.get("Occurrences", 0),
+            })
+    else:
+        cols = ["Entité", "Occurrences"]
+        for it in agg:
+            _id = it.get("_id", {})
+            rows_all.append({
+                "Entité": clean(_id.get("Entité", "")),
+                "Occurrences": it.get("Occurrences", 0),
+            })
+
+    # Pagination
+    page = max(int(page or 1), 1)
+    page_size = min(max(int(page_size or 50), 1), 200)
+    total = len(rows_all)
+    start = (page - 1) * page_size
+    end = start + page_size
+    rows = rows_all[start:end]
+
+    md = as_md(rows, cols, empty_msg="Aucune statistique trouvée.")
+    return {
+        "ok": True,
+        "entity": "annotation",
+        "mode": "stats",
+        "data": {"cols": cols, "rows": rows},
+        "render": {"markdown": md},
+        "meta": {"page": page, "page_size": page_size, "total": total},
+    }
+
+# =============================
 # SQL Agent (NL → SQL for SQLite) — sécurisé
 # =============================
 
@@ -946,18 +1329,26 @@ def chatbot_api(request):
             f = _infer_country_filter_for_products(q_lower)
             if f: imp_filters.append(f)
             payload = list_products(produits_qs, imp_filters, clean, as_md, page, page_size)
-            payload["response"] = payload["render"]["markdown"]
+            payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
+            return JsonResponse(payload)
+        if re.search(r"\bannotations?\b|\bentit[eé]s?\b|\blabels?\b", q_lower):
+            # Stats si mots-clés: nombre, combien, stats, top
+            if re.search(r"\b(combien|nombre|stats?|statistiques|top)\b", q_lower):
+                payload = list_annotation_stats_mongo(question, docs_qs, page, page_size)
+            else:
+                payload = list_annotations_mongo(question, docs_qs, page, page_size)
+            payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
             return JsonResponse(payload)
         if re.search(r"\bdocuments?\b", q_lower):
             payload = list_documents(docs_qs, [], clean, format_date, as_md, page, page_size)
-            payload["response"] = payload["render"]["markdown"]
+            payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
             return JsonResponse(payload)
         if re.search(r"\bsites?\b", q_lower):
             site_filters = []
             f = _infer_country_filter_for_sites(q_lower)
             if f: site_filters.append(f)
             payload = list_sites(sites_qs, site_filters, clean, as_md, page, page_size)
-            payload["response"] = payload["render"]["markdown"]
+            payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
             return JsonResponse(payload)
         if os.environ.get('MISTRAL_API_KEY'):
             content = call_mistral(question, contexte, os.environ['MISTRAL_API_KEY'])
@@ -965,31 +1356,44 @@ def chatbot_api(request):
                                  "render":{"markdown":content}})
         return JsonResponse({'response': "Je n’ai pas bien compris la demande. Peux-tu préciser ?", "ok": False}, status=200)
 
+    # Interception annotations prioritaire (même si entity=library)
+    # Détection de ciblage: si l’utilisateur demande une entité spécifique (ex: Required Document/Authority/Delay)
+    if (entity == 'library' or re.search(r"\bdocuments?\b|\bdocument\b", q_lower)) and re.search(r"\bannotations?\b|\bentit[eé]s?\b|\blabels?\b|\brequired\s+documents?\b|\bauthorit[y|e]\b|\bdelay\b|\blegal\s+reference\b|\bsite\b|\bcode\b", q_lower):
+        payload = list_annotations_mongo(question, docs_qs, page, page_size)
+        payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
+        return JsonResponse(payload)
+
     # Entity-specific handling
     if entity == 'library':
         if mode == 'list':
             payload = list_documents(docs_qs, filters, clean, format_date, as_md, page, page_size)
-            payload["response"] = payload["render"]["markdown"]
+            payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
             return JsonResponse(payload)
         else:
             payload = detail_document(docs_qs, fields, title, question, clean, format_date)
-            payload["response"] = payload["render"]["markdown"]
+            payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
             return JsonResponse(payload)
+
+    # Interception simple si l’utilisateur mentionne annotations avec entity/library
+    if entity in ('annotation', 'annotations') or (entity == 'library' and re.search(r"\bannotations?\b|\bentit[eé]s?\b|\blabels?\b", q_lower)):
+        payload = list_annotations_mongo(question, docs_qs, page, page_size)
+        payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
+        return JsonResponse(payload)
 
     if entity == 'product':
         if mode == 'list':
             payload = list_products(produits_qs, filters, clean, as_md, page, page_size)
-            payload["response"] = payload["render"]["markdown"]
+            payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
             return JsonResponse(payload)
         else:
             payload = detail_product(produits_qs, fields, name, question, clean)
-            payload["response"] = payload["render"]["markdown"]
+            payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
             return JsonResponse(payload)
 
     if entity == 'site':
         if mode == 'list':
             payload = list_sites(sites_qs, filters, clean, as_md, page, page_size)
-            payload["response"] = payload["render"]["markdown"]
+            payload["response"] = payload.get("render", {}).get("html") or payload.get("render", {}).get("markdown")
             return JsonResponse(payload)
         else:
             name_hint = parsed.get('site_name') if 'parsed' in locals() else None

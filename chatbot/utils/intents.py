@@ -40,6 +40,9 @@ def _local_guess_intent(question: str) -> str:
         return "doc_to_prod"
 
     # entités simples
+    # prioriser les requêtes annotations si mots-clés détectés
+    if re.search(r"\b(annotations?|entit[eé]s?|labels?)\b", q):
+        return "library"  # on route vers handler library mais interception annotations s'applique
     if re.search(r"\b(documents?|guidances?|guidelines?)\b", q):
         return "library"
     if re.search(r"\b(produits?|products?)\b", q):
