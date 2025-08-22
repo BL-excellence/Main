@@ -109,6 +109,8 @@ DOC_ALIAS_TO_FIELD = {
     "version": "version",
     "uploadé par": "owner__username",
     "owner": "owner__username",
+    "contexte": "context",
+    "context": "context",
 }
 
 PROD_ALIAS_TO_FIELD = {
@@ -393,6 +395,12 @@ def parse_request(question: str, intent: str, produits_qs, docs_qs):
         doc_filters.append(("source", m.group(1).strip()))
     if m := re.search(r"\blang(?:ue|age)\s+([a-z0-9\-\s]+)", ql, re.I):
         doc_filters.append(("language", m.group(1).strip()))
+    # AJOUT — filtre par contexte (tolere "contexte X" ou "context X")
+    if m := re.search(r"\bcontext(?:e)?\s+([a-z0-9\-\s]+)", ql, re.I):
+        doc_filters.append(("context", m.group(1).strip()))
+    # cas "contexte non specifie"
+    if re.search(r"\bcontexte\s+non\s+specifi(?:e|\u00e9)", ql, re.I):
+        doc_filters.append(("context", "__NULL__"))
     f = _infer_owner_filter_for_docs(ql)
     if f: doc_filters.append(f)
 
@@ -512,7 +520,7 @@ def list_documents(qs, filters, clean, format_date, as_md, page=1, page_size=50)
 
     items, meta = paginate(qs, page, page_size)
 
-    cols = ["Titre", "Type", "Langue", "Version", "Source", "Date de publication", "Pays"]
+    cols = ["Titre", "Type", "Langue", "Version", "Source", "Date de publication", "Pays", "Contexte"]
     rows = [{
         "Titre": clean(d.title),
         "Type": clean(getattr(d, "doc_type", "")),
@@ -521,6 +529,7 @@ def list_documents(qs, filters, clean, format_date, as_md, page=1, page_size=50)
         "Source": clean(getattr(d, 'source', '')),
         "Date de publication": format_date(getattr(d, 'publication_date', '')),
         "Pays": clean(getattr(d, 'country', '')),
+        "Contexte": clean(getattr(d, 'context', '')),
     } for d in items]
 
     return {
@@ -618,7 +627,7 @@ def detail_document(qs, fields, title_hint, raw_q, clean, format_date):
                 "render":{"markdown":"Je n’ai pas trouvé ce document. Peux-tu préciser le titre ?"}}
 
     if not fields:
-        fields = ["doc_type", "language", "version", "source", "publication_date", "country"]
+        fields = ["doc_type", "language", "version", "source", "publication_date", "country", "context"]
     parts = []
     for f in fields:
         if f == "owner_username":
@@ -1292,7 +1301,7 @@ def chatbot_api(request):
     docs_str = ''
     for d in docs_qs:
         docs_str += (
-            f"- {clean(d.title)} | {clean(getattr(d, 'doc_type', ''))} | {clean(getattr(d, 'language', ''))} | Source: {clean(getattr(d, 'source', ''))}\n"
+            f"- {clean(d.title)} | {clean(getattr(d, 'doc_type', ''))} | {clean(getattr(d, 'language', ''))} | Source: {clean(getattr(d, 'source', ''))} | Contexte: {clean(getattr(d, 'context', ''))}\n"
         )
 
     subs_str = '\n'.join([
