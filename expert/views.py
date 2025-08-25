@@ -1160,24 +1160,156 @@ def save_summary_changes(request, doc_id):
 
         old_summary = document.global_annotations_summary or ""
 
-        # 1) sauver le résumé
-        document.global_annotations_summary = new_summary
-        document.global_annotations_summary_generated_at = timezone.now()
-        document.save(update_fields=['global_annotations_summary', 'global_annotations_summary_generated_at'])
-
-        # 2) préparer JSON/entités
+        # 2) Préparer/initialiser le JSON global et les entités si manquants
         current_json = document.global_annotations_json or {}
         current_json.setdefault('document', {})
         current_entities = current_json.get('entities', {}) or {}
-        allowed_keys = list(current_entities.keys())  # on ne crée pas de nouveau type
 
-        # 3) IA → propositions
-        proposed = ai_propose_entity_updates(old_summary, new_summary, current_entities, allowed_keys)
+        if not current_entities:
+            # Tenter de construire les entités depuis les annotations du document
+            try:
+                from rawdocs.views import _build_entities_map  # utilitaire existant
+                all_annotations = Annotation.objects.filter(page__document=document).select_related('annotation_type')
+                built = _build_entities_map(all_annotations, use_display_name=True) or {}
+                current_entities = built
+            except Exception:
+                # Fallback minimal: construire une map simple type -> valeurs depuis les annotations
+                built = {}
+                anns = Annotation.objects.filter(page__document=document).select_related('annotation_type')
+                for ann in anns:
+                    key = getattr(ann.annotation_type, 'display_name', None) or getattr(ann.annotation_type, 'name', None) or 'Unknown'
+                    built.setdefault(key, [])
+                    val = (ann.selected_text or '').strip()
+                    if val and val not in built[key]:
+                        built[key].append(val)
+                current_entities = built
 
-        # 4) appliquer en "replace-only"
-        updated_entities, changed_keys, human_diffs = _replace_only(current_entities, proposed)
-        if changed_keys:
-            current_json['entities'] = updated_entities
+            # Si toujours vide (ex: document sans annotations), initialiser des clés par défaut
+            if not current_entities:
+                default_keys = [
+                    'Invented Name',
+                    'Strength',
+                    'Pharmaceutical Form',
+                    'Route Of Administration',
+                    'Immediate Packaging',
+                    'Pack Size',
+                    'Ma Number',
+                ]
+                current_entities = {k: [] for k in default_keys}
+
+            current_json['entities'] = current_entities
+
+        allowed_keys = list(current_entities.keys())
+
+        # 1) Extraire les entités du nouveau résumé (toutes clés existantes, via libellés)
+        extracted_entities = extract_by_allowed_keys(new_summary, allowed_keys)
+        print(f"Entités extraites du résumé: {extracted_entities}")
+
+        # 3) Mise à jour fine par valeurs (ajouts/suppressions basées sur le résumé)
+        updated_entities = current_entities.copy()
+        changes_made = []
+
+        # Normaliser les clés permises (mapping insensible à la casse)
+        key_map = {k.lower(): k for k in allowed_keys}
+
+        # Extraire entités de l'ancien résumé pour détecter suppressions (toutes clés)
+        old_extracted = extract_by_allowed_keys(old_summary or "", allowed_keys)
+
+        def _norm_val(s: str) -> str:
+            return re.sub(r'\s+', ' ', (s or '').strip()).lower()
+
+        for lower_k, canon_k in key_map.items():
+            # valeurs existantes
+            existing_vals = list(updated_entities.get(canon_k, []) or [])
+            existing_norms = { _norm_val(v) for v in existing_vals }
+
+            # valeurs extraites anciennes et nouvelles pour cette clé
+            old_vals_ex = []
+            for etype, vals in (old_extracted or {}).items():
+                if (etype or '').lower() == lower_k:
+                    old_vals_ex = vals or []
+                    break
+            new_vals_ex = []
+            for etype, vals in (extracted_entities or {}).items():
+                if (etype or '').lower() == lower_k:
+                    new_vals_ex = vals or []
+                    break
+
+            cleaned_old = _clean_values_for_type(canon_k, old_vals_ex)
+            cleaned_new = _clean_values_for_type(canon_k, new_vals_ex)
+
+            old_norms = { _norm_val(v) for v in cleaned_old }
+            new_norms = { _norm_val(v) for v in cleaned_new }
+
+            # suppressions: présentes avant, absentes maintenant
+            to_remove = old_norms - new_norms
+            # ajouts: présentes dans le nouveau résumé, pas déjà existantes
+            to_add = [v for v in cleaned_new if _norm_val(v) not in existing_norms]
+
+            # appliquer suppressions
+            kept = [v for v in existing_vals if _norm_val(v) not in to_remove]
+            # appliquer ajouts
+            for v in to_add:
+                nv = _norm_val(v)
+                if nv not in { _norm_val(x) for x in kept }:
+                    kept.append(v)
+
+            if kept != existing_vals:
+                # log diff simple
+                removed_list = [v for v in existing_vals if _norm_val(v) in to_remove]
+                added_list = [v for v in to_add]
+                change_msg = f"{canon_k}:"
+                if removed_list:
+                    change_msg += f" -{removed_list}"
+                if added_list:
+                    change_msg += f" +{added_list}"
+                changes_made.append(change_msg)
+                updated_entities[canon_k] = kept
+
+        # 4) Sauvegarder le résumé
+        document.global_annotations_summary = new_summary
+        document.global_annotations_summary_generated_at = timezone.now()
+
+        # 5) Mettre à jour le JSON
+        current_json['entities'] = updated_entities
+        
+        # 6) Mettre à jour les métadonnées
+        current_json['last_updated'] = timezone.now().isoformat()
+        current_json['last_updated_by'] = request.user.username
+        current_json['document'].update({
+            'summary': new_summary,
+            'summary_updated_at': timezone.now().isoformat(),
+            'summary_updated_by': request.user.username,
+        })
+
+        # 7) Sauvegarder les modifications
+        document.global_annotations_json = current_json
+        document.save(update_fields=['global_annotations_summary', 'global_annotations_summary_generated_at', 'global_annotations_json'])
+
+        # Log de l'action
+        reason = "Summary edited and entities synchronized"
+        if changes_made:
+            reason += " | Changes: " + " ; ".join(changes_made[:5])
+        else:
+            reason += " | Aucune entité changée"
+        log_expert_action(
+            user=request.user,
+            action='summary_edited',
+            annotation=None,
+            document_id=document.id,
+            document_title=document.title,
+            old_text=old_summary,
+            new_text=new_summary,
+            reason=reason
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Résumé sauvegardé et entités synchronisées',
+            'updated_json': current_json,
+            'changes_made': changes_made,
+            'entities_changes': changes_made,
+        })
 
         # métadonnées de mise à jour
         current_json['last_updated'] = timezone.now().isoformat()
@@ -1227,30 +1359,125 @@ import re
 
 def extract_entities_from_text(text: str) -> dict:
     """
-    Extraction côté serveur (stricte) pour limiter le bruit.
-    Retourne un dict {Type: [valeurs]} avec clés 'brutes' (Product, Dosage, ...).
+    Extraction intelligente des entités du texte avec support pour tous les types d'entités.
+    Retourne un dict {Type: [valeurs]} avec support pour tous les types existants.
     """
-    patterns = {
+    # Patterns de base pour les types courants
+    base_patterns = {
         'Product': [
-            r'(?:produit|m[ée]dicament)\s*:?\s*([A-Z][\wÀ-ÿ\s\-\/]{2,40})',
-            r'^(?:le\s+)?([A-Z][\wÀ-ÿ\s\-\/]{3,40})\s+(?:est|sera|contient)\b'
+            r'(?:produit|médicament)\s*:?\s*([A-Z][\wÀ-ÿ\s\-\/]{2,40})',
+            r'^(?:le\s+)?([A-Z][\wÀ-ÿ\s\-\/]{3,40})\s+(?:est|sera|contient)\b',
+            r'(?:nom du produit|product name)\s*:?\s*([A-Z][\wÀ-ÿ\s\-\/]{2,40})'
         ],
         'Dosage': [
-            r'\b([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI))\b'
+            r'\b([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|mg\/ml|g\/l))\b',
+            r'(?:dosage|posologie|concentration)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|mg\/ml|g\/l))',
         ],
-        'Substance Active': [
-            r'(?:substance active|principe actif)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,40})',
-            r'(?:contient|à base de)\s+([A-Z][\wÀ-ÿ\s\-]{3,40})'
+        'Substance_Active': [
+            r'(?:substance active|principe actif|active ingredient)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,40})',
+            r'(?:contient|à base de|contains)\s+([A-Z][\wÀ-ÿ\s\-]{3,40})'
         ],
         'Site': [
-            r'(?:site|usine|fabricant)\s*:?\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})',
-            r'(?:fabriqu[ée]|produit)\s*(?:à|par)\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})'
+            r'(?:site|usine|fabricant|manufacturing site)\s*:?\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})',
+            r'(?:fabriqu[ée]|produit|manufactured)\s*(?:à|par|by|in)\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})'
         ],
         'Pays': [
             r'(?:pays|country)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,30})',
-            r'(?:en|au|aux)\s+([A-Z][\wÀ-ÿ\s\-]{4,25})(?=[\s,\.]|$)'
+            r'(?:en|au|aux|in)\s+([A-Z][\wÀ-ÿ\s\-]{4,25})(?=[\s,\.]|$)'
         ],
+        'Strength': [
+            r'(?:strength|force|puissance)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI))',
+            r'(?:concentration|teneur)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI))',
+            r'(?:est\s+de)\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI))',
+        ],
+        'Form': [
+            r'(?:forme|form|presentation)\s*:?\s*(\b(?:comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable)\b)',
+            r'(?:sous\s+forme\s+de)\s*(\b(?:comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable)\b)',
+        ],
+        'Batch_Size': [
+            r'(?:taille de lot|batch size|lot)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:unités?|comprim[ée]s?|g[ée]lules?|capsules?)?)',
+        ],
+        'Shelf_Life': [
+            r'(?:durée de conservation|shelf life|péremption)\s*:?\s*([0-9]+\s*(?:mois|ans?|months?|years?|m|y))',
+        ]
     }
+
+    # Patterns génériques pour capturer d'autres types possibles
+    generic_patterns = [
+        r'(?:{})\s*:?\s*([^\.,:;\n]+)',  # Capture après "Type:"
+        r'(?:{})\s+(?:est|is|are)\s+([^\.,:;\n]+)',  # Capture après "Type is/are"
+        r'(?:{})\s*:\s*([^\.,:;\n]+)',  # Capture après "Type:"
+    ]
+
+    results = {}
+    
+    # 1. Appliquer les patterns de base
+    for entity_type, patterns in base_patterns.items():
+        found_values = set()
+        for pattern in patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE)
+            for match in matches:
+                value = match.group(1).strip()
+                if value and len(value) <= 100:  # Limite raisonnable
+                    found_values.add(value)
+        if found_values:
+            results[entity_type] = list(found_values)
+
+    # 2. Chercher d'autres types potentiels dans le texte
+    potential_types = re.findall(r'\b([A-Z][a-z]+(?:_[A-Z][a-z]+)*)\b', text)
+    for pot_type in potential_types:
+        if pot_type not in results:
+            found_values = set()
+            for gen_pattern in generic_patterns:
+                pattern = gen_pattern.format(pot_type)
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    value = match.group(1).strip()
+                    if value and len(value) <= 100:
+                        found_values.add(value)
+            if found_values:
+                results[pot_type] = list(found_values)
+
+    return results
+
+
+def extract_by_allowed_keys(text: str, allowed_keys: list[str]) -> dict:
+    """
+    Extraction basée sur les libellés des clés existantes (insensible à la casse).
+    Pour chaque clé existante, capture des valeurs sous les formes:
+    - "<Clé>: <valeur>"
+    - "<Clé> est/is/are <valeur>"
+    Les valeurs extraites sont ensuite nettoyées par _clean_values_for_type.
+    """
+    results: dict[str, list[str]] = {}
+
+    def norm_one(s: str) -> str:
+        s = re.sub(r"\s+", " ", (s or "").strip())
+        # normaliser espace entre nombre et unité
+        s = re.sub(r"(?i)\b([0-9]+(?:[.,][0-9]+)?)(mg|g|ml|l|µg|mcg|%|ui)\b", r"\1 \2", s)
+        return s
+
+    text = text or ""
+
+    for key in allowed_keys or []:
+        if not key:
+            continue
+        label = re.escape(key)
+        patterns = [
+            rf"(?i)\b{label}\b\s*[:\-]\s*([^\.;\n]+)",          # Clé: valeur
+            rf"(?i)\b{label}\b\s*(?:est|is|are)\s*([^\.;\n]+)",  # Clé est/is/are valeur
+        ]
+        found = set()
+        for pat in patterns:
+            for m in re.finditer(pat, text):
+                raw_val = norm_one(m.group(1))
+                cleaned = _clean_values_for_type(key, [raw_val])
+                for cv in cleaned:
+                    found.add(cv)
+        if found:
+            results[key] = list(found)
+
+    return results
 
     out = {}
     for etype, regs in patterns.items():
@@ -1268,16 +1495,24 @@ def extract_entities_from_text(text: str) -> dict:
 def _clean_values_for_type(key: str, values: list[str]) -> list[str]:
     """Filtre fort par type pour éviter le bruit + déduplication canonique."""
     def norm(s: str) -> str:
-        return re.sub(r'\s+', ' ', s.strip())
+        s = re.sub(r'\s+', ' ', (s or '').strip())
+        # Insérer un espace entre le nombre et l'unité si manquant (ex: 500mg -> 500 mg)
+        s = re.sub(r'(?i)\b([0-9]+(?:[.,][0-9]+)?)(mg|g|ml|l|µg|mcg|%|ui)\b', r'\1 \2', s)
+        return s
 
     seen = set()
     keep = []
 
-    if key.lower() == 'dosage':
-        rx = re.compile(r'^[0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI)$', re.IGNORECASE)
-        for v in values:
+    if key.lower() in ('dosage', 'strength'):
+        # N'accepter que "nombre + unité" (optionnellement avec /ml, /l, /g)
+        strict_rx = re.compile(r'(?i)^[0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|ui)(?:\s*/\s*(?:ml|l|g))?$')
+        for v in values or []:
             vv = norm(v)
-            if rx.match(vv):
+            # Si la valeur contient du texte supplémentaire, extraire seulement la partie "nombre + unité"
+            m = re.search(r'(?i)([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|ui)(?:\s*/\s*(?:ml|l|g))?)', vv)
+            if m:
+                vv = norm(m.group(1))
+            if strict_rx.match(vv):
                 k = vv.lower()
                 if k not in seen:
                     seen.add(k); keep.append(vv)
@@ -1285,7 +1520,7 @@ def _clean_values_for_type(key: str, values: list[str]) -> list[str]:
 
     # pour les autres, on enlève les fragments trop courts / mots vides
     stop = {'de','du','des','et','la','le','les','à','au','aux','pour','sur','dans','par','avec'}
-    for v in values:
+    for v in values or []:
         vv = norm(v)
         if 2 < len(vv) <= 80 and vv.lower() not in stop:
             k = vv.lower()
@@ -1890,10 +2125,18 @@ def expert_delete_annotation(request, annotation_id):
         
         try:
             # Mise à jour du JSON de la page
-            page_annotations = page.annotations.all().select_related('annotation_type').order_by('start_pos')
-            from rawdocs.views import _build_entities_map, generate_entities_based_page_summary
+            page_annotations = page.annotations.filter(
+                validation_status__in=['validated', 'expert_created']
+            ).select_related('annotation_type').order_by('start_pos')
             
+            from rawdocs.views import _build_entities_map, generate_entities_based_page_summary
             page_entities = _build_entities_map(page_annotations, use_display_name=True)
+            
+            # Filtrer les entités non pertinentes
+            filtered_entities = {}
+            for entity_type, values in page_entities.items():
+                if values and any(value.strip() for value in values):
+                    filtered_entities[entity_type] = [v for v in values if v.strip()]
             
             page_json = {
                 'document': {
@@ -1904,9 +2147,10 @@ def expert_delete_annotation(request, annotation_id):
                 },
                 'page': {
                     'number': page.page_number,
-                    'annotations_count': page_annotations.count(),
+                    'annotations_count': len(page_annotations),
+                    'validated_count': len(page_annotations),
                 },
-                'entities': page_entities,
+                'entities': filtered_entities,
                 'generated_at': datetime.utcnow().isoformat() + 'Z',
             }
             
@@ -1915,10 +2159,17 @@ def expert_delete_annotation(request, annotation_id):
             
             # Mise à jour du JSON du document
             all_annotations = Annotation.objects.filter(
-                page__document=document
+                page__document=document,
+                validation_status__in=['validated', 'expert_created']  # Ne prendre que les annotations validées
             ).select_related('annotation_type', 'page').order_by('page__page_number', 'start_pos')
             
             document_entities = _build_entities_map(all_annotations, use_display_name=True)
+            
+            # Filtrer les entités pour ne garder que celles qui sont pertinentes
+            filtered_entities = {}
+            for entity_type, values in document_entities.items():
+                if values and any(value.strip() for value in values):
+                    filtered_entities[entity_type] = [v for v in values if v.strip()]
             
             document_json = {
                 'document': {
@@ -1927,9 +2178,9 @@ def expert_delete_annotation(request, annotation_id):
                     'doc_type': getattr(document, 'doc_type', None),
                     'source': getattr(document, 'source', None),
                     'total_pages': document.total_pages,
-                    'total_annotations': all_annotations.count(),
+                    'total_annotations': len(all_annotations),
                 },
-                'entities': document_entities,
+                'entities': filtered_entities,  # Utiliser les entités filtrées
                 'generated_at': datetime.utcnow().isoformat() + 'Z',
             }
             
@@ -2082,8 +2333,9 @@ def expert_generate_document_annotation_summary(request, doc_id):
         # Résumé à partir des seules entités/valeurs
         summary = generate_entities_based_document_summary(
             entities=entities,
-            document_title=document.title,
-            total_pages=document.total_pages
+            doc_title=document.title,
+            doc_type=getattr(document, 'doc_type', None),
+            total_annotations=all_annotations.count()
         )
 
         # Sauvegarde
