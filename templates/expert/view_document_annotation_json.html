@@ -993,8 +993,24 @@ document.addEventListener('DOMContentLoaded', function() {
     if (data.updated_json && window.editor) {
       window.editor.setValue(JSON.stringify(data.updated_json, null, 2));
     }
-    const changed = (data.changed_keys || []).join(', ');
-    setStatus(changed ? `Résumé sauvegardé • Entités mises à jour: ${changed}` : 'Résumé sauvegardé • Aucune entité modifiée');
+    // Construire un message détaillé: clés + valeurs ajoutées
+    const added = data.entities_added || {};
+    const removed = data.entities_removed || {};
+    const changed = data.changed_keys || [];
+
+    let parts = [];
+    changed.forEach(k => {
+      const a = added[k];
+      const r = removed[k];
+      if (a && a.length) parts.push(`${k} +[${a.join(', ')}]`);
+      if (r && r.length) parts.push(`${k} -[${r.join(', ')}]`);
+    });
+
+    if (parts.length) {
+      setStatus(`Résumé sauvegardé • Modifications: ${parts.join(' ; ')}`);
+    } else {
+      setStatus('Résumé sauvegardé • Aucune entité modifiée');
+    }
   } catch (e) {
     console.error(e); setStatus(e.message, false);
   }

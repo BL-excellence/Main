@@ -1201,13 +1201,65 @@ def save_summary_changes(request, doc_id):
 
         allowed_keys = list(current_entities.keys())
 
-        # 1) Extraire les entités du nouveau résumé (toutes clés existantes, via libellés)
-        extracted_entities = extract_by_allowed_keys(new_summary, allowed_keys)
-        print(f"Entités extraites du résumé: {extracted_entities}")
+        # 1) Extraire les entités du nouveau résumé:
+        #    a) via libellés existants (Clé: valeur)
+        extracted_by_keys = extract_by_allowed_keys(new_summary, allowed_keys)
+        #    b) via texte libre (phrases), en détectant entité/valeur
+        free_extracted = extract_entities_from_text(new_summary) or {}
+        #       b2) enrichissement par détections ciblées (route, packaging, pack size, forme)
+        try:
+            # Route of Administration
+            route_vals = set()
+            for m in re.finditer(r"(?i)(?:par\s+voie\s+|voie\s+)(orale|intraveineuse|intramusculaire|sous\s*cutan[eé]e|subcutan[eé]e|nasale|topique|cutan[eé]e|rectale|inhalation)", new_summary):
+                route_vals.add(m.group(1))
+            for m in re.finditer(r"(?i)\b(oral|intravenous|intramuscular|subcutaneous|topical|nasal|rectal|inhalation|iv|im|sc)\b", new_summary):
+                route_vals.add(m.group(1))
+            if route_vals:
+                free_extracted.setdefault('Route Of Administration', []).extend(sorted(route_vals))
+
+            # Immediate Packaging
+            packaging_vals = set()
+            for m in re.finditer(r"(?i)\b(blisters?|blister|flacons?|bouteilles?|bottles?|sachets?|ampoules?|seringues?\s*pr[ée]remplies?)\b", new_summary):
+                packaging_vals.add(m.group(0))
+            if packaging_vals:
+                free_extracted.setdefault('Immediate Packaging', []).extend(sorted(packaging_vals))
+
+            # Pack Size (ex: 20 comprimés, 100 ml, 6 sachets)
+            pack_vals = set()
+            for m in re.finditer(r"(?i)\b([0-9]{1,4}\s*(?:comprim[ée]s?|g[ée]lules?|capsules?|sachets?|ml|ampoules?|unit[eé]s?))\b", new_summary):
+                pack_vals.add(m.group(1))
+            if pack_vals:
+                free_extracted.setdefault('Pack Size', []).extend(sorted(pack_vals))
+
+            # Pharmaceutical Form
+            form_vals = set()
+            for m in re.finditer(r"(?i)\b(comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable|tablet[s]?)\b", new_summary):
+                form_vals.add(m.group(0))
+            if form_vals:
+                free_extracted.setdefault('Pharmaceutical Form', []).extend(sorted(form_vals))
+        except Exception:
+            pass
+
+        #    c) Fusionner en ne gardant que les clés existantes (mapping canonique)
+        extracted_entities: dict[str, list[str]] = {}
+        for k, vals in (extracted_by_keys or {}).items():
+            extracted_entities.setdefault(k, []).extend(vals or [])
+        for raw_k, vals in (free_extracted or {}).items():
+            canon = _canonical_key(raw_k, allowed_keys)
+            if not canon:
+                continue
+            extracted_entities.setdefault(canon, []).extend(vals or [])
+        # Déduplication + nettoyage par type
+        for k, vals in list(extracted_entities.items()):
+            extracted_entities[k] = _clean_values_for_type(k, vals or [])
+        print(f"Entités extraites (fusion): {extracted_entities}")
 
         # 3) Mise à jour fine par valeurs (ajouts/suppressions basées sur le résumé)
         updated_entities = current_entities.copy()
         changes_made = []
+        entities_added: dict[str, list[str]] = {}
+        entities_removed: dict[str, list[str]] = {}
+        changed_keys: list[str] = []
 
         # Normaliser les clés permises (mapping insensible à la casse)
         key_map = {k.lower(): k for k in allowed_keys}
@@ -1248,23 +1300,26 @@ def save_summary_changes(request, doc_id):
 
             # appliquer suppressions
             kept = [v for v in existing_vals if _norm_val(v) not in to_remove]
+            removed_list = [v for v in existing_vals if _norm_val(v) in to_remove]
             # appliquer ajouts
+            added_list = []
             for v in to_add:
                 nv = _norm_val(v)
                 if nv not in { _norm_val(x) for x in kept }:
                     kept.append(v)
+                    added_list.append(v)
 
             if kept != existing_vals:
-                # log diff simple
-                removed_list = [v for v in existing_vals if _norm_val(v) in to_remove]
-                added_list = [v for v in to_add]
                 change_msg = f"{canon_k}:"
                 if removed_list:
                     change_msg += f" -{removed_list}"
+                    entities_removed[canon_k] = removed_list
                 if added_list:
                     change_msg += f" +{added_list}"
+                    entities_added[canon_k] = added_list
                 changes_made.append(change_msg)
                 updated_entities[canon_k] = kept
+                changed_keys.append(canon_k)
 
         # 4) Sauvegarder le résumé
         document.global_annotations_summary = new_summary
@@ -1308,6 +1363,9 @@ def save_summary_changes(request, doc_id):
             'message': 'Résumé sauvegardé et entités synchronisées',
             'updated_json': current_json,
             'changes_made': changes_made,
+            'changed_keys': changed_keys,
+            'entities_added': entities_added,
+            'entities_removed': entities_removed,
             'entities_changes': changes_made,
         })
 
@@ -1529,12 +1587,63 @@ def _clean_values_for_type(key: str, values: list[str]) -> list[str]:
     return keep
 
 
-def _canonical_key(key: str, existing_keys: list[str]) -> str | None:
-    """Mappe 'product' -> 'Product' etc. On ne crée JAMAIS de nouvelle clé."""
+import unicodedata
+
+def _fold_key(s: str) -> str:
+    s = (s or '').strip().lower()
+    s = unicodedata.normalize('NFD', s)
+    s = ''.join(ch for ch in s if unicodedata.category(ch) != 'Mn')  # remove accents
+    s = re.sub(r'[^a-z0-9]+', ' ', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+
+def _build_synonym_map(existing_keys: list[str]) -> dict:
+    """Construit une map foldée -> clé canonique, avec synonymes courants."""
+    syn: dict[str, str] = {}
+    existing_keys = existing_keys or []
+
+    # D'abord, les clés existantes elles-mêmes
     for ek in existing_keys:
-        if ek.lower() == key.lower():
-            return ek
-    return None
+        syn[_fold_key(ek)] = ek
+
+    # Ensuite, lier des synonymes connus SEULEMENT si la clé canonique est présente
+    def bind(canon: str, variants: list[str]):
+        if canon in existing_keys:
+            syn[_fold_key(canon)] = canon
+            for v in variants:
+                syn[_fold_key(v)] = canon
+
+    bind('Invented Name', ['product', 'product name', 'nom du produit', 'nom commercial', 'invented name'])
+    bind('Strength', ['dosage', 'posologie', 'concentration', 'teneur', 'strength'])
+    # Supporter plusieurs variantes de clés canoniques si elles existent réellement dans le JSON
+    for variant in ['Pharmaceutical Form', 'Form']:
+        bind(variant, ['form', 'forme', 'presentation', 'pharmaceutical form', 'forme pharmaceutique'])
+    for variant in ['Route Of Administration', 'Route', 'Voie']:
+        bind(variant, ['route', 'voie', "voie d administration", 'route of administration', "voie d’administration", 'administration route'])
+    for variant in ['Immediate Packaging', 'Packaging', 'Emballage']:
+        bind(variant, ['packaging', 'emballage', 'immediate packaging', 'conditionnement'])
+    for variant in ['Pack Size', 'Packsize', 'Pack']:
+        bind(variant, ['pack size', 'taille du pack', 'taille de pack', 'taille de boîte', 'boîte'])
+    for variant in ['Ma Number', 'AMM Number', 'Authorization Number']:
+        bind(variant, ['ma number', 'numero amm', 'numéro amm', 'authorization number', 'marketing authorization number', 'amm'])
+    for variant in ['Site', 'Manufacturing Site']:
+        bind(variant, ['manufacturing site', 'site', 'usine', 'fabricant'])
+    for variant in ['Country', 'Pays']:
+        bind(variant, ['pays', 'country'])
+    for variant in ['Substance Active', 'Substance_Active', 'Active Ingredient']:
+        bind(variant, ['substance active', 'principe actif', 'active ingredient'])
+
+    return syn
+
+
+def _canonical_key(key: str, existing_keys: list[str]) -> str | None:
+    """Retourne la clé canonique parmi existing_keys en utilisant un matching accent/casse/synonymes."""
+    if not key:
+        return None
+    syn = _build_synonym_map(existing_keys)
+    folded = _fold_key(key)
+    return syn.get(folded)
 
 
 def update_document_json_with_entities_replace_only(document, new_entities: dict) -> tuple[dict, list[str]]:
