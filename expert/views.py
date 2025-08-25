@@ -1420,51 +1420,56 @@ def extract_entities_from_text(text: str) -> dict:
     Extraction intelligente des entités du texte avec support pour tous les types d'entités.
     Retourne un dict {Type: [valeurs]} avec support pour tous les types existants.
     """
-    # Patterns de base pour les types courants
+    # Patterns de base pour les types courants (FR/EN + abréviations)
     base_patterns = {
         'Product': [
-            r'(?:produit|médicament)\s*:?\s*([A-Z][\wÀ-ÿ\s\-\/]{2,40})',
-            r'^(?:le\s+)?([A-Z][\wÀ-ÿ\s\-\/]{3,40})\s+(?:est|sera|contient)\b',
-            r'(?:nom du produit|product name)\s*:?\s*([A-Z][\wÀ-ÿ\s\-\/]{2,40})'
+            # "Produit: X" ou "Product: X"
+            r'\b(?:produit|médicament|product)\b\s*:?\s*((?-i:[A-Z])[\wÀ-ÿ\s\-\/]{2,60})',
+            # "Le produit est X" / "The product is X"
+            r'\b(?:produit|product)\b\s+(?:est|is)\s+((?-i:[A-Z])[\wÀ-ÿ\s\-\/]{2,60})',
+            # "X est/sera/contient" en début de phrase (moins prioritaire)
+            r'^(?:le\s+|the\s+)?([A-Z][\wÀ-ÿ\s\-\/]{3,60})\s+(?:est|sera|contient|is|contains)\b',
+            # "Nom du produit: X"
+            r'(?:nom du produit|product name)\s*:?\s*([A-Z][\wÀ-ÿ\s\-\/]{2,60})'
         ],
         'Dosage': [
-            r'\b([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|mg\/ml|g\/l))\b',
-            r'(?:dosage|posologie|concentration)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|mg\/ml|g\/l))',
+            r'\b([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|iu|mg\/ml|g\/l))\b',
+            r'(?:dosage|posologie|concentration|strength)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|iu|mg\/ml|g\/l))',
         ],
         'Substance_Active': [
-            r'(?:substance active|principe actif|active ingredient)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,40})',
-            r'(?:contient|à base de|contains)\s+([A-Z][\wÀ-ÿ\s\-]{3,40})'
+            r'(?:substance active|principe actif|active ingredient)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,60})',
+            r'(?:contient|à base de|contains)\s+([A-Z][\wÀ-ÿ\s\-]{2,60})'
         ],
         'Site': [
-            r'(?:site|usine|fabricant|manufacturing site)\s*:?\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})',
-            r'(?:fabriqu[ée]|produit|manufactured)\s*(?:à|par|by|in)\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})'
+            r'(?:site|usine|fabricant|manufacturing site|manufacturer)\s*:?\s*([A-Z][\wÀ-ÿ\s\.\-]{2,80})',
+            r'(?:fabriqu[ée]|produit|manufactured|made)\s*(?:à|par|by|in)\s*([A-Z][\wÀ-ÿ\s\.\-]{2,80})'
         ],
         'Pays': [
-            r'(?:pays|country)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,30})',
-            r'(?:en|au|aux|in)\s+([A-Z][\wÀ-ÿ\s\-]{4,25})(?=[\s,\.]|$)'
+            r'(?:pays|country)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,40})',
+            r'(?:en|au|aux|in)\s+([A-Z][\wÀ-ÿ\s\-]{2,40})(?=[\s,\.]|$)'
         ],
         'Strength': [
-            r'(?:strength|force|puissance)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI))',
-            r'(?:concentration|teneur)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI))',
-            r'(?:est\s+de)\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI))',
+            r'(?:strength|force|puissance|teneur)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|iu))',
+            r'(?:concentration)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|iu))',
+            r'(?:est\s+de|is)\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|iu))',
         ],
         'Form': [
-            r'(?:forme|form|presentation)\s*:?\s*(\b(?:comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable)\b)',
-            r'(?:sous\s+forme\s+de)\s*(\b(?:comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable)\b)',
+            r'(?:forme|form|presentation|pharmaceutical form)\s*:?\s*(\b(?:comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable|gel|cr[èe]me|onguent|suppositoire|tablet[s]?)\b)',
+            r'(?:sous\s+forme\s+de|as\s+a)\s*(\b(?:comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable|gel|cr[èe]me|onguent|suppositoire|tablet[s]?)\b)',
         ],
         'Batch_Size': [
-            r'(?:taille de lot|batch size|lot)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:unités?|comprim[ée]s?|g[ée]lules?|capsules?)?)',
+            r'(?:taille de lot|batch size|lot)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:unités?|comprim[ée]s?|g[ée]lules?|capsules?|batches?))',
         ],
         'Shelf_Life': [
-            r'(?:durée de conservation|shelf life|péremption)\s*:?\s*([0-9]+\s*(?:mois|ans?|months?|years?|m|y))',
+            r'(?:durée de conservation|shelf life|péremption|expiry)\s*:?\s*([0-9]+\s*(?:mois|ans?|months?|years?|m|y))',
         ]
     }
 
     # Patterns génériques pour capturer d'autres types possibles
+    # Patterns génériques restreints pour limiter le bruit (capture jusqu'à la 1ère ponctuation forte)
     generic_patterns = [
-        r'(?:{})\s*:?\s*([^\.,:;\n]+)',  # Capture après "Type:"
-        r'(?:{})\s+(?:est|is|are)\s+([^\.,:;\n]+)',  # Capture après "Type is/are"
-        r'(?:{})\s*:\s*([^\.,:;\n]+)',  # Capture après "Type:"
+        r'(?:{})\s*[:\-]\s*([^\.;\n]+)',  # Clé: valeur (éviter la virgule qui crée des fragments parasites)
+        r'(?:{})\s+(?:est|is|are)\s+([^\.;\n]+)',
     ]
 
     results = {}
@@ -1563,11 +1568,11 @@ def _clean_values_for_type(key: str, values: list[str]) -> list[str]:
 
     if key.lower() in ('dosage', 'strength'):
         # N'accepter que "nombre + unité" (optionnellement avec /ml, /l, /g)
-        strict_rx = re.compile(r'(?i)^[0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|ui)(?:\s*/\s*(?:ml|l|g))?$')
+        strict_rx = re.compile(r'(?i)^[0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|ui|iu)(?:\s*/\s*(?:ml|l|g))?$')
         for v in values or []:
             vv = norm(v)
             # Si la valeur contient du texte supplémentaire, extraire seulement la partie "nombre + unité"
-            m = re.search(r'(?i)([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|ui)(?:\s*/\s*(?:ml|l|g))?)', vv)
+            m = re.search(r'(?i)([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|ui|iu)(?:\s*/\s*(?:ml|l|g))?)', vv)
             if m:
                 vv = norm(m.group(1))
             if strict_rx.match(vv):
@@ -1576,10 +1581,33 @@ def _clean_values_for_type(key: str, values: list[str]) -> list[str]:
                     seen.add(k); keep.append(vv)
         return keep
 
+    # Nettoyages spécifiques pour éviter les segments parasites
+    # Product / Substance Active: couper à la première conjonction forte ou virgule
+    if key.lower() in ('product', 'invented name', 'substance active', 'substance_active', 'active ingredient'):
+        cut_rx = re.compile(r'^(.*?)(?:\s+(?:et|and)\b|,|;|\.|$)', re.IGNORECASE)
+        for v in values or []:
+            vv = norm(v)
+            m = cut_rx.match(vv)
+            if m:
+                vv = m.group(1).strip()
+            # retirer un éventuel préfixe "est/est de/is/contains" mal capturé
+            vv = re.sub(r'(?i)^(?:le\s+produit\s+est|the\s+product\s+is|est|est de|is|contains)\s+', '', vv).strip()
+            # éviter d'attraper "produits de dégradation" → demander une majuscule initiale
+            if not re.match(r'^(?-i:[A-Z]).*', vv):
+                continue
+            # filtrer les tokens courts
+            if 1 < len(vv) <= 80:
+                k = vv.lower()
+                if k and k not in seen:
+                    seen.add(k); keep.append(vv)
+        return keep
+
     # pour les autres, on enlève les fragments trop courts / mots vides
     stop = {'de','du','des','et','la','le','les','à','au','aux','pour','sur','dans','par','avec'}
     for v in values or []:
         vv = norm(v)
+        # couper à ; . fin de phrase pour éviter de longues séquences
+        vv = re.split(r'[;\.]', vv)[0].strip()
         if 2 < len(vv) <= 80 and vv.lower() not in stop:
             k = vv.lower()
             if k not in seen:
