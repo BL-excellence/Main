@@ -1,0 +1,103 @@
+{% extends "admin/base.html" %}
+{% block title %}AI Learning Dashboard{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 2rem auto; padding: 0 1rem;">
+    <h1>🧠 Métadonnées - Apprentissage IA</h1>
+    
+    {% if no_data %}
+        <div style="text-align: center; padding: 3rem; background: #f8f9fa; border-radius: 12px;">
+            <h3>Pas encore de données d'apprentissage</h3>
+            <p>Uploadez et corrigez des documents pour voir les statistiques.</p>
+        </div>
+    {% elif error %}
+        <div style="color: #dc3545; padding: 1rem; background: #f8d7da; border-radius: 8px;">
+            Erreur: {{ error }}
+        </div>
+    {% else %}
+        <!-- Three Cards Section -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin: 2rem 0;">
+            <div style="background: #e3f2fd; padding: 2rem; border-radius: 12px; text-align: center;">
+                <h3>Score Global</h3>
+                <div style="font-size: 3rem; font-weight: bold; color: #1976d2;">{{ avg_score|floatformat:0 }}%</div>
+                <p>Précision moyenne IA</p>
+            </div>
+            
+            <div style="background: #f3e5f5; padding: 2rem; border-radius: 12px; text-align: center;">
+                <h3>Total Feedbacks</h3>
+                <div style="font-size: 3rem; font-weight: bold; color: #7b1fa2;">{{ total_feedbacks }}</div>
+                <p>Corrections traitées</p>
+            </div>
+            
+            <div style="background: #e8f5e9; padding: 2rem; border-radius: 12px; text-align: center;">
+                <h3>Amélioration IA</h3>
+                <div style="font-size: 3rem; font-weight: bold; color: {% if improvement > 0 %}#4caf50{% elif improvement < 0 %}#f44336{% else %}#ff9800{% endif %};">
+                    {% if improvement > 0 %}+{% endif %}{{ improvement|default:0 }}%
+                </div>
+                <p>{% if total_feedbacks < 2 %}Pas assez de données{% else %}Changement depuis le premier feedback{% endif %}</p>
+            </div>
+        </div>
+
+        <!-- Performance Tables Section -->
+        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <!-- Field Performance Table -->
+            <h3>Performance par Champ</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 1rem; margin-bottom: 3rem;">
+                <thead>
+                    <tr style="background: #f5f5f5;">
+                        <th style="padding: 1rem; text-align: left; border-bottom: 2px solid #ddd;">Champ</th>
+                        <th style="padding: 1rem; text-align: center; border-bottom: 2px solid #ddd; color: #4caf50;">Correct</th>
+                        <th style="padding: 1rem; text-align: center; border-bottom: 2px solid #ddd; color: #f44336;">Erreurs</th>
+                        <th style="padding: 1rem; text-align: center; border-bottom: 2px solid #ddd; color: #ff9800;">Manqués</th>
+                        <th style="padding: 1rem; text-align: center; border-bottom: 2px solid #ddd;">Précision</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for field, stats in field_stats.items %}
+                    <tr>
+                        <td style="padding: 1rem; border-bottom: 1px solid #eee; font-weight: 600;">{{ field|capfirst }}</td>
+                        <td style="padding: 1rem; border-bottom: 1px solid #eee; text-align: center; color: #4caf50; font-weight: bold;">{{ stats.correct }}</td>
+                        <td style="padding: 1rem; border-bottom: 1px solid #eee; text-align: center; color: #f44336; font-weight: bold;">{{ stats.wrong }}</td>
+                        <td style="padding: 1rem; border-bottom: 1px solid #eee; text-align: center; color: #ff9800; font-weight: bold;">{{ stats.missed }}</td>
+                        <td style="padding: 1rem; border-bottom: 1px solid #eee; text-align: center; font-weight: bold;">
+                            {{ stats.precision }}%
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <!-- Document Performance Table -->
+            <h3>Précision par Document</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+                <thead>
+                    <tr style="background: #e8f4fd;">
+                        <th style="padding: 1rem; text-align: left; border-bottom: 2px solid #ddd;">Document</th>
+                        <th style="padding: 1rem; text-align: center; border-bottom: 2px solid #ddd; color: #4caf50;">Correct</th>
+                        <th style="padding: 1rem; text-align: center; border-bottom: 2px solid #ddd; color: #f44336;">Erreurs</th>
+                        <th style="padding: 1rem; text-align: center; border-bottom: 2px solid #ddd; color: #ff9800;">Manqués</th>
+                        <th style="padding: 1rem; text-align: center; border-bottom: 2px solid #ddd;">Précision</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc_id, stats in document_stats.items %}
+                    <tr>
+                        <td style="padding: 1rem; border-bottom: 1px solid #eee; font-weight: 600;">{{ stats.title|truncatechars:40 }}</td>
+                        <td style="padding: 1rem; border-bottom: 1px solid #eee; text-align: center; color: #4caf50; font-weight: bold;">{{ stats.correct }}</td>
+                        <td style="padding: 1rem; border-bottom: 1px solid #eee; text-align: center; color: #f44336; font-weight: bold;">{{ stats.wrong }}</td>
+                        <td style="padding: 1rem; border-bottom: 1px solid #eee; text-align: center; color: #ff9800; font-weight: bold;">{{ stats.missed }}</td>
+                        <td style="padding: 1rem; border-bottom: 1px solid #eee; text-align: center; font-weight: bold;">
+                            {{ stats.precision }}%
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+    
+    <div style="text-align: center; margin-top: 2rem;">
+        <a href="{% url 'rawdocs:dashboard' %}" style="background: #2196f3; color: white; padding: 1rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600;">← Retour Dashboard</a>
+    </div>
+</div>
+{% endblock %}

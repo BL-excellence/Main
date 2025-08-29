@@ -23,6 +23,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import views as auth_views
 from django.http import HttpResponse
 from django.views.decorators.http import require_POST
+from .metadata_rlhf_learning import MetadataRLHFLearner
+
 
 
 from .models import (
@@ -168,6 +170,7 @@ def dashboard_view(request):
         'in_progress': pending_validation_count,
         'pending_validation_count': pending_validation_count,
         'total_imported': total_imported,
+        'total_in_reextraction': total_imported,
         # Placeholder charts (peuvent être ajustés plus tard)
         'pie_data': json.dumps([15, 8, 12, 5, 3]),
         'bar_data': json.dumps([150, total_imported, validated_count, pending_validation_count]),
@@ -181,9 +184,112 @@ def upload_pdf(request):
     form = UploadForm(request.POST or None, request.FILES or None)
     context = {'form': form}
 
-    if request.method == 'POST' and form.is_valid():
+    # Handle metadata editing form submission
+    if request.method == 'POST' and request.POST.get('edit_metadata'):
+        doc_id = request.POST.get('doc_id')
+        rd = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
+        edit_form = MetadataEditForm(request.POST)
+        
+        # Get ORIGINAL AI extracted metadata (what AI first extracted)
+        ai_metadata = {}
+        standard_fields = ['title', 'doc_type', 'publication_date', 'version', 'source', 'context', 'country', 'language', 'url_source']
+        
+        # Get ORIGINAL AI extracted metadata (what was first extracted by LLM)
+        ai_metadata = rd.original_ai_metadata or {}
+
+        if edit_form.is_valid():
+            # Collect human corrections
+            human_metadata = {}
+            changes_made = False
+            
+            field_mapping = {
+                'title': 'title',
+                'type': 'doc_type', 
+                'publication_date': 'publication_date',
+                'version': 'version',
+                'source': 'source',
+                'context': 'context',
+                'country': 'country',
+                'language': 'language',
+                'url_source': 'url_source'
+            }
+            
+            for form_field, model_field in field_mapping.items():
+                new_value = edit_form.cleaned_data.get(form_field, '') or ''
+                old_value = getattr(rd, model_field, '') or ''
+                human_metadata[form_field] = new_value
+                
+                if str(old_value) != str(new_value):
+                    changes_made = True
+                    MetadataLog.objects.create(
+                        document=rd, field_name=form_field,
+                        old_value=old_value, new_value=new_value,
+                        modified_by=request.user
+                    )
+                    setattr(rd, model_field, new_value)
+            
+            if changes_made:
+                rd.save()
+                
+                # Process RLHF Learning ONLY if changes were made
+                from .metadata_rlhf_learning import MetadataRLHFLearner
+                learner = MetadataRLHFLearner()
+                feedback_result = learner.process_metadata_feedback(rd, ai_metadata, human_metadata, request.user)
+
+                # Create detailed message with learning stats
+                corrections = feedback_result['corrections_summary']
+                score = int(feedback_result['feedback_score'] * 100)
+                correct_count = len(corrections.get('kept_correct', []))
+                wrong_count = len(corrections.get('corrected_fields', [])) + len(corrections.get('removed_fields', []))
+                missed_count = len(corrections.get('missed_fields', []))
+
+                # Show success message with learning stats
+                learning_message = f"✅ Métadonnées sauvegardées! 🧠 IA Score: {score}% | ✅ Corrects: {correct_count} | ❌ Erreurs: {wrong_count} | 📝 Manqués: {missed_count}"
+                messages.success(request, learning_message)
+
+                # Pass learning data to template
+                context['learning_feedback'] = {
+                    'score': score,
+                    'correct': correct_count,
+                    'wrong': wrong_count,
+                    'missed': missed_count,
+                    'show': True,
+                    'feedback_result': feedback_result
+                }
+            else:
+                messages.info(request, "Aucune modification détectée.")
+  
+
+        metadata = extract_metadonnees(rd.file.path, rd.url or "")
+        text = extract_full_text(rd.file.path)
+        
+        initial_data = {
+            'title': rd.title or '',
+            'type': rd.doc_type or '', 
+            'publication_date': rd.publication_date or '',
+            'version': rd.version or '',
+            'source': rd.source or '',
+            'context': rd.context or '',
+            'country': rd.country or '',
+            'language': rd.language or '',
+            'url_source': rd.url_source or (rd.url or ''),
+        }
+        edit_form = MetadataEditForm(initial=initial_data)
+        
+        context.update({
+            'doc': rd,
+            'metadata': metadata,
+            'extracted_text': text,
+            'edit_form': edit_form,
+            'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
+        })
+        
+        return render(request, 'rawdocs/upload.html', context)
+
+    # Handle file upload
+    elif request.method == 'POST' and form.is_valid():
         try:
-            # Priorité au fichier local
+            # Priority to local file
             if form.cleaned_data.get('pdf_file'):
                 f = form.cleaned_data['pdf_file']
                 rd = RawDocument(owner=request.user)
@@ -201,8 +307,9 @@ def upload_pdf(request):
             metadata = extract_metadonnees(rd.file.path, rd.url or "")
             text = extract_full_text(rd.file.path)
             
-            # Sauvegarder les métadonnées extraites par le LLM dans les champs du modèle
+            # Save extracted metadata to the model
             if metadata:
+                rd.original_ai_metadata = metadata
                 rd.title = metadata.get('title', '')
                 rd.doc_type = metadata.get('type', '')
                 rd.publication_date = metadata.get('publication_date', '')
@@ -215,15 +322,27 @@ def upload_pdf(request):
                 rd.save()
                 
                 print(f"✅ Métadonnées LLM sauvegardées pour le document {rd.pk}")
-                print(f"   - Titre: {rd.title}")
-                print(f"   - Type: {rd.doc_type}")
-                print(f"   - Source: {rd.source}")
-                print(f"   - Pays: {rd.country}")
+
+            # Create form for editing with initial data
+            initial_data = {
+                'title': rd.title or '',
+                'type': rd.doc_type or '', 
+                'publication_date': rd.publication_date or '',
+                'version': rd.version or '',
+                'source': rd.source or '',
+                'context': rd.context or '',
+                'country': rd.country or '',
+                'language': rd.language or '',
+                'url_source': rd.url_source or (rd.url or ''),
+            }
+            edit_form = MetadataEditForm(initial=initial_data)
 
             context.update({
                 'doc': rd,
                 'metadata': metadata,
-                'extracted_text': text
+                'extracted_text': text,
+                'edit_form': edit_form,
+                'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
             })
             messages.success(request, "Document importé avec succès!")
 
@@ -322,7 +441,7 @@ def edit_metadata(request, doc_id):
                     except CustomField.DoesNotExist:
                         pass
             
-            messages.success(request, "Métadonnées mises à jour")
+            
             return redirect('rawdocs:document_list')
     else:
         initial_data = {
@@ -2114,3 +2233,111 @@ def validate_global_summary(request, doc_id):
     except Exception as e:
         print(f"❌ Erreur validation résumé global du document {doc_id}: {e}")
         return JsonResponse({'error': f'Erreur lors de la validation: {str(e)}'}, status=500)
+    
+
+
+@login_required
+@user_passes_test(is_metadonneur)
+def metadata_learning_dashboard(request):
+    """Dashboard showing AI learning statistics with proper calculations"""
+    try:
+        from .models import MetadataFeedback, MetadataLearningMetrics
+        
+        total_feedbacks = MetadataFeedback.objects.count()
+        
+        if total_feedbacks == 0:
+            return render(request, 'rawdocs/learning_dashboard.html', {
+                'no_data': True
+            })
+        
+        # Calculate average score
+        avg_score = MetadataFeedback.objects.aggregate(
+            avg=models.Avg('feedback_score')
+        )['avg'] or 0
+        
+        # Field performance with percentages calculated
+        field_stats = {}
+        document_stats = {}  # NEW: Track per-document performance
+        
+        for feedback in MetadataFeedback.objects.all():
+            corrections = feedback.corrections_made
+            doc_id = feedback.document.id
+            doc_title = feedback.document.title or f"Document {doc_id}"
+            
+            # Initialize document stats
+            if doc_id not in document_stats:
+                document_stats[doc_id] = {
+                    'title': doc_title,
+                    'correct': 0,
+                    'wrong': 0,
+                    'missed': 0,
+                    'precision': 0
+                }
+            
+            for kept in corrections.get('kept_correct', []):
+                field = kept.get('field')
+                if field not in field_stats:
+                    field_stats[field] = {'correct': 0, 'wrong': 0, 'missed': 0}
+                field_stats[field]['correct'] += 1
+                document_stats[doc_id]['correct'] += 1
+            
+            for wrong in corrections.get('corrected_fields', []):
+                field = wrong.get('field')
+                if field not in field_stats:
+                    field_stats[field] = {'correct': 0, 'wrong': 0, 'missed': 0}
+                field_stats[field]['wrong'] += 1
+                document_stats[doc_id]['wrong'] += 1
+            
+            for missed in corrections.get('missed_fields', []):
+                field = missed.get('field')
+                if field not in field_stats:
+                    field_stats[field] = {'correct': 0, 'wrong': 0, 'missed': 0}
+                field_stats[field]['missed'] += 1
+                document_stats[doc_id]['missed'] += 1
+        
+        # Calculate precision percentages
+        for field, stats in field_stats.items():
+            total = stats['correct'] + stats['wrong'] + stats['missed']
+            stats['precision'] = int((stats['correct'] / total * 100)) if total > 0 else 0
+        
+        for doc_id, stats in document_stats.items():
+            total = stats['correct'] + stats['wrong'] + stats['missed']
+            stats['precision'] = int((stats['correct'] / total * 100)) if total > 0 else 0
+        
+        # Get improvement trend
+        feedbacks = MetadataFeedback.objects.order_by('created_at')
+        improvement = 0
+        if feedbacks.count() >= 2:
+            first_score = feedbacks.first().feedback_score * 100
+            last_score = feedbacks.last().feedback_score * 100
+            improvement = int(last_score - first_score)
+        
+        return render(request, 'rawdocs/learning_dashboard.html', {
+            'total_feedbacks': total_feedbacks,
+            'avg_score': int(avg_score * 100),
+            'field_stats': field_stats,
+            'document_stats': document_stats,  # NEW: Pass document stats
+            'improvement': improvement,
+            'has_data': True
+        })
+        
+    except Exception as e:
+        print(f"Learning dashboard error: {e}")
+        return render(request, 'rawdocs/learning_dashboard.html', {'error': str(e)})
+
+@login_required 
+def metadata_learning_api(request):
+    """API for learning stats"""
+    try:
+        from .models import MetadataFeedback
+        
+        total = MetadataFeedback.objects.count()
+        avg = MetadataFeedback.objects.aggregate(avg=models.Avg('feedback_score'))['avg'] or 0
+        
+        return JsonResponse({
+            'total_feedbacks': total,
+            'average_score': avg * 100,
+            'learning_active': total > 0
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

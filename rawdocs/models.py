@@ -1,3 +1,4 @@
+
 # rawdocs/models.py
 from os.path import join
 from datetime import datetime
@@ -27,7 +28,6 @@ class RawDocument(models.Model):
     url = models.URLField(help_text="URL d'origine du PDF", blank=True)
     file = models.FileField(upload_to=pdf_upload_to, help_text="Fichier PDF téléchargé")
     created_at = models.DateTimeField(auto_now_add=True)
-
     # Ownership
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -59,6 +59,7 @@ class RawDocument(models.Model):
     country = models.CharField(max_length=100, blank=True, help_text="Pays détecté (GPE ou TLD)")
     language = models.CharField(max_length=10, blank=True, help_text="Langue détectée (fr, en…)")
     url_source = models.URLField(blank=True, help_text="URL d'origine pour référence")
+    original_ai_metadata = models.JSONField(null=True, blank=True, help_text="Original AI extracted metadata for RLHF comparison")
     # JSON global de toutes les annotations du document
     global_annotations_json = models.JSONField(
         null=True, blank=True,
@@ -537,3 +538,18 @@ class CustomFieldValue(models.Model):
     
     class Meta:
         unique_together = ['document', 'field']
+
+class MetadataFeedback(models.Model):
+    document = models.ForeignKey(RawDocument, on_delete=models.CASCADE)
+    metadonneur = models.ForeignKey(User, on_delete=models.CASCADE)
+    ai_metadata_before = models.JSONField()
+    human_metadata_after = models.JSONField()
+    corrections_made = models.JSONField()
+    feedback_score = models.FloatField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class MetadataLearningMetrics(models.Model):
+    field_performance = models.JSONField()
+    total_feedbacks = models.IntegerField()
+    avg_feedback_score = models.FloatField()
+    created_at = models.DateTimeField(auto_now_add=True)

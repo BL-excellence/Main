@@ -1,0 +1,163 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}Performance AI - Administration{% endblock %}
+
+{% block extrastyle %}
+<style>
+    body { 
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .ai-hub {
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .hub-header {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+    
+    .hub-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #2563eb, #10b981);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 1rem;
+    }
+    
+    .hub-subtitle {
+        color: #6b7280;
+        font-size: 1.1rem;
+    }
+    
+    .ai-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 2rem;
+    }
+    
+    .ai-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+    }
+    
+    .ai-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        border-color: #3b82f6;
+    }
+    
+    .ai-card.available:hover {
+        border-color: #10b981;
+    }
+    
+    .ai-card.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .card-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: white;
+        margin-bottom: 1.5rem;
+    }
+    
+    .card-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 0.5rem;
+    }
+    
+    .card-description {
+        color: #6b7280;
+        margin-bottom: 1rem;
+    }
+    
+    .card-status {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .status-available {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-coming-soon {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .back-btn {
+        display: inline-block;
+        margin-bottom: 2rem;
+        padding: 0.75rem 1.5rem;
+        background: #6b7280;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .back-btn:hover {
+        background: #4b5563;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ai-hub">
+    <a href="/admin/" class="back-btn">← Retour au Dashboard</a>
+    
+    <div class="hub-header">
+        <h1 class="hub-title">Performance AI</h1>
+        <p class="hub-subtitle">Analyse des performances de l'intelligence artificielle</p>
+    </div>
+    
+    <div class="ai-options">
+        <a href="/admin/ai-performance/metadata/" class="ai-card available">
+            <div class="card-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">🧠</div>
+            <h3 class="card-title">AI Métadonnées</h3>
+            <p class="card-description">Analyse des performances d'extraction des métadonnées par l'IA</p>
+            <span class="card-status status-available">Disponible</span>
+        </a>
+        
+        <div class="ai-card disabled">
+            <div class="card-icon" style="background: linear-gradient(135deg, #fbbf24, #f59e0b);">📊</div>
+            <h3 class="card-title">AI JSON</h3>
+            <p class="card-description">Analyse des performances de génération JSON par l'IA</p>
+            <span class="card-status status-coming-soon">Bientôt disponible</span>
+        </div>
+        
+        <div class="ai-card disabled">
+            <div class="card-icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">✏️</div>
+            <h3 class="card-title">AI Annotations</h3>
+            <p class="card-description">Analyse des performances d'annotation automatique par l'IA</p>
+            <span class="card-status status-coming-soon">Bientôt disponible</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

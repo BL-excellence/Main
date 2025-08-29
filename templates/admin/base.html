@@ -1,0 +1,32 @@
+{% load i18n static %}<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:"en-us" }}">
+<head>
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" type="text/css" href="{% block stylesheet %}{% static "admin/css/base.css" %}{% endblock %}">
+    {% block extrastyle %}{% endblock %}
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+
+<!-- Header -->
+<div id="header">
+    <div id="branding">
+        {% block branding %}{% endblock %}
+    </div>
+    {% block usertools %}
+    <div id="user-tools">
+        Welcome, <strong>RANIA</strong> / 
+        <a href="/admin/password_change/">Change password</a> / 
+        <a href="/admin/logout/">Log out</a>
+    </div>
+    {% endblock %}
+</div>
+
+<!-- Content (no containers!) -->
+<div id="main">
+    {% block content %}
+    {% endblock %}
+</div>
+
+</body>
+</html>

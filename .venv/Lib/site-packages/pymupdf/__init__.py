@@ -375,8 +375,20 @@ def _int_rc(text):
 
 # Basic version information.
 #
-pymupdf_version = "1.26.3"
+# (We use `noqa F401` to avoid flake8 errors such as `F401
+# '._build.mupdf_location' imported but unused`.
+#
+from ._build import mupdf_location      # noqa F401
+from ._build import pymupdf_git_branch  # noqa F401
+from ._build import pymupdf_git_diff    # noqa F401
+from ._build import pymupdf_git_sha     # noqa F401
+from ._build import pymupdf_version     # noqa F401
+from ._build import swig_version        # noqa F401
+from ._build import swig_version_tuple  # noqa F401
+
 mupdf_version = mupdf.FZ_VERSION
+
+# Removed in PyMuPDF-1.26.1.
 pymupdf_date = None
 
 # Versions as tuples; useful when comparing versions.
@@ -3865,28 +3877,7 @@ class Document:
     def delete_page(self, pno: int =-1):
         """ Delete one page from a PDF.
         """
-        if not self.is_pdf:
-            raise ValueError("is no PDF")
-        if self.is_closed:
-            raise ValueError("document closed")
-
-        page_count = self.page_count
-        while pno < 0:
-            pno += page_count
-
-        if pno >= page_count:
-            raise ValueError("bad page number(s)")
-
-        # remove TOC bookmarks pointing to deleted page
-        toc = self.get_toc()
-        ol_xrefs = self.get_outline_xrefs()
-        for i, item in enumerate(toc):
-            if item[2] == pno + 1:
-                self._remove_toc_item(ol_xrefs[i])
-
-        self._remove_links_to(frozenset((pno,)))
-        self._delete_page(pno)
-        self._reset_page_refs()
+        return self.delete_pages(pno)
 
     def delete_pages(self, *args, **kw):
         """Delete pages from a PDF.
@@ -3896,6 +3887,7 @@ class Document:
             specify the first/last page to delete.
             Or a list/tuple/range object, which can contain arbitrary
             page numbers.
+            Or a single integer page number.
         """
         if not self.is_pdf:
             raise ValueError("is no PDF")
@@ -3928,12 +3920,13 @@ class Document:
                 if not f <= t < page_count:
                     raise ValueError("bad page number(s)")
                 numbers = tuple(range(f, t + 1))
+            elif isinstance(args[0], int):
+                pno = args[0]
+                while pno < 0:
+                    pno += page_count
+                numbers = (pno,)
             else:
-                r = args[0]
-                if type(r) is int:
-                    numbers = (r,)
-                else:
-                    numbers = tuple(r)
+                numbers = tuple(args[0])
 
         numbers = list(map(int, set(numbers)))  # ensure unique integers
         if numbers == []:
@@ -8753,6 +8746,16 @@ class Page:
         ropt.num_comp = components
         ropts = mupdf.PdfRecolorOptions(ropt)
         mupdf.pdf_recolor_page(pdfdoc, self.number, ropts)
+
+    def clip_to_rect(self, rect):
+        """Clip away page content outside the rectangle."""
+        clip = Rect(rect)
+        if clip.is_infinite or (clip & self.rect).is_empty:
+            raise ValueError("rect must not be infinite or empty")
+        clip *= self.transformation_matrix
+        pdfpage = _as_pdf_page(self)
+        pclip = JM_rect_from_py(clip)
+        mupdf.pdf_clip_page(pdfpage, pclip)
 
     @property
     def artbox(self):
@@ -17811,6 +17814,14 @@ def get_tessdata(tessdata=None):
     # Try to locate the tesseract-ocr installation.
     
     import subprocess
+    
+    cp = subprocess.run('tesseract --list-langs', shell=1, capture_output=1, check=0, text=True)
+    if cp.returncode == 0:
+        m = re.search('List of available languages in "(.+)"', cp.stdout)
+        if m:
+            tessdata = m.group(1)
+            return tessdata
+    
     # Windows systems:
     if sys.platform == "win32":
         cp = subprocess.run("where tesseract", shell=1, capture_output=1, check=0, text=True)
@@ -17825,20 +17836,27 @@ def get_tessdata(tessdata=None):
             raise RuntimeError("No tessdata specified and Tesseract installation has no {tessdata} folder")
 
     # Unix-like systems:
-    cp = subprocess.run("whereis tesseract-ocr", shell=1, capture_output=1, check=0, text=True)
-    response = cp.stdout.strip().split()
-    if cp.returncode or len(response) != 2:  # if not 2 tokens: no tesseract-ocr
-        raise RuntimeError("No tessdata specified and Tesseract is not installed")
-
-    # search tessdata in folder structure
-    dirname = response[1]  # contains tesseract-ocr installation folder
-    pattern = f"{dirname}/*/tessdata"
-    tessdatas = glob.glob(pattern)
-    tessdatas.sort()
-    if tessdatas:
-        return tessdatas[-1]
+    attempts = list()
+    for path in 'tesseract-ocr', 'tesseract':
+        cp = subprocess.run(f'whereis {path}', shell=1, capture_output=1, check=0, text=True)
+        if cp.returncode == 0:
+            response = cp.stdout.strip().split()
+            if len(response) == 2:
+                # search tessdata in folder structure
+                dirname = response[1]  # contains tesseract-ocr installation folder
+                pattern = f"{dirname}/*/tessdata"
+                attempts.append(pattern)
+                tessdatas = glob.glob(pattern)
+                tessdatas.sort()
+                if tessdatas:
+                    return tessdatas[-1]
+    if attempts:
+        text = 'No tessdata specified and no match for:\n'
+        for attempt in attempts:
+            text += f'    {attempt}'
+        raise RuntimeError(text)
     else:
-        raise RuntimeError("No tessdata specified and Tesseract installation has no {pattern} folder.")
+        raise RuntimeError('No tessdata specified and Tesseract is not installed')
 
 
 def css_for_pymupdf_font(
@@ -18820,6 +18838,7 @@ class JM_new_bbox_device_Device(mupdf.FzDevice2):
         super().__init__()
         self.result = result
         self.layers = layers
+        self.layer_name = ""
         self.use_virtual_fill_path()
         self.use_virtual_stroke_path()
         self.use_virtual_fill_text()

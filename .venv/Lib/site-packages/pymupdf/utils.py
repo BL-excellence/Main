@@ -1987,7 +1987,11 @@ def do_widgets(
                 w_obj.pdf_dict_get(pymupdf.PDF_NAME("Parent"))
             )
             if parent_xref == 0:  # parent not in target yet
-                w_obj_graft = mupdf.pdf_graft_mapped_object(graftmap, w_obj)
+                try:
+                    w_obj_graft = mupdf.pdf_graft_mapped_object(graftmap, w_obj)
+                except Exception as e:
+                    pymupdf.message_warning(f"cannot copy widget at {xref=}: {e}")
+                    continue
                 w_obj_tar = mupdf.pdf_add_object(tarpdf, w_obj_graft)
                 tar_xref = w_obj_tar.pdf_to_num()
                 w_obj_tar_ind = mupdf.pdf_new_indirect(tarpdf, tar_xref, 0)
@@ -4369,7 +4373,7 @@ def scrub(
         found_redacts = False
         for annot in page.annots():
             if annot.type[0] == mupdf.PDF_ANNOT_FILE_ATTACHMENT and attached_files:
-                annot.update_file(buffer=b" ")  # set file content to empty
+                annot.update_file(buffer_=b" ")  # set file content to empty
             if reset_responses:
                 annot.delete_responses()
             if annot.type[0] == pymupdf.PDF_ANNOT_REDACT:  # pylint: disable=no-member

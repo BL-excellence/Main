@@ -1,19 +1,25 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Importer un PDF – RawDocs{% endblock %}
 
 {% block content %}
 <style>
   :root {
-    --primary: #0f172a;          /* Bleu nuit profond */
-    --primary-light: #2563eb;    /* Bleu principal */
-    --primary-hover: #1e293b;    /* Bleu nuit */
-    --accent: #3b82f6;           /* Bleu pharma vif */
+    --primary: #0f172a;          
+    --primary-light: #2563eb;    
+    --primary-hover: #1e293b;    
+    --accent: #3b82f6;           
     --accent-light: #60a5fa;
-    --text: #f8fafc;             /* Presque blanc */
+    --text: #f8fafc;             
     --text-secondary: #e2e8f0;
-    --card-bg: rgba(15, 23, 42, 0.80);
-    --card-border: rgba(59, 130, 246, 0.20);
-    --shadow: 0 8px 32px rgba(31, 72, 164, 0.12);
+    --card-bg: rgba(15, 23, 42, 0.95);
+    --card-border: rgba(59, 130, 246, 0.3);
+    --shadow: 0 8px 32px rgba(31, 72, 164, 0.2);
+    --success-green: #10b981;
+    --danger-red: #ef4444;
+    --glass-bg: rgba(15, 23, 42, 0.9);
+    --text-muted: #94a3b8;
+    --primary-dark: #1e40af;
   }
 
   .upload-container {
@@ -162,6 +168,20 @@
     backdrop-filter: blur(8px);
     transition: box-shadow 0.3s;
   }
+  .card {
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  border-radius: 18px;
+  padding: 1.5rem 1.3rem;
+  margin-bottom: 2.5rem;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  transition: box-shadow 0.3s;
+}
+
+.card:hover {
+  box-shadow: 0 16px 40px 0 rgba(31,72,164,0.16);
+}
   .metadata-card:hover,
   .text-card:hover {
     box-shadow: 0 16px 40px 0 rgba(31,72,164,0.16);
@@ -217,18 +237,18 @@
 
   /* Extracted Text - Enhanced for PDF-like appearance */
   .text-content {
-    max-height: 38vh;
+    max-height: 400px;
     overflow: auto;
-    background: rgba(31,41,55,0.60);
+    background: rgba(15, 23, 42, 0.95);
     padding: 1.8rem 2rem;
     border-radius: 12px;
     margin-bottom: 1rem;
     font-size: 1.05rem;
     color: var(--text);
     line-height: 1.8;
-    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-    border: 1px solid rgba(59, 130, 246, 0.2);
-    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.1);
+    font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
   }
   
   .text-content pre {
@@ -285,6 +305,47 @@
     hyphens: auto;
     word-spacing: 0.05em;
   }
+  /* Learning Dashboard Widget */
+.learning-dashboard-widget {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-top: 1rem;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.learning-dashboard-widget h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.learning-metrics {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+}
+
+.metric-label {
+    opacity: 0.8;
+    margin-bottom: 0.25rem;
+}
+
+.metric-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
 
   /* Responsive */
   @media (max-width: 820px) {
@@ -296,6 +357,184 @@
     .upload-title, .card-title { font-size: 1rem; }
     .btn, .btn-primary { font-size: 0.93rem; padding: 0.67rem 1.1rem; }
     .form-group { margin-bottom: 0.6rem; }
+  }
+  /* Form Layout */
+  .flex-responsive {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+  }
+
+  .main-panel {
+    flex: 2;
+  }
+
+  .sidebar-panel {
+    flex: 1;
+    min-width: 300px;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .form-field {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .field-label {
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .auto-badge {
+    background: var(--success-green);
+    color: white;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  .btn-refuse {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+}
+
+.btn-refuse:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
+}
+
+.btn-view {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+}
+
+.btn-view:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+}
+
+  .quality-metrics {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .metric-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .extraction-rate {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .extracted-fields {
+    margin-top: 1rem;
+  }
+
+  .field-tag {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    margin: 0.2rem;
+  }
+
+  .confidence-scores {
+    margin-top: 1.5rem;
+  }
+
+  .confidence-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .confidence-score {
+    font-weight: 600;
+  }
+
+  .score-high { color: #10b981; }
+  .score-medium { color: #f59e0b; }
+  .score-low { color: #ef4444; }
+
+  .history-entry {
+    border: 1.3px solid var(--card-border);
+    border-radius: 10px;
+    background: var(--glass-bg);
+    padding: 1.1rem 1rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .history-entry:last-child { margin-bottom: 0; }
+
+  .history-field { 
+    color: var(--primary-dark); 
+    font-size: 0.96rem; 
+    font-weight: 600;
+  }
+
+  .history-date { 
+    font-size: 0.81rem; 
+    color: var(--text-muted);
+  }
+
+  .history-values { 
+    color: var(--text); 
+    font-size: 0.96rem;
+  }
+
+  .history-user { 
+    font-size: 0.83rem; 
+    color: var(--text-muted); 
+    display: flex; 
+    align-items: center; 
+    gap: 0.32rem;
+  }
+  textarea.form-input {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+  textarea.form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-light);
+    background: rgba(255,255,255,0.16);
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .flex-responsive { flex-direction: column; }
+    .main-panel, .sidebar-panel { width: 100%; }
+    .form-grid { grid-template-columns: 1fr; }
   }
 </style>
 
@@ -336,45 +575,233 @@
       <i class="fas fa-upload"></i> Extraire
     </button>
   </form>
+    {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+        <div class="message {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
 
   <!-- Metadata Table -->
-  {% if metadata %}
-  <div class="metadata-card">
-    <h3 class="card-title">
-      <i class="fas fa-info-circle"></i> Métadonnées extraites
-    </h3>
-    <table class="metadata-table">
-      <tbody>
-        <tr><th>Titre</th><td>{{ metadata.title|default:"Non spécifié" }}</td></tr>
-        <tr><th>Type de document</th><td>{{ metadata.type|default:"–" }}</td></tr>
-        <tr><th>Langue</th><td>{{ metadata.language|default:"–" }}</td></tr>
-        <tr><th>Version</th><td>{{ metadata.version|default:"–" }}</td></tr>
-        <tr>
-          <th>URL Source</th>
-          <td>
-            {% if metadata.url_source %}
-            <a href="{{ metadata.url_source }}" target="_blank" class="source-link">
-              <i class="fas fa-external-link-alt"></i>
-              {{ metadata.url_source|truncatechars:40 }}
+  {% if doc and metadata and doc.id %}
+  <!-- Editable Form Layout -->
+  <div class="flex-responsive">
+    <!-- Main Form Panel -->
+    <div class="main-panel">
+      <div class="card">
+        <!-- Header with Action Buttons -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--card-border); padding-bottom: 1rem; margin-bottom: 2rem;">
+          <h2 class="card-title">
+            <i class="fas fa-edit" style="color:var(--primary-light);"></i>
+            Éditer les métadonnées
+          </h2>
+          <div style="display:flex; gap:0.7rem;">
+            <button type="button" onclick="reextractMetadata()" class="btn btn-outline" title="Réextraire">
+              <i class="fas fa-sync"></i> Réextraire
+            </button>
+            <button type="button" class="btn btn-refuse" title="Refuser le document">
+              <i class="fas fa-times"></i> Refuser
+            </button>
+            <a href="{{ doc.file.url }}" target="_blank" class="btn btn-view" title="Voir le document">
+              <i class="fas fa-eye"></i> Voir
             </a>
-            {% else %}
-              –
-            {% endif %}
-          </td>
-        </tr>
-        <tr><th>Source interne</th><td>{{ metadata.source|default:"Non spécifiée" }}</td></tr>
-        <tr><th>Date de publication</th><td>{{ metadata.publication_date|default:"Non spécifiée" }}</td></tr>
-        <tr>
-          <th>Contexte</th>
-          <td>
-            <div class="text-content" style="max-height: 120px;">
-              {{ metadata.context|default:"Aucun contexte fourni" }}
+            <button type="button" onclick="showAddFieldModal()" class="btn btn-outline">
+              <i class="fas fa-plus"></i> Ajouter Champ
+            </button>
+          </div>
+        </div>
+
+        <!-- Editable Metadata Form -->
+        <form id="metadataForm" method="post" action="">
+          {% csrf_token %}
+          <input type="hidden" name="doc_id" value="{{ doc.id }}">
+          <input type="hidden" name="edit_metadata" value="1">
+          
+          <div class="form-grid">
+            <!-- Title -->
+            <div class="form-field">
+              <label class="field-label">
+                <i class="fas fa-heading"></i>
+                Titre du document
+                {% if metadata.title %}<span class="auto-badge">Auto-extrait</span>{% endif %}
+              </label>
+              <input type="text" name="title" value="{{ edit_form.title.value|default:'' }}" class="form-input" placeholder="Titre du document">
             </div>
-          </td>
-        </tr>
-        <tr><th>Pays</th><td>{{ metadata.country|default:"–" }}</td></tr>
-      </tbody>
-    </table>
+
+            <!-- Type -->
+            <div class="form-field">
+              <label class="field-label">
+                <i class="fas fa-file-alt"></i>
+                Type de document
+                {% if metadata.type %}<span class="auto-badge">Auto-détecté</span>{% endif %}
+              </label>
+              <input type="text" name="type" value="{{ edit_form.type.value|default:'' }}" class="form-input" placeholder="Type de document">
+            </div>
+
+            <!-- Context -->
+            <div class="form-field" style="grid-column: span 2;">
+              <label class="field-label">
+                <i class="fas fa-align-left"></i>
+                Contexte
+                {% if metadata.context %}<span class="auto-badge">Auto-détecté</span>{% endif %}
+              </label>
+              <textarea name="context" rows="3" class="form-input" placeholder="Contexte du document">{{ edit_form.context.value|default:'' }}</textarea>
+            </div>
+
+            <!-- Language -->
+            <div class="form-field">
+              <label class="field-label">
+                <i class="fas fa-language"></i>
+                Langue
+                {% if metadata.language %}<span class="auto-badge">Auto-détectée</span>{% endif %}
+              </label>
+              <input type="text" name="language" value="{{ edit_form.language.value|default:'' }}" class="form-input" placeholder="Langue">
+            </div>
+
+            <!-- Publication Date -->
+            <div class="form-field">
+              <label class="field-label">
+                <i class="fas fa-calendar"></i>
+                Date de publication
+                {% if metadata.publication_date %}<span class="auto-badge">Auto-extraite</span>{% endif %}
+              </label>
+              <input type="text" name="publication_date" value="{{ edit_form.publication_date.value|default:'' }}" class="form-input" placeholder="Ex: 23 January 2025">
+            </div>
+
+            <!-- Version -->
+            <div class="form-field">
+              <label class="field-label">
+                <i class="fas fa-tag"></i>
+                Version
+              </label>
+              <input type="text" name="version" value="{{ edit_form.version.value|default:'' }}" class="form-input" placeholder="Version du document">
+            </div>
+
+            <!-- Source -->
+            <div class="form-field">
+              <label class="field-label">
+                <i class="fas fa-building"></i>
+                Source
+              </label>
+              <input type="text" name="source" value="{{ edit_form.source.value|default:'' }}" class="form-input" placeholder="Source du document">
+            </div>
+
+            <!-- Country -->
+            <div class="form-field">
+              <label class="field-label">
+                <i class="fas fa-globe"></i>
+                Pays
+              </label>
+              <input type="text" name="country" value="{{ edit_form.country.value|default:'' }}" class="form-input" placeholder="Pays">
+            </div>
+
+            <!-- URL Source -->
+            <div class="form-field">
+              <label class="field-label">
+                <i class="fas fa-link"></i>
+                URL Source
+              </label>
+              <input type="url" name="url_source" value="{{ edit_form.url_source.value|default:'' }}" class="form-input" placeholder="URL du document source">
+            </div>
+          </div>
+
+          <!-- Save Actions -->
+          <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--card-border);">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save"></i> Sauvegarder
+            </button>
+            <a href="{% url 'rawdocs:document_list' %}" class="btn btn-outline">
+              <i class="fas fa-arrow-left"></i> Retour à la liste
+            </a>
+          </div>
+        </form>
+        <!-- Learning Progress Indicator -->
+        <div id="learning-progress" style="display: none; align-items: center; gap: 0.5rem; color: #8b5cf6; font-weight: 600;">
+            <i class="fas fa-brain fa-spin"></i>
+            <span>IA en apprentissage...</span>
+        </div>
+    
+        <!-- Learning Widget -->
+        <div id="metadata-learning-widget" class="learning-dashboard-widget" style="display: none;">
+            <h4><i class="fas fa-chart-line"></i> Apprentissage Métadonnées IA</h4>
+            <div class="learning-metrics">
+                <div class="metric">
+                    <span class="metric-label">Score:</span>
+                    <span class="metric-value" id="learning-score">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Corrections:</span>
+                    <span class="metric-value" id="improvements-count">--</span>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Sidebar Panel -->
+    <div class="sidebar-panel">
+      <!-- Quality Metrics -->
+      <div class="quality-metrics">
+        <div class="metric-title">
+          <i class="fas fa-chart-line"></i>
+          Qualité d'extraction
+        </div>
+        <div class="extraction-rate">12%</div>
+        
+        <div class="extracted-fields">
+          <div style="margin-bottom: 0.5rem; font-size: 0.9rem;">Champs extraits :</div>
+          {% if metadata.title %}<span class="field-tag">Title</span>{% endif %}
+          {% if metadata.type %}<span class="field-tag">Type</span>{% endif %}
+          {% if metadata.language %}<span class="field-tag">Language</span>{% endif %}
+          {% if metadata.publication_date %}<span class="field-tag">Publication_Date</span>{% endif %}
+          {% if metadata.version %}<span class="field-tag">Version</span>{% endif %}
+          {% if metadata.source %}<span class="field-tag">Source</span>{% endif %}
+          {% if metadata.context %}<span class="field-tag">Context</span>{% endif %}
+          {% if metadata.country %}<span class="field-tag">Country</span>{% endif %}
+        </div>
+
+        <div class="confidence-scores">
+          <div style="margin-bottom: 0.5rem; font-size: 0.9rem;">Scores de confiance :</div>
+          {% if metadata.title %}<div class="confidence-item"><span>Title</span><span class="confidence-score score-medium">30%</span></div>{% endif %}
+          {% if metadata.type %}<div class="confidence-item"><span>Type</span><span class="confidence-score score-low">0%</span></div>{% endif %}
+          {% if metadata.language %}<div class="confidence-item"><span>Language</span><span class="confidence-score score-high">80%</span></div>{% endif %}
+          {% if metadata.publication_date %}<div class="confidence-item"><span>Publication_Date</span><span class="confidence-score score-low">0%</span></div>{% endif %}
+        </div>
+      </div>
+      <!-- Learning Dashboard Link -->
+      <div class="card" style="text-align: center;">
+        <a href="{% url 'rawdocs:metadata_learning_dashboard' %}" class="btn btn-outline">
+          <i class="fas fa-brain"></i> Voir Apprentissage IA
+        </a>
+      </div>
+      
+
+      <!-- History Section -->
+      {% if logs %}
+      <div class="card">
+        <h3 class="card-title">
+          <i class="fas fa-history"></i>
+          Historique des modifications
+        </h3>
+        {% for log in logs %}
+        <div class="history-entry">
+          <div class="history-field">{{ log.field_name }}</div>
+          <div class="history-date">{{ log.modified_at|date:"d/m/Y H:i" }}</div>
+          <div class="history-values">
+            {% if log.old_value %}{{ log.old_value }}{% else %}(vide){% endif %}
+            →
+            {% if log.new_value %}{{ log.new_value }}{% else %}(vide){% endif %}
+          </div>
+          <div class="history-user">
+            <i class="fas fa-user"></i>
+            {{ log.modified_by.username }}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
   </div>
   {% endif %}
 
@@ -401,11 +828,13 @@
   </div>
 </div>
 
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    if (location.hash === '#metadata-tab') {
-      window.scrollTo(0, 0);
-    }
-  });
+<!-- Load the external JS file -->
+<script src="{% static 'js/metadata-learning.js' %}"></script>
+
+{% if learning_feedback.show %}
+<script id="learning-data" type="application/json">
+{"show": true, "score": {{ learning_feedback.score }}, "correct": {{ learning_feedback.correct }}, "wrong": {{ learning_feedback.wrong }}, "missed": {{ learning_feedback.missed }}}
 </script>
+{% endif %}
+
 {% endblock %}

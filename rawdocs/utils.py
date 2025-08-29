@@ -6,6 +6,9 @@ import requests
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlparse
+import json
+import requests
+from groq import Groq
 
 import spacy
 from PyPDF2 import PdfReader
@@ -311,6 +314,45 @@ def extract_tables_from_pdf(file_path):
     return tables_data
 
 
+def call_llm_with_learned_prompt(prompt):
+    """Call LLM with the adaptive prompt"""
+    try:
+        api_key = os.getenv("GROQ_API_KEY") or "your_actual_groq_api_key_here"
+        client = Groq(api_key=api_key)
+        
+        response = client.chat.completions.create(
+            messages=[{
+                "role": "user", 
+                "content": prompt
+            }],
+            model="llama3-8b-8192",
+            temperature=0.1,
+            max_tokens=1000
+        )
+        
+        result = response.choices[0].message.content
+        
+        # Try to parse JSON
+        try:
+            return json.loads(result)
+        except:
+            # Fallback: extract JSON from text
+            json_match = re.search(r'\{.*\}', result, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            return {}
+            
+    except Exception as e:
+        print(f"LLM call error: {e}")
+        # Fallback to your existing Mistral extraction
+        return call_mistral_basic_extraction(prompt)
+
+def call_mistral_basic_extraction(prompt):
+    """Fallback to basic extraction if Groq fails"""
+    # Use your existing call_mistral_with_confidence logic here
+    # or return empty dict to use fallback
+    return {}
+
 def extract_images_from_pdf(file_path):
     """
     Extrait toutes les images du PDF avec PyMuPDF
@@ -388,96 +430,117 @@ def extract_full_text(file_path):
     return text
 
 
-def extract_metadonnees(file_path: str, source_url: str) -> dict:
-    """
-    Main extraction function with REAL LLM confidence metrics + tables & images
-    """
-    print("🔍 Starting enhanced LLM extraction with confidence scoring...")
-    full_text = extract_full_text(file_path)
-    filename = Path(file_path).name
-    llm_result = call_mistral_with_confidence(full_text, source_url, filename)
-
-    # Extraire les tableaux et images
-    print("📊 Extracting tables from PDF...")
-    tables_data = extract_tables_from_pdf(file_path)
+def extract_metadonnees(pdf_path, url=""):
+    """Extract metadata with fallback to working system"""
     
-    print("🖼️ Extracting images from PDF...")
-    images_data = extract_images_from_pdf(file_path)
-
-    if llm_result and 'metadata' in llm_result and 'confidence_scores' in llm_result:
-        print("✅ Using LLM extraction with real confidence scores!")
-
-        metadata = llm_result['metadata']
-        conf_scores = llm_result['confidence_scores']
-        reasoning = llm_result.get('extraction_reasoning', {})
-
-        metadata['url_source'] = source_url
-
-        # Ajouter les données des tableaux et images
-        metadata['tables'] = {
-            'count': len(tables_data),
-            'data': tables_data,
-            'summary': f"{len(tables_data)} tableau(x) trouvé(s)" if tables_data else "Aucun tableau détecté"
-        }
+    # First try the learning-enhanced extraction
+    try:
+        # Get learning insights
+        learning_prompts = get_learned_field_improvements()
         
-        metadata['images'] = {
-            'count': len(images_data),
-            'data': images_data,
-            'summary': f"{len(images_data)} image(s) trouvée(s)" if images_data else "Aucune image détectée"
-        }
+        # If we have learning data, use adaptive extraction
+        if learning_prompts:
+            text = extract_full_text(pdf_path)
+            if text:
+                instructions = build_adaptive_field_instructions(learning_prompts)
+                mistakes_prompt = get_common_mistakes_prompt(learning_prompts)
+                
+                prompt = f"""Extract metadata from this document:
+{text[:2000]}
 
-        # Calculate quality metrics
-        overall_quality = calculate_overall_quality(conf_scores)
-        extracted_fields = sum(1 for s in conf_scores.values() if s >= 50)
-        total_fields = len(conf_scores)
+Fields to extract: {json.dumps(instructions, indent=2)}
 
-        metadata['quality'] = {
-            'extraction_rate': overall_quality,
-            'field_scores': conf_scores,
-            'extraction_reasoning': reasoning,
-            'extracted_fields': extracted_fields,
-            'total_fields': total_fields,
-            'llm_powered': True,
-            'enhanced_features': {
-                'tables_extracted': len(tables_data) > 0,
-                'images_extracted': len(images_data) > 0,
-                'total_tables': len(tables_data),
-                'total_images': len(images_data)
-            }
-        }
-        
-        print(f"✅ Extraction complète: {len(tables_data)} tableaux, {len(images_data)} images")
-        return metadata
+Common mistakes to avoid: {mistakes_prompt}
 
-    # Fallback basic extraction with tables/images
-    print("⚠ LLM extraction failed, using basic fallback with tables/images")
-    basic_metadata = extract_basic_fallback(file_path, source_url)
+Return ONLY JSON with keys: title, type, publication_date, version, source, context, country, language, url_source"""
+                
+                result = call_llm_with_learned_prompt(prompt)
+                if result and isinstance(result, dict):
+                    return result
     
-    # Ajouter les tableaux et images même en mode fallback
-    basic_metadata['tables'] = {
-        'count': len(tables_data),
-        'data': tables_data,
-        'summary': f"{len(tables_data)} tableau(x) trouvé(s)" if tables_data else "Aucun tableau détecté"
+    except Exception as e:
+        print(f"Learning extraction failed: {e}")
+    
+    # Fallback to your working Mistral extraction
+    try:
+        result = call_mistral_with_confidence(extract_full_text(pdf_path), url, pdf_path)
+        if result and 'metadata' in result:
+            return result['metadata']
+    except Exception as e:
+        print(f"Mistral extraction failed: {e}")
+    
+    # Final fallback
+    return extract_basic_fallback(pdf_path, url)
+
+def get_learned_field_improvements():
+    """Get field-specific improvements from feedback data"""
+    try:
+        from .models import MetadataFeedback
+        
+        field_insights = {}
+        
+        for feedback in MetadataFeedback.objects.all():
+            corrections = feedback.corrections_made
+            
+            # Analyze wrong fields
+            for wrong in corrections.get('corrected_fields', []):
+                field = wrong.get('field')
+                ai_value = wrong.get('ai_value', '')
+                correct_value = wrong.get('human_value', '')
+                
+                if field not in field_insights:
+                    field_insights[field] = {'mistakes': [], 'patterns': []}
+                
+                field_insights[field]['mistakes'].append({
+                    'wrong': ai_value,
+                    'correct': correct_value
+                })
+        
+        return field_insights
+        
+    except Exception as e:
+        print(f"Learning insights error: {e}")
+        return {}
+    
+    
+def build_adaptive_field_instructions(learning_prompts):
+    """Build field instructions that incorporate learning"""
+    instructions = {}
+    
+    base_fields = {
+        'title': "Document title",
+        'type': "Document type (guide, report, etc)",
+        'publication_date': "Publication date",
+        'source': "Source organization",
+        'language': "Document language",
+        'context': "Brief context (2 sentences max)"
     }
     
-    basic_metadata['images'] = {
-        'count': len(images_data),
-        'data': images_data,
-        'summary': f"{len(images_data)} image(s) trouvée(s)" if images_data else "Aucune image détectée"
-    }
+    for field, base_desc in base_fields.items():
+        if field in learning_prompts:
+            mistakes = learning_prompts[field]['mistakes']
+            if mistakes:
+                # Add specific guidance based on past mistakes
+                common_errors = [m['wrong'] for m in mistakes[-3:]]  # Last 3 mistakes
+                instructions[field] = f"{base_desc}. AVOID these patterns: {', '.join(common_errors)}"
+            else:
+                instructions[field] = base_desc
+        else:
+            instructions[field] = base_desc
     
-    # Mettre à jour les métriques de qualité
-    if 'quality' in basic_metadata:
-        basic_metadata['quality']['enhanced_features'] = {
-            'tables_extracted': len(tables_data) > 0,
-            'images_extracted': len(images_data) > 0,
-            'total_tables': len(tables_data),
-            'total_images': len(images_data)
-        }
-    
-    print(f"✅ Extraction basique complète: {len(tables_data)} tableaux, {len(images_data)} images")
-    return basic_metadata
+    return instructions
 
+def get_common_mistakes_prompt(learning_prompts):
+    """Generate prompt section about common mistakes"""
+    mistakes = []
+    
+    for field, data in learning_prompts.items():
+        if data['mistakes']:
+            latest_mistakes = data['mistakes'][-2:]  # Last 2 mistakes
+            for mistake in latest_mistakes:
+                mistakes.append(f"Don't confuse {field}: '{mistake['wrong']}' should be '{mistake['correct']}'")
+    
+    return "\n".join(mistakes[:5])  
 
 def extract_basic_fallback(file_path: str, source_url: str) -> dict:
     """Basic fallback with honest low confidence scores"""

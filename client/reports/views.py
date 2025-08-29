@@ -168,6 +168,11 @@ def get_all_dynamic_fields():
         print(f"❌ Error discovering MongoDB metadata: {e}")
 
     print(f"🎯 Discovered {len(all_fields)} dynamic fields total")
+    print("=== FIELD DISCOVERY DEBUG ===")
+    for field in all_fields:
+        if 'code' in field['name'].lower():
+            print(f"Found code field: {field}")
+    print("=== END DEBUG ===")
     return all_fields
 
 
@@ -561,8 +566,8 @@ def get_real_filter_options():
                     )
 
                     if values:
-                        filter_options[field_name] = values
-                        print(f"Added RawDocument filter: {field_name} ({len(values)} options)")
+                        filter_options[f'document_{field_name}'] = values
+                        print(f"Added RawDocument filter: document_{field_name} ({len(values)} options)")
 
                 except Exception as e:
                     print(f"Error with RawDocument.{field_name}: {e}")
@@ -653,7 +658,7 @@ def get_real_filter_options():
 
     filter_options['annotations'] = annotation_filters
 
-    # Handle MongoDB entity filters - FIXED
+    # Handle MongoDB entity filters 
     try:
         pipeline = [
             {"$match": {"entities": {"$exists": True}}},
@@ -672,9 +677,17 @@ def get_real_filter_options():
             if entity_name:
                 pipeline_values = [
                     {"$match": {"entities": {"$exists": True}}},
-                    {"$project": {f"entity_values": f"$entities.{entity_name}"}},
+                    {"$match": {f"entities.{entity_name}": {"$exists": True, "$ne": None, "$ne": ""}}},
+                    {"$project": {
+                        "entity_values": {
+                            "$cond": {
+                                "if": {"$isArray": f"$entities.{entity_name}"},
+                                "then": f"$entities.{entity_name}",
+                                "else": [f"$entities.{entity_name}"]
+                            }
+                        }
+                    }},
                     {"$unwind": "$entity_values"},
-                    {"$match": {"entity_values": {"$ne": None, "$ne": ""}}},
                     {"$group": {"_id": "$entity_values"}},
                     {"$sort": {"_id": 1}},
                     {"$limit": 15}
@@ -688,6 +701,39 @@ def get_real_filter_options():
 
     except Exception as e:
         print(f"Error getting entity filter options: {e}")
+    # Handle MongoDB metadata filters with exact matching
+    try:
+        pipeline = [
+            {"$match": {"metadata": {"$exists": True}}},
+            {"$project": {"metadata": {"$objectToArray": "$metadata"}}},
+            {"$unwind": "$metadata"},
+            {"$group": {
+                "_id": "$metadata.k",
+                "count": {"$sum": 1}
+            }}
+        ]
+
+        metadata_stats = list(mongo_collection.aggregate(pipeline))
+
+        for metadata in metadata_stats:
+            field_name = metadata['_id']
+            if field_name:
+                pipeline_values = [
+                    {"$match": {"metadata": {"$exists": True}}},
+                    {"$match": {f"metadata.{field_name}": {"$exists": True, "$ne": None, "$ne": ""}}},
+                    {"$group": {"_id": f"$metadata.{field_name}"}},
+                    {"$sort": {"_id": 1}},
+                    {"$limit": 15}
+                ]
+
+                sample_values = list(mongo_collection.aggregate(pipeline_values))
+                if sample_values:
+                    metadata_field_name = f'metadata_{field_name.lower().replace(" ", "_")}'
+                    filter_options[metadata_field_name] = [val['_id'] for val in sample_values if val['_id']]
+                    print(f"Added metadata filter: {metadata_field_name}")
+
+    except Exception as e:
+        print(f"Error getting metadata filter options: {e}")
 
     print(f"Total filter options generated: {len(filter_options)} keys")
     return filter_options
@@ -1033,10 +1079,17 @@ def generate_unified_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
                 for column in columns:
                     field_name = column.get('name', '')
                     if field_name.startswith('entity_'):
-                        entity_key = field_name.replace('entity_', '').replace('_', ' ').title()
+                        clean_entity_name = field_name.replace('entity_', '')
                         entities = mongo_data.get('entities', {})
-                        if entity_key in entities and isinstance(entities[entity_key], list):
-                            entity_arrays[field_name] = entities[entity_key]
+                        
+                        # Try multiple key variations like in get_field_value_dynamically
+                        for key in entities.keys():
+                            if (key.lower().replace(' ', '_') == clean_entity_name or 
+                                key.lower() == clean_entity_name or
+                                key == clean_entity_name):
+                                if isinstance(entities[key], list):
+                                    entity_arrays[field_name] = entities[key]
+                                break
 
             # If we have entity arrays, create one row per combination
             if entity_arrays:
@@ -1124,10 +1177,17 @@ def generate_unified_rows(columns: List[Dict], filters: Dict) -> List[Dict]:
                 for column in columns:
                     field_name = column.get('name', '')
                     if field_name.startswith('entity_'):
-                        entity_key = field_name.replace('entity_', '').replace('_', ' ').title()
+                        clean_entity_name = field_name.replace('entity_', '')
                         entities = mongo_data.get('entities', {})
-                        if entity_key in entities and isinstance(entities[entity_key], list):
-                            entity_arrays[field_name] = entities[entity_key]
+                        
+                        # Try multiple key variations like in get_field_value_dynamically
+                        for key in entities.keys():
+                            if (key.lower().replace(' ', '_') == clean_entity_name or 
+                                key.lower() == clean_entity_name or
+                                key == clean_entity_name):
+                                if isinstance(entities[key], list):
+                                    entity_arrays[field_name] = entities[key]
+                                break
 
             # If we have entity arrays, create one row per combination
             if entity_arrays:
@@ -1201,27 +1261,36 @@ def get_field_value_dynamically(obj, field_name):
     try:
         # Handle MongoDB entities (from your MongoDB collection)
         if field_name.startswith('entity_') or field_name.startswith('metadata_'):
-            # For MongoDB fields, we need to query MongoDB directly
             if hasattr(obj, 'id'):
                 doc_data = mongo_collection.find_one({"document_id": str(obj.id)})
                 if doc_data:
                     if field_name.startswith('entity_'):
-                        entity_key = field_name.replace('entity_', '').replace('_', ' ').title()
+                        # Try exact match first
+                        clean_entity_name = field_name.replace('entity_', '')
                         entities = doc_data.get('entities', {})
-                        if entity_key in entities:
-                            values = entities[entity_key]
-                            if isinstance(values, list):
-                                # Return only the first value instead of joining all
-                                return str(values[0]) if values else ''
-                            else:
+                        
+                        # Try multiple variations
+                        for key in entities.keys():
+                            if (key.lower().replace(' ', '_') == clean_entity_name or 
+                                key.lower() == clean_entity_name or
+                                key == clean_entity_name):
+                                values = entities[key]
+                                if isinstance(values, list):
+                                    return str(values[0]) if values else ''
                                 return str(values)
-
+                                
                     elif field_name.startswith('metadata_'):
-                        metadata_key = field_name.replace('metadata_', '')
+                        clean_metadata_name = field_name.replace('metadata_', '')
                         metadata = doc_data.get('metadata', {})
-                        return str(metadata.get(metadata_key, ''))
-
-            return '—'
+                        
+                        # Try exact match first, then variations
+                        if clean_metadata_name in metadata:
+                            return str(metadata[clean_metadata_name])
+                        
+                        # Try case variations
+                        for key in metadata.keys():
+                            if key.lower() == clean_metadata_name.lower():
+                                return str(metadata[key])
 
         # Clean field name for SQL fields
         clean_field_name = field_name
@@ -1315,38 +1384,38 @@ def build_base_queryset_simple(filters: Dict):
     # Apply product filters (filter documents that have products with these criteria)
     if filters.get('product_name'):
         queryset = queryset.filter(
-            product_set__name__icontains=filters['product_name']
+            product__name__icontains=filters['product_name']
         ).distinct()
 
     if filters.get('dosage'):
         queryset = queryset.filter(
-            product_set__dosage__icontains=filters['dosage']
+            product__dosage__icontains=filters['dosage']
         ).distinct()
 
     if filters.get('active_ingredient'):
         queryset = queryset.filter(
-            product_set__active_ingredient__icontains=filters['active_ingredient']
+            product__active_ingredient__icontains=filters['active_ingredient']
         ).distinct()
 
     if filters.get('therapeutic_area'):
         queryset = queryset.filter(
-            product_set__therapeutic_area__icontains=filters['therapeutic_area']
+            product__therapeutic_area__icontains=filters['therapeutic_area']
         ).distinct()
 
     if filters.get('product_status'):
         queryset = queryset.filter(
-            product_set__status=filters['product_status']
+            product__status=filters['product_status']
         ).distinct()
 
     # Apply manufacturing site filters
     if filters.get('site_country'):
         queryset = queryset.filter(
-            product_set__sites__country__icontains=filters['site_country']
+            product__sites__country__icontains=filters['site_country']
         ).distinct()
 
     if filters.get('site_name'):
         queryset = queryset.filter(
-            product_set__sites__site_name__icontains=filters['site_name']
+            product__sites__site_name__icontains=filters['site_name']
         ).distinct()
 
     # Apply annotation filters (dynamic based on annotation types)
@@ -1622,14 +1691,13 @@ def apply_filters_dynamically(queryset, model_class, filters: Dict):
         if filter_key == 'period':
             continue
 
-        # Special handling for product filters
         if filter_key == 'product_name':
             if model_class == Product:
                 queryset = queryset.filter(name__icontains=filter_value)
                 print(f"✅ Applied product_name filter to Product: {filter_value}")
                 continue
             elif model_class == RawDocument:
-                queryset = queryset.filter(product_set__name__icontains=filter_value).distinct()
+                queryset = queryset.filter(product__name__icontains=filter_value).distinct()
                 print(f"✅ Applied product_name filter to RawDocument: {filter_value}")
                 continue
 
@@ -1639,7 +1707,7 @@ def apply_filters_dynamically(queryset, model_class, filters: Dict):
                 print(f"✅ Applied active_ingredient filter: {filter_value}")
                 continue
             elif model_class == RawDocument:
-                queryset = queryset.filter(product_set__active_ingredient__icontains=filter_value).distinct()
+                queryset = queryset.filter(product__active_ingredient__icontains=filter_value).distinct()
                 print(f"✅ Applied active_ingredient filter to documents: {filter_value}")
                 continue
 
@@ -1649,7 +1717,7 @@ def apply_filters_dynamically(queryset, model_class, filters: Dict):
                 print(f"✅ Applied dosage filter: {filter_value}")
                 continue
             elif model_class == RawDocument:
-                queryset = queryset.filter(product_set__dosage__icontains=filter_value).distinct()
+                queryset = queryset.filter(product__dosage__icontains=filter_value).distinct()
                 print(f"✅ Applied dosage filter to documents: {filter_value}")
                 continue
 

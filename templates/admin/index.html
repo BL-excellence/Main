@@ -1,0 +1,491 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    :root {
+        --primary: #2563eb;
+        --primary-light: #3b82f6;
+        --primary-dark: #1e40af;
+        --secondary: #1f2937;
+        --accent: #10b981;
+        --success: #059669;
+        --warning: #f59e0b;
+        --error: #dc2626;
+        --text: #111827;
+        --text-secondary: #6b7280;
+        --card-bg: #ffffff;
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        --border-radius: 12px;
+        --border-radius-sm: 8px;
+    }
+
+    * { 
+        font-family: 'Inter', sans-serif; 
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+    
+    body { 
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        color: var(--text);
+        line-height: 1.6;
+    }
+
+    /* HIDE SIDEBAR */
+    #nav-sidebar {
+        display: none !important;
+    }
+
+    #main {
+        margin-left: 0 !important;
+    }
+
+    #content {
+        margin-left: 0 !important;
+        padding: 0 !important;
+        max-width: none !important;
+    }
+
+    .admin-dashboard {
+        padding: 2rem;
+        min-height: 100vh;
+    }
+
+    .dashboard-header {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .dashboard-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 1rem;
+    }
+
+    .dashboard-subtitle {
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+    }
+
+    /* AI Performance Card */
+    .ai-performance-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow-md);
+        transition: all 0.3s ease;
+        overflow: hidden;
+        cursor: pointer;
+        margin-bottom: 2rem;
+    }
+
+    .ai-performance-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--primary-light);
+    }
+
+    .ai-card-header {
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .ai-card-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--border-radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        background: rgba(255, 255, 255, 0.2);
+        flex-shrink: 0;
+    }
+
+    .ai-card-info h3 {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .ai-card-info p {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+
+    .ai-card-arrow {
+        margin-left: auto;
+        font-size: 1.2rem;
+        transition: transform 0.3s ease;
+    }
+
+    .ai-performance-card:hover .ai-card-arrow {
+        transform: translateX(5px);
+    }
+
+    /* Django Module Cards */
+    .module {
+        background: var(--card-bg) !important;
+        border: 1px solid var(--gray-200) !important;
+        border-radius: var(--border-radius) !important;
+        box-shadow: var(--shadow-sm) !important;
+        margin-bottom: 2rem !important;
+        padding: 0 !important;
+        transition: all 0.3s ease !important;
+        overflow: hidden !important;
+    }
+
+    .module:hover {
+        transform: translateY(-4px) !important;
+        box-shadow: var(--shadow-lg) !important;
+        border-color: var(--primary-light) !important;
+    }
+
+    .module h2 {
+        background: var(--gray-50) !important;
+        color: var(--text) !important;
+        padding: 1.5rem !important;
+        margin: 0 !important;
+        border-bottom: 1px solid var(--gray-200) !important;
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 1rem !important;
+        text-transform: capitalize !important;
+    }
+
+    .module h2::before {
+        content: '';
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        border-radius: var(--border-radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+
+    /* App-specific icons */
+    .module h2[class*="AUTHENTICATION"]::before,
+    .module h2:contains("AUTHENTICATION")::before {
+        content: '👥';
+    }
+
+    .module h2[class*="EXPERT"]::before,
+    .module h2:contains("EXPERT")::before {
+        content: '🎯';
+    }
+
+    .module h2[class*="LIBRARY"]::before,
+    .module h2:contains("LIBRARY")::before {
+        content: '📚';
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    }
+
+    .module h2[class*="PRODUCTS"]::before,
+    .module h2:contains("PRODUCTS")::before {
+        content: '🏷️';
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    .module h2[class*="RAWDOCS"]::before,
+    .module h2:contains("RAWDOCS")::before {
+        content: '📄';
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    }
+
+    /* Default icon */
+    .module h2::before {
+        content: '⚙️';
+    }
+
+    .module table {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 1.5rem !important;
+        border-collapse: separate !important;
+        border-spacing: 0 0.5rem !important;
+        background: white !important;
+    }
+
+    .module tr {
+        background: var(--gray-50) !important;
+        border-radius: var(--border-radius-sm) !important;
+        transition: all 0.2s ease !important;
+        display: table-row !important;
+    }
+
+    .module tr:hover {
+        background: white !important;
+        box-shadow: var(--shadow-sm) !important;
+        transform: translateY(-1px) !important;
+    }
+
+    .module td {
+        padding: 1rem !important;
+        border: none !important;
+        vertical-align: middle !important;
+        border-bottom: none !important;
+    }
+
+    .module td:first-child {
+        font-weight: 500 !important;
+        color: var(--text) !important;
+        width: 60% !important;
+    }
+
+    .module td:first-child a {
+        color: var(--text) !important;
+        text-decoration: none !important;
+    }
+
+    .module td:first-child a:hover {
+        color: var(--primary) !important;
+    }
+
+    .addlink, .changelink, .viewlink {
+        padding: 0.5rem 1rem !important;
+        border-radius: var(--border-radius-sm) !important;
+        text-decoration: none !important;
+        font-weight: 500 !important;
+        font-size: 0.85rem !important;
+        transition: all 0.2s ease !important;
+        display: inline-block !important;
+        margin-left: 0.5rem !important;
+    }
+
+    .addlink {
+        background: var(--accent) !important;
+        color: white !important;
+    }
+
+    .addlink:hover {
+        background: var(--success) !important;
+        color: white !important;
+        transform: translateY(-1px) !important;
+    }
+
+    .changelink, .viewlink {
+        background: var(--primary) !important;
+        color: white !important;
+    }
+
+    .changelink:hover, .viewlink:hover {
+        background: var(--primary-dark) !important;
+        color: white !important;
+        transform: translateY(-1px) !important;
+    }
+
+    .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 2rem;
+        width: 100%;
+    }
+
+    /* Activity Card Styling */
+    .activity-card {
+        background: var(--card-bg) !important;
+        border: 1px solid var(--gray-200) !important;
+        border-radius: var(--border-radius) !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+
+    .activity-card h2::before {
+        content: '📈';
+        background: linear-gradient(135deg, var(--warning), #d97706);
+    }
+
+    .activity-content {
+        padding: 1.5rem !important;
+        background: white !important;
+    }
+
+    .activity-list {
+        list-style: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .activity-item {
+        display: flex !important;
+        align-items: center !important;
+        gap: 1rem !important;
+        padding: 1rem !important;
+        margin-bottom: 0.5rem !important;
+        background: var(--gray-50) !important;
+        border-radius: var(--border-radius-sm) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .activity-item:hover {
+        background: white !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+
+    .activity-icon {
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-weight: bold !important;
+        font-size: 0.9rem !important;
+    }
+
+    .activity-item.addition .activity-icon {
+        background: var(--accent) !important;
+        color: white !important;
+    }
+
+    .activity-item.change .activity-icon {
+        background: var(--primary) !important;
+        color: white !important;
+    }
+
+    .activity-item.deletion .activity-icon {
+        background: var(--error) !important;
+        color: white !important;
+    }
+
+    .activity-details {
+        flex: 1 !important;
+    }
+
+    .activity-object {
+        font-weight: 500 !important;
+        color: var(--text) !important;
+        margin-bottom: 0.25rem !important;
+    }
+
+    .activity-object a {
+        color: var(--primary) !important;
+        text-decoration: none !important;
+    }
+
+    .activity-object a:hover {
+        text-decoration: underline !important;
+    }
+
+    .activity-meta {
+        font-size: 0.8rem !important;
+        color: var(--text-secondary) !important;
+    }
+
+    .no-activity {
+        text-align: center !important;
+        color: var(--text-secondary) !important;
+        padding: 2rem !important;
+    }
+</style>
+{% endblock %}
+
+{% block coltype %}colMS{% endblock %}
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+
+{% block content %}
+<div class="admin-dashboard">
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">Administration PharmaLabs</h1>
+        <p class="dashboard-subtitle">Tableau de bord administrateur - Gestion complète du système</p>
+    </div>
+
+    <!-- AI Performance Card -->
+    <div class="ai-performance-card" onclick="window.location.href='/admin/ai-performance/'">
+        <div class="ai-card-header">
+            <div class="ai-card-icon">🎯</div>
+            <div class="ai-card-info">
+                <h3>AI Performance</h3>
+                <p>Analyse des performances IA</p>
+            </div>
+            <div class="ai-card-arrow">→</div>
+        </div>
+    </div>
+
+    <!-- Django's Natural App Structure + Activity History -->
+    <div class="cards-grid">
+        {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+        
+        <!-- Recent Activity Card -->
+        <div class="module activity-card">
+            <h2>Activité Récente</h2>
+            <div class="activity-content">
+                {% load log %}
+                {% get_admin_log 10 as admin_log for_user user %}
+                {% if not admin_log %}
+                    <p class="no-activity">Aucune activité récente</p>
+                {% else %}
+                    <ul class="activity-list">
+                    {% for entry in admin_log %}
+                    <li class="activity-item {% if entry.is_addition %}addition{% endif %}{% if entry.is_change %}change{% endif %}{% if entry.is_deletion %}deletion{% endif %}">
+                        <div class="activity-icon">
+                            {% if entry.is_addition %}+{% elif entry.is_change %}✎{% elif entry.is_deletion %}×{% endif %}
+                        </div>
+                        <div class="activity-details">
+                            <div class="activity-object">
+                                {% if entry.is_deletion or not entry.get_admin_url %}
+                                    {{ entry.object_repr }}
+                                {% else %}
+                                    <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+                                {% endif %}
+                            </div>
+                            <div class="activity-meta">
+                                {% if entry.content_type %}
+                                    {{ entry.content_type.name|capfirst }}
+                                {% else %}
+                                    Contenu inconnu
+                                {% endif %}
+                                - {{ entry.action_time|timesince }} ago
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Add click handlers for better UX
+document.addEventListener('DOMContentLoaded', function() {
+    // Make module headers clickable to expand/collapse
+    const modules = document.querySelectorAll('.module h2');
+    modules.forEach(header => {
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', function() {
+            const table = this.nextElementSibling;
+            if (table && table.tagName === 'TABLE') {
+                table.style.display = table.style.display === 'none' ? 'table' : 'none';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

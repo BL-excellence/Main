@@ -301,4 +301,6 @@ path(
         views.get_annotation_details,
         name='get_annotation_details'
     ),
+    path('learning/metadata-dashboard/', views.metadata_learning_dashboard, name='metadata_learning_dashboard'),
+        
 ]

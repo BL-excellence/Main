@@ -1,0 +1,38 @@
+{% load i18n %}
+
+{% if app_list %}
+    {% for app in app_list %}
+        <div class="module">
+            <h2>{{ app.name|upper }}</h2>
+            <table>
+                {% for model in app.models %}
+                    <tr>
+                        <td>
+                            {% if model.admin_url %}
+                                <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                            {% else %}
+                                {{ model.name }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if model.add_url %}
+                                <a href="{{ model.add_url }}" class="addlink">{% translate 'Add' %}</a>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if model.admin_url and show_changelinks %}
+                                {% if model.view_only %}
+                                    <a href="{{ model.admin_url }}" class="viewlink">{% translate 'View' %}</a>
+                                {% else %}
+                                    <a href="{{ model.admin_url }}" class="changelink">{% translate 'Change' %}</a>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+    {% endfor %}
+{% else %}
+    <p>{% translate 'You don’t have permission to view or edit anything.' %}</p>
+{% endif %}

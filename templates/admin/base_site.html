@@ -1,0 +1,42 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    :root {
+        --primary: #0ea5e9;
+        --primary-light: #38bdf8;
+        --secondary: #1e293b;
+        --accent: #10b981;
+        --white: #ffffff;
+        --gray-light: #f8f9fa;
+        --gray-border: #e0e0e0;
+        --text: #333333;
+        --text-muted: #6b7280;
+    }
+
+    * { font-family: 'Inter', sans-serif; }
+    body { background-color: var(--white); color: var(--text); }
+    #header { background-color: var(--primary); color: var(--white); }
+    .module { background: var(--gray-light); border: 1px solid var(--gray-border); border-radius: 8px; margin-bottom: 1rem; padding: 1rem; }
+    .module h2 { background: var(--primary-light); color: var(--text); padding: 0.5rem; border-radius: 4px; }
+    .module table { width: 100%; border-collapse: collapse; }
+    .module td, .module th { padding: 0.5rem; border-bottom: 1px solid var(--gray-border); }
+    a { color: var(--primary); }
+    a:hover { color: var(--primary-dark); }
+    .breadcrumbs { background: var(--white); }
+    #content { background: var(--white); }
+    #content-related { background: var(--gray-light); border-radius: 8px; padding: 1rem; }
+</style>
+{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">{{ site_header|default:_('Django administration') }}</a></h1>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
