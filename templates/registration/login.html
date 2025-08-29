@@ -5,9 +5,19 @@
 <style>
   /* Styles spécifiques au formulaire de connexion */
   .auth-card {
-    max-width: 420px; /* Réduit de 480px à 420px */
+    max-width: 520px;
     margin: 0 auto;
-    padding: 2.5rem 2rem; /* Padding réduit */
+    padding: 2.5rem; /* Augmenté pour plus d'espace autour du formulaire */
+    background: var(--bg-card);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .auth-form {
+    width: 100%;
+    max-width: 400px; /* Limite la largeur du formulaire */
+    margin: 0 auto;
+    padding: 0 1.5rem; /* Espace sur les côtés du formulaire */
   }
 
   .auth-card h2 {
@@ -32,10 +42,9 @@
   }
 
   .form-group {
-    margin-bottom: 1.3rem;
-    max-width: 320px; /* Largeur maximale des champs */
-    margin-left: auto;
-    margin-right: auto;
+    margin-bottom: 1.5rem;
+    width: 100%;
+    padding: 0;
   }
 
   .form-group label {
@@ -71,8 +80,8 @@
   }
 
   .btn {
-    max-width: 320px;
     width: 100%;
+    margin: 1rem 0 0 0;
     padding: 0.9rem;
     background: var(--primary);
     color: white;

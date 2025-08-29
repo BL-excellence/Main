@@ -31,7 +31,8 @@ from .models import (
     RawDocument, MetadataLog,
     DocumentPage, AnnotationType,
     Annotation, AnnotationSession,
-    AILearningMetrics, AnnotationFeedback
+    AILearningMetrics, AnnotationFeedback,
+    GlobalSummaryEditHistory
 )
 from .utils import extract_metadonnees, extract_full_text
 from .annotation_utils import extract_pages_from_pdf
@@ -58,7 +59,8 @@ class RegisterForm(UserCreationForm):
         ("Metadonneur", "Métadonneur"),
         ("Annotateur", "Annotateur"),
         ("Expert", "Expert"),
-        ("Client", "Client"),  # ADD THIS LINE
+        ("Client", "Client"), 
+        ("DevMetier",   "Dev métier"), 
     ], label="Profil")
 
     class Meta:
@@ -101,6 +103,9 @@ def is_annotateur(user):
 def is_expert(user):
     return user.groups.filter(name="Expert").exists()
 
+def is_dev_metier(user):                              
+    return user.groups.filter(name="DevMetier").exists()    
+
 
 # ——— Authentication ————————————————————————————————————
 
@@ -121,6 +126,8 @@ class CustomLoginView(auth_views.LoginView):
             return reverse('rawdocs:annotation_dashboard')
         if user.groups.filter(name='Metadonneur').exists():
             return reverse('rawdocs:dashboard')
+        if user.groups.filter(name='DevMetier').exists():
+            return reverse('rawdocs:dev_metier_dashboard')
         return '/'
 
 
@@ -144,6 +151,8 @@ def register(request):
                 return redirect('expert:dashboard')  # Expert dashboard
             elif grp == "Client":
                 return redirect('/client/')  # Client dashboard
+            elif   grp == "DevMetier":   
+                return redirect('rawdocs:dev_metier_dashboard')  # dev metier dashboard
             else:
                 return redirect('rawdocs:dashboard')  # Fallback
     else:
@@ -1645,6 +1654,164 @@ def regulatory_analysis_dashboard(request):
     return render(request, 'rawdocs/regulatory_analysis_dashboard.html', context)
 
 
+# =================== VUES POUR L'ÉDITION DES ANNOTATIONS ===================
+
+@login_required
+@csrf_exempt
+def edit_annotation(request, annotation_id):
+    """
+    Permet de modifier une annotation existante
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        annotation = get_object_or_404(Annotation, id=annotation_id)
+
+        # Vérifier les permissions
+        if not (is_annotateur(request.user) or is_expert(request.user) or is_metadonneur(request.user)):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+
+        data = json.loads(request.body)
+
+        # Vérifier les champs requis
+        required_fields = ['selected_text', 'annotation_type_id']
+        for field in required_fields:
+            if field not in data:
+                return JsonResponse({'error': f'Champ requis manquant: {field}'}, status=400)
+
+        # Obtenir le nouveau type d'annotation
+        new_annotation_type = get_object_or_404(AnnotationType, id=data['annotation_type_id'])
+
+        # Sauvegarder les anciennes valeurs pour logging
+        old_values = {
+            'selected_text': annotation.selected_text,
+            'annotation_type': annotation.annotation_type.display_name,
+            'start_pos': annotation.start_pos,
+            'end_pos': annotation.end_pos
+        }
+
+        # Mettre à jour l'annotation
+        annotation.selected_text = data['selected_text'].strip()
+        annotation.annotation_type = new_annotation_type
+
+        # Mettre à jour les positions si fournies
+        if 'start_pos' in data:
+            annotation.start_pos = int(data['start_pos'])
+        if 'end_pos' in data:
+            annotation.end_pos = int(data['end_pos'])
+
+        # Marquer comme modifiée par un humain
+        annotation.modified_by_human = True
+        annotation.human_modified_at = timezone.now()
+        annotation.last_modified_by = request.user
+
+        # Ajouter une note sur la modification
+        if annotation.ai_reasoning:
+            annotation.ai_reasoning = f"[Modifié par {request.user.username}] {annotation.ai_reasoning}"
+        else:
+            annotation.ai_reasoning = f"Annotation modifiée par {request.user.username}"
+
+        annotation.save()
+
+        # Logger la modification (optionnel)
+        print(f"✏️ Annotation {annotation_id} modifiée par {request.user.username}")
+        print(f"   Ancien texte: '{old_values['selected_text']}'")
+        print(f"   Nouveau texte: '{annotation.selected_text}'")
+        print(f"   Ancien type: {old_values['annotation_type']}")
+        print(f"   Nouveau type: {annotation.annotation_type.display_name}")
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Annotation modifiée avec succès',
+            'annotation': {
+                'id': annotation.id,
+                'selected_text': annotation.selected_text,
+                'annotation_type': {
+                    'id': annotation.annotation_type.id,
+                    'name': annotation.annotation_type.name,
+                    'display_name': annotation.annotation_type.display_name,
+                    'color': annotation.annotation_type.color
+                },
+                'confidence_score': annotation.confidence_score,
+                'ai_reasoning': annotation.ai_reasoning,
+                'start_pos': annotation.start_pos,
+                'end_pos': annotation.end_pos,
+                'modified_by_human': True
+            }
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON invalide'}, status=400)
+    except Exception as e:
+        print(f"❌ Erreur modification annotation {annotation_id}: {e}")
+        return JsonResponse({'error': f'Erreur lors de la modification: {str(e)}'}, status=500)
+
+
+@login_required
+def get_annotation_details(request, annotation_id):
+    """
+    Récupère les détails d'une annotation pour l'édition
+    """
+    try:
+        annotation = get_object_or_404(Annotation, id=annotation_id)
+
+        # Vérifier les permissions
+        if not (is_annotateur(request.user) or is_expert(request.user) or is_metadonneur(request.user)):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+
+        return JsonResponse({
+            'success': True,
+            'annotation': {
+                'id': annotation.id,
+                'selected_text': annotation.selected_text,
+                'annotation_type': {
+                    'id': annotation.annotation_type.id,
+                    'name': annotation.annotation_type.name,
+                    'display_name': annotation.annotation_type.display_name,
+                    'color': annotation.annotation_type.color
+                },
+                'confidence_score': annotation.confidence_score,
+                'ai_reasoning': annotation.ai_reasoning,
+                'start_pos': annotation.start_pos,
+                'end_pos': annotation.end_pos,
+                'created_by': annotation.created_by.username if annotation.created_by else None,
+                'modified_by_human': getattr(annotation, 'modified_by_human', False)
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url='rawdocs:login')
+@user_passes_test(is_dev_metier, login_url='rawdocs:login')
+def dev_metier_dashboard(request):
+    # Documents validés par l'EXPERT uniquement
+    validated_documents = (
+        RawDocument.objects
+        .filter(is_expert_validated=True)
+        .order_by('-expert_validated_at')[:100]
+    )
+
+    for doc in validated_documents:
+        # nom de fichier lisible dans le template
+        doc.basename = os.path.basename(doc.file.name) if doc.file else ''
+
+    # Quelques stats simples pour les graphes
+    total_docs = RawDocument.objects.count()
+    expert_validated_count = validated_documents.count()
+    remaining = max(total_docs - expert_validated_count, 0)
+
+    bar_data = json.dumps([150, total_docs, expert_validated_count, remaining])
+    pie_data = json.dumps([30, 20, 25, 10, 15])  # garde tel quel si c'est du fake data
+
+    return render(request, 'rawdocs/dev_metier_dashboard.html', {
+        "validated_documents": validated_documents,
+        "bar_data": bar_data,
+        "pie_data": pie_data,
+    })
+
 # =================== NOUVELLES VUES POUR JSON ET RÉSUMÉS D'ANNOTATIONS ===================
 
 from .regulatory_analyzer import RegulatoryAnalyzer
@@ -1943,6 +2110,34 @@ def view_page_annotation_json(request, page_id):
         return redirect('rawdocs:annotation_dashboard')
 
 
+@login_required(login_url='rawdocs:login')
+@user_passes_test(is_dev_metier, login_url='rawdocs:login')
+def dev_metier_document_annotation_json(request, doc_id):
+    """
+    Vue spéciale dev-métier : affiche le JSON d'un document validé par expert
+    """
+    document = get_object_or_404(RawDocument, id=doc_id, is_expert_validated=True)
+
+    # Si pas encore généré, déclencher la génération
+    if not document.global_annotations_json:
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        fake_request = factory.post(f'/generate-document-annotation-summary/{doc_id}/')
+        fake_request.user = request.user
+        generate_document_annotation_summary(fake_request, doc_id)
+        document.refresh_from_db()
+
+    context = {
+        "document": document,
+        "global_annotations_json": document.global_annotations_json,
+        "global_annotations_summary": document.global_annotations_summary,
+        "total_annotations": sum(p.annotations.count() for p in document.pages.all()),
+        "annotated_pages": document.pages.filter(annotations__isnull=False).distinct().count(),
+        "total_pages": document.total_pages,
+    }
+    return render(request, 'rawdocs/view_document_annotation_json_devmetier.html', context)
+
+
 @login_required
 def view_document_annotation_json(request, doc_id):
     """
@@ -2119,14 +2314,7 @@ def get_annotation_details(request, annotation_id):
 
 # =================== NOUVELLES VUES POUR L'ÉDITION DU RÉSUMÉ GLOBAL PAR L'EXPERT ===================
 
-class GlobalSummaryEditHistory(models.Model):
-    """Model pour garder l'historique des modifications du résumé global"""
-    document = models.ForeignKey(RawDocument, on_delete=models.CASCADE)
-    old_summary = models.TextField()
-    new_summary = models.TextField()
-    modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    modified_at = models.DateTimeField(auto_now_add=True)
-    reason = models.TextField(blank=True)
+from .models import GlobalSummaryEditHistory  # Import du modèle depuis models.py
 
 @login_required
 @user_passes_test(is_expert)

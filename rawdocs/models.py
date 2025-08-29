@@ -77,6 +77,10 @@ class RawDocument(models.Model):
         null=True, blank=True,
         help_text="Date de génération du résumé global d'annotations"
     )
+    
+    # Validation par expert
+    is_expert_validated = models.BooleanField(default=False, help_text="Document validé par un expert")
+    expert_validated_at = models.DateTimeField(null=True, blank=True, help_text="Date de validation par un expert")
 
     def __str__(self):
         owner_name = self.owner.username if self.owner else "–"
@@ -438,6 +442,7 @@ class UserProfile(models.Model):
         ('annotateur', 'Annotateur'),
         ('expert', 'Expert'),
         ('client', 'Client'),
+        ('dev_metier', 'Dev métier'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -538,6 +543,15 @@ class CustomFieldValue(models.Model):
     
     class Meta:
         unique_together = ['document', 'field']
+
+class GlobalSummaryEditHistory(models.Model):
+    """Model pour garder l'historique des modifications du résumé global"""
+    document = models.ForeignKey(RawDocument, on_delete=models.CASCADE)
+    old_summary = models.TextField()
+    new_summary = models.TextField()
+    modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    modified_at = models.DateTimeField(auto_now_add=True)
+    reason = models.TextField(blank=True)
 
 class MetadataFeedback(models.Model):
     document = models.ForeignKey(RawDocument, on_delete=models.CASCADE)

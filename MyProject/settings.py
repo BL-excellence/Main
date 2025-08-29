@@ -14,6 +14,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Charger les variables d'environnement depuis .env
 load_dotenv()
 
+MONGO_URI = "mongodb://localhost:27017/"
+MONGO_DB = "annotations_db"
+MONGO_COLLECTION = "documents"
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-+!-)(fvkm_r@&19om$2q_n)1=3n-i@@va%31(n+inqw38zt0&('
@@ -172,3 +175,21 @@ OAUTH_REDIRECT_URI = 'http://127.0.0.1:8000/client/products/api/oauth/callback/'
 # Sécurité
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
