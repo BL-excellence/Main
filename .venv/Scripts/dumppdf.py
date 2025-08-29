@@ -1,4 +1,4 @@
-#!C:\Users\ranya\Downloads\Main-lassana\.venv\Scripts\python.exe
+#!C:\Users\lasss\PycharmProjects\MyProject\.venv\Scripts\python.exe
 """Extract pdf structure in XML format"""
 
 import logging
