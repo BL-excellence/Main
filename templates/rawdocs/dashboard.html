@@ -522,32 +522,47 @@
 
         <!-- Stats Grid -->
         <div class="stats-grid">
-            <!-- Documents Scrappés -->
+           <!-- Documents Scrappés -->
             <div id="card-scrapped" class="card animate-fade-in cursor-pointer">
 
                 <div class="stat-icon documents">
                     <i class="fas fa-file-medical text-white"></i>
                 </div>
                 <div class="stat-value">{{ total_scrapped }}</div>
-                <div class="stat-label">Documents scrappés sur {{ total_planned }} planifiés</div>
+                <div class="stat-label">
+                    Documents scrappés sur 
+                    <span id="planned-number">{{ total_planned }}</span> planifiés
+                </div>
                 <div class="progress-container">
                     <div class="progress-bar bg-gradient-to-r from-sky-500 to-sky-400"
-                         style="width: {% if total_planned > 0 %}{% widthratio total_scrapped total_planned 100 %}%{% else %}0%{% endif %}"></div>
+                        style="width: {% if total_planned > 0 %}{% widthratio total_scrapped total_planned 100 %}%{% else %}0%{% endif %}"></div>
                 </div>
+
+                <!-- Planifier button -->
+                <form method="post" action="">
+                    {% csrf_token %}
+                    <input type="hidden" name="planned_number" id="planned_number" value="{{ total_planned }}">
+                    <button type="submit"
+                            onclick="return updatePlanned()"
+                            class="btn btn-primary text-sm px-2 py-1 rounded-md mt-2">
+                        Planifier un nombre de documents
+                    </button>
+                </form>
             </div>
 
-            <!-- En cours -->
-            <div class="card animate-fade-in" style="animation-delay: 0.1s">
-                <div class="stat-icon progress">
-                    <i class="fas fa-pills text-white"></i>
-                </div>
-                <div class="stat-value">{{ in_progress }}</div>
-                <div class="stat-label">En cours sur {{ total_in_reextraction }} en réextraction</div>
-                <div class="progress-container">
-                    <div class="progress-bar bg-gradient-to-r from-amber-500 to-yellow-400"
-                         style="width: {% if total_in_reextraction > 0 %}{% widthratio in_progress total_in_reextraction 100 %}%{% else %}0%{% endif %}"></div>
-                </div>
-            </div>
+            <script>
+            function updatePlanned() {
+                let current = document.getElementById("planned_number").value;
+                let newVal = prompt("Entrez le nombre de documents planifiés :", current);
+                if (newVal !== null && newVal.trim() !== "") {
+                    document.getElementById("planned_number").value = newVal;
+                    return true; // submit the form -> sends to Django
+                }
+                return false; // cancel -> no submit
+            }
+            </script>
+
+
 
             <!-- Terminés -->
             <div class="card animate-fade-in" style="animation-delay: 0.2s">
@@ -555,7 +570,7 @@
                     <i class="fas fa-check-circle text-white"></i>
                 </div>
                 <div class="stat-value">{{ total_completed }}</div>
-                <div class="stat-label">Terminés sur {{ total_scrapped }} scrappés</div>
+                <div class="stat-label">Validés sur {{ total_scrapped }} en total</div>
                 <div class="progress-container">
                     <div class="progress-bar bg-gradient-to-r from-emerald-500 to-teal-400"
                          style="width: {% if total_scrapped > 0 %}{% widthratio total_completed total_scrapped 100 %}%{% else %}0%{% endif %}"></div>
@@ -568,7 +583,7 @@
                     <i class="fas fa-clock text-white"></i>
                 </div>
                 <div class="stat-value">{{ pending_validation_count|default:0 }}</div>
-                <div class="stat-label">En attente de validation</div>
+                <div class="stat-label">En attente de validation sur {{ total_scrapped }} en total</div>
                 <div class="progress-container">
                     <div class="progress-bar bg-gradient-to-r from-amber-500 to-yellow-400"
                          style="width: {% if total_imported > 0 %}{% widthratio pending_validation_count total_imported 100 %}%{% else %}0%{% endif %}"></div>
@@ -668,9 +683,7 @@
             <a href="{% url 'rawdocs:upload' %}" class="btn btn-primary text-sm px-3 py-2 rounded-md">
                 <i class="fas fa-upload"></i> Importer un nouveau PDF
             </a>
-            <a href="{% url 'rawdocs:metadata_learning_dashboard' %}" class="btn btn-outline">
-                <i class="fas fa-brain"></i> Apprentissage IA
-            </a>
+            
         </div>    
         <div class="card">
             <h2 class="card-title" style="color: #000000;"> <!-- Noir explicitement défini -->
@@ -775,7 +788,7 @@
     new Chart(barCtx, {
         type: 'bar',
         data: {
-            labels: ['Planifiés', 'Scrappés', 'Terminés', 'En cours'],
+            labels: ['Planifiés', 'Scrappés', 'Validés', 'En attente'],
             datasets: [{
                 label: 'Documents',
                 data: barData,
@@ -859,7 +872,8 @@
     new Chart(pieCtx, {
         type: 'doughnut',
         data: {
-            labels: ['Extraction', 'Validation', 'Annotation', 'Correction', 'Finalisation'],
+            labels: ['Planifiés' ,'Validés', 'En attente'],
+
             datasets: [{
                 data: pieData,
                 backgroundColor: [
@@ -982,5 +996,60 @@ document.getElementById('card-scrapped').addEventListener('click', () => {
 });
 
 </script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Récupérer les données envoyées par Django
+    const barData = JSON.parse('{{ bar_data|escapejs }}');
+    const pieData = JSON.parse('{{ pie_data|escapejs }}');
+
+    // === BAR CHART ===
+    const ctxBar = document.getElementById('barChart').getContext('2d');
+    new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+            labels: ['Planifiés', 'Scrappés', 'Validés', 'En attente'],
+            datasets: [{
+                label: 'Nombre de documents',
+                data: barData,
+                backgroundColor: ['#38bdf8','#0ea5e9','#10b981','#f59e0b']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+
+    // === PIE CHART ===
+const ctxPie = document.getElementById('pieChart').getContext('2d');
+new Chart(ctxPie, {
+    type: 'pie',
+    data: {
+        labels: ['Planifiés', 'Validés', 'En attente'],
+        datasets: [{
+            data: pieData,
+            backgroundColor: [
+                '#38bdf8', // Planifiés
+                '#10b981', // Validés
+                '#f59e0b'  // En attente
+            ]
+
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom' }
+        }
+    }
+});
+
+</script>
+
 
 {% endblock %}

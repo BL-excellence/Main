@@ -25,14 +25,13 @@ from django.http import HttpResponse
 from django.views.decorators.http import require_POST
 from .metadata_rlhf_learning import MetadataRLHFLearner
 
-
+from .models import CustomField, CustomFieldValue
 
 from .models import (
     RawDocument, MetadataLog,
     DocumentPage, AnnotationType,
     Annotation, AnnotationSession,
-    AILearningMetrics, AnnotationFeedback,
-    GlobalSummaryEditHistory
+    AILearningMetrics, AnnotationFeedback
 )
 from .utils import extract_metadonnees, extract_full_text
 from .annotation_utils import extract_pages_from_pdf
@@ -59,8 +58,7 @@ class RegisterForm(UserCreationForm):
         ("Metadonneur", "Métadonneur"),
         ("Annotateur", "Annotateur"),
         ("Expert", "Expert"),
-        ("Client", "Client"), 
-        ("DevMetier",   "Dev métier"), 
+        ("Client", "Client"),  # ADD THIS LINE
     ], label="Profil")
 
     class Meta:
@@ -103,9 +101,6 @@ def is_annotateur(user):
 def is_expert(user):
     return user.groups.filter(name="Expert").exists()
 
-def is_dev_metier(user):                              
-    return user.groups.filter(name="DevMetier").exists()    
-
 
 # ——— Authentication ————————————————————————————————————
 
@@ -126,8 +121,6 @@ class CustomLoginView(auth_views.LoginView):
             return reverse('rawdocs:annotation_dashboard')
         if user.groups.filter(name='Metadonneur').exists():
             return reverse('rawdocs:dashboard')
-        if user.groups.filter(name='DevMetier').exists():
-            return reverse('rawdocs:dev_metier_dashboard')
         return '/'
 
 
@@ -151,8 +144,6 @@ def register(request):
                 return redirect('expert:dashboard')  # Expert dashboard
             elif grp == "Client":
                 return redirect('/client/')  # Client dashboard
-            elif   grp == "DevMetier":   
-                return redirect('rawdocs:dev_metier_dashboard')  # dev metier dashboard
             else:
                 return redirect('rawdocs:dashboard')  # Fallback
     else:
@@ -162,13 +153,11 @@ def register(request):
 
 # ——— Métadonneur Views ——————————————————————————————
 
-@login_required(login_url='rawdocs:login')
-@user_passes_test(is_metadonneur)
 def dashboard_view(request):
     docs = RawDocument.objects.filter(owner=request.user).order_by('-created_at')
 
     # Définir total_planned par défaut si pas encore défini
-    total_planned = request.session.get('total_planned', 0)
+    total_planned = request.session.get('total_planned', 0)  # 150 par défaut
 
     # Si formulaire POST pour mettre à jour total_planned
     if request.method == 'POST':
@@ -181,7 +170,7 @@ def dashboard_view(request):
     total_scrapped = docs.count()
     total_completed = docs.filter(is_validated=True).count()
     pending_validation_count = docs.filter(is_validated=False).count()
-
+    
     context = {
         'documents': docs,
         'total_scrapped': total_scrapped,
@@ -194,7 +183,11 @@ def dashboard_view(request):
             total_completed,  # Validés
             pending_validation_count  # En attente
         ]),
+
     }
+    return render(request, 'rawdocs/dashboard.html', context)
+
+
     return render(request, 'rawdocs/dashboard.html', context)
 
 
@@ -210,18 +203,10 @@ def upload_pdf(request):
         rd = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
         edit_form = MetadataEditForm(request.POST)
         
-        # Get ORIGINAL AI extracted metadata (what AI first extracted)
-        ai_metadata = {}
-        standard_fields = ['title', 'doc_type', 'publication_date', 'version', 'source', 'context', 'country', 'language', 'url_source']
-        
-        # Get ORIGINAL AI extracted metadata (what was first extracted by LLM)
         ai_metadata = rd.original_ai_metadata or {}
-
         if edit_form.is_valid():
-            # Collect human corrections
             human_metadata = {}
             changes_made = False
-            
             field_mapping = {
                 'title': 'title',
                 'type': 'doc_type', 
@@ -238,7 +223,6 @@ def upload_pdf(request):
                 new_value = edit_form.cleaned_data.get(form_field, '') or ''
                 old_value = getattr(rd, model_field, '') or ''
                 human_metadata[form_field] = new_value
-                
                 if str(old_value) != str(new_value):
                     changes_made = True
                     MetadataLog.objects.create(
@@ -248,41 +232,48 @@ def upload_pdf(request):
                     )
                     setattr(rd, model_field, new_value)
             
+            # Handle custom fields
+            custom_changes_made = False
+            for key, value in request.POST.items():
+                if key.startswith('custom_'):
+                    field_name = key.replace('custom_', '')
+                    try:
+                        custom_field = CustomField.objects.get(name=field_name)
+                        custom_value, created = CustomFieldValue.objects.get_or_create(
+                            document=rd,
+                            field=custom_field,
+                            defaults={'value': value}
+                        )
+                        if not created:
+                            old_val = custom_value.value
+                            if str(old_val) != str(value):
+                                custom_changes_made = True
+                                custom_value.value = value
+                                custom_value.save()
+                                MetadataLog.objects.create(
+                                    document=rd, 
+                                    field_name=f"Custom: {field_name}",
+                                    old_value=old_val, 
+                                    new_value=value,
+                                    modified_by=request.user
+                                )
+                        elif created and value:
+                            custom_changes_made = True
+                    except CustomField.DoesNotExist:
+                        pass
+            
+            changes_made = changes_made or custom_changes_made
             if changes_made:
                 rd.save()
-                
-                # Process RLHF Learning ONLY if changes were made
                 from .metadata_rlhf_learning import MetadataRLHFLearner
                 learner = MetadataRLHFLearner()
-                feedback_result = learner.process_metadata_feedback(rd, ai_metadata, human_metadata, request.user)
-
-                # Create detailed message with learning stats
-                corrections = feedback_result['corrections_summary']
-                score = int(feedback_result['feedback_score'] * 100)
-                correct_count = len(corrections.get('kept_correct', []))
-                wrong_count = len(corrections.get('corrected_fields', [])) + len(corrections.get('removed_fields', []))
-                missed_count = len(corrections.get('missed_fields', []))
-
-                # Show success message with learning stats
-                learning_message = f"✅ Métadonnées sauvegardées! 🧠 IA Score: {score}% | ✅ Corrects: {correct_count} | ❌ Erreurs: {wrong_count} | 📝 Manqués: {missed_count}"
-                messages.success(request, learning_message)
-
-                # Pass learning data to template
-                context['learning_feedback'] = {
-                    'score': score,
-                    'correct': correct_count,
-                    'wrong': wrong_count,
-                    'missed': missed_count,
-                    'show': True,
-                    'feedback_result': feedback_result
-                }
+                learner.process_metadata_feedback(rd, ai_metadata, human_metadata, request.user)
+                messages.success(request, "Métadonnées sauvegardées avec succès!")
             else:
                 messages.info(request, "Aucune modification détectée.")
-  
-
+        
         metadata = extract_metadonnees(rd.file.path, rd.url or "")
         text = extract_full_text(rd.file.path)
-        
         initial_data = {
             'title': rd.title or '',
             'type': rd.doc_type or '', 
@@ -295,13 +286,21 @@ def upload_pdf(request):
             'url_source': rd.url_source or (rd.url or ''),
         }
         edit_form = MetadataEditForm(initial=initial_data)
+        custom_fields_data = []
+        for custom_value in CustomFieldValue.objects.filter(document=rd):
+            custom_fields_data.append({
+                'name': custom_value.field.name,
+                'type': custom_value.field.field_type,
+                'value': custom_value.value or ''
+            })
         
         context.update({
             'doc': rd,
             'metadata': metadata,
             'extracted_text': text,
             'edit_form': edit_form,
-            'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
+            'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at'),
+            'custom_fields_data': custom_fields_data
         })
         
         return render(request, 'rawdocs/upload.html', context)
@@ -309,7 +308,6 @@ def upload_pdf(request):
     # Handle file upload
     elif request.method == 'POST' and form.is_valid():
         try:
-            # Priority to local file
             if form.cleaned_data.get('pdf_file'):
                 f = form.cleaned_data['pdf_file']
                 rd = RawDocument(owner=request.user)
@@ -327,7 +325,6 @@ def upload_pdf(request):
             metadata = extract_metadonnees(rd.file.path, rd.url or "")
             text = extract_full_text(rd.file.path)
             
-            # Save extracted metadata to the model
             if metadata:
                 rd.original_ai_metadata = metadata
                 rd.title = metadata.get('title', '')
@@ -340,10 +337,8 @@ def upload_pdf(request):
                 rd.language = metadata.get('language', '')
                 rd.url_source = metadata.get('url_source', rd.url or '')
                 rd.save()
-                
                 print(f"✅ Métadonnées LLM sauvegardées pour le document {rd.pk}")
 
-            # Create form for editing with initial data
             initial_data = {
                 'title': rd.title or '',
                 'type': rd.doc_type or '', 
@@ -356,21 +351,27 @@ def upload_pdf(request):
                 'url_source': rd.url_source or (rd.url or ''),
             }
             edit_form = MetadataEditForm(initial=initial_data)
-
+            custom_fields_data = []
+            for custom_value in CustomFieldValue.objects.filter(document=rd):
+                custom_fields_data.append({
+                    'name': custom_value.field.name,
+                    'type': custom_value.field.field_type,
+                    'value': custom_value.value or ''
+                })
+            
             context.update({
                 'doc': rd,
                 'metadata': metadata,
                 'extracted_text': text,
                 'edit_form': edit_form,
-                'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
+                'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at'),
+                'custom_fields_data': custom_fields_data
             })
             messages.success(request, "Document importé avec succès!")
-
         except Exception as e:
             messages.error(request, f"Erreur lors de l'import: {str(e)}")
 
     return render(request, 'rawdocs/upload.html', context)
-
 
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_metadonneur)
@@ -1665,164 +1666,6 @@ def regulatory_analysis_dashboard(request):
     return render(request, 'rawdocs/regulatory_analysis_dashboard.html', context)
 
 
-# =================== VUES POUR L'ÉDITION DES ANNOTATIONS ===================
-
-@login_required
-@csrf_exempt
-def edit_annotation(request, annotation_id):
-    """
-    Permet de modifier une annotation existante
-    """
-    if request.method != 'POST':
-        return JsonResponse({'error': 'POST required'}, status=405)
-
-    try:
-        annotation = get_object_or_404(Annotation, id=annotation_id)
-
-        # Vérifier les permissions
-        if not (is_annotateur(request.user) or is_expert(request.user) or is_metadonneur(request.user)):
-            return JsonResponse({'error': 'Permission denied'}, status=403)
-
-        data = json.loads(request.body)
-
-        # Vérifier les champs requis
-        required_fields = ['selected_text', 'annotation_type_id']
-        for field in required_fields:
-            if field not in data:
-                return JsonResponse({'error': f'Champ requis manquant: {field}'}, status=400)
-
-        # Obtenir le nouveau type d'annotation
-        new_annotation_type = get_object_or_404(AnnotationType, id=data['annotation_type_id'])
-
-        # Sauvegarder les anciennes valeurs pour logging
-        old_values = {
-            'selected_text': annotation.selected_text,
-            'annotation_type': annotation.annotation_type.display_name,
-            'start_pos': annotation.start_pos,
-            'end_pos': annotation.end_pos
-        }
-
-        # Mettre à jour l'annotation
-        annotation.selected_text = data['selected_text'].strip()
-        annotation.annotation_type = new_annotation_type
-
-        # Mettre à jour les positions si fournies
-        if 'start_pos' in data:
-            annotation.start_pos = int(data['start_pos'])
-        if 'end_pos' in data:
-            annotation.end_pos = int(data['end_pos'])
-
-        # Marquer comme modifiée par un humain
-        annotation.modified_by_human = True
-        annotation.human_modified_at = timezone.now()
-        annotation.last_modified_by = request.user
-
-        # Ajouter une note sur la modification
-        if annotation.ai_reasoning:
-            annotation.ai_reasoning = f"[Modifié par {request.user.username}] {annotation.ai_reasoning}"
-        else:
-            annotation.ai_reasoning = f"Annotation modifiée par {request.user.username}"
-
-        annotation.save()
-
-        # Logger la modification (optionnel)
-        print(f"✏️ Annotation {annotation_id} modifiée par {request.user.username}")
-        print(f"   Ancien texte: '{old_values['selected_text']}'")
-        print(f"   Nouveau texte: '{annotation.selected_text}'")
-        print(f"   Ancien type: {old_values['annotation_type']}")
-        print(f"   Nouveau type: {annotation.annotation_type.display_name}")
-
-        return JsonResponse({
-            'success': True,
-            'message': 'Annotation modifiée avec succès',
-            'annotation': {
-                'id': annotation.id,
-                'selected_text': annotation.selected_text,
-                'annotation_type': {
-                    'id': annotation.annotation_type.id,
-                    'name': annotation.annotation_type.name,
-                    'display_name': annotation.annotation_type.display_name,
-                    'color': annotation.annotation_type.color
-                },
-                'confidence_score': annotation.confidence_score,
-                'ai_reasoning': annotation.ai_reasoning,
-                'start_pos': annotation.start_pos,
-                'end_pos': annotation.end_pos,
-                'modified_by_human': True
-            }
-        })
-
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'JSON invalide'}, status=400)
-    except Exception as e:
-        print(f"❌ Erreur modification annotation {annotation_id}: {e}")
-        return JsonResponse({'error': f'Erreur lors de la modification: {str(e)}'}, status=500)
-
-
-@login_required
-def get_annotation_details(request, annotation_id):
-    """
-    Récupère les détails d'une annotation pour l'édition
-    """
-    try:
-        annotation = get_object_or_404(Annotation, id=annotation_id)
-
-        # Vérifier les permissions
-        if not (is_annotateur(request.user) or is_expert(request.user) or is_metadonneur(request.user)):
-            return JsonResponse({'error': 'Permission denied'}, status=403)
-
-        return JsonResponse({
-            'success': True,
-            'annotation': {
-                'id': annotation.id,
-                'selected_text': annotation.selected_text,
-                'annotation_type': {
-                    'id': annotation.annotation_type.id,
-                    'name': annotation.annotation_type.name,
-                    'display_name': annotation.annotation_type.display_name,
-                    'color': annotation.annotation_type.color
-                },
-                'confidence_score': annotation.confidence_score,
-                'ai_reasoning': annotation.ai_reasoning,
-                'start_pos': annotation.start_pos,
-                'end_pos': annotation.end_pos,
-                'created_by': annotation.created_by.username if annotation.created_by else None,
-                'modified_by_human': getattr(annotation, 'modified_by_human', False)
-            }
-        })
-
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
-
-@login_required(login_url='rawdocs:login')
-@user_passes_test(is_dev_metier, login_url='rawdocs:login')
-def dev_metier_dashboard(request):
-    # Documents validés par l'EXPERT uniquement
-    validated_documents = (
-        RawDocument.objects
-        .filter(is_expert_validated=True)
-        .order_by('-expert_validated_at')[:100]
-    )
-
-    for doc in validated_documents:
-        # nom de fichier lisible dans le template
-        doc.basename = os.path.basename(doc.file.name) if doc.file else ''
-
-    # Quelques stats simples pour les graphes
-    total_docs = RawDocument.objects.count()
-    expert_validated_count = validated_documents.count()
-    remaining = max(total_docs - expert_validated_count, 0)
-
-    bar_data = json.dumps([150, total_docs, expert_validated_count, remaining])
-    pie_data = json.dumps([30, 20, 25, 10, 15])  # garde tel quel si c'est du fake data
-
-    return render(request, 'rawdocs/dev_metier_dashboard.html', {
-        "validated_documents": validated_documents,
-        "bar_data": bar_data,
-        "pie_data": pie_data,
-    })
-
 # =================== NOUVELLES VUES POUR JSON ET RÉSUMÉS D'ANNOTATIONS ===================
 
 from .regulatory_analyzer import RegulatoryAnalyzer
@@ -2121,34 +1964,6 @@ def view_page_annotation_json(request, page_id):
         return redirect('rawdocs:annotation_dashboard')
 
 
-@login_required(login_url='rawdocs:login')
-@user_passes_test(is_dev_metier, login_url='rawdocs:login')
-def dev_metier_document_annotation_json(request, doc_id):
-    """
-    Vue spéciale dev-métier : affiche le JSON d'un document validé par expert
-    """
-    document = get_object_or_404(RawDocument, id=doc_id, is_expert_validated=True)
-
-    # Si pas encore généré, déclencher la génération
-    if not document.global_annotations_json:
-        from django.test import RequestFactory
-        factory = RequestFactory()
-        fake_request = factory.post(f'/generate-document-annotation-summary/{doc_id}/')
-        fake_request.user = request.user
-        generate_document_annotation_summary(fake_request, doc_id)
-        document.refresh_from_db()
-
-    context = {
-        "document": document,
-        "global_annotations_json": document.global_annotations_json,
-        "global_annotations_summary": document.global_annotations_summary,
-        "total_annotations": sum(p.annotations.count() for p in document.pages.all()),
-        "annotated_pages": document.pages.filter(annotations__isnull=False).distinct().count(),
-        "total_pages": document.total_pages,
-    }
-    return render(request, 'rawdocs/view_document_annotation_json_devmetier.html', context)
-
-
 @login_required
 def view_document_annotation_json(request, doc_id):
     """
@@ -2325,7 +2140,14 @@ def get_annotation_details(request, annotation_id):
 
 # =================== NOUVELLES VUES POUR L'ÉDITION DU RÉSUMÉ GLOBAL PAR L'EXPERT ===================
 
-from .models import GlobalSummaryEditHistory  # Import du modèle depuis models.py
+class GlobalSummaryEditHistory(models.Model):
+    """Model pour garder l'historique des modifications du résumé global"""
+    document = models.ForeignKey(RawDocument, on_delete=models.CASCADE)
+    old_summary = models.TextField()
+    new_summary = models.TextField()
+    modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    modified_at = models.DateTimeField(auto_now_add=True)
+    reason = models.TextField(blank=True)
 
 @login_required
 @user_passes_test(is_expert)
@@ -2433,110 +2255,3 @@ def validate_global_summary(request, doc_id):
         print(f"❌ Erreur validation résumé global du document {doc_id}: {e}")
         return JsonResponse({'error': f'Erreur lors de la validation: {str(e)}'}, status=500)
     
-
-
-@login_required
-@user_passes_test(is_metadonneur)
-def metadata_learning_dashboard(request):
-    """Dashboard showing AI learning statistics with proper calculations"""
-    try:
-        from .models import MetadataFeedback, MetadataLearningMetrics
-        
-        total_feedbacks = MetadataFeedback.objects.count()
-        
-        if total_feedbacks == 0:
-            return render(request, 'rawdocs/learning_dashboard.html', {
-                'no_data': True
-            })
-        
-        # Calculate average score
-        avg_score = MetadataFeedback.objects.aggregate(
-            avg=models.Avg('feedback_score')
-        )['avg'] or 0
-        
-        # Field performance with percentages calculated
-        field_stats = {}
-        document_stats = {}  # NEW: Track per-document performance
-        
-        for feedback in MetadataFeedback.objects.all():
-            corrections = feedback.corrections_made
-            doc_id = feedback.document.id
-            doc_title = feedback.document.title or f"Document {doc_id}"
-            
-            # Initialize document stats
-            if doc_id not in document_stats:
-                document_stats[doc_id] = {
-                    'title': doc_title,
-                    'correct': 0,
-                    'wrong': 0,
-                    'missed': 0,
-                    'precision': 0
-                }
-            
-            for kept in corrections.get('kept_correct', []):
-                field = kept.get('field')
-                if field not in field_stats:
-                    field_stats[field] = {'correct': 0, 'wrong': 0, 'missed': 0}
-                field_stats[field]['correct'] += 1
-                document_stats[doc_id]['correct'] += 1
-            
-            for wrong in corrections.get('corrected_fields', []):
-                field = wrong.get('field')
-                if field not in field_stats:
-                    field_stats[field] = {'correct': 0, 'wrong': 0, 'missed': 0}
-                field_stats[field]['wrong'] += 1
-                document_stats[doc_id]['wrong'] += 1
-            
-            for missed in corrections.get('missed_fields', []):
-                field = missed.get('field')
-                if field not in field_stats:
-                    field_stats[field] = {'correct': 0, 'wrong': 0, 'missed': 0}
-                field_stats[field]['missed'] += 1
-                document_stats[doc_id]['missed'] += 1
-        
-        # Calculate precision percentages
-        for field, stats in field_stats.items():
-            total = stats['correct'] + stats['wrong'] + stats['missed']
-            stats['precision'] = int((stats['correct'] / total * 100)) if total > 0 else 0
-        
-        for doc_id, stats in document_stats.items():
-            total = stats['correct'] + stats['wrong'] + stats['missed']
-            stats['precision'] = int((stats['correct'] / total * 100)) if total > 0 else 0
-        
-        # Get improvement trend
-        feedbacks = MetadataFeedback.objects.order_by('created_at')
-        improvement = 0
-        if feedbacks.count() >= 2:
-            first_score = feedbacks.first().feedback_score * 100
-            last_score = feedbacks.last().feedback_score * 100
-            improvement = int(last_score - first_score)
-        
-        return render(request, 'rawdocs/learning_dashboard.html', {
-            'total_feedbacks': total_feedbacks,
-            'avg_score': int(avg_score * 100),
-            'field_stats': field_stats,
-            'document_stats': document_stats,  # NEW: Pass document stats
-            'improvement': improvement,
-            'has_data': True
-        })
-        
-    except Exception as e:
-        print(f"Learning dashboard error: {e}")
-        return render(request, 'rawdocs/learning_dashboard.html', {'error': str(e)})
-
-@login_required 
-def metadata_learning_api(request):
-    """API for learning stats"""
-    try:
-        from .models import MetadataFeedback
-        
-        total = MetadataFeedback.objects.count()
-        avg = MetadataFeedback.objects.aggregate(avg=models.Avg('feedback_score'))['avg'] or 0
-        
-        return JsonResponse({
-            'total_feedbacks': total,
-            'average_score': avg * 100,
-            'learning_active': total > 0
-        })
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)

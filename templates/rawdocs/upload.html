@@ -429,61 +429,6 @@
   box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
 }
 
-  .quality-metrics {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    border-radius: 16px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-  }
-
-  .metric-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .extraction-rate {
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-  }
-
-  .extracted-fields {
-    margin-top: 1rem;
-  }
-
-  .field-tag {
-    display: inline-block;
-    background: rgba(255, 255, 255, 0.2);
-    padding: 0.3rem 0.7rem;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    margin: 0.2rem;
-  }
-
-  .confidence-scores {
-    margin-top: 1.5rem;
-  }
-
-  .confidence-item {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-  }
-
-  .confidence-score {
-    font-weight: 600;
-  }
-
-  .score-high { color: #10b981; }
-  .score-medium { color: #f59e0b; }
-  .score-low { color: #ef4444; }
-
   .history-entry {
     border: 1.3px solid var(--card-border);
     border-radius: 10px;
@@ -536,6 +481,31 @@
     .main-panel, .sidebar-panel { width: 100%; }
     .form-grid { grid-template-columns: 1fr; }
   }
+  #validatePopup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+#validatePopup div {
+    background: var(--card-bg);
+    border-radius: 16px;
+    border: 1.7px solid var(--card-border);
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(14,165,233,0.16);
+    max-width: 400px;
+    text-align: center;
+}
+#validatePopup .btn-yes { background: var(--accent); color: white; }
+#validatePopup .btn-yes:hover { background: var(--accent-light); }
+#validatePopup .btn-no { background: var(--card-border); color: var(--text-muted); }
+#validatePopup .btn-no:hover { background: var(--hover-bg); color: var(--primary); }
 </style>
 
 <div class="upload-container">
@@ -597,9 +567,12 @@
             Éditer les métadonnées
           </h2>
           <div style="display:flex; gap:0.7rem;">
+            {% if doc and doc.id %}
             <button type="button" onclick="reextractMetadata()" class="btn btn-outline" title="Réextraire">
-              <i class="fas fa-sync"></i> Réextraire
+                <i class="fas fa-sync"></i> Réextraire
             </button>
+            {% endif %}
+
             <button type="button" class="btn btn-refuse" title="Refuser le document">
               <i class="fas fa-times"></i> Refuser
             </button>
@@ -704,16 +677,25 @@
               </label>
               <input type="url" name="url_source" value="{{ edit_form.url_source.value|default:'' }}" class="form-input" placeholder="URL du document source">
             </div>
+
+            <!-- Custom Fields Container -->
+            <div id="customFields" class="form-field">
+            </div>
           </div>
 
-          <!-- Save Actions -->
+         <!-- Save Actions -->
           <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--card-border);">
-            <button type="submit" class="btn btn-primary">
-              <i class="fas fa-save"></i> Sauvegarder
-            </button>
-            <a href="{% url 'rawdocs:document_list' %}" class="btn btn-outline">
-              <i class="fas fa-arrow-left"></i> Retour à la liste
-            </a>
+              <button type="submit" class="btn btn-primary">
+                  <i class="fas fa-save"></i> Sauvegarder
+              </button>
+              <a href="{% url 'rawdocs:document_list' %}" class="btn btn-outline">
+                  <i class="fas fa-arrow-left"></i> Retour à la liste
+              </a>
+              {% if doc and not doc.is_validated and not doc.is_refused %}
+              <button type="button" class="btn btn-primary" id="validateButton">
+                  <i class="fas fa-check"></i> Valider
+              </button>
+              {% endif %}
           </div>
         </form>
         <!-- Learning Progress Indicator -->
@@ -739,44 +721,6 @@
       </div>
     </div>
     
-    <!-- Sidebar Panel -->
-    <div class="sidebar-panel">
-      <!-- Quality Metrics -->
-      <div class="quality-metrics">
-        <div class="metric-title">
-          <i class="fas fa-chart-line"></i>
-          Qualité d'extraction
-        </div>
-        <div class="extraction-rate">12%</div>
-        
-        <div class="extracted-fields">
-          <div style="margin-bottom: 0.5rem; font-size: 0.9rem;">Champs extraits :</div>
-          {% if metadata.title %}<span class="field-tag">Title</span>{% endif %}
-          {% if metadata.type %}<span class="field-tag">Type</span>{% endif %}
-          {% if metadata.language %}<span class="field-tag">Language</span>{% endif %}
-          {% if metadata.publication_date %}<span class="field-tag">Publication_Date</span>{% endif %}
-          {% if metadata.version %}<span class="field-tag">Version</span>{% endif %}
-          {% if metadata.source %}<span class="field-tag">Source</span>{% endif %}
-          {% if metadata.context %}<span class="field-tag">Context</span>{% endif %}
-          {% if metadata.country %}<span class="field-tag">Country</span>{% endif %}
-        </div>
-
-        <div class="confidence-scores">
-          <div style="margin-bottom: 0.5rem; font-size: 0.9rem;">Scores de confiance :</div>
-          {% if metadata.title %}<div class="confidence-item"><span>Title</span><span class="confidence-score score-medium">30%</span></div>{% endif %}
-          {% if metadata.type %}<div class="confidence-item"><span>Type</span><span class="confidence-score score-low">0%</span></div>{% endif %}
-          {% if metadata.language %}<div class="confidence-item"><span>Language</span><span class="confidence-score score-high">80%</span></div>{% endif %}
-          {% if metadata.publication_date %}<div class="confidence-item"><span>Publication_Date</span><span class="confidence-score score-low">0%</span></div>{% endif %}
-        </div>
-      </div>
-      <!-- Learning Dashboard Link -->
-      <div class="card" style="text-align: center;">
-        <a href="{% url 'rawdocs:metadata_learning_dashboard' %}" class="btn btn-outline">
-          <i class="fas fa-brain"></i> Voir Apprentissage IA
-        </a>
-      </div>
-      
-
       <!-- History Section -->
       {% if logs %}
       <div class="card">
@@ -827,14 +771,207 @@
     </a>
   </div>
 </div>
+<!-- Modal for adding a custom field -->
+<div id="addFieldModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+     background:rgba(0,0,0,0.5); z-index:1000;">
+  <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+       background:white; padding:2rem; border-radius:8px; min-width:400px;">
+    <h3>Ajouter un champ</h3>
+    
+    <div style="margin-bottom:1rem;">
+      <label>Nom du champ :</label>
+      <input type="text" id="newFieldName" style="width:100%; padding:0.5rem; margin-top:0.5rem;">
+    </div>
+    
+    <div style="margin-bottom:1rem;">
+      <label>Type de champ :</label>
+      <select id="newFieldType" style="width:100%; padding:0.5rem; margin-top:0.5rem;">
+        <option value="text">Texte</option>
+        <option value="textarea">Texte long</option>
+        <option value="date">Date</option>
+        <option value="number">Nombre</option>
+      </select>
+    </div>
+    
+    <div style="text-align:right;">
+      <button onclick="hideAddFieldModal()" style="margin-right:1rem; padding:0.5rem 1rem;">Annuler</button>
+      <button onclick="addCustomField()" style="padding:0.5rem 1rem; background:#3b82f6; color:white; border:none;">Ajouter</button>
+    </div>
+  </div>
+</div>
 
-<!-- Load the external JS file -->
-<script src="{% static 'js/metadata-learning.js' %}"></script>
+<script>
+function reextractMetadata() {
+    const docId = "{{ doc.id|default:'' }}";
+    if (!docId) {
+        alert("Le document doit être sauvegardé avant de réextraire les métadonnées.");
+        return;
+    }
 
-{% if learning_feedback.show %}
-<script id="learning-data" type="application/json">
-{"show": true, "score": {{ learning_feedback.score }}, "correct": {{ learning_feedback.correct }}, "wrong": {{ learning_feedback.wrong }}, "missed": {{ learning_feedback.missed }}}
+    if (!confirm("Relancer l'extraction automatique ?")) return;
+
+    fetch(`/edit/${docId}/reextract/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) { alert('Erreur: ' + (data.error || 'réextraction')); return; }
+        const m = data.metadata || {};
+        document.querySelector('[name="title"]').value = m.title || '';
+        document.querySelector('[name="type"]').value = m.type || '';
+        document.querySelector('[name="context"]').value = m.context || '';
+        document.querySelector('[name="language"]').value = m.language || '';
+        document.querySelector('[name="publication_date"]').value = m.publication_date || '';
+        document.querySelector('[name="version"]').value = m.version || '';
+        document.querySelector('[name="source"]').value = m.source || '';
+        document.querySelector('[name="url_source"]').value = m.url_source || '';
+        const countryInput = document.querySelector('[name="country"]');
+        if (countryInput) countryInput.value = m.country || '';
+        alert('Réextraction terminée et champs mis à jour.');
+    })
+    .catch(err => alert('Erreur réseau: ' + err));
+}
+
 </script>
-{% endif %}
 
+<script>
+function showAddFieldModal() {
+    document.getElementById('addFieldModal').style.display = 'block';
+}
+
+function hideAddFieldModal() {
+    document.getElementById('addFieldModal').style.display = 'none';
+    document.getElementById('newFieldName').value = '';
+    document.getElementById('newFieldType').value = 'text';
+}
+
+function addCustomField() {
+    const name = document.getElementById('newFieldName').value;
+    const type = document.getElementById('newFieldType').value;
+    
+    if (!name) {
+        alert('Please enter field name');
+        return;
+    }
+    
+    // Get document ID from the form instead of URL since we're in upload.html
+    const docId = document.querySelector('input[name="doc_id"]').value;
+    
+    fetch('{% url "rawdocs:add_field_ajax" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            name: name, 
+            type: type, 
+            doc_id: docId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            hideAddFieldModal();
+            addFieldToForm(name, type);
+            alert(data.message);
+        } else {
+            alert(data.message);
+        }
+    });
+}
+function addFieldToFormWithValue(name, type, value = '') {
+    const container = document.getElementById('customFields');
+    if (!container || document.getElementById(`custom_${name}`)) return;
+
+    const fieldDiv = document.createElement('div');
+    fieldDiv.className = 'form-field'; // Matches existing fields
+
+    let inputHtml = '';
+    const safeValue = value ? value.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+    if (type === 'textarea') {
+        inputHtml = `<textarea name="custom_${name}" id="custom_${name}" class="form-input" rows="3" placeholder="${name}">${safeValue}</textarea>`;
+    } else if (type === 'date') {
+        inputHtml = `<input type="date" name="custom_${name}" id="custom_${name}" value="${safeValue}" class="form-input" placeholder="${name}">`;
+    } else if (type === 'number') {
+        inputHtml = `<input type="number" name="custom_${name}" id="custom_${name}" value="${safeValue}" class="form-input" placeholder="${name}">`;
+    } else {
+        inputHtml = `<input type="text" name="custom_${name}" id="custom_${name}" value="${safeValue}" class="form-input" placeholder="${name}">`;
+    }
+
+    fieldDiv.innerHTML = `
+        <label class="field-label" for="custom_${name}">
+            <i class="fas fa-plus"></i>
+            ${name}
+            <span class="auto-badge">Personnalisé</span>
+        </label>
+        ${inputHtml}
+    `;
+
+    container.appendChild(fieldDiv);
+}
+
+function addFieldToForm(name, type) {
+    addFieldToFormWithValue(name, type, '');
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% if custom_fields_data %}
+        console.log('Custom fields data:', {{ custom_fields_data|safe }}); // Debug log
+        {% for field in custom_fields_data %}
+            addFieldToFormWithValue('{{ field.name }}', '{{ field.type }}', '{{ field.value|escapejs }}');
+        {% endfor %}
+    {% endif %}
+});
+</script>
+
+<script>
+document.getElementById('validateButton')?.addEventListener('click', function() {
+    const popup = document.createElement('div');
+    popup.id = 'validatePopup';
+    popup.innerHTML = `
+        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card-bg); border-radius: 16px; border: 1.7px solid var(--card-border); padding: 2rem; box-shadow: var(--shadow); max-width: 450px; text-align: center; color: var(--text); z-index: 1001;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 2.5rem; color: var(--danger-red); margin-bottom: 1.5rem;"></i>
+            <h3 style="color: var(--primary-dark); font-weight: 700; margin-bottom: 1rem;">Confirmation de Validation</h3>
+            <p style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 2rem;">Êtes-vous sûr ? Une fois validé, le document sera envoyé à l’annotateur pour annotation.</p>
+            <div style="display: flex; justify-content: center; gap: 1.5rem;">
+                <button class="btn btn-primary btn-yes" onclick="submitValidation(); document.getElementById('validatePopup').remove();">Oui</button>
+                <button class="btn btn-outline btn-no" onclick="document.getElementById('validatePopup').remove();">Non</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(popup);
+});
+
+function submitValidation() {
+    const form = document.getElementById('metadataForm');
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'validate_document';
+    input.value = '{{ doc.id }}';
+    form.appendChild(input);
+    form.action = '{% url "rawdocs:validate_document" 0 %}'.replace('0', '{{ doc.id }}');
+    form.method = 'POST';
+    form.submit();
+}
+</script>
 {% endblock %}

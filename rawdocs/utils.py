@@ -502,7 +502,7 @@ def get_learned_field_improvements():
         print(f"Learning insights error: {e}")
         return {}
     
-    
+
 def build_adaptive_field_instructions(learning_prompts):
     """Build field instructions that incorporate learning"""
     instructions = {}
@@ -512,8 +512,8 @@ def build_adaptive_field_instructions(learning_prompts):
         'type': "Document type (guide, report, etc)",
         'publication_date': "Publication date",
         'source': "Source organization",
-        'language': "Document language",
-        'context': "Brief context (2 sentences max)"
+        'language': "Document language code (en, fr, etc.)",
+        'context': "field , pharmaceutical, legal, etc.",
     }
     
     for field, base_desc in base_fields.items():
