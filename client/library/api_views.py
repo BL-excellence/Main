@@ -113,80 +113,43 @@ def _extract_sections(text: str):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def analyze_document_groq(request, pk):
-    """Analyse via Groq en TEXTE, sans annotations, avec chunking pour éviter 413/TPM."""
+    """Retourne l'analyse réglementaire existante (expert). Ne lance pas Groq."""
     doc = get_object_or_404(RawDocument, pk=pk, is_validated=True)
 
-    # Ensure we have extracted pages/cleaned_text for Client uploads as well
-    pages = _ensure_document_pages(doc)
-    # Chunking to respect Groq token/min limits
-    chunks = _split_pages_to_chunks(pages, max_chars=16000)
-
-    if len(chunks) == 1 and not chunks[0].strip():
-        return Response({"error": "Aucun texte extrait pour ce document."}, status=status.HTTP_400_BAD_REQUEST)
-
-    analysis_prompt_tpl = (
-        "Tu es un expert en analyse réglementaire. Analyse le contenu suivant et rends UNE RÉPONSE EN TEXTE CLAIR (pas de JSON). "
-        "Structure ta réponse ainsi: \n"
-        "Résumé:\n<un paragraphe concis>\n\n"
-        "Points clés:\n- point 1\n- point 2\n\n"
-        "Obligations:\n- obligation 1\n- obligation 2\n\n"
-        "Délais:\n- délai 1\n- délai 2\n\n"
-        "Autorités:\n- autorité 1\n- autorité 2\n\n"
-        "Ne réponds QUE à partir du texte fourni. Sois concis et précis.\n\nTEXTE:\n{body}"
-    )
-
+    # 1) Tenter de renvoyer l'analyse réglementaire experte déjà enregistrée
     try:
-        annotator = GroqAnnotator()
+        regulatory = doc.regulatory_analysis  # OneToOne: DocumentRegulatoryAnalysis
+    except Exception:
+        regulatory = None
 
-        summaries = []
-        agg_key_points = []
-        agg_obligations = []
-        agg_deadlines = []
-        agg_authorities = []
-
-        for idx, body in enumerate(chunks, start=1):
-            if not body.strip():
-                continue
-            prompt = analysis_prompt_tpl.format(body=body)
-            resp = annotator.call_groq_api(prompt, max_tokens=800)
-            if not resp:
-                continue
-            text = str(resp).strip()
-            s, k, o, d, a = _extract_sections(text)
-            summaries.append(s or text)
-            agg_key_points.extend(k)
-            agg_obligations.extend(o)
-            agg_deadlines.extend(d)
-            agg_authorities.extend(a)
-
-        def dedup(lst):
-            seen = set()
-            out = []
-            for it in lst:
-                key = it.lower()
-                if key not in seen and it:
-                    seen.add(key)
-                    out.append(it)
-            return out
-
+    if regulatory:
+        consolidated = regulatory.consolidated_analysis or {}
         analysis = {
-            "summary": "\n\n".join(s for s in summaries if s).strip()[:8000] if summaries else "",
-            "key_points": dedup(agg_key_points)[:40],
-            "obligations": dedup(agg_obligations)[:40],
-            "deadlines": dedup(agg_deadlines)[:40],
-            "authorities": dedup(agg_authorities)[:40],
+            # Préférer le résumé expert; sinon fallback au résumé global d'annotations
+            "summary": (regulatory.global_summary or consolidated.get("global_summary") or doc.global_annotations_summary or ""),
+            # Points clés: privilégier des champs communs si présents
+            "key_points": consolidated.get("key_regulatory_points") or consolidated.get("main_regulatory_themes") or [],
+            # Listes consolidées déjà présentes dans le modèle
+            "obligations": list(regulatory.main_obligations or []),
+            "deadlines": list(regulatory.critical_deadlines_summary or []),
+            "authorities": list(regulatory.relevant_authorities or []),
         }
-
-        if not any([analysis["summary"], analysis["key_points"], analysis["obligations"], analysis["deadlines"], analysis["authorities"]]):
-            return Response({"error": "Aucune réponse de Groq."}, status=status.HTTP_502_BAD_GATEWAY)
-
         return Response({
             "document_id": doc.id,
             "analysis": analysis,
         })
-    except Exception as e:
-        logger.exception("Erreur d'analyse Groq")
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # 2) Pas d'analyse experte disponible → renvoyer une réponse vide et un message clair (200)
+    return Response({
+        "document_id": doc.id,
+        "analysis": {
+            "summary": "Aucune analyse réglementaire créée.",
+            "key_points": [],
+            "obligations": [],
+            "deadlines": [],
+            "authorities": []
+        }
+    })
 
 
 @api_view(['GET'])

@@ -69,7 +69,10 @@ class ExpertDashboardView(LoginRequiredMixin, TemplateView):
         total_documents = docs_qs.count()
 
         # Aggregates for annotations (limités aux docs prêts)
-        ann_qs = Annotation.objects.filter(page__document__in=docs_qs)
+        ann_qs = Annotation.objects.filter(
+        page__document__in=docs_qs,
+        validation_status__in=['pending', 'validated', 'expert_created']
+    )
         total_annotations = ann_qs.count()
         validated_annotations = ann_qs.filter(validation_status='validated').count()
         pending_annotations = ann_qs.filter(validation_status='pending').count()
@@ -134,32 +137,61 @@ class DocumentReviewView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         document_id = self.kwargs['document_id']
         document = get_object_or_404(RawDocument, id=document_id)
+        
+        # Get current page number (default to 1)
+        current_page_num = int(self.request.GET.get('page', 1))
+        current_page = document.pages.filter(page_number=current_page_num).first()
+        page_annotations = current_page.annotations.all().select_related('annotation_type').order_by('start_pos') if current_page else []
 
-        # Get pages with their annotations
-        pages = document.pages.prefetch_related(
-            'annotations__annotation_type'
-        ).order_by('page_number')
-
-        # Pagination by page
-        paginator = Paginator(pages, 1)
-        page_number = self.request.GET.get('page', 1)
-        page_obj = paginator.get_page(page_number)
-
-        current_page = page_obj.object_list[0] if page_obj.object_list else None
-
-        # Get all annotation types for expert interface
-        annotation_types = AnnotationType.objects.all().order_by('display_name')
-
-        # Get existing annotations for current page
-        existing_annotations = current_page.annotations.all() if current_page else []
-
+        
+        if not current_page:
+            current_page = document.pages.first()
+            current_page_num = current_page.page_number if current_page else 1
+        
+        # Get page summary (generate if not exists)
+        page_summary = ""
+        if hasattr(current_page, 'annotations_summary') and current_page.annotations_summary:
+            page_summary = current_page.annotations_summary
+        else:
+            # Get ALL annotations (not just validated ones) for expert review
+            page_annotations = current_page.annotations.filter(
+                validation_status__in=['pending', 'validated', 'expert_created', 'rejected']
+            )
+            if page_annotations.exists():
+                # Build entities and generate summary
+                entities = {}
+                for annotation in page_annotations:
+                    entity_type = annotation.annotation_type.display_name
+                    if entity_type not in entities:
+                        entities[entity_type] = []
+                    entities[entity_type].append(annotation.selected_text)
+                
+                # Generate summary for this page
+                from rawdocs.views import generate_entities_based_page_summary
+                page_summary = generate_entities_based_page_summary(
+                    entities=entities,
+                    page_number=current_page.page_number,
+                    document_title=document.title
+                )
+                
+                # Save the generated summary to the page for future use
+                current_page.annotations_summary = page_summary
+                current_page.save(update_fields=['annotations_summary'])
+            else:
+                page_summary = f"Page {current_page_num}: Aucune annotation disponible pour générer un résumé."
+        
+        # Check if this is the last page
+        is_last_page = current_page_num >= document.total_pages
+        
         context.update({
             'document': document,
-            'page_obj': page_obj,
             'current_page': current_page,
-            'annotation_types': annotation_types,
-            'existing_annotations': existing_annotations,
+            'current_page_num': current_page_num,
+            'page_summary': page_summary,
+            'is_last_page': is_last_page,
             'total_pages': document.total_pages,
+            'page_annotations': page_annotations,
+'total_page_annotations': page_annotations.count() if current_page else 0,
         })
         return context
 
@@ -283,8 +315,8 @@ def create_annotation_ajax(request):
                 page=page,
                 selected_text=text,
                 annotation_type=annotation_type,
-                start_pos=data.get('start_offset', 0),
-                end_pos=data.get('end_offset', len(text)),
+                start_pos=data.get('start_pos', 0),  # Changed from 'start_offset'
+                end_pos=data.get('end_pos', len(text)),  # Changed from 'end_offset'
                 validation_status='expert_created',
                 validated_by=request.user,
                 validated_at=timezone.now(),
@@ -2017,18 +2049,16 @@ def expert_annotation_dashboard(request):
     return render(request, 'expert/annotation_dashboard.html', context)
 
 
-@expert_required
 def expert_annotate_document(request, doc_id):
-    """Interface d'annotation pour Expert - copie de rawdocs.views.annotate_document"""
-    document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
-
-    # Pagination par page
-    pages = document.pages.order_by('page_number')
-    paginator = Paginator(pages, 1)
-    page_number = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_number)
-
-    current_page = page_obj.object_list[0] if page_obj.object_list else None
+    document = get_object_or_404(RawDocument, id=doc_id, is_ready_for_expert=True)
+    pages = document.pages.all()
+    pnum = int(request.GET.get('page', 1))
+    current_page = get_object_or_404(DocumentPage, document=document, page_number=pnum)
+    
+    # Get existing annotations
+    existing_annotations = current_page.annotations.filter(
+        validation_status__in=['pending', 'validated', 'expert_created', 'rejected']
+    ).order_by('start_pos')
 
     # Types d'annotations disponibles
     annotation_types = AnnotationType.objects.all().order_by('display_name')
@@ -2038,11 +2068,11 @@ def expert_annotate_document(request, doc_id):
 
     context = {
         'document': document,
-        'page_obj': page_obj,
+        'pages': pages,
         'current_page': current_page,
-        'annotation_types': annotation_types,
+        'annotation_types': AnnotationType.objects.all(),
         'existing_annotations': existing_annotations,
-        'total_pages': document.total_pages,
+        'total_pages': document.total_pages
     }
 
     return render(request, 'expert/annotate_document.html', context)
@@ -2237,15 +2267,18 @@ def expert_get_page_annotations(request, page_id):
     """Récupération des annotations d'une page pour Expert - copie de rawdocs.views.get_page_annotations"""
     try:
         page = get_object_or_404(DocumentPage, id=page_id)
-        annotations = page.annotations.select_related('annotation_type').order_by('start_pos')
+        annotations = page.annotations.filter(
+            validation_status__in=['pending', 'validated', 'expert_created', 'rejected']
+        ).select_related('annotation_type').order_by('start_pos')
 
         annotations_data = []
         for annotation in annotations:
             annotations_data.append({
                 'id': annotation.id,
-                'text': annotation.selected_text,
-                'type': annotation.annotation_type.display_name,
-                'type_name': annotation.annotation_type.name,
+                'selected_text': annotation.selected_text,  # Match the JavaScript expectation
+                'type_display': annotation.annotation_type.display_name,  # Match the JavaScript expectation
+                'type': annotation.annotation_type.name,
+                'color': annotation.annotation_type.color,  # Add the color
                 'start_pos': annotation.start_pos,
                 'end_pos': annotation.end_pos,
                 'validation_status': annotation.validation_status,
@@ -2523,13 +2556,13 @@ def expert_generate_document_annotation_summary(request, doc_id):
 
 @expert_required
 def expert_view_page_annotation_json(request, page_id):
-    """Visualisation du JSON et résumé d'une page - Expert - copie de rawdocs.views.view_page_annotation_json"""
+    """Visualisation du JSON et résumé d'une page - Expert avec navigation"""
     try:
         page = get_object_or_404(DocumentPage, id=page_id)
+        document = page.document
 
         # Si pas encore généré, le générer
         if not hasattr(page, 'annotations_json') or not page.annotations_json:
-            # Déclencher la génération
             from django.test import RequestFactory
             factory = RequestFactory()
             fake_request = factory.post(f'/expert/annotation/page/{page_id}/generate-summary/')
@@ -2537,12 +2570,21 @@ def expert_view_page_annotation_json(request, page_id):
             expert_generate_page_annotation_summary(fake_request, page_id)
             page.refresh_from_db()
 
+        # Calculate navigation info
+        current_page_num = page.page_number
+        next_page_num = current_page_num + 1 if current_page_num < document.total_pages else None
+        is_last_page = current_page_num >= document.total_pages
+
         context = {
             'page': page,
-            'document': page.document,
+            'document': document,
             'annotations_json': page.annotations_json if hasattr(page, 'annotations_json') else None,
             'annotations_summary': page.annotations_summary if hasattr(page, 'annotations_summary') else None,
-            'total_annotations': page.annotations.count()
+            'total_annotations': page.annotations.count(),
+            'current_page_num': current_page_num,
+            'next_page_num': next_page_num,
+            'is_last_page': is_last_page,
+            'total_pages': document.total_pages,
         }
 
         return render(request, 'expert/view_page_annotation_json.html', context)
@@ -2551,10 +2593,9 @@ def expert_view_page_annotation_json(request, page_id):
         messages.error(request, f"Erreur: {str(e)}")
         return redirect('expert:annotation_dashboard')
 
-
 @expert_required
 def expert_view_document_annotation_json(request, doc_id):
-    """Visualisation et édition du JSON et résumé global d'un document - Expert"""
+    """Visualisation et édition du JSON et résumé global d'un document - Expert avec analyse réglementaire"""
     try:
         document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
 
@@ -2563,7 +2604,7 @@ def expert_view_document_annotation_json(request, doc_id):
             try:
                 data = json.loads(request.body)
                 action = data.get('action', '')
-
+                
                 if action == 'save_summary':
                     # Déléguer à la fonction existante
                     return save_summary_changes(request, doc_id)
@@ -2589,12 +2630,33 @@ def expert_view_document_annotation_json(request, doc_id):
         # Enrichir le contexte pour l'édition
         document_json = document.global_annotations_json if hasattr(document, 'global_annotations_json') else {}
         allowed_entity_types = list(document_json.get('entities', {}).keys())
-        document_summary = document.global_annotations_summary if hasattr(document,
-                                                                          'global_annotations_summary') else ""
+        document_summary = document.global_annotations_summary if hasattr(document, 'global_annotations_summary') else ""
 
-        # Statistiques
+        # Statistiques des annotations
         total_annotations = sum(page.annotations.count() for page in document.pages.all())
         annotated_pages = document.pages.filter(annotations__isnull=False).distinct().count()
+
+        # Get regulatory analysis data
+        try:
+            from rawdocs.models import DocumentRegulatoryAnalysis
+            regulatory_analysis = document.regulatory_analysis
+            has_regulatory_analysis = True
+        except DocumentRegulatoryAnalysis.DoesNotExist:
+            regulatory_analysis = None
+            has_regulatory_analysis = False
+
+        # Calculate regulatory stats
+        regulatory_stats = {
+            'total_pages': document.total_pages,
+            'analyzed_pages': document.pages.filter(is_regulatory_analyzed=True).count(),
+            'high_importance_pages': document.pages.filter(regulatory_importance_score__gte=70).count(),
+        }
+        if regulatory_stats['total_pages'] > 0:
+            regulatory_stats['completion_percentage'] = int(
+                (regulatory_stats['analyzed_pages'] / regulatory_stats['total_pages']) * 100
+            )
+        else:
+            regulatory_stats['completion_percentage'] = 0
 
         context = {
             'document': document,
@@ -2605,9 +2667,12 @@ def expert_view_document_annotation_json(request, doc_id):
             'total_pages': document.total_pages,
             'allowed_entity_types': allowed_entity_types,
             'can_edit': True,  # Activer l'interface d'édition
-            'patterns': extract_entities_from_text.__doc__,  # Documentation des patterns d'extraction
             'last_updated': document_json.get('last_updated'),
             'last_updated_by': document_json.get('last_updated_by'),
+            # Regulatory analysis data
+            'regulatory_analysis': regulatory_analysis,
+            'has_regulatory_analysis': has_regulatory_analysis,
+            'regulatory_stats': regulatory_stats,
         }
 
         return render(request, 'expert/view_document_annotation_json.html', context)
@@ -2615,3 +2680,189 @@ def expert_view_document_annotation_json(request, doc_id):
     except Exception as e:
         messages.error(request, f"Erreur: {str(e)}")
         return redirect('expert:annotation_dashboard')
+    
+
+@expert_required
+@csrf_exempt
+def save_regulatory_summary(request, doc_id):
+    """Save regulatory summary edited by expert"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id)
+        data = json.loads(request.body)
+        regulatory_summary = data.get('regulatory_summary', '').strip()
+        
+        if not regulatory_summary:
+            return JsonResponse({'error': 'Regulatory summary cannot be empty'}, status=400)
+        
+        # Get or create regulatory analysis
+        from rawdocs.models import DocumentRegulatoryAnalysis
+        regulatory_analysis, created = DocumentRegulatoryAnalysis.objects.get_or_create(
+            document=document,
+            defaults={
+                'global_summary': regulatory_summary,
+                'analyzed_by': request.user,
+            }
+        )
+        
+        if not created:
+            regulatory_analysis.global_summary = regulatory_summary
+            regulatory_analysis.analyzed_by = request.user
+            regulatory_analysis.save()
+        
+        # Log expert action
+        log_expert_action(
+            user=request.user,
+            annotation=None,
+            action='regulatory_summary_saved',
+            document_id=document.id,
+            document_title=document.title,
+            reason='Expert edited regulatory summary'
+        )
+        
+        return JsonResponse({'success': True, 'message': 'Regulatory summary saved successfully'})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@expert_required
+@csrf_exempt
+def validate_regulatory_analysis(request, doc_id):
+    """Validate regulatory analysis by expert"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id)
+        
+        # Get regulatory analysis
+        from rawdocs.models import DocumentRegulatoryAnalysis
+        try:
+            regulatory_analysis = document.regulatory_analysis
+        except DocumentRegulatoryAnalysis.DoesNotExist:
+            return JsonResponse({'error': 'No regulatory analysis found for this document'}, status=404)
+        
+        # Mark as expert validated
+        regulatory_analysis.is_expert_validated = True
+        regulatory_analysis.expert_validated_by = request.user
+        regulatory_analysis.expert_validated_at = timezone.now()
+        regulatory_analysis.save()
+        
+        # Log expert action
+        log_expert_action(
+            user=request.user,
+            annotation=None,
+            action='regulatory_analysis_validated',
+            document_id=document.id,
+            document_title=document.title,
+            reason='Expert validated regulatory analysis'
+        )
+        
+        return JsonResponse({'success': True, 'message': 'Regulatory analysis validated successfully'})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+@expert_required
+@csrf_exempt
+def generate_regulatory_analysis(request, doc_id):
+    """Generate complete regulatory analysis for a document in expert module"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+        
+        print(f"Starting expert regulatory analysis for document {doc_id}")
+
+        # Initialize expert regulatory analyzer
+        from .regulatory_analyzer import ExpertRegulatoryAnalyzer
+        analyzer = ExpertRegulatoryAnalyzer()
+        document_context = f"{document.title} - {document.doc_type} - {document.source}"
+
+        # Analyze all pages
+        pages = document.pages.all().order_by('page_number')
+        analyses = []
+        analyzed_count = 0
+
+        for page in pages:
+            try:
+                print(f"Analyzing page {page.page_number}/{document.total_pages}")
+
+                analysis = analyzer.analyze_page_regulatory_content(
+                    page_text=page.cleaned_text,
+                    page_num=page.page_number,
+                    document_context=document_context
+                )
+
+                # Save page-level analysis
+                page.regulatory_analysis = analysis
+                page.page_summary = analysis.get('page_summary', '')
+                page.regulatory_obligations = analysis.get('regulatory_obligations', [])
+                page.critical_deadlines = analysis.get('critical_deadlines', [])
+                page.regulatory_importance_score = analysis.get('regulatory_importance_score', 0)
+                page.is_regulatory_analyzed = True
+                page.regulatory_analyzed_at = timezone.now()
+                page.regulatory_analyzed_by = request.user
+                page.save()
+
+                analyses.append(analysis)
+                analyzed_count += 1
+
+                # Pause to avoid API limits
+                import time
+                time.sleep(2)
+
+            except Exception as e:
+                print(f"Error analyzing page {page.page_number}: {e}")
+                continue
+
+        # Generate global summary
+        print(f"Generating global summary with {len(analyses)} analyses...")
+        global_analysis = analyzer.generate_document_global_summary(document, analyses)
+
+        # Save document-level regulatory analysis
+        from rawdocs.models import DocumentRegulatoryAnalysis
+        doc_analysis, created = DocumentRegulatoryAnalysis.objects.update_or_create(
+            document=document,
+            defaults={
+                'global_summary': global_analysis.get('global_summary', ''),
+                'consolidated_analysis': global_analysis,
+                'main_obligations': global_analysis.get('critical_compliance_requirements', []),
+                'critical_deadlines_summary': global_analysis.get('key_deadlines_summary', []),
+                'relevant_authorities': global_analysis.get('regulatory_authorities_involved', []),
+                'global_regulatory_score': global_analysis.get('global_regulatory_score', 0),
+                'analyzed_by': request.user,
+                'total_pages_analyzed': analyzed_count,
+                'pages_with_regulatory_content': sum(
+                    1 for a in analyses if a.get('regulatory_importance_score', 0) > 30
+                )
+            }
+        )
+
+        # Log expert action
+        log_expert_action(
+            user=request.user,
+            annotation=None,
+            action='regulatory_analysis_generated',
+            document_id=document.id,
+            document_title=document.title,
+            reason=f'Expert generated regulatory analysis for {analyzed_count} pages'
+        )
+
+        print(f"Expert regulatory analysis completed: {analyzed_count} pages analyzed")
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Regulatory analysis generated successfully! {analyzed_count} pages analyzed.',
+            'analyzed_pages': analyzed_count,
+            'global_score': global_analysis.get('global_regulatory_score', 0)
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'error': f'Error generating regulatory analysis: {str(e)}'
+        }, status=500)
+    

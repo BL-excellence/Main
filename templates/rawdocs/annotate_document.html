@@ -1,4 +1,4 @@
-{#template/rawdocs/annotate_document.html#}
+{#template/annotate_document.html#}
 {% extends "base.html" %}
 {% load rawdocs_extras %}
 {% load static %}
@@ -1401,6 +1401,74 @@ body {
 .modal-footer .btn-primary:hover {
   background: linear-gradient(90deg, var(--pharma-accent), var(--pharma-primary));
 }
+
+/* Prodigy-like Toolbar Styles */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.label-btn {
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.label-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.label-btn.active {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.3);
+  border: 2px solid #fff;
+}
+
+/* Inline annotation styles */
+.inline-annotation {
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: 0 1px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 500;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.inline-annotation:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.inline-annotation .ann-label {
+  font-size: 0.7rem;
+  font-weight: bold;
+  margin-left: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* Enhanced text content for better selection */
+.text-content {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
 </style>
 
 <!-- Annotation Header -->
@@ -1534,34 +1602,29 @@ body {
   </div>
 </div>
 
-<!-- Annotation Types Panel (identique) -->
+<!-- Prodigy-like Annotation Toolbar -->
 <section class="annotation-types-panel">
-  <h3>Sélectionnez un type d'entité</h3>
-  <p class="instructions">Cliquez sur un type, puis surlignez le texte correspondant</p>
-
-  <div class="annotation-types">
+  <h3>Types d'Annotation</h3>
+  <p class="instructions">Cliquez sur un type, puis surlignez le texte dans le document</p>
+  
+  <div class="toolbar" id="label-toolbar">
     {% for ann_type in annotation_types %}
-    <button class="annotation-type-btn"
-            data-type="{{ ann_type.name }}"
-            data-color="{{ ann_type.color }}"
-            style="border-color: {{ ann_type.color }}; color: {{ ann_type.color }};">
+    <button class="label-btn" 
+      data-id="{{ ann_type.id }}" 
+      data-name="{{ ann_type.name }}" 
+      data-color="{{ ann_type.color }}"
+      style="background: {{ ann_type.color }}">
       {{ ann_type.display_name }}
     </button>
     {% endfor %}
+
     <button class="annotation-type-btn-add" onclick="showAddAnnotationTypeModal()" type="button">
       <i class="fas fa-plus"></i> Add Custom Type
     </button>
+    <button id="clear-annotations-btn" class="label-btn" style="background:#6b7280;color:white;">
+      🧹 Clear All
+    </button>
   </div>
-
-  <div class="annotation-mode">
-    <span class="mode-label">
-      <i class="fas fa-hand-pointer"></i>
-      Mode annotation activé:
-    </span>
-    <span id="current-mode" class="current-mode">Aucun type sélectionné</span>
-  </div>
-
-  <p class="help-text">Surlignez du texte pour créer une annotation automatiquement</p>
 
   <div id="context-menu" class="context-menu hidden">
     <button class="context-menu-item danger" onclick="deleteAnnotationTypeFromMenu()">
@@ -1570,7 +1633,7 @@ body {
     <button class="context-menu-item" onclick="hideContextMenu()">
         <i class="fas fa-times"></i> Cancel
     </button>
-</div>
+  </div>
 </section>
 
 <!-- Page Navigation avec disposition améliorée des boutons -->
@@ -1814,55 +1877,9 @@ body {
     {% endif %}
   </h3>
 
-  <div id="text-content" class="text-content" data-page-id="{{ current_page.id }}">
-    {{ current_page.cleaned_text }}
-  </div>
-</section>
-
-<!-- Annotations List (identique) -->
-<section class="annotations-list">
-  <h3><i class="fas fa-tags"></i> Annotations ({{ existing_annotations.count }})</h3>
-
-  <div id="annotations-container">
-    {% for annotation in existing_annotations %}
-    <div class="annotation-item" data-annotation-id="{{ annotation.id }}">
-      <div class="annotation-header">
-        <span class="annotation-type" style="background: {{ annotation.annotation_type.color }}">
-          {{ annotation.annotation_type.display_name }}
-        </span>
-        <span class="annotation-confidence">{{ annotation.confidence_score|floatformat:0 }}%</span>
-
-        <!-- NOUVEAU: Bouton d'édition -->
-        <button class="edit-annotation" onclick="openEditAnnotationModal({{ annotation.id }})"
-                title="Modifier cette annotation">
-          <i class="fas fa-edit"></i>
-        </button>
-
-        <button class="delete-annotation" onclick="deleteAnnotation({{ annotation.id }})">
-          <i class="fas fa-trash"></i>
-        </button>
-      </div>
-
-      <div class="annotation-text annotation-text-clickable"
-        onclick="highlightTextInDocument('{{ annotation.selected_text|escapejs }}', {{ annotation.start_pos }}, {{ annotation.end_pos }})"
-        style="cursor: pointer; color: var(--pharma-primary-dark); text-decoration: underline;"
-        title="Cliquez pour voir dans le texte">"{{ annotation.selected_text }}"</div>
-
-      {% if annotation.ai_reasoning %}
-      <div class="annotation-reasoning">
-        <i class="fas fa-lightbulb"></i> {{ annotation.ai_reasoning }}
-      </div>
-      {% endif %}
-
-      <!-- NOUVEAU: Indicateur si modifié par humain -->
-      {% if annotation.modified_by_human %}
-      <div class="human-modified-indicator">
-        <i class="fas fa-user-edit"></i> Modifié par {{ annotation.last_modified_by.username|default:"humain" }}
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
+  <div id="page-text" class="text-content doc-text" data-page-id="{{ current_page.id }}">
+    <!-- This will be populated by JavaScript with annotated text -->
+</div>
 </section>
 
 <!-- Modal pour ajouter des types d'annotation (identique) -->
@@ -1996,33 +2013,463 @@ body {
 
 <script src="{% static 'rawdocs/js/rlhf_annotation.js' %}"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- JavaScript existant + nouvelles fonctions JSON -->
 <script>
-// EXISTING JAVASCRIPT CODE (conservé identique)
+// Combined Prodigy-like + Existing functionality JavaScript
 let annotationTypeMap = {};
+let selectedAnnotationType = null;
+let selectedColor = null;
+let currentLabel = null;
+let currentEditingAnnotationId = null;
+let editModal = null;
+let contextMenuTarget = null;
 
-// Initialize the type mapping when page loads
+// Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // BUILD THE TYPE MAPPING FIRST
+    // Build type mapping
     {% for ann_type in annotation_types %}
     annotationTypeMap['{{ ann_type.name|escapejs }}'] = {{ ann_type.id }};
     {% endfor %}
 
     console.log('📋 Annotation type mapping loaded:', annotationTypeMap);
+
+    // Initialize Prodigy-like toolbar
+    initializeProdigyToolbar();
+    
+    // Load and render existing annotations
+    loadAndRenderAnnotations();
+    
+    // Initialize modals and existing functionality
+    initializeModals();
+    initializeExistingFunctionality();
 });
 
-// NOUVELLES FONCTIONS POUR L'ANALYSE RÉGLEMENTAIRE
+function initializeProdigyToolbar() {
+    const pageEl = document.getElementById("page-text");
+    const pageId = pageEl.dataset.pageId;
 
+    // Activate label buttons
+    document.querySelectorAll(".label-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            // Remove active from all
+            document.querySelectorAll(".label-btn").forEach(b => b.classList.remove("active"));
+            
+            // Skip if it's a special button
+            if (btn.id === 'clear-annotations-btn' || btn.classList.contains('annotation-type-btn-add')) {
+                return;
+            }
+            
+            // Activate selected
+            btn.classList.add("active");
+            currentLabel = {
+                id: btn.dataset.id,
+                name: btn.dataset.name,
+                color: btn.dataset.color
+            };
+            
+            // Update for compatibility with existing code
+            selectedAnnotationType = btn.dataset.name;
+            selectedColor = btn.dataset.color;
+        });
+        
+        // Add right-click context menu (keep existing functionality)
+        if (!btn.classList.contains('annotation-type-btn-add') && btn.id !== 'clear-annotations-btn') {
+            btn.addEventListener('contextmenu', handleRightClick);
+        }
+    });
+
+    // Text selection for annotation
+    pageEl.addEventListener("mouseup", handleTextSelection);
+    
+    // Clear button
+    document.getElementById("clear-annotations-btn").addEventListener("click", () => {
+        if (confirm('Effacer toutes les annotations de cette page ?')) {
+            clearPageAnnotations();
+        }
+    });
+}
+
+function loadAndRenderAnnotations() {
+    const pageEl = document.getElementById("page-text");
+    const pageId = pageEl.dataset.pageId;
+    
+    // Store the original clean text
+    const originalText = `{{ current_page.cleaned_text|escapejs }}`;
+    
+    console.log('🔄 Loading annotations for page:', pageId);
+    
+    // Load annotations from backend
+    fetch(`/annotation/page/${pageId}/`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('📥 Received annotation data:', data);
+            
+            if (data.success && data.annotations && data.annotations.length > 0) {
+                console.log(`✅ Found ${data.annotations.length} annotations to render`);
+                
+                // Use the original text for rendering
+                renderInlineAnnotations(originalText, data.annotations);
+            } else {
+                console.log('ℹ️ No annotations found, showing clean text');
+                pageEl.textContent = originalText;
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error loading annotations:', error);
+            pageEl.textContent = originalText;
+        });
+}
+
+
+function renderInlineAnnotations(originalText, annotations) {
+    const pageEl = document.getElementById("page-text");
+    
+    if (!annotations || annotations.length === 0) {
+        pageEl.textContent = originalText;
+        return;
+    }
+    
+    console.log('🎨 Rendering', annotations.length, 'annotations');
+    
+    // Start with clean text
+    let cleanText = originalText;
+    let workingText = cleanText;
+    
+    // Sort annotations by length (longest first) to avoid overlapping issues
+    const sortedAnnotations = [...annotations].sort((a, b) => b.selected_text.length - a.selected_text.length);
+    
+    let processedAnnotations = 0;
+    
+    for (let ann of sortedAnnotations) {
+        const searchText = ann.selected_text.trim();
+        
+        // Find the text in the working text (case-insensitive)
+        const searchTextLower = searchText.toLowerCase();
+        const workingTextLower = workingText.toLowerCase();
+        
+        let startIndex = workingTextLower.indexOf(searchTextLower);
+        
+        if (startIndex !== -1) {
+            // Get the actual text (preserving case)
+            const actualText = workingText.slice(startIndex, startIndex + searchText.length);
+            
+            // Create the replacement HTML
+            const annotationHtml = `<span class="inline-annotation" data-annotation-id="${ann.id}" style="background:${ann.color}; padding: 2px 4px; margin: 0 1px; border-radius: 3px; cursor: pointer;">${actualText}<span class="ann-label">${ann.type_display}</span></span>`;
+            
+            // Replace the text
+            workingText = workingText.slice(0, startIndex) + annotationHtml + workingText.slice(startIndex + searchText.length);
+            
+            processedAnnotations++;
+            console.log('✅ Processed annotation:', searchText);
+        } else {
+            console.log('❌ Could not find text in document:', searchText);
+        }
+    }
+    
+    console.log(`🎨 Successfully processed ${processedAnnotations}/${annotations.length} annotations`);
+    
+    // Set the HTML content
+    pageEl.innerHTML = workingText;
+
+    // Add click events for deletion
+    pageEl.querySelectorAll('.inline-annotation').forEach(annotation => {
+        annotation.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.getSelection().removeAllRanges();
+            
+            const annotationId = this.dataset.annotationId;
+            deleteAnnotationSimple(annotationId);
+        });
+    });
+    
+    console.log('🎨 Annotations rendered successfully');
+}
+
+
+function handleTextSelection() {
+    const selection = window.getSelection();
+    
+    // Don't process if no selection or empty selection
+    if (!selection.rangeCount || !selection.toString().trim()) {
+        return;
+    }
+
+    // Check if selection is within an annotation - if so, ignore
+    const range = selection.getRangeAt(0);
+    const startContainer = range.startContainer;
+    const endContainer = range.endContainer;
+    
+    // Check if either start or end of selection is within an inline-annotation
+    let withinAnnotation = false;
+    
+    [startContainer, endContainer].forEach(container => {
+        let node = container;
+        while (node && node !== document.getElementById("page-text")) {
+            if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('inline-annotation')) {
+                withinAnnotation = true;
+                break;
+            }
+            node = node.parentNode;
+        }
+    });
+    
+    if (withinAnnotation) {
+        selection.removeAllRanges();
+        return;
+    }
+
+    if (!currentLabel) {
+        alert('Veuillez d\'abord sélectionner un type d\'annotation');
+        return;
+    }
+
+    const selectedText = selection.toString().trim();
+    const pageEl = document.getElementById("page-text");
+    
+    // Get clean text without HTML for position calculation
+    const cleanText = pageEl.textContent || pageEl.innerText;
+    
+    // Calculate position using clean text
+    let startPos = cleanText.toLowerCase().indexOf(selectedText.toLowerCase());
+    
+    if (startPos === -1) {
+        alert('Impossible de localiser le texte sélectionné.');
+        return;
+    }
+    
+    const endPos = startPos + selectedText.length;
+
+    console.log('Selection positions:', {
+        text: selectedText,
+        start: startPos,
+        end: endPos,
+        cleanTextLength: cleanText.length
+    });
+
+    // Create visual annotation immediately
+    const span = document.createElement("span");
+    span.classList.add("inline-annotation");
+    span.setAttribute("data-annotation-id", "temp-" + Date.now());
+    span.style.background = currentLabel.color;
+    span.style.padding = "2px 4px";
+    span.style.margin = "0 1px";
+    span.style.borderRadius = "3px";
+    span.style.cursor = "pointer";
+    span.innerHTML = selectedText + `<span class="ann-label" style="font-size: 0.7rem; font-weight: bold; margin-left: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.6); color: #fff; white-space: nowrap;">${currentLabel.name}</span>`;
+
+    addClickHandlerToTempAnnotation(span);
+
+    try {
+        range.deleteContents();
+        range.insertNode(span);
+    } catch (e) {
+        console.error('Error inserting annotation:', e);
+    }
+
+    // Save to database
+    saveManualAnnotation({
+        page_id: pageEl.dataset.pageId,
+        type_id: currentLabel.id,
+        selected_text: selectedText,
+        start_pos: startPos,
+        end_pos: endPos
+    });
+
+    // Clear selection
+    selection.removeAllRanges();
+}
+
+function deleteAnnotationSimple(annotationId) {
+    // No confirmation, immediate delete like Prodigy
+    fetch(`/annotation/${annotationId}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Immediately reload annotations to show updated state
+            loadAndRenderAnnotations();
+        } else {
+            console.error('Delete failed:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting annotation:', error);
+    });
+}
+
+function clearPageAnnotations() {
+    const pageId = document.getElementById("page-text").dataset.pageId;
+    
+    // Clear all annotations for this page
+    fetch(`/clear_page_annotations/${pageId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadAndRenderAnnotations(); // Reload clean text
+        }
+    })
+    .catch(error => {
+        console.error('Error clearing annotations:', error);
+        // Fallback: just reload the page
+        location.reload();
+    });
+}
+
+function saveManualAnnotation(data) {
+    fetch('/annotation/manual/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            console.log('Annotation saved successfully');
+            // Don't reload immediately - keep the visual annotation
+        } else {
+            alert('Erreur: ' + result.error);
+            // If save failed, reload to clean up
+            loadAndRenderAnnotations();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Erreur lors de la sauvegarde');
+        loadAndRenderAnnotations();
+    });
+}
+
+function addClickHandlerToTempAnnotation(span) {
+    span.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.getSelection().removeAllRanges();
+        
+        // For temporary annotations, just remove them visually
+        if (this.dataset.annotationId.startsWith('temp-')) {
+            this.remove();
+        } else {
+            deleteAnnotationSimple(this.dataset.annotationId);
+        }
+    });
+}
+
+// Position calculation function for annotated text
+function getTextPosition(container, node, offset) {
+    let position = 0;
+    const walker = document.createTreeWalker(
+        container,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+
+    let currentNode;
+    while (currentNode = walker.nextNode()) {
+        if (currentNode === node) {
+            return position + offset;
+        }
+        position += currentNode.textContent.length;
+    }
+    return position;
+}
+
+function getAnnotationTypeId(typeName) {
+    console.log('🔍 Looking for type:', typeName);
+    console.log('📋 Available types:', annotationTypeMap);
+
+    const typeId = annotationTypeMap[typeName];
+    if (!typeId) {
+        console.error('❌ Type ID not found for:', typeName);
+        console.error('Available types:', Object.keys(annotationTypeMap));
+        return null;
+    }
+
+    console.log('✅ Found type ID:', typeId, 'for type:', typeName);
+    return typeId;
+}
+
+// Initialize existing functionality
+function initializeModals() {
+    const editModalElement = document.getElementById('editAnnotationModal');
+    if (editModalElement) {
+        editModal = new bootstrap.Modal(editModalElement, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
+    }
+}
+
+function initializeExistingFunctionality() {
+    // Auto-generate technical name from display name
+    const displayNameInput = document.getElementById('new-annotation-display-name');
+    if (displayNameInput) {
+        displayNameInput.addEventListener('input', function() {
+            const displayName = this.value;
+            const technicalName = displayName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+            document.getElementById('new-annotation-name').value = technicalName;
+        });
+    }
+
+    // Mark validated pages
+    const validateBtn = document.getElementById('validate-page-btn');
+    if (validateBtn?.textContent?.includes('Validée')) {
+        showLearningWidget({});
+    }
+
+    // Add indicators to AI-generated annotations
+    document.querySelectorAll('.annotation-item').forEach(annotation => {
+        if (annotation.querySelector('.annotation-reasoning')?.textContent?.includes('RLHF')) {
+            annotation.classList.add('ai-generated');
+            const indicator = document.createElement('div');
+            indicator.className = 'rlhf-indicator';
+            indicator.innerHTML = '<i class="fas fa-brain"></i> IA Apprenante';
+            annotation.appendChild(indicator);
+        }
+    });
+
+    // Context menu functionality
+    addContextMenuToButtons();
+
+    // Hide context menu when clicking elsewhere
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.context-menu')) {
+            hideContextMenu();
+        }
+    });
+
+    // Prevent default context menu on annotation buttons
+    document.addEventListener('contextmenu', function(e) {
+        if (e.target.classList.contains('label-btn')) {
+            e.preventDefault();
+        }
+    });
+}
+
+// ALL YOUR EXISTING FUNCTIONS - Keep everything below exactly as is:
+
+// Regulatory Analysis Functions
 function analyzePageRegulatory() {
     const btn = document.getElementById('analyze-page-regulatory-btn');
     const loading = document.getElementById('regulatory-loading');
 
-    // Désactiver le bouton et afficher le loading
     btn.disabled = true;
     loading.style.display = 'inline-flex';
 
-    const pageId = document.getElementById('text-content').dataset.pageId;
+    const pageId = document.getElementById('page-text').dataset.pageId;
 
     fetch(`/regulatory/analyze-page/${pageId}/`, {
         method: 'POST',
@@ -2034,13 +2481,11 @@ function analyzePageRegulatory() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Afficher le succès
             showRegulatorySuccess(data.message, data.importance_score);
-
-            // Recharger la page pour afficher l'analyse
+            // Clear existing annotations visually first, then reload fresh
             setTimeout(() => {
-                location.reload();
-            }, 2000);
+                loadAndRenderAnnotations();
+            }, 1000);
         } else {
             alert('Erreur: ' + data.error);
         }
@@ -2080,11 +2525,7 @@ function analyzeDocumentRegulatory() {
     .then(data => {
         if (data.success) {
             showRegulatorySuccess(data.message, data.global_score);
-
-            // Recharger la page pour afficher l'analyse
-            setTimeout(() => {
-                location.reload();
-            }, 3000);
+            setTimeout(() => location.reload(), 3000);
         } else {
             alert('Erreur: ' + data.error);
         }
@@ -2101,7 +2542,6 @@ function analyzeDocumentRegulatory() {
 }
 
 function showRegulatorySuccess(message, score) {
-    // Créer et afficher un message de succès
     const successDiv = document.createElement('div');
     successDiv.className = 'validation-success';
     successDiv.innerHTML = `
@@ -2112,34 +2552,27 @@ function showRegulatorySuccess(message, score) {
         </div>
     `;
 
-    // Insérer avant le contenu principal
     const mainContent = document.querySelector('.text-content-card');
     mainContent.parentNode.insertBefore(successDiv, mainContent);
 
-    // Supprimer après 5 secondes
-    setTimeout(() => {
-        successDiv.remove();
-    }, 5000);
+    setTimeout(() => successDiv.remove(), 5000);
 }
 
-// NOUVELLES FONCTIONS POUR GÉNÉRATION JSON ET RÉSUMÉS
-
+// JSON Generation Functions
 function generatePageJson() {
     const btn = document.getElementById('generate-page-json-btn');
     const loading = document.getElementById('json-loading');
 
-    // Vérifier qu'il y a des annotations
-    const annotationsCount = document.querySelectorAll('.annotation-item').length;
+    const annotationsCount = document.querySelectorAll('.inline-annotation').length;
     if (annotationsCount === 0) {
         alert('Aucune annotation trouvée sur cette page. Annotez d\'abord la page.');
         return;
     }
 
-    // Désactiver le bouton et afficher le loading
     btn.disabled = true;
     loading.style.display = 'inline-flex';
 
-    const pageId = document.getElementById('text-content').dataset.pageId;
+    const pageId = document.getElementById('page-text').dataset.pageId;
 
     fetch(`/annotation/page/${pageId}/generate-summary/`, {
         method: 'POST',
@@ -2151,10 +2584,7 @@ function generatePageJson() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Afficher le succès
             showJsonSuccess(data.message, 'page');
-
-            // Optionnel : ouvrir automatiquement la vue JSON
             setTimeout(() => {
                 window.open(`/annotation/page/${pageId}/view-json/`, '_blank');
             }, 1000);
@@ -2173,7 +2603,6 @@ function generatePageJson() {
 }
 
 function generateDocumentJson() {
-    // Vérifier qu'il y a des annotations dans le document
     const documentId = {{ document.id }};
 
     if (!confirm('Générer le JSON global et le résumé de tout le document ? Cela peut prendre quelques minutes selon la taille du document.')) {
@@ -2197,10 +2626,7 @@ function generateDocumentJson() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Afficher le succès avec statistiques
             showJsonSuccess(data.message, 'document', data.stats);
-
-            // Optionnel : ouvrir automatiquement la vue JSON globale
             setTimeout(() => {
                 window.open(`/annotation/document/${documentId}/view-json/`, '_blank');
             }, 1000);
@@ -2220,7 +2646,6 @@ function generateDocumentJson() {
 }
 
 function showJsonSuccess(message, type, stats = null) {
-    // Créer et afficher un message de succès
     const successDiv = document.createElement('div');
     successDiv.className = 'validation-success';
 
@@ -2241,194 +2666,168 @@ function showJsonSuccess(message, type, stats = null) {
         </div>
     `;
 
-    // Insérer avant le contenu principal
     const mainContent = document.querySelector('.text-content-card');
     mainContent.parentNode.insertBefore(successDiv, mainContent);
 
-    // Supprimer après 5 secondes
-    setTimeout(() => {
-        successDiv.remove();
-    }, 5000);
+    setTimeout(() => successDiv.remove(), 5000);
 }
 
-// RESTE DU JAVASCRIPT EXISTANT (conservé identique)
+// AI and Validation Functions
+function validatePage() {
+    const btn = document.getElementById('validate-page-btn');
+    const pageId = document.getElementById('page-text').dataset.pageId;
 
-let selectedAnnotationType = null;
-let selectedColor = null;
+    if (confirm('Valider cette page ? Cela confirmera que les annotations sont correctes.')) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validation...';
 
-// FIXED: Initialize annotation type selection
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize annotation type buttons
-    document.querySelectorAll('.annotation-type-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            // Remove active class from all buttons
-            document.querySelectorAll('.annotation-type-btn').forEach(b => b.classList.remove('active'));
+        fetch(`/annotation/validate-page/${pageId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const successDiv = document.createElement('div');
+                successDiv.className = 'validation-success';
+                successDiv.innerHTML = `
+                    <i class="fas fa-graduation-cap" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <strong>✅ ${data.message}</strong>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">
+                            L'IA s'améliore grâce à votre validation !
+                        </div>
+                    </div>
+                `;
 
-            // Add active class to clicked button
-            this.classList.add('active');
+                const mainContent = document.querySelector('.text-content-card');
+                mainContent.parentNode.insertBefore(successDiv, mainContent);
 
-            // Set selected type
-            selectedAnnotationType = this.dataset.type;
-            selectedColor = this.dataset.color;
+                if (data.ai_improved) {
+                    showLearningWidget(data);
+                }
 
-            // Update current mode display
-            document.getElementById('current-mode').textContent = this.textContent;
-            document.getElementById('current-mode').style.backgroundColor = selectedColor;
+                btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Page Validée 🎓';
+                btn.disabled = true;
+
+                setTimeout(() => successDiv.remove(), 5000);
+
+            } else {
+                alert('Erreur: ' + data.error);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Validate Page';
+            }
+        })
+        .catch(error => {
+            console.error('Erreur validation:', error);
+            alert('Erreur lors de la validation');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Validate Page';
         });
-    });
-
-    // Auto-generate technical name from display name
-    document.getElementById('new-annotation-display-name').addEventListener('input', function() {
-        const displayName = this.value;
-        const technicalName = displayName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-        document.getElementById('new-annotation-name').value = technicalName;
-    });
-
-    // Mark validated pages
-    const validateBtn = document.getElementById('validate-page-btn');
-    if (validateBtn?.textContent?.includes('Validée')) {
-        showLearningWidget({});
     }
+}
 
-    // Add indicators to AI-generated annotations
-    document.querySelectorAll('.annotation-item').forEach(annotation => {
-        if (annotation.querySelector('.annotation-reasoning')?.textContent?.includes('RLHF')) {
-            annotation.classList.add('ai-generated');
-            const indicator = document.createElement('div');
-            indicator.className = 'rlhf-indicator';
-            indicator.innerHTML = '<i class="fas fa-brain"></i> IA Apprenante';
-            annotation.appendChild(indicator);
+function annotateWithGroq() {
+    const btn = document.getElementById('groq-annotate-btn');
+    const loading = document.getElementById('ai-loading');
+    const pageId = document.getElementById('page-text').dataset.pageId;
+
+    if (confirm('Lancer l\'annotation automatique avec IA ? Cela remplacera les annotations existantes.')) {
+        btn.disabled = true;
+        loading.style.display = 'inline-flex';
+
+        fetch(`/annotation/groq/${pageId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const successDiv = document.createElement('div');
+                successDiv.className = 'validation-success';
+                successDiv.innerHTML = `
+                    <i class="fas fa-rocket" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <strong>✅ ${data.message}</strong>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">
+                            IA améliorée par l'apprentissage RLHF
+                        </div>
+                    </div>
+                `;
+
+                const mainContent = document.querySelector('.text-content-card');
+                mainContent.parentNode.insertBefore(successDiv, mainContent);
+
+                setTimeout(() => {
+                    loadAndRenderAnnotations();
+                }, 1500);
+
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur annotation IA:', error);
+            alert('Erreur lors de l\'annotation IA');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            loading.style.display = 'none';
+        });
+    }
+}
+
+// Delete annotation function
+function deleteAnnotation(annotationId) {
+    if (!confirm('Supprimer cette annotation ?')) return;
+
+    fetch(`/annotation/${annotationId}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Reload annotations instead of full page
+            loadAndRenderAnnotations();
+            
+            // Also update the annotations list if it exists
+            const annotationElement = document.querySelector(`[data-annotation-id="${annotationId}"]`);
+            if (annotationElement) {
+                annotationElement.remove();
+            }
+        } else {
+            alert('Erreur: ' + data.error);
         }
     });
-});
-
-// TOUTES LES AUTRES FONCTIONS JAVASCRIPT EXISTANTES (conservées identiques)
-// Text selection for manual annotation, deletion, etc.
-
-// Text selection for manual annotation
-document.getElementById('text-content').addEventListener('mouseup', function() {
-  if (!selectedAnnotationType) {
-    alert('Veuillez d\'abord sélectionner un type d\'annotation');
-    return;
-  }
-
-  const selection = window.getSelection();
-  if (selection.toString().trim().length === 0) return;
-
-  const range = selection.getRangeAt(0);
-  const selectedText = selection.toString().trim();
-
-  // Calculate positions
-  const textContent = this.textContent;
-  const startPos = getTextPosition(this, range.startContainer, range.startOffset);
-  const endPos = startPos + selectedText.length;
-
-  // Save annotation
-  saveManualAnnotation({
-    page_id: this.dataset.pageId,
-    type_id: getAnnotationTypeId(selectedAnnotationType),
-    start_pos: startPos,
-    end_pos: endPos,
-    selected_text: selectedText
-  });
-
-  // Clear selection
-  selection.removeAllRanges();
-});
-
-function getTextPosition(container, node, offset) {
-  let position = 0;
-  const walker = document.createTreeWalker(
-    container,
-    NodeFilter.SHOW_TEXT,
-    null,
-    false
-  );
-
-  let currentNode;
-  while (currentNode = walker.nextNode()) {
-    if (currentNode === node) {
-      return position + offset;
-    }
-    position += currentNode.textContent.length;
-  }
-  return position;
 }
 
-function getAnnotationTypeId(typeName) {
-    console.log('🔍 Looking for type:', typeName);
-    console.log('📋 Available types:', annotationTypeMap);
-
-    const typeId = annotationTypeMap[typeName];
-    if (!typeId) {
-        console.error('❌ Type ID not found for:', typeName);
-        console.error('Available types:', Object.keys(annotationTypeMap));
-        return null;
-    }
-
-    console.log('✅ Found type ID:', typeId, 'for type:', typeName);
-    return typeId;
-}
-
-function saveManualAnnotation(data) {
-  fetch('{% url "rawdocs:save_manual_annotation" %}', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': getCookie('csrftoken')
-    },
-    body: JSON.stringify(data)
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      location.reload(); // Refresh to show new annotation
-    } else {
-      alert('Erreur: ' + data.error);
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    alert('Erreur lors de la sauvegarde');
-  });
-}
-
-function deleteAnnotation(annotationId) {
-  if (!confirm('Supprimer cette annotation ?')) return;
-
-  fetch(`{% url "rawdocs:delete_annotation" 0 %}`.replace('0', annotationId), {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': getCookie('csrftoken')
-    }
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      location.reload();
-    } else {
-      alert('Erreur: ' + data.error);
-    }
-  });
-}
-
+// Utility Functions
 function goToPage(pageNumber) {
-  window.location.href = `?page=${pageNumber}`;
+    window.location.href = `?page=${pageNumber}`;
 }
 
 function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
     }
-  }
-  return cookieValue;
+    return cookieValue;
 }
 
 function submitDocumentForExpert() {
@@ -2452,13 +2851,11 @@ function submitDocumentForExpert() {
     }
 }
 
-// FIXED: Modal handling like expert module
+// Modal Functions
 function showAddAnnotationTypeModal() {
-    // Clear previous values
     document.getElementById('new-annotation-display-name').value = '';
     document.getElementById('new-annotation-name').value = '';
 
-    // Show modal with proper Bootstrap 5 method
     const modal = new bootstrap.Modal(document.getElementById('addAnnotationTypeModal'), {
         backdrop: true,
         keyboard: true,
@@ -2494,21 +2891,17 @@ function createAnnotationType() {
         if (data.success) {
             alert(data.message);
 
-            // CRITICAL: Add the new type to our mapping!
             annotationTypeMap[data.annotation_type.name] = data.annotation_type.id;
             console.log('📋 Updated type mapping:', annotationTypeMap);
 
-            // Add new button to the interface immediately
             addNewAnnotationButtonToAnnotateur(data.annotation_type);
 
-            // Close modal properly
             const modalElement = document.getElementById('addAnnotationTypeModal');
             const modal = bootstrap.Modal.getInstance(modalElement);
             if (modal) {
                 modal.hide();
             }
 
-            // Clear form
             document.getElementById('new-annotation-display-name').value = '';
             document.getElementById('new-annotation-name').value = '';
         } else {
@@ -2522,50 +2915,48 @@ function createAnnotationType() {
 }
 
 function addNewAnnotationButtonToAnnotateur(annotationType) {
-    // Check if button already exists to avoid duplicates
-    const existingButton = document.querySelector(`[data-type="${annotationType.name}"]`);
+    const existingButton = document.querySelector(`[data-name="${annotationType.display_name}"]`);
     if (existingButton && !existingButton.classList.contains('annotation-type-btn-add')) {
-        console.log('Button already exists for type:', annotationType.name);
+        console.log('Button already exists for type:', annotationType.display_name);
         return;
     }
+    
     annotationTypeMap[annotationType.name] = annotationType.id;
-    console.log('📋 Updated type mapping:', annotationTypeMap);
 
-    // Create new button element
     const newButton = document.createElement('button');
-    newButton.className = 'annotation-type-btn';
-    newButton.setAttribute('data-type', annotationType.name);
+    newButton.className = 'label-btn';
+    newButton.setAttribute('data-id', annotationType.id);
+    newButton.setAttribute('data-name', annotationType.name);
     newButton.setAttribute('data-color', annotationType.color);
-    newButton.style.borderColor = annotationType.color;
-    newButton.style.color = annotationType.color;
+    newButton.style.background = annotationType.color;
     newButton.textContent = annotationType.display_name;
 
-    // Add event listener for the new button
+    // Add event listeners
     newButton.addEventListener('click', function() {
-        // Remove active class from all buttons
-        document.querySelectorAll('.annotation-type-btn').forEach(b => b.classList.remove('active'));
-
-        // Add active class to clicked button
-        this.classList.add('active');
-
-        // Set selected type
-        selectedAnnotationType = this.dataset.type;
-        selectedColor = this.dataset.color;
-
-        // Update current mode display
-        document.getElementById('current-mode').textContent = this.textContent;
-        document.getElementById('current-mode').style.backgroundColor = selectedColor;
+        document.querySelectorAll('.label-btn').forEach(b => b.classList.remove('active'));
+        
+        if (this.id !== 'clear-annotations-btn' && !this.classList.contains('annotation-type-btn-add')) {
+            this.classList.add('active');
+            currentLabel = {
+                id: this.dataset.id,
+                name: this.dataset.name,
+                color: this.dataset.color
+            };
+            selectedAnnotationType = this.dataset.name;
+            selectedColor = this.dataset.color;
+        }
     });
 
-    // Add to annotation types container (before the "Add" button)
-    const container = document.querySelector('.annotation-types');
+    newButton.addEventListener('contextmenu', handleRightClick);
+
+    const container = document.querySelector('.toolbar');
     const addButton = document.querySelector('.annotation-type-btn-add');
     if (container && addButton) {
         container.insertBefore(newButton, addButton);
     }
 }
 
-// RLHF Learning functions from the existing JS
+// Learning Widget Functions
 function showLearningWidget(data) {
     let widget = document.getElementById('learning-widget') || createLearningWidget();
 
@@ -2625,63 +3016,29 @@ function getPerformanceLevel(score) {
     return {performanceLevel: 'Nécessite entrainement', performanceIcon: '📚'};
 }
 
-let contextMenuTarget = null;
-
-// Context menu functionality
-document.addEventListener('DOMContentLoaded', function() {
-
-    // Add right-click event listeners to all annotation type buttons
-    function addContextMenuToButtons() {
-        document.querySelectorAll('.annotation-type-btn').forEach(btn => {
-            // Remove existing listeners to prevent duplicates
-            btn.removeEventListener('contextmenu', handleRightClick);
-            // Add new listener
+// Context Menu Functions
+function addContextMenuToButtons() {
+    document.querySelectorAll('.label-btn').forEach(btn => {
+        // Remove existing listeners to prevent duplicates
+        btn.removeEventListener('contextmenu', handleRightClick);
+        // Add new listener only to annotation type buttons
+        if (!btn.classList.contains('annotation-type-btn-add') && btn.id !== 'clear-annotations-btn') {
             btn.addEventListener('contextmenu', handleRightClick);
-        });
-    }
-
-    // Initial setup
-    addContextMenuToButtons();
-
-    // Update the addNewAnnotationButtonToAnnotateur function to include context menu
-    const originalAddFunction = window.addNewAnnotationButtonToAnnotateur;
-    window.addNewAnnotationButtonToAnnotateur = function(annotationType) {
-        // Call original function
-        originalAddFunction(annotationType);
-
-        // Add context menu to new button
-        setTimeout(() => {
-            addContextMenuToButtons();
-        }, 100);
-    };
-
-    // Hide context menu when clicking elsewhere
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.context-menu')) {
-            hideContextMenu();
         }
     });
-
-    // Prevent default context menu on annotation buttons
-    document.addEventListener('contextmenu', function(e) {
-        if (e.target.classList.contains('annotation-type-btn')) {
-            e.preventDefault();
-        }
-    });
-});
+}
 
 function handleRightClick(e) {
     e.preventDefault();
 
-    // Don't show context menu for the "Add Custom Type" button
-    if (e.target.classList.contains('annotation-type-btn-add')) {
+    // Don't show context menu for special buttons
+    if (e.target.classList.contains('annotation-type-btn-add') || e.target.id === 'clear-annotations-btn') {
         return;
     }
 
     contextMenuTarget = e.target;
 
     const contextMenu = document.getElementById('context-menu');
-    const rect = e.target.getBoundingClientRect();
 
     // Position the context menu
     contextMenu.style.left = (e.pageX) + 'px';
@@ -2690,7 +3047,7 @@ function handleRightClick(e) {
     // Show the menu
     contextMenu.classList.remove('hidden');
 
-    console.log('🖱️ Right-clicked on:', e.target.textContent);
+    console.log('Right-clicked on:', e.target.textContent);
 }
 
 function hideContextMenu() {
@@ -2705,7 +3062,7 @@ function deleteAnnotationTypeFromMenu() {
         return;
     }
 
-    const typeName = contextMenuTarget.dataset.type;
+    const typeName = contextMenuTarget.dataset.name;
     const displayName = contextMenuTarget.textContent;
 
     // Confirm deletion
@@ -2714,10 +3071,10 @@ function deleteAnnotationTypeFromMenu() {
         return;
     }
 
-    console.log('🗑️ Deleting annotation type:', typeName);
+    console.log('Deleting annotation type:', typeName);
 
     // Get the annotation type ID
-    const typeId = annotationTypeMap[typeName];
+    const typeId = contextMenuTarget.dataset.id;
     if (!typeId) {
         alert('Error: Could not find annotation type to delete');
         hideContextMenu();
@@ -2745,7 +3102,7 @@ function deleteAnnotationTypeFromMenu() {
 
             // Remove from mapping
             delete annotationTypeMap[typeName];
-            console.log('📋 Updated type mapping after deletion:', annotationTypeMap);
+            console.log('Updated type mapping after deletion:', annotationTypeMap);
 
             // Remove the button from interface
             contextMenuTarget.remove();
@@ -2754,11 +3111,10 @@ function deleteAnnotationTypeFromMenu() {
             if (selectedAnnotationType === typeName) {
                 selectedAnnotationType = null;
                 selectedColor = null;
-                document.getElementById('current-mode').textContent = 'Aucun type sélectionné';
-                document.getElementById('current-mode').style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                currentLabel = null;
             }
 
-            console.log('✅ Annotation type deleted successfully');
+            console.log('Annotation type deleted successfully');
         } else {
             alert('Error: ' + data.error);
         }
@@ -2772,41 +3128,31 @@ function deleteAnnotationTypeFromMenu() {
     });
 }
 
-// View original document function
+// Document Viewer Function
 function viewOriginalDocument(documentId) {
     if (!documentId) {
         alert('Document ID non disponible');
         return;
     }
 
-    // Create the URL to view the original document - SAME AS EXPERT
     const documentUrl = `/documents/${documentId}/view-original/`;
-
-    // Open in new window like the expert interface
     window.open(documentUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
 }
 
-// Highlight text in document function
+// Text Highlighting Functions
 function highlightTextInDocument(text, startPos, endPos) {
-    const pageDisplay = document.getElementById('text-content');
-
-    // Store the clean original text content
+    const pageDisplay = document.getElementById('page-text');
     const originalTextContent = pageDisplay.textContent;
 
-    // Remove any existing highlights first
     clearExistingHighlights();
 
     try {
-        // Reset to clean text content
         pageDisplay.textContent = originalTextContent;
 
         let content = pageDisplay.textContent;
         let targetText = text.trim();
-
         let textIndex = -1;
         let foundText = targetText;
-
-        // BULLETPROOF SEARCH STRATEGIES - Try them all!
 
         // Strategy 1: Exact match
         textIndex = content.indexOf(targetText);
@@ -2816,7 +3162,7 @@ function highlightTextInDocument(text, startPos, endPos) {
             textIndex = content.toLowerCase().indexOf(targetText.toLowerCase());
         }
 
-        // Strategy 3: Flexible whitespace (spaces, line breaks, tabs)
+        // Strategy 3: Flexible whitespace
         if (textIndex === -1) {
             const flexiblePattern = targetText.replace(/\s+/g, '\\s+');
             const regex = new RegExp(flexiblePattern, 'i');
@@ -2828,55 +3174,20 @@ function highlightTextInDocument(text, startPos, endPos) {
             }
         }
 
-        // Strategy 4: Remove ALL whitespace and punctuation for comparison
-        if (textIndex === -1) {
-            const cleanTarget = targetText.replace(/[\s\(\)\-\.,;:!?]/g, '').toLowerCase();
-            const cleanContent = content.toLowerCase();
-
-            // Find position by removing chars progressively
-            let bestMatch = '';
-            let bestIndex = -1;
-            let bestLength = 0;
-
-            for (let i = 0; i < content.length - cleanTarget.length + 1; i++) {
-                for (let len = cleanTarget.length; len <= cleanTarget.length + 50; len++) {
-                    if (i + len > content.length) break;
-
-                    const candidate = content.substring(i, i + len);
-                    const cleanCandidate = candidate.replace(/[\s\(\)\-\.,;:!?]/g, '').toLowerCase();
-
-                    if (cleanCandidate === cleanTarget) {
-                        bestMatch = candidate;
-                        bestIndex = i;
-                        bestLength = len;
-                        break;
-                    }
-                }
-                if (bestMatch) break;
-            }
-
-            if (bestMatch) {
-                textIndex = bestIndex;
-                foundText = bestMatch;
-            }
-        }
-
-        // Strategy 5: Word-by-word fuzzy matching
+        // Strategy 4: Word-by-word fuzzy matching
         if (textIndex === -1) {
             const targetWords = targetText.toLowerCase().split(/\s+/);
             const contentLower = content.toLowerCase();
 
-            // Find first word
             const firstWordIndex = contentLower.indexOf(targetWords[0]);
             if (firstWordIndex !== -1) {
-                // Try to match subsequent words within a reasonable window
                 let currentPos = firstWordIndex;
                 let matchedText = '';
                 let allWordsFound = true;
 
                 for (let word of targetWords) {
                     const wordPos = contentLower.indexOf(word, currentPos);
-                    if (wordPos !== -1 && wordPos - currentPos < 100) { // Within 100 chars
+                    if (wordPos !== -1 && wordPos - currentPos < 100) {
                         if (!matchedText) {
                             matchedText = content.substring(firstWordIndex, wordPos + word.length);
                         } else {
@@ -2896,75 +3207,14 @@ function highlightTextInDocument(text, startPos, endPos) {
             }
         }
 
-        // Strategy 6: Character-by-character similarity matching
-        if (textIndex === -1) {
-            const targetLower = targetText.toLowerCase().replace(/\s+/g, ' ');
-            let bestSimilarity = 0;
-            let bestIndex = -1;
-            let bestMatch = '';
-
-            // Try different window sizes around the target length
-            const minLen = Math.max(5, targetText.length - 10);
-            const maxLen = targetText.length + 20;
-
-            for (let i = 0; i < content.length - minLen; i++) {
-                for (let len = minLen; len <= maxLen && i + len <= content.length; len++) {
-                    const candidate = content.substring(i, i + len);
-                    const candidateLower = candidate.toLowerCase().replace(/\s+/g, ' ');
-
-                    // Calculate similarity (simple character overlap)
-                    let similarity = 0;
-                    const minLength = Math.min(targetLower.length, candidateLower.length);
-
-                    for (let j = 0; j < minLength; j++) {
-                        if (targetLower[j] === candidateLower[j]) {
-                            similarity++;
-                        }
-                    }
-
-                    const similarityRatio = similarity / Math.max(targetLower.length, candidateLower.length);
-
-                    if (similarityRatio > bestSimilarity && similarityRatio > 0.7) {
-                        bestSimilarity = similarityRatio;
-                        bestIndex = i;
-                        bestMatch = candidate;
-                    }
-                }
-            }
-
-            if (bestIndex !== -1) {
-                textIndex = bestIndex;
-                foundText = bestMatch;
-            }
-        }
-
-        // Strategy 7: Last resort - partial matching
-        if (textIndex === -1) {
-            const words = targetText.split(/\s+/);
-            for (let word of words) {
-                if (word.length > 3) { // Only try meaningful words
-                    const wordIndex = content.toLowerCase().indexOf(word.toLowerCase());
-                    if (wordIndex !== -1) {
-                        // Found at least one significant word
-                        textIndex = wordIndex;
-                        foundText = word;
-                        console.log(`⚠️ Partial match found: "${word}" from "${targetText}"`);
-                        break;
-                    }
-                }
-            }
-        }
-
-        // HIGHLIGHT THE RESULT
+        // Highlight the result
         if (textIndex !== -1) {
-            console.log(`✅ FOUND: "${foundText}" at position ${textIndex}`);
+            console.log(`Found: "${foundText}" at position ${textIndex}`);
 
-            // Create highlighted version
             const beforeText = content.substring(0, textIndex);
             const highlightedText = content.substring(textIndex, textIndex + foundText.length);
             const afterText = content.substring(textIndex + foundText.length);
 
-            // Replace with highlighted version
             pageDisplay.innerHTML =
                 beforeText +
                 '<span id="highlighted-annotation" style="background-color: #fff3cd; padding: 2px 4px; border-radius: 3px; border: 2px solid #ffc107; animation: highlight-pulse 2s ease-in-out;">' +
@@ -2972,25 +3222,22 @@ function highlightTextInDocument(text, startPos, endPos) {
                 '</span>' +
                 afterText;
 
-            // Scroll to the highlighted text
             document.getElementById('highlighted-annotation').scrollIntoView({
                 behavior: 'smooth',
                 block: 'center'
             });
 
-            // Clear any existing timeout
             if (window.highlightTimeout) {
                 clearTimeout(window.highlightTimeout);
             }
 
-            // Remove highlight after 5 seconds and restore clean text
             window.highlightTimeout = setTimeout(() => {
                 pageDisplay.textContent = originalTextContent;
             }, 5000);
 
         } else {
-            console.log('❌ NO MATCH FOUND with any strategy for:', targetText);
-            alert('Texte non trouvé même avec recherche avancée: "' + targetText.substring(0, 50) + (targetText.length > 50 ? '...' : '') + '"');
+            console.log('No match found for:', targetText);
+            alert('Texte non trouvé: "' + targetText.substring(0, 50) + (targetText.length > 50 ? '...' : '') + '"');
         }
     } catch (error) {
         console.error('Error highlighting text:', error);
@@ -3011,169 +3258,20 @@ function clearExistingHighlights() {
     }
 }
 
-// Fonction pour valider la page avec RLHF
-function validatePage() {
-    const btn = document.getElementById('validate-page-btn');
-    const pageId = document.getElementById('text-content').dataset.pageId;
-
-    if (confirm('Valider cette page ? Cela confirmera que les annotations sont correctes.')) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validation...';
-
-        fetch(`/annotation/validate-page/${pageId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Afficher le succès avec les métriques d'apprentissage
-                const successDiv = document.createElement('div');
-                successDiv.className = 'validation-success';
-                successDiv.innerHTML = `
-                    <i class="fas fa-graduation-cap" style="font-size: 1.5rem;"></i>
-                    <div>
-                        <strong>✅ ${data.message}</strong>
-                        <div style="font-size: 0.9rem; opacity: 0.9;">
-                            L'IA s'améliore grâce à votre validation !
-                        </div>
-                    </div>
-                `;
-
-                // Insérer avant le contenu principal
-                const mainContent = document.querySelector('.text-content-card');
-                mainContent.parentNode.insertBefore(successDiv, mainContent);
-
-                // Afficher le widget d'apprentissage
-                if (data.ai_improved) {
-                    showLearningWidget(data);
-                }
-
-                // Mettre à jour le bouton
-                btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Page Validée 🎓';
-                btn.disabled = true;
-
-                // Supprimer le message après 5 secondes
-                setTimeout(() => {
-                    successDiv.remove();
-                }, 5000);
-
-            } else {
-                alert('Erreur: ' + data.error);
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Validate Page';
-            }
-        })
-        .catch(error => {
-            console.error('Erreur validation:', error);
-            alert('Erreur lors de la validation');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Validate Page';
-        });
-    }
-}
-
-// Fonction pour l'annotation IA avec GROQ
-function annotateWithGroq() {
-    const btn = document.getElementById('groq-annotate-btn');
-    const loading = document.getElementById('ai-loading');
-    const pageId = document.getElementById('text-content').dataset.pageId;
-
-    if (confirm('Lancer l\'annotation automatique avec IA ? Cela remplacera les annotations existantes.')) {
-        btn.disabled = true;
-        loading.style.display = 'inline-flex';
-
-        fetch(`/annotation/groq/${pageId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Afficher le succès
-                const successDiv = document.createElement('div');
-                successDiv.className = 'validation-success';
-                successDiv.innerHTML = `
-                    <i class="fas fa-rocket" style="font-size: 1.5rem;"></i>
-                    <div>
-                        <strong>✅ ${data.message}</strong>
-                        <div style="font-size: 0.9rem; opacity: 0.9;">
-                            IA améliorée par l'apprentissage RLHF
-                        </div>
-                    </div>
-                `;
-
-                // Insérer avant le contenu principal
-                const mainContent = document.querySelector('.text-content-card');
-                mainContent.parentNode.insertBefore(successDiv, mainContent);
-
-                // Recharger pour afficher les nouvelles annotations
-                setTimeout(() => {
-                    location.reload();
-                }, 2000);
-
-            } else {
-                alert('Erreur: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Erreur annotation IA:', error);
-            alert('Erreur lors de l\'annotation IA');
-        })
-        .finally(() => {
-            btn.disabled = false;
-            loading.style.display = 'none';
-        });
-    }
-}
-
-
-// Variables globales pour l'édition
-let currentEditingAnnotationId = null;
-let editModal = null;
-
-// Initialiser le modal d'édition au chargement de la page
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialiser le modal d'édition (s'il existe)
-    const editModalElement = document.getElementById('editAnnotationModal');
-    if (editModalElement) {
-        editModal = new bootstrap.Modal(editModalElement, {
-            backdrop: true,
-            keyboard: true,
-            focus: true
-        });
-    }
-});
-
-/**
- * Ouvre le modal d'édition pour une annotation spécifique
- */
+// Edit Annotation Functions
 function openEditAnnotationModal(annotationId) {
-    console.log('🖊️ Ouverture du modal d\'édition pour annotation:', annotationId);
+    console.log('Opening edit modal for annotation:', annotationId);
 
     if (!editModal) {
         alert('Modal d\'édition non disponible');
         return;
     }
 
-    // Stocker l'ID de l'annotation en cours d'édition
     currentEditingAnnotationId = annotationId;
-
-    // Charger les détails de l'annotation
     loadAnnotationDetails(annotationId);
 }
 
-/**
- * Charge les détails d'une annotation depuis le serveur
- */
 function loadAnnotationDetails(annotationId) {
-    // Afficher un indicateur de chargement
     showEditModalLoading(true);
 
     fetch(`/annotation/${annotationId}/details/`, {
@@ -3201,22 +3299,16 @@ function loadAnnotationDetails(annotationId) {
     });
 }
 
-/**
- * Remplit le modal d'édition avec les données de l'annotation
- */
 function populateEditModal(annotation) {
-    // Remplir les champs du formulaire
     document.getElementById('edit-selected-text').value = annotation.selected_text || '';
     document.getElementById('edit-annotation-type').value = annotation.annotation_type.id || '';
     document.getElementById('edit-start-pos').value = annotation.start_pos || '';
     document.getElementById('edit-end-pos').value = annotation.end_pos || '';
 
-    // Remplir les informations sur l'annotation
     document.getElementById('edit-created-by').textContent = annotation.created_by || 'IA';
     document.getElementById('edit-confidence').textContent = Math.round(annotation.confidence_score || 0);
     document.getElementById('edit-ai-reasoning').textContent = annotation.ai_reasoning || 'Aucun raisonnement disponible';
 
-    // Mettre en surbrillance si modifié par humain
     if (annotation.modified_by_human) {
         const infoPanel = document.querySelector('.annotation-info-panel');
         if (infoPanel) {
@@ -3225,25 +3317,20 @@ function populateEditModal(annotation) {
         }
     }
 
-    console.log('✅ Modal d\'édition rempli avec les données de l\'annotation');
+    console.log('Modal populated with annotation data');
 }
 
-/**
- * Sauvegarde les modifications de l'annotation
- */
 function saveAnnotationChanges() {
     if (!currentEditingAnnotationId) {
         alert('Aucune annotation sélectionnée pour modification');
         return;
     }
 
-    // Récupérer les valeurs du formulaire
     const selectedText = document.getElementById('edit-selected-text').value.trim();
     const annotationTypeId = document.getElementById('edit-annotation-type').value;
     const startPos = parseInt(document.getElementById('edit-start-pos').value) || 0;
     const endPos = parseInt(document.getElementById('edit-end-pos').value) || 0;
 
-    // Validation basique
     if (!selectedText) {
         alert('Le texte sélectionné ne peut pas être vide');
         return;
@@ -3254,7 +3341,6 @@ function saveAnnotationChanges() {
         return;
     }
 
-    // Préparer les données à envoyer
     const editData = {
         selected_text: selectedText,
         annotation_type_id: parseInt(annotationTypeId),
@@ -3262,13 +3348,11 @@ function saveAnnotationChanges() {
         end_pos: endPos
     };
 
-    // Désactiver le bouton de sauvegarde pendant la requête
     const saveButton = document.querySelector('#editAnnotationModal .btn-primary');
     const originalText = saveButton.innerHTML;
     saveButton.disabled = true;
     saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...';
 
-    // Envoyer la requête de modification
     fetch(`/annotation/${currentEditingAnnotationId}/edit/`, {
         method: 'POST',
         headers: {
@@ -3280,17 +3364,15 @@ function saveAnnotationChanges() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Afficher le succès
             showEditSuccess(data.message);
-
-            // Fermer le modal
             editModal.hide();
-
-            // Mettre à jour l'affichage de l'annotation dans la liste
             updateAnnotationInList(data.annotation);
-
-            // Réinitialiser l'ID d'édition
             currentEditingAnnotationId = null;
+            
+            // Reload inline annotations to show changes
+            setTimeout(() => {
+                loadAndRenderAnnotations();
+            }, 500);
         } else {
             alert('Erreur lors de la sauvegarde: ' + data.error);
         }
@@ -3300,35 +3382,27 @@ function saveAnnotationChanges() {
         alert('Erreur lors de la sauvegarde des modifications');
     })
     .finally(() => {
-        // Restaurer le bouton
         saveButton.disabled = false;
         saveButton.innerHTML = originalText;
     });
 }
 
-/**
- * Met à jour l'affichage d'une annotation dans la liste après modification
- */
 function updateAnnotationInList(updatedAnnotation) {
     const annotationElement = document.querySelector(`[data-annotation-id="${updatedAnnotation.id}"]`);
     if (!annotationElement) {
-        console.error('Élément d\'annotation non trouvé dans la liste');
+        console.error('Annotation element not found in list');
         return;
     }
 
-    // Mettre à jour le type d'annotation
     const typeElement = annotationElement.querySelector('.annotation-type');
     if (typeElement) {
         typeElement.textContent = updatedAnnotation.annotation_type.display_name;
         typeElement.style.background = updatedAnnotation.annotation_type.color;
     }
 
-    // Mettre à jour le texte sélectionné
     const textElement = annotationElement.querySelector('.annotation-text');
     if (textElement) {
         textElement.textContent = `"${updatedAnnotation.selected_text}"`;
-
-        // Mettre à jour l'événement onclick avec les nouvelles positions
         textElement.onclick = function() {
             highlightTextInDocument(
                 updatedAnnotation.selected_text,
@@ -3338,7 +3412,6 @@ function updateAnnotationInList(updatedAnnotation) {
         };
     }
 
-    // Ajouter ou mettre à jour l'indicateur de modification humaine
     let humanIndicator = annotationElement.querySelector('.human-modified-indicator');
     if (!humanIndicator) {
         humanIndicator = document.createElement('div');
@@ -3347,18 +3420,14 @@ function updateAnnotationInList(updatedAnnotation) {
     }
     humanIndicator.innerHTML = '<i class="fas fa-user-edit"></i> Modifié par vous';
 
-    // Ajouter une animation de mise à jour
     annotationElement.style.animation = 'highlight-pulse 1s ease-in-out';
     setTimeout(() => {
         annotationElement.style.animation = '';
     }, 1000);
 
-    console.log('✅ Annotation mise à jour dans la liste');
+    console.log('Annotation updated in list');
 }
 
-/**
- * Affiche un message de succès après modification
- */
 function showEditSuccess(message) {
     const successDiv = document.createElement('div');
     successDiv.className = 'validation-success';
@@ -3372,30 +3441,17 @@ function showEditSuccess(message) {
         </div>
     `;
 
-    // Insérer avant le contenu principal
     const mainContent = document.querySelector('.text-content-card');
     if (mainContent) {
         mainContent.parentNode.insertBefore(successDiv, mainContent);
-
-        // Supprimer après 4 secondes
-        setTimeout(() => {
-            successDiv.remove();
-        }, 4000);
+        setTimeout(() => successDiv.remove(), 4000);
     }
 }
 
-/**
- * Affiche/cache l'indicateur de chargement dans le modal d'édition
- */
 function showEditModalLoading(show) {
-    // Cette fonction peut être utilisée pour ajouter des indicateurs de chargement
-    // si nécessaire dans le futur
-    console.log(show ? '⏳ Chargement...' : '✅ Chargement terminé');
+    console.log(show ? 'Loading...' : 'Loading complete');
 }
 
-/**
- * Réinitialise le formulaire d'édition
- */
 function resetEditModal() {
     document.getElementById('edit-selected-text').value = '';
     document.getElementById('edit-annotation-type').value = '';
@@ -3405,7 +3461,6 @@ function resetEditModal() {
     document.getElementById('edit-confidence').textContent = '-';
     document.getElementById('edit-ai-reasoning').textContent = '-';
 
-    // Restaurer le style du panel d'information
     const infoPanel = document.querySelector('.annotation-info-panel');
     if (infoPanel) {
         infoPanel.style.borderLeft = '1px solid #dee2e6';
@@ -3415,7 +3470,7 @@ function resetEditModal() {
     currentEditingAnnotationId = null;
 }
 
-// Événement pour réinitialiser le modal quand il se ferme
+// Event listener for modal close
 document.addEventListener('DOMContentLoaded', function() {
     const editModalElement = document.getElementById('editAnnotationModal');
     if (editModalElement) {
@@ -3425,13 +3480,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-/**
- * Auto-calcul des positions lors de la modification du texte
- * (Fonction avancée - optionnelle)
- */
 function recalculatePositions() {
     const selectedText = document.getElementById('edit-selected-text').value.trim();
-    const pageText = document.getElementById('text-content').textContent;
+    const pageText = document.getElementById('page-text').textContent;
 
     if (selectedText && pageText) {
         const startPos = pageText.indexOf(selectedText);
@@ -3442,7 +3493,7 @@ function recalculatePositions() {
     }
 }
 
-// Optionnel: Auto-recalcul des positions quand le texte change
+// Auto-recalculate positions when text changes
 document.addEventListener('DOMContentLoaded', function() {
     const textArea = document.getElementById('edit-selected-text');
     if (textArea) {
@@ -3450,6 +3501,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-console.log('📝 Fonctions d\'édition d\'annotations chargées avec succès');
+console.log('Prodigy-like annotation system with full functionality loaded successfully');
 </script>
 {% endblock %}

@@ -667,8 +667,8 @@ def annotate_document(request, doc_id):
     })
 
 
-@login_required(login_url='rawdocs:login')
-@user_passes_test(is_annotateur)
+@login_required
+@csrf_exempt
 def save_manual_annotation(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -678,6 +678,7 @@ def save_manual_annotation(request):
         page = get_object_or_404(DocumentPage, id=data['page_id'])
         atype = get_object_or_404(AnnotationType, id=data['type_id'])
 
+        # Create the annotation with proper fields
         ann = Annotation.objects.create(
             page=page,
             annotation_type=atype,
@@ -685,56 +686,123 @@ def save_manual_annotation(request):
             end_pos=data['end_pos'],
             selected_text=data['selected_text'],
             confidence_score=100.0,
-            created_by=request.user
+            created_by=request.user,
+            ai_reasoning=f"Manual annotation by {request.user.username}"
         )
 
+        # Mark page as annotated
+        if not page.is_annotated:
+            page.is_annotated = True
+            page.annotated_at = timezone.now()
+            page.annotated_by = request.user
+            page.save()
+
+        # Return complete annotation data
         return JsonResponse({
             'success': True,
             'annotation_id': ann.id,
-            'message': 'Annotation sauvegardée'
+            'message': 'Annotation sauvegardée',
+            'annotation': {
+                'id': ann.id,
+                'selected_text': ann.selected_text,
+                'start_pos': ann.start_pos,
+                'end_pos': ann.end_pos,
+                'annotation_type': {
+                    'id': atype.id,
+                    'name': atype.name,
+                    'display_name': atype.display_name,
+                    'color': atype.color
+                },
+                'confidence_score': ann.confidence_score,
+                'ai_reasoning': ann.ai_reasoning,
+                'created_by': request.user.username
+            }
         })
     except Exception as e:
+        print(f"Error saving annotation: {e}")
         return JsonResponse({
             'error': str(e),
             'message': 'Erreur lors de la sauvegarde'
         }, status=500)
+    
 
-
-@login_required(login_url='rawdocs:login')
+@login_required
 def get_page_annotations(request, page_id):
-    page = get_object_or_404(DocumentPage, id=page_id)
-    anns = [{
-        'id': a.id,
-        'start_pos': a.start_pos,
-        'end_pos': a.end_pos,
-        'selected_text': a.selected_text,
-        'type': a.annotation_type.name,
-        'type_display': a.annotation_type.display_name,
-        'color': a.annotation_type.color,
-        'confidence': a.confidence_score,
-        'reasoning': a.ai_reasoning,
-        'is_validated': a.is_validated,
-    } for a in page.annotations.all().order_by('start_pos')]
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        annotations = page.annotations.all().select_related('annotation_type').order_by('start_pos')
+        
+        anns = []
+        for a in annotations:
+            anns.append({
+                'id': a.id,
+                'start_pos': a.start_pos,
+                'end_pos': a.end_pos,
+                'selected_text': a.selected_text,
+                'type': a.annotation_type.name,
+                'type_display': a.annotation_type.display_name,
+                'color': a.annotation_type.color,
+                'confidence': a.confidence_score,
+                'reasoning': a.ai_reasoning,
+                'is_validated': getattr(a, 'is_validated', False),
+            })
 
-    return JsonResponse({
-        'annotations': anns,
-        'page_text': page.cleaned_text
-    })
+        return JsonResponse({
+            'success': True,
+            'annotations': anns,
+            'page_text': page.cleaned_text,
+            'total_annotations': len(anns)
+        })
+        
+    except Exception as e:
+        print(f"Error loading annotations: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'annotations': [],
+            'page_text': '',
+            'total_annotations': 0
+        })
+    
 
-
-@login_required(login_url='rawdocs:login')
-@user_passes_test(is_annotateur)
+@login_required
+@csrf_exempt  
 def delete_annotation(request, annotation_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    ann = get_object_or_404(Annotation, id=annotation_id)
-    if ann.created_by != request.user and not request.user.groups.filter(name="Expert").exists():
-        return JsonResponse({'error': 'Permission denied'}, status=403)
+    try:
+        ann = get_object_or_404(Annotation, id=annotation_id)
+        
+        # Check permissions
+        if ann.created_by != request.user and not request.user.groups.filter(name="Expert").exists():
+            return JsonResponse({'error': 'Permission denied'}, status=403)
 
-    ann.delete()
-    return JsonResponse({'success': True})
+        # Store page reference before deletion
+        page = ann.page
+        
+        # Delete the annotation
+        ann.delete()
+        
+        # Check if page still has annotations
+        remaining_annotations = page.annotations.count()
+        if remaining_annotations == 0:
+            page.is_annotated = False
+            page.save()
 
+        return JsonResponse({
+            'success': True,
+            'message': 'Annotation supprimée',
+            'remaining_annotations': remaining_annotations
+        })
+        
+    except Exception as e:
+        print(f"Error deleting annotation: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+    
 
 @login_required
 @csrf_exempt
@@ -790,6 +858,18 @@ def validate_page_annotations(request, page_id):
         # Clear session
         if ai_session_key in request.session:
             del request.session[ai_session_key]
+
+        # If all pages of the document are validated by human, auto-submit for expert review
+        doc = page.document
+        try:
+            total = doc.total_pages or doc.pages.count()
+            validated = doc.pages.filter(is_validated_by_human=True).count()
+            if total > 0 and validated >= total and not doc.is_ready_for_expert:
+                doc.is_ready_for_expert = True
+                doc.expert_ready_at = datetime.now()
+                doc.save(update_fields=['is_ready_for_expert', 'expert_ready_at'])
+        except Exception:
+            pass
 
         return JsonResponse({
             'success': True,
@@ -2540,3 +2620,17 @@ def metadata_learning_api(request):
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+    
+
+from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+
+@require_http_methods(["POST"])
+def clear_page_annotations(request, page_id):
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        page.annotations.all().delete()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

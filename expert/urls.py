@@ -62,4 +62,18 @@ urlpatterns = [
 
     # Sauvegarde du résumé modifié
     path('annotation/document/<int:doc_id>/save-summary/', views.save_summary_changes, name='save_summary_changes'),
+
+    # Regulatory analysis endpoints for expert
+    path('regulatory/save-summary/<int:doc_id>/', views.save_regulatory_summary, name='save_regulatory_summary'),
+    path('regulatory/validate/<int:doc_id>/', views.validate_regulatory_analysis, name='validate_regulatory_analysis'),
+    # Expert regulatory analysis generation
+    path('regulatory/generate/<int:doc_id>/', views.generate_regulatory_analysis, name='generate_regulatory_analysis'),
+    # Expert annotation interface
+    path('annotate/<int:doc_id>/', views.expert_annotate_document, name='annotate_document'),
+    path('api/groq/<int:page_id>/', views.expert_ai_annotate_page_groq, name='ai_annotate_page_groq'),
+    path('api/save-annotation/', views.expert_save_manual_annotation, name='save_manual_annotation'),
+    path('api/get-annotations/<int:page_id>/', views.expert_get_page_annotations, name='get_page_annotations'),
+    path('api/delete-annotation/<int:annotation_id>/', views.expert_delete_annotation, name='delete_annotation'),
+    path('api/get-annotations/<int:page_id>/', views.expert_get_page_annotations, name='get_page_annotations'),
+
 ]

@@ -663,6 +663,97 @@ body {
   {% endif %}
 </section>
 
+<!-- Regulatory Analysis Section -->
+{% if has_regulatory_analysis %}
+<section class="json-container">
+  <h3><i class="fas fa-balance-scale"></i> Analyse Réglementaire Globale</h3>
+  
+  <!-- Regulatory Stats -->
+  <div class="stats-grid" style="margin-bottom: 2rem;">
+    <div class="stat-card">
+      <span class="stat-value">{{ regulatory_stats.analyzed_pages }}</span>
+      <span class="stat-label">Pages Analysées</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">{{ regulatory_stats.high_importance_pages }}</span>
+      <span class="stat-label">Pages Haute Importance</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">{{ regulatory_analysis.global_regulatory_score|default:0 }}</span>
+      <span class="stat-label">Score Réglementaire Global</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">{{ regulatory_stats.completion_percentage }}%</span>
+      <span class="stat-label">Analyse Complète</span>
+    </div>
+  </div>
+
+  <!-- Global Regulatory Summary -->
+  {% if regulatory_analysis.global_summary %}
+  <div class="alert alert-info" style="margin-bottom: 1.5rem;">
+    <i class="fas fa-info-circle"></i> Cette analyse réglementaire est éditable par l'expert.
+  </div>
+
+  <div class="summary-editor-container">
+    <h4 style="color: var(--text); margin-bottom: 1rem;">
+      <i class="fas fa-gavel"></i> Résumé Réglementaire Global
+    </h4>
+    <textarea
+      id="regulatory-summary-editor"
+      class="summary-editor"
+      placeholder="Modifiez l'analyse réglementaire du document..."
+      rows="6">{{ regulatory_analysis.global_summary }}</textarea>
+
+    <div class="summary-actions" style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+      <button class="copy-btn" onclick="saveRegulatorySummary()" style="background: #dc3545;">
+        <i class="fas fa-save"></i> Sauvegarder Analyse Réglementaire
+      </button>
+      <button class="copy-btn" onclick="generateRegulatoryAnalysis(event)" style="background: #0d6efd;">
+        <i class="fas fa-rotate"></i> Relancer l'analyse
+      </button>
+      <span id="regulatory-status" class="text-muted" style="margin-left: 0.5rem; font-size: 0.9rem;"></span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Regulatory Analysis JSON -->
+  {% if regulatory_analysis.consolidated_analysis %}
+  <div style="margin-top: 2rem;">
+    <h4 style="color: var(--text); margin-bottom: 1rem;">
+      <i class="fas fa-code"></i> Analyse Réglementaire Structurée (JSON)
+    </h4>
+    <div class="json-content">{{ regulatory_analysis.consolidated_analysis|safe }}</div>
+    
+    <div style="margin-top: 1rem;">
+      <button class="copy-btn" onclick="copyRegulatoryJson()" style="background: #6f42c1;">
+        <i class="fas fa-copy"></i> Copier JSON Réglementaire
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Validation Button -->
+  <div style="margin-top: 2rem; text-align: center;">
+    <button class="btn-action" onclick="validateRegulatoryAnalysis()" style="background: linear-gradient(90deg, #dc3545, #e74c3c);">
+      <i class="fas fa-check-circle"></i> Valider Analyse Réglementaire
+    </button>
+  </div>
+</section>
+
+{% else %}
+<!-- Generate Regulatory Analysis -->
+<section class="json-container">
+  <h3><i class="fas fa-balance-scale"></i> Analyse Réglementaire</h3>
+  <div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle"></i>
+    Aucune analyse réglementaire générée pour ce document.
+    <button class="btn-action" onclick="generateRegulatoryAnalysis()" style="margin-left: 1rem; background: #dc3545;">
+      <i class="fas fa-cogs"></i> Générer Analyse Réglementaire
+    </button>
+  </div>
+</section>
+{% endif %}
+
 <!-- Navigation par pages - Style de l'annotateur -->
 {% if document.pages.all %}
 <section class="json-container">
@@ -835,7 +926,7 @@ function showSaveStatus(message, type) {
 }
 
 // Copier le JSON dans le presse-papiers
-function copyJsonToClipboard() {
+function copyJsonToClipboard(evt) {
     if (!editor) {
         alert('Éditeur non initialisé');
         return;
@@ -844,15 +935,17 @@ function copyJsonToClipboard() {
     const jsonContent = editor.getValue();
 
     navigator.clipboard.writeText(jsonContent).then(function() {
-        const btn = event.target.closest('.copy-btn');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check"></i> Copié !';
-        btn.style.background = '#22c55e';
+        const btn = evt?.target?.closest('.copy-btn');
+        if (btn) {
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Copié !';
+            btn.style.background = '#22c55e';
 
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.style.background = '#10b981';
-        }, 2000);
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.style.background = '#10b981';
+            }, 2000);
+        }
     }).catch(function(err) {
         console.error('Erreur lors de la copie:', err);
         alert('Erreur lors de la copie dans le presse-papiers');
@@ -925,6 +1018,135 @@ function exportToExcel() {
     // TODO: Implémenter l'export Excel
 }
 
+// Save regulatory summary
+async function saveRegulatorySummary() {
+    const el = document.getElementById('regulatory-summary-editor');
+    const statusEl = document.getElementById('regulatory-status');
+    const setStatus = (m, ok=true) => {
+        if(statusEl) {
+            statusEl.textContent = m;
+            statusEl.style.color = ok ? '#059669' : '#dc2626';
+        }
+    };
+
+    const content = (el?.value || '').trim();
+    if (!content) {
+        setStatus('Le résumé réglementaire est vide.', false);
+        return;
+    }
+
+    try {
+        setStatus('Sauvegarde de l\'analyse réglementaire...');
+        const res = await fetch(`/expert/regulatory/save-summary/{{ document.id }}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ regulatory_summary: content })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Erreur');
+
+        setStatus('Analyse réglementaire sauvegardée avec succès!');
+    } catch (e) {
+        console.error(e);
+        setStatus(e.message, false);
+    }
+}
+
+// Copy regulatory JSON
+function copyRegulatoryJson() {
+    const content = document.querySelector('.json-content').textContent;
+    navigator.clipboard.writeText(content).then(() => {
+        alert('JSON réglementaire copié dans le presse-papiers!');
+    }).catch(() => {
+        alert('Erreur lors de la copie');
+    });
+}
+
+// Generate regulatory analysis
+async function generateRegulatoryAnalysis(event) {
+    console.log('🔥 generateRegulatoryAnalysis called');
+    
+    if (!confirm('Voulez-vous générer l\'analyse réglementaire pour ce document? Cela peut prendre quelques minutes.')) {
+        return;
+    }
+
+    const btn = event ? event.target.closest('.copy-btn') : document.querySelector('button[onclick="generateRegulatoryAnalysis()"]');
+    if (!btn) {
+        console.error('❌ Button not found');
+        return;
+    }
+    
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération en cours...';
+    btn.disabled = true;
+
+    try {
+        console.log('🚀 Making fetch request to:', `/expert/regulatory/generate/{{ document.id }}/`);
+        
+        const res = await fetch(`/expert/regulatory/generate/{{ document.id }}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('📡 Response status:', res.status);
+        console.log('📡 Response headers:', res.headers);
+
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+
+        const data = await res.json();
+        console.log('📦 Response data:', data);
+        
+        if (data.success) {
+            alert(`Analyse réglementaire générée avec succès! ${data.analyzed_pages} pages analysées avec un score global de ${data.global_score}/100.`);
+            location.reload();
+        } else {
+            console.error('❌ Server error:', data.error);
+            alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+        }
+    } catch (error) {
+        console.error('💥 Fetch error:', error);
+        alert('Erreur lors de la génération de l\'analyse réglementaire: ' + error.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+// Validate regulatory analysis
+async function validateRegulatoryAnalysis() {
+    if (!confirm('Êtes-vous sûr de vouloir valider cette analyse réglementaire? Elle sera marquée comme validée par un expert.')) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/expert/regulatory/validate/{{ document.id }}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            alert('Analyse réglementaire validée avec succès!');
+            location.reload();
+        } else {
+            alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+        }
+    } catch (error) {
+        alert('Erreur lors de la validation');
+    }
+}
+
 // Fonction utilitaire pour récupérer le token CSRF
 function getCookie(name) {
     let cookieValue = null;
@@ -951,148 +1173,128 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-
 // ---- Résumé : changements UI de base ----
 (function () {
-  const summaryEl = document.getElementById('summary-editor');
-  const statusEl = document.getElementById('summary-status');
+    const summaryEl = document.getElementById('summary-editor');
+    const statusEl = document.getElementById('summary-status');
 
-  function setStatus(msg, ok = true) {
-    if (!statusEl) return;
-    statusEl.textContent = msg;
-    statusEl.style.color = ok ? '#059669' : '#dc2626';
-  }
-
-  if (summaryEl) {
-    const original = summaryEl.value;
-    summaryEl.addEventListener('input', () => {
-      summaryEl.classList.toggle('modified', summaryEl.value !== original);
-      setStatus('Non sauvegardé…', true);
-    });
-  }
-
-  // --------- 1) SAUVEGARDE DU RÉSUMÉ ----------
-  window.saveSummaryChanges = async function () {
-  const el = document.getElementById('summary-editor');
-  const statusEl = document.getElementById('summary-status');
-  const setStatus = (m, ok=true)=>{ if(statusEl){ statusEl.textContent=m; statusEl.style.color=ok?'#059669':'#dc2626'; } };
-
-  const content = (el?.value || '').trim();
-  if (!content) { setStatus('Le résumé est vide.', false); return; }
-
-  try {
-    setStatus('Analyse IA et sauvegarde…');
-    const res = await fetch(`/expert/annotation/document/{{ document.id }}/save-summary/`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
-      body: JSON.stringify({ summary_content: content })
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Erreur');
-
-    if (data.updated_json && window.editor) {
-      window.editor.setValue(JSON.stringify(data.updated_json, null, 2));
+    function setStatus(msg, ok = true) {
+        if (!statusEl) return;
+        statusEl.textContent = msg;
+        statusEl.style.color = ok ? '#059669' : '#dc2626';
     }
-    // Construire un message détaillé: clés + valeurs ajoutées
-    const added = data.entities_added || {};
-    const removed = data.entities_removed || {};
-    const changed = data.changed_keys || [];
 
-    let parts = [];
-    changed.forEach(k => {
-      const a = added[k];
-      const r = removed[k];
-      if (a && a.length) parts.push(`${k} +[${a.join(', ')}]`);
-      if (r && r.length) parts.push(`${k} -[${r.join(', ')}]`);
-    });
-
-    if (parts.length) {
-      setStatus(`Résumé sauvegardé • Modifications: ${parts.join(' ; ')}`);
-    } else {
-      setStatus('Résumé sauvegardé • Aucune entité modifiée');
+    if (summaryEl) {
+        const original = summaryEl.value;
+        summaryEl.addEventListener('input', () => {
+            summaryEl.classList.toggle('modified', summaryEl.value !== original);
+            setStatus('Non sauvegardé…', true);
+        });
     }
-  } catch (e) {
-    console.error(e); setStatus(e.message, false);
-  }
-};
 
+    // --------- 1) SAUVEGARDE DU RÉSUMÉ ----------
+    window.saveSummaryChanges = async function () {
+        const el = document.getElementById('summary-editor');
+        const statusEl = document.getElementById('summary-status');
+        const setStatus = (m, ok=true)=>{ if(statusEl){ statusEl.textContent=m; statusEl.style.color=ok?'#059669':'#dc2626'; } };
 
+        const content = (el?.value || '').trim();
+        if (!content) { setStatus('Le résumé est vide.', false); return; }
 
-  // --------- 2) EXTRACTION D’ENTITÉS (aperçu client) ----------
-  window.extractEntitiesFromSummary = function extractEntitiesFromSummary() {
-    if (!summaryEl) return;
-    const text = summaryEl.value;
+        try {
+            setStatus('Analyse IA et sauvegarde…');
+            const res = await fetch(`/expert/annotation/document/{{ document.id }}/save-summary/`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
+                body: JSON.stringify({ summary_content: content })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'Erreur');
 
-    const patterns = {
-      'product': [
-        /(?:produit|m[ée]dicament)\s*:?\s*([A-Z][\wÀ-ÿ\s\-\/]{2,40})/gi,
-        /^([A-Z][\wÀ-ÿ\s\-\/]{3,40})\s+(?:est|sera|contient)/gim
-      ],
-      'dosage': [
-        /([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|µg|%|UI))/gi
-      ],
-      'substance_active': [
-        /(?:substance active|principe actif)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,40})/gi,
-        /(?:contient|à base de)\s+([A-Z][\wÀ-ÿ\s\-]{3,40})/gi
-      ],
-      'site': [
-        /(?:site|usine|fabricant)\s*:?\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})/gi,
-        /(?:fabriqu[ée]|produit)\s*(?:à|par)\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})/gi
-      ],
-      'pays': [
-        /(?:pays|country)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,30})/gi,
-        /(?:en|au|aux)\s+([A-Z][\wÀ-ÿ\s\-]{4,25})(?=[\s,\.]|$)/gi
-      ]
+            if (data.updated_json && window.editor) {
+                window.editor.setValue(JSON.stringify(data.updated_json, null, 2));
+            }
+            // Construire un message détaillé: clés + valeurs ajoutées
+            const added = data.entities_added || {};
+            const removed = data.entities_removed || {};
+            const changed = data.changed_keys || [];
+
+            let parts = [];
+            changed.forEach(k => {
+                const a = added[k];
+                const r = removed[k];
+                if (a && a.length) parts.push(`${k} +[${a.join(', ')}]`);
+                if (r && r.length) parts.push(`${k} -[${r.join(', ')}]`);
+            });
+
+            if (parts.length) {
+                setStatus(`Résumé sauvegardé • Modifications: ${parts.join(' ; ')}`);
+            } else {
+                setStatus('Résumé sauvegardé • Aucune entité modifiée');
+            }
+        } catch (e) {
+            console.error(e); setStatus(e.message, false);
+        }
     };
 
-    const found = {};
-    for (const [type, regs] of Object.entries(patterns)) {
-      const vals = new Set();
-      regs.forEach(re => {
-        let m;
-        while ((m = re.exec(text)) !== null) {
-          const v = (m[1] || '').trim().replace(/[.,;:]$/, '');
-          if (v.length > 1) vals.add(v);
+    // --------- 2) EXTRACTION D'ENTITÉS (aperçu client) ----------
+    window.extractEntitiesFromSummary = function extractEntitiesFromSummary() {
+        if (!summaryEl) return;
+        const text = summaryEl.value;
+
+        const patterns = {
+            'product': [
+                /(?:produit|m[ée]dicament)\s*:?\s*([A-Z][\wÀ-ÿ\s\-\/]{2,40})/gi,
+                /^([A-Z][\wÀ-ÿ\s\-\/]{3,40})\s+(?:est|sera|contient)/gim
+            ],
+            'dosage': [
+                /([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|µg|%|UI))/gi
+            ],
+            'substance_active': [
+                /(?:substance active|principe actif)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,40})/gi,
+                /(?:contient|à base de)\s+([A-Z][\wÀ-ÿ\s\-]{3,40})/gi
+            ],
+            'site': [
+                /(?:site|usine|fabricant)\s*:?\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})/gi,
+                /(?:fabriqu[ée]|produit)\s*(?:à|par)\s*([A-Z][\wÀ-ÿ\s\.\-]{2,40})/gi
+            ],
+            'pays': [
+                /(?:pays|country)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,30})/gi,
+                /(?:en|au|aux)\s+([A-Z][\wÀ-ÿ\s\-]{4,25})(?=[\s,\.]|$)/gi
+            ]
+        };
+
+        const found = {};
+        for (const [type, regs] of Object.entries(patterns)) {
+            const vals = new Set();
+            regs.forEach(re => {
+                let m;
+                while ((m = re.exec(text)) !== null) {
+                    const v = (m[1] || '').trim().replace(/[.,;:]$/, '');
+                    if (v.length > 1) vals.add(v);
+                }
+            });
+            if (vals.size) found[type] = Array.from(vals);
         }
-      });
-      if (vals.size) found[type] = Array.from(vals);
-    }
 
-    // Affiche un petit aperçu sous l’éditeur
-    let box = document.querySelector('.entity-extraction-preview');
-    if (!box) {
-      box = document.createElement('div');
-      box.className = 'entity-extraction-preview';
-      summaryEl.parentNode.appendChild(box);
-    }
-    if (!Object.keys(found).length) {
-      box.innerHTML = '<small class="text-muted">Aucune entité détectée…</small>';
-      return found;
-    }
-    box.innerHTML = Object.entries(found)
-      .map(([k, arr]) => `<div><strong>${k}</strong> : ${arr.map(v => `<span class="entity-tag new">${v}</span>`).join(' ')}</div>`)
-      .join('');
-    setStatus('Aperçu des entités mis à jour.', true);
-    return found;
-  };
-
-  // ---- petite amélioration : corriger l’usage d’event dans le bouton Copier ----
-  window.copyJsonToClipboard = function copyJsonToClipboard(evt) {
-    if (!editor) { alert('Éditeur non initialisé'); return; }
-    navigator.clipboard.writeText(editor.getValue()).then(() => {
-      const btn = evt?.target?.closest('.copy-btn');
-      if (!btn) return;
-      const original = btn.innerHTML;
-      btn.innerHTML = '<i class="fas fa-check"></i> Copié !';
-      btn.style.background = '#22c55e';
-      setTimeout(() => { btn.innerHTML = original; btn.style.background = '#10b981'; }, 2000);
-    }).catch(err => {
-      console.error('Erreur de copie:', err);
-      alert('Erreur lors de la copie dans le presse-papiers');
-    });
-  };
+        // Affiche un petit aperçu sous l'éditeur
+        let box = document.querySelector('.entity-extraction-preview');
+        if (!box) {
+            box = document.createElement('div');
+            box.className = 'entity-extraction-preview';
+            summaryEl.parentNode.appendChild(box);
+        }
+        if (!Object.keys(found).length) {
+            box.innerHTML = '<small class="text-muted">Aucune entité détectée…</small>';
+            return found;
+        }
+        box.innerHTML = Object.entries(found)
+            .map(([k, arr]) => `<div><strong>${k}</strong> : ${arr.map(v => `<span class="entity-tag new">${v}</span>`).join(' ')}</div>`)
+            .join('');
+        setStatus('Aperçu des entités mis à jour.', true);
+        return found;
+    };
 })();
-
 </script>
 
 {% endblock %}

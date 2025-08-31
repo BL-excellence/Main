@@ -192,13 +192,42 @@ def client_document_detail(request, pk):
         source='Client',
         is_validated=True
     ).exclude(pk=document.pk)[:5]
+
+    # Indiquer si une analyse réglementaire experte existe déjà
+    has_expert_regulatory = hasattr(document, 'regulatory_analysis')
     
     context = {
         'document': document,
         'metadata': metadata,
         'related_documents': related_documents,
+        'has_expert_regulatory': has_expert_regulatory,
     }
     return render(request, 'client/library/client_document_detail.html', context)
+
+@login_required
+def client_document_regulatory_view(request, pk):
+    """
+    Vue Client pour afficher l'analyse réglementaire experte SANS régénération.
+    Reprend le rendu JSON expert, en lecture seule.
+    """
+    document = get_object_or_404(RawDocument, pk=pk, owner=request.user, source='Client')
+
+    # Vérifie qu'une analyse experte existe
+    from rawdocs.models import DocumentRegulatoryAnalysis
+    try:
+        doc_analysis = document.regulatory_analysis  # OneToOne related_name
+    except DocumentRegulatoryAnalysis.DoesNotExist:
+        messages.error(request, "Aucune analyse réglementaire experte disponible pour ce document.")
+        return redirect('client:library:client_document_detail', pk=pk)
+
+    # Prépare le même contexte minimal que la vue expert JSON attend (global_annotations_json déjà injecté côté expert)
+    # Ici, on va simplement injecter consolidated_analysis sous un id json-data comme dans le template expert.
+    context = {
+        'document': document,
+        'global_annotations_json': doc_analysis.consolidated_analysis or {},
+        'global_summary': (doc_analysis.global_summary or '').strip(),
+    }
+    return render(request, 'client/library/client_document_regulatory.html', context)
 
 
 @login_required

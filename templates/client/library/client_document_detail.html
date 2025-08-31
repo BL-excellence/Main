@@ -460,6 +460,12 @@
                     <i class="material-icons">text_snippet</i>
                     <span class="text">Extraire texte brut</span>
                 </button>
+                {% if has_expert_regulatory %}
+                <a href="{% url 'client:library:client_document_regulatory' document.pk %}" class="btn btn-primary" title="Voir l'analyse réglementaire">
+                    <i class="material-icons">gavel</i>
+                    <span class="text">Analyser le document</span>
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>

@@ -513,7 +513,7 @@ def build_adaptive_field_instructions(learning_prompts):
         'publication_date': "Publication date",
         'source': "Source organization",
         'language': "Document language code (en, fr, etc.)",
-        'context': "field , pharmaceutical, legal, etc.",
+        'context': "The field of the document content (pharmaceutical, legal, etc.) ",
     }
     
     for field, base_desc in base_fields.items():

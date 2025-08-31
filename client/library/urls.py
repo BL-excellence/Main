@@ -30,6 +30,8 @@ urlpatterns = [
     path('client/documents/<int:pk>/download/', download_client_document, name='download_client_document'),
     path('client/documents/<int:pk>/delete/', delete_client_document, name='delete_client_document'),
     path('client/documents/<int:pk>/extract-text/', client_upload_views.extract_text_now, name='extract_text_now'),
+    # Client: voir l'analyse réglementaire experte (sans régénération)
+    path('client/documents/<int:pk>/regulatory/', client_upload_views.client_document_regulatory_view, name='client_document_regulatory'),
     
     # API endpoints
     path('api/search/', views.search_documents, name='api_search'),

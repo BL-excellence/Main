@@ -310,4 +310,5 @@ urlpatterns = [
         views.dev_metier_document_annotation_json,
         name='dev_metier_document_json'
     ),
+    path('clear_page_annotations/<int:page_id>/', views.clear_page_annotations, name='clear_page_annotations'),
 ]

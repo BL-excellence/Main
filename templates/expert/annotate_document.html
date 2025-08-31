@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Annotation Expert - {{ document.title }}{% endblock %}
+{% block content %}
+
+<style>
+    :root {
+        --primary: #0ea5e9;
+        --primary-light: #38bdf8;
+        --accent: #10b981;
+        --text: #000000;
+        --card-bg: rgba(255, 255, 255, 0.95);
+        --card-border: rgba(14, 165, 233, 0.15);
+    }
+
+    .annotation-container {
+        max-width: 1400px;
+        margin: 2rem auto;
+        padding: 0 1.5rem;
+    }
+
+    .annotation-header {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .annotation-types-panel {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .annotation-types {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin: 1rem 0;
+    }
+
+    .annotation-type-btn {
+        background: var(--card-bg);
+        border: 2px solid var(--primary);
+        color: var(--primary);
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+
+    .annotation-type-btn:hover,
+    .annotation-type-btn.active {
+        background: var(--primary);
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .text-content-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .text-content {
+        background: #fafbfc;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 2rem;
+        line-height: 1.8;
+        font-size: 1rem;
+        color: #1f2937;
+        white-space: pre-wrap;
+        min-height: 500px;
+        cursor: text;
+    }
+
+    .page-navigation {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(14, 165, 233, 0.05);
+        padding: 1rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+    }
+
+    .nav-btn {
+        background: var(--primary);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .nav-btn:hover {
+        background: var(--primary-light);
+        color: white;
+        text-decoration: none;
+    }
+
+    .inline-annotation {
+        background-color: #fff3cd;
+        padding: 2px 4px;
+        margin: 0 1px;
+        border-radius: 3px;
+        cursor: pointer;
+        position: relative;
+    }
+
+    .inline-annotation .ann-label {
+        font-size: 0.7rem;
+        font-weight: bold;
+        margin-left: 4px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(0,0,0,0.6);
+        color: #fff;
+        white-space: nowrap;
+    }
+</style>
+
+<div class="annotation-container">
+    <!-- Header -->
+    <div class="annotation-header">
+        <div>
+            <h2 style="color: var(--primary); margin: 0;">{{ document.title }}</h2>
+            <p style="color: #6b7280; margin: 0.5rem 0 0 0;">Page {{ current_page.page_number }} / {{ total_pages }}</p>
+        </div>
+        <a href="{% url 'expert:review_document' document.id %}" class="nav-btn">
+            <i class="fas fa-arrow-left"></i> Retour
+        </a>
+    </div>
+
+    <!-- Annotation Types -->
+    <div class="annotation-types-panel">
+        <h3 style="color: var(--text); margin-bottom: 1rem;">
+            <i class="fas fa-tags" style="color: var(--primary);"></i>
+            Types d'Annotation
+        </h3>
+        <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 1rem;">
+            Cliquez sur un type, puis surlignez le texte dans le document
+        </p>
+        
+        <div class="annotation-types">
+            {% for ann_type in annotation_types %}
+            <button class="annotation-type-btn" 
+                    data-id="{{ ann_type.id }}" 
+                    data-name="{{ ann_type.name }}" 
+                    data-color="{{ ann_type.color }}">
+                {{ ann_type.display_name }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Page Navigation -->
+    <div class="page-navigation">
+        {% if current_page.page_number > 1 %}
+            <a href="?page={{ current_page.page_number|add:'-1' }}" class="nav-btn">
+                <i class="fas fa-chevron-left"></i> Page Précédente
+            </a>
+        {% else %}
+            <span></span>
+        {% endif %}
+        
+        <span style="color: var(--primary); font-weight: 600;">
+            Page {{ current_page.page_number }} / {{ total_pages }}
+        </span>
+        
+        {% if current_page.page_number < total_pages %}
+            <a href="?page={{ current_page.page_number|add:'1' }}" class="nav-btn">
+                Page Suivante <i class="fas fa-chevron-right"></i>
+            </a>
+        {% else %}
+            <span></span>
+        {% endif %}
+    </div>
+
+    <!-- Document Text -->
+    <div class="text-content-card">
+        <h3 style="color: var(--text); margin-bottom: 1rem;">
+            <i class="fas fa-file-text"></i>
+            Page {{ current_page.page_number }}
+            {% if existing_annotations %}
+                <span style="color: var(--accent); font-size: 0.9rem;">
+                    ({{ existing_annotations|length }} annotations)
+                </span>
+            {% endif %}
+        </h3>
+
+        <div id="page-text" class="text-content" data-page-id="{{ current_page.id }}">
+            <!-- Text will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<script>
+let currentLabel = null;
+let annotationTypeMap = {};
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Build type mapping
+    {% for ann_type in annotation_types %}
+    annotationTypeMap['{{ ann_type.name|escapejs }}'] = {{ ann_type.id }};
+    {% endfor %}
+
+    initializeAnnotationInterface();
+    loadAndRenderAnnotations();
+});
+
+function initializeAnnotationInterface() {
+    // Activate annotation type buttons
+    document.querySelectorAll('.annotation-type-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Remove active from all
+            document.querySelectorAll('.annotation-type-btn').forEach(b => b.classList.remove('active'));
+            
+            // Activate selected
+            this.classList.add('active');
+            currentLabel = {
+                id: this.dataset.id,
+                name: this.dataset.name,
+                color: this.dataset.color
+            };
+        });
+    });
+
+    // Text selection for annotation
+    document.getElementById('page-text').addEventListener('mouseup', handleTextSelection);
+}
+
+function loadAndRenderAnnotations() {
+    const pageEl = document.getElementById('page-text');
+    const pageId = pageEl.dataset.pageId;
+    const originalText = `{{ current_page.cleaned_text|escapejs }}`;
+    
+    // Load annotations from backend
+    fetch(`/expert/api/get-annotations/${pageId}/`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Annotation data received:', data);
+            if (data.success && data.annotations && data.annotations.length > 0) {
+                console.log('Rendering', data.annotations.length, 'annotations');
+                renderInlineAnnotations(originalText, data.annotations);
+            } else {
+                console.log('No annotations found, showing clean text');
+                pageEl.textContent = originalText;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading annotations:', error);
+            pageEl.textContent = originalText;
+        });
+}
+
+function renderInlineAnnotations(originalText, annotations) {
+    const pageEl = document.getElementById('page-text');
+    
+    if (!annotations || annotations.length === 0) {
+        pageEl.textContent = originalText;
+        return;
+    }
+    
+    let workingText = originalText;
+    const sortedAnnotations = [...annotations].sort((a, b) => b.selected_text.length - a.selected_text.length);
+    
+    for (let ann of sortedAnnotations) {
+        const searchText = ann.selected_text.trim();
+        const searchTextLower = searchText.toLowerCase();
+        const workingTextLower = workingText.toLowerCase();
+        
+        let startIndex = workingTextLower.indexOf(searchTextLower);
+        
+        if (startIndex !== -1) {
+            const actualText = workingText.slice(startIndex, startIndex + searchText.length);
+            const annotationHtml = `<span class="inline-annotation" data-annotation-id="${ann.id}" style="background:${ann.color}; padding: 2px 4px; margin: 0 1px; border-radius: 3px; cursor: pointer;">${actualText}<span class="ann-label">${ann.type_display}</span></span>`;
+            
+            workingText = workingText.slice(0, startIndex) + annotationHtml + workingText.slice(startIndex + searchText.length);
+        }
+    }
+    
+    pageEl.innerHTML = workingText;
+
+    // Add click events for deletion
+    pageEl.querySelectorAll('.inline-annotation').forEach(annotation => {
+        annotation.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (confirm('Supprimer cette annotation?')) {
+                const annotationId = this.dataset.annotationId;
+                deleteAnnotation(annotationId);
+            }
+        });
+    });
+}
+
+function handleTextSelection() {
+    const selection = window.getSelection();
+    
+    if (!selection.rangeCount || !selection.toString().trim()) {
+        return;
+    }
+
+    if (!currentLabel) {
+        alert('Veuillez d\'abord sélectionner un type d\'annotation');
+        return;
+    }
+
+    const selectedText = selection.toString().trim();
+    const pageEl = document.getElementById('page-text');
+    const cleanText = pageEl.textContent || pageEl.innerText;
+    
+    let startPos = cleanText.toLowerCase().indexOf(selectedText.toLowerCase());
+    
+    if (startPos === -1) {
+        alert('Impossible de localiser le texte sélectionné.');
+        return;
+    }
+    
+    const endPos = startPos + selectedText.length;
+
+    // Save annotation
+    saveManualAnnotation({
+        page_id: pageEl.dataset.pageId,
+        type_id: currentLabel.id,
+        selected_text: selectedText,
+        start_pos: startPos,
+        end_pos: endPos
+    });
+
+    // Clear selection
+    selection.removeAllRanges();
+}
+
+function saveManualAnnotation(data) {
+    fetch('/expert/api/save-annotation/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            // Reload annotations to show the new one
+            loadAndRenderAnnotations();
+        } else {
+            alert('Erreur: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Erreur lors de la sauvegarde');
+    });
+}
+
+function deleteAnnotation(annotationId) {
+    fetch(`/expert/api/delete-annotation/${annotationId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadAndRenderAnnotations();
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting annotation:', error);
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+
+{% endblock %}

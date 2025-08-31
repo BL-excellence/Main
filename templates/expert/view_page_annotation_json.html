@@ -1,826 +1,139 @@
-{#template/expert/view_page_annotation_json.html#}
 {% extends "base.html" %}
 {% load static %}
-{% load expert_extras %}
-{% block title %}JSON Annotations Expert - Page {{ page.page_number }} – RegExpert{% endblock %}
-
+{% block title %}JSON Page {{ current_page_num }} - {{ document.title }}{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="{% static 'rawdocs/css/rlhf_styles.css' %}">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
 
 <style>
-:root {
-    --pharma-primary: #3b82f6;
-    --pharma-accent: #10b981;
-    --pharma-info: #06b6d4;
-    --pharma-bg-card: #ffffff;
-    --pharma-bg: #f8fafc;
-    --pharma-text: #1e293b;
-    --pharma-text-soft: #64748b;
-    --pharma-border: #e2e8f0;
-    --pharma-radius: 12px;
-    --pharma-radius-sm: 8px;
-    --pharma-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
-    --pharma-glass: rgba(255, 255, 255, 0.85);
-    --pharma-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
+    /* Copy the same beautiful styling from dashboard */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    :root {
+        --primary: #0ea5e9;
+        --primary-light: #38bdf8;
+        --accent: #10b981;
+        --success: #059669;
+        --text: #000000;
+        --text-secondary: #4b5563;
+        --text-muted: #6b7280;
+        --card-bg: rgba(255, 255, 255, 0.08);
+        --card-border: rgba(14, 165, 233, 0.15);
+        --glass-bg: rgba(255, 255, 255, 0.05);
+    }
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
 
-body {
-    background-color: var(--pharma-bg);
-    color: var(--pharma-text);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-/* Header Styles */
-.annotation-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
-    border-radius: var(--pharma-radius);
-    padding: 1.5rem 2rem;
-    margin-bottom: 2rem;
-    border: 1px solid var(--pharma-border);
-    box-shadow: var(--pharma-shadow);
-}
-
-.header-info h2 {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--pharma-text);
-    margin-bottom: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.header-info h2 i {
-    color: var(--pharma-primary);
-}
-
-.document-meta {
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.meta-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.95rem;
-    color: var(--pharma-text-soft);
-}
-
-.meta-item i {
-    color: var(--pharma-primary);
-    width: 18px;
-    text-align: center;
-}
-
-/* Card Styles */
-.json-container {
-    background: var(--pharma-bg-card);
-    border-radius: var(--pharma-radius);
-    box-shadow: var(--pharma-shadow);
-    border: 1px solid var(--pharma-border);
-    margin-bottom: 2rem;
-    padding: 2rem;
-    transition: var(--pharma-transition);
-}
-
-.json-container:hover {
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-}
-
-.json-container h3 {
-    font-size: 1.4rem;
-    font-weight: 600;
-    margin-bottom: 1.5rem;
-    color: var(--pharma-text);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.json-container h3 i {
-    color: var(--pharma-primary);
-}
-
-/* JSON Display - Sera redéfini plus bas avec les améliorations */
-
-/* Syntax Highlighting for JSON - Style MongoDB/VS Code */
-.json-display .json-key { 
-    color: #0451a5; 
-    font-weight: 600; 
-}
-.json-display .json-string { 
-    color: #0a7d0a; 
-}
-.json-display .json-number { 
-    color: #098658; 
-    font-weight: 500;
-}
-.json-display .json-boolean { 
-    color: #0000ff; 
-    font-weight: 600;
-}
-.json-display .json-null { 
-    color: #0000ff; 
-    font-weight: 600;
-    font-style: italic;
-}
-.json-display .json-bracket { 
-    color: #000000; 
-    font-weight: bold;
-}
-.json-display .json-comma { 
-    color: #000000; 
-}
-
-/* Numéros de ligne */
-.json-display.json-with-lines {
-    counter-reset: line-counter;
-}
-.json-display .line-number {
-    display: inline-block;
-    width: 3em;
-    padding-right: 1em;
-    color: #858585;
-    font-size: 0.85em;
-    text-align: right;
-    user-select: none;
-    border-right: 1px solid #e0e0e0;
-    margin-right: 1em;
-    background: #f8f9fa;
-}
-.json-display .line-content {
-    display: inline;
-}
-
-/* Amélioration de l'affichage JSON */
-.json-display {
-    background: #ffffff;
-    border: 2px solid #e9ecef;
-    border-radius: var(--pharma-radius-sm);
-    padding: 0;
-    font-family: 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-    font-size: 0.875rem;
-    line-height: 1.5;
-    overflow-x: auto;
-    white-space: pre;
-    max-height: 600px;
-    overflow-y: auto;
-    color: #24292e;
-    position: relative;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.json-display::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-.json-display::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-.json-display::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
-}
-.json-display::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-/* Summary Section */
-.summary-container {
-    background: linear-gradient(120deg, #f0f9ff 70%, #e0f2fe 100%);
-    border: 1px solid var(--pharma-info);
-    border-radius: var(--pharma-radius);
-    margin-bottom: 2rem;
-    box-shadow: var(--pharma-shadow);
-    padding: 2rem;
-    transition: var(--pharma-transition);
-}
-
-.summary-container:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(6, 182, 212, 0.15);
-}
-
-.summary-text {
-    background: var(--pharma-bg-card);
-    border-radius: var(--pharma-radius-sm);
-    padding: 1.5rem;
-    line-height: 1.8;
-    font-size: 1.05rem;
-    color: var(--pharma-text);
-    border: 1px solid var(--pharma-border);
-}
-
-/* Stats Grid */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2.5rem;
-}
-
-.stat-card {
-    background: var(--pharma-bg-card);
-    border: 1px solid var(--pharma-border);
-    border-radius: var(--pharma-radius);
-    padding: 1.5rem;
-    text-align: center;
-    box-shadow: var(--pharma-shadow);
-    transition: var(--pharma-transition);
-}
-
-.stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
-}
-
-.stat-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--pharma-primary);
-    display: block;
-    margin-bottom: 0.25rem;
-}
-
-.stat-label {
-    font-size: 0.95rem;
-    color: var(--pharma-text-soft);
-    margin-top: 0.5rem;
-    font-weight: 500;
-}
-
-/* Buttons */
-.btn-action {
-    background: linear-gradient(90deg, var(--pharma-primary), var(--pharma-accent));
-    color: #fff;
-    border: none;
-    border-radius: var(--pharma-radius-sm);
-    padding: 0.75rem 1.5rem;
-    font-weight: 600;
-    font-size: 1rem;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-    transition: var(--pharma-transition);
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-}
-
-.btn-action:hover {
-    background: linear-gradient(90deg, var(--pharma-accent), var(--pharma-primary));
-    color: #fff;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(16, 185, 129, 0.2);
-}
-
-.btn-action i {
-    font-size: 0.9em;
-}
-
-.copy-btn {
-    background: var(--pharma-accent);
-    color: #fff;
-    border: none;
-    border-radius: var(--pharma-radius-sm);
-    padding: 0.6rem 1.25rem;
-    font-size: 0.95rem;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 1.5rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: var(--pharma-transition);
-}
-
-.copy-btn:hover {
-    background: #059669;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
-}
-
-/* Monaco Editor Styles */
-.monaco-editor {
-    border-radius: var(--pharma-radius-sm);
-    overflow: hidden;
-}
-
-.squiggly-error {
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3' enable-background='new 0 0 6 3' height='3' width='6'%3E%3Cg fill='%23dc3545'%3E%3Cpolygon points='5.5,0 2.5,3 1.1,3 4.1,0'/%3E%3Cpolygon points='4,0 6,2 6,0.6 5.4,0'/%3E%3Cpolygon points='0,2 1,3 2.4,3 0,0.6'/%3E%3C/g%3E%3C/svg%3E") repeat-x bottom left;
-    padding-bottom: 2px;
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-    .annotation-header {
-        flex-direction: column;
-        align-items: flex-start;
+    .dashboard-container {
+        max-width: 1400px;
+        margin: 1.5rem auto;
+        padding: 0 1.5rem;
     }
 
-    .stats-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
-@media (max-width: 480px) {
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .json-container, .summary-container {
+    .card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
         padding: 1.5rem;
+        margin-bottom: 1.5rem;
     }
-}
 
-/* Floating action button */
-.floating-action {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    z-index: 99;
-}
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 12px;
+        border: none;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
 
-.floating-btn {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
-    color: white;
-    border: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
+    .btn-success {
+        background: linear-gradient(135deg, var(--success), var(--accent));
+        color: white;
+    }
+    
+    .btn-success:hover {
+        transform: translateY(-2px);
+        color: white;
+        text-decoration: none;
+    }
 
-.floating-btn:hover {
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-}
-
-/* Alert Styles */
-.alert {
-    padding: 1rem;
-    border-radius: var(--pharma-radius-sm);
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.alert-warning {
-    background-color: #fffbeb;
-    border: 1px solid #fcd34d;
-    color: #92400e;
-}
-
-.alert-warning i {
-    color: #f59e0b;
-}
-
-.alert-info {
-    background-color: #eff6ff;
-    border: 1px solid #93c5fd;
-    color: #1e40af;
-}
-
-.alert-info i {
-    color: #3b82f6;
-}
+    .json-content {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1.5rem;
+        white-space: pre-wrap;
+        font-family: 'Monaco', 'Consolas', monospace;
+        font-size: 0.9rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
 </style>
 
-<!-- Header -->
-<section class="annotation-header">
-  <div class="header-info">
-    <h2><i class="fas fa-code"></i> JSON Annotations Expert - Page {{ page.page_number }}</h2>
-    <div class="document-meta">
-      <span class="meta-item">
-        <i class="fas fa-file-alt"></i>
-        {{ document.title }}
-      </span>
-      <span class="meta-item">
-        <i class="fas fa-tags"></i>
-        {{ total_annotations }} annotation(s)
-      </span>
-      <span class="meta-item">
-        <i class="fas fa-calendar-alt"></i>
-        {% if page.annotations_summary_generated_at %}
-          {{ page.annotations_summary_generated_at|date:"d/m/Y H:i" }}
-        {% else %}
-          Pas encore généré
-        {% endif %}
-      </span>
+<div class="dashboard-container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text);">
+                JSON Page {{ current_page_num }} - {{ document.title }}
+            </h1>
+            <p style="color: var(--text-muted);">
+                Validation et édition du JSON pour cette page
+            </p>
+        </div>
     </div>
-  </div>
 
-  <div class="header-actions">
-    <a href="{% url 'expert:review_document' document.id %}" class="btn-action">
-      <i class="fas fa-arrow-left"></i> Retour à l'annotation
-    </a>
-  </div>
-</section>
-
-<!-- Statistiques -->
-<div class="stats-grid">
-  <div class="stat-card">
-    <span class="stat-value">{{ total_annotations }}</span>
-    <span class="stat-label">Total Annotations</span>
-  </div>
-  <div class="stat-card">
-    <span class="stat-value">{{ page.page_number }}</span>
-    <span class="stat-label">Numéro de Page</span>
-  </div>
-  <div class="stat-card">
-    <span class="stat-value">
-      {% if annotations_json.annotations %}
-        {{ annotations_json.annotations|length }}
-      {% else %}
-        0
-      {% endif %}
-    </span>
-    <span class="stat-label">Dans le JSON</span>
-  </div>
-</div>
-
-<!-- Résumé en langage naturel -->
-{% if annotations_summary %}
-<section class="summary-container">
-  <h3><i class="fas fa-file-text"></i> Résumé des Annotations (Expert)</h3>
-  <div class="summary-text">
-    <div class="alert alert-info" style="margin-bottom: 1.5rem;">
-      <i class="fas fa-info-circle"></i> Ce résumé a été généré automatiquement à partir des annotations validées par l'expert.
+    <!-- Page Summary -->
+    {% if annotations_summary %}
+    <div class="card">
+        <h3 style="color: var(--text); margin-bottom: 1rem;">
+            <i class="fas fa-file-text" style="color: var(--primary);"></i>
+            Résumé des Annotations (Page {{ current_page_num }})
+        </h3>
+        <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--primary);">
+            <p>{{ annotations_summary|linebreaks }}</p>
+        </div>
     </div>
-    {{ annotations_summary|linebreaks }}
-  </div>
-</section>
-{% endif %}
+    {% endif %}
 
-<!-- JSON structuré -->
-<section class="json-container">
-  <h3><i class="fas fa-code"></i> JSON Structuré des Annotations (Expert)</h3>
-  {% if annotations_json %}
-  <div class="alert alert-info" style="margin-bottom: 1.5rem;">
-    <i class="fas fa-info-circle"></i> Ce JSON contient toutes les annotations validées par l'expert pour cette page, avec leurs métadonnées complètes.
-  </div>
+    <!-- JSON Content -->
+    {% if annotations_json %}
+    <div class="card">
+        <h3 style="color: var(--text); margin-bottom: 1rem;">
+            <i class="fas fa-code" style="color: var(--accent);"></i>
+            JSON Structuré des Annotations
+        </h3>
+        <div class="json-content">{{ annotations_json|safe }}</div>
+    </div>
+    {% endif %}
 
-  <div id="monaco-editor" style="height: 600px; border: 2px solid #e9ecef; border-radius: 8px;"></div>
+    <!-- Action Buttons -->
+    <div class="card">
+        <div class="d-flex gap-3 justify-content-center">
+            {% if not is_last_page %}
+                <!-- Validate & Next Page Button -->
+                <a href="{% url 'expert:review_document' document.id %}?page={{ next_page_num }}" 
+                class="btn btn-success btn-lg">
+                    <i class="fas fa-check-circle"></i>
+                    Valider JSON & Page Suivante ({{ next_page_num }})
+                </a>
+            {% else %}
+                <!-- Last Page - Go to Document Summary -->
+                <a href="{% url 'expert:view_document_annotation_json' document.id %}" 
+                class="btn btn-success btn-lg">
+                    <i class="fas fa-file-check"></i>
+                    Valider JSON & Résumé Document Complet
+                </a>
+            {% endif %}
 
-  <div id="save-status" class="alert alert-success" style="display: none; margin-top: 1rem;">
-    <i class="fas fa-check-circle"></i>
-    <span></span>
-  </div>
-
-  <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-    <button class="copy-btn" onclick="copyJsonToClipboard()">
-      <i class="fas fa-copy"></i> Copier le JSON
-    </button>
-    <button class="copy-btn" onclick="saveJsonChanges()" style="background: #22c55e;">
-      <i class="fas fa-save"></i> Sauvegarder
-    </button>
-    <a href="{% url 'expert:generate_page_annotation_summary' page.id %}" class="copy-btn" onclick="regenerateSummary(event)" style="background: #f59e0b;">
-      <i class="fas fa-sync-alt"></i> Régénérer
-    </a>
-  </div>
-  {% else %}
-  <div class="alert alert-warning">
-    <i class="fas fa-exclamation-triangle"></i>
-    Aucun JSON généré pour cette page. 
-    <a href="{% url 'expert:generate_page_annotation_summary' page.id %}" onclick="generateSummary(event)" style="color: #92400e; text-decoration: underline;">
-      Cliquez ici pour le générer
-    </a>
-  </div>
-  {% endif %}
-</section>
-
-<!-- Actions rapides -->
-<section class="json-container">
-  <h3><i class="fas fa-bolt"></i> Actions Rapides Expert</h3>
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-    <a href="{% url 'expert:review_document' document.id %}" class="btn-action">
-      <i class="fas fa-highlighter"></i> Continuer l'annotation
-    </a>
-    <a href="{% url 'expert:view_document_annotation_json' document.id %}" class="btn-action">
-      <i class="fas fa-file-code"></i> JSON du document complet
-    </a>
-    <a href="{% url 'expert:annotation_dashboard' %}" class="btn-action">
-      <i class="fas fa-tachometer-alt"></i> Dashboard Expert
-    </a>
-  </div>
-</section>
-
-<!-- Floating action button -->
-<div class="floating-action">
-  <button class="floating-btn" onclick="scrollToTop()" title="Retour en haut">
-    <i class="fas fa-arrow-up"></i>
-  </button>
+            <a href="{% url 'expert:review_document' document.id %}?page={{ current_page_num }}" 
+               class="btn" style="background: var(--glass-bg); color: var(--text-secondary); border: 1px solid var(--card-border);">
+                <i class="fas fa-arrow-left"></i>
+                Retour Page {{ current_page_num }}
+            </a>
+        </div>
+    </div>
 </div>
-
-<script>
-let editor = null;
-
-// Configuration et initialisation du Monaco Editor
-require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' }});
-
-// Initialisation du Monaco Editor
-require(['vs/editor/editor.main'], function() {
-    // Créer l'éditeur
-    editor = monaco.editor.create(document.getElementById('monaco-editor'), {
-        value: JSON.stringify({{ annotations_json|safe }}, null, 2),
-        language: 'json',
-        theme: 'vs',
-        automaticLayout: true,
-        minimap: { enabled: false },
-        scrollBeyondLastLine: false,
-        fontSize: 14,
-        lineNumbers: 'on',
-        renderLineHighlight: 'all',
-        roundedSelection: false,
-        selectOnLineNumbers: true,
-        formatOnPaste: true,
-        formatOnType: true,
-        autoClosingBrackets: "always",
-        autoClosingQuotes: "always",
-        folding: true,
-        foldingStrategy: "indentation",
-        wordWrap: "on",
-        wrappingStrategy: "advanced",
-        snippetSuggestions: "none",
-        contextmenu: false,
-        renderValidationDecorations: "on",
-        hover: {
-            enabled: true,
-            delay: 300
-        }
-    });
-
-    // Ajouter la validation automatique du JSON
-    let decorations = [];
-    editor.onDidChangeModelContent(() => {
-        const model = editor.getModel();
-        try {
-            const content = model.getValue();
-            JSON.parse(content);
-            // Si le JSON est valide, effacer les décorations d'erreur
-            decorations = editor.deltaDecorations(decorations, []);
-        } catch (e) {
-            // Si le JSON est invalide, ajouter une décoration d'erreur
-            const match = e.message.match(/at position (\d+)/);
-            if (match) {
-                const pos = parseInt(match[1]);
-                const position = model.getPositionAt(pos);
-                decorations = editor.deltaDecorations(decorations, [{
-                    range: new monaco.Range(
-                        position.lineNumber,
-                        position.column,
-                        position.lineNumber,
-                        position.column + 1
-                    ),
-                    options: {
-                        inlineClassName: 'squiggly-error',
-                        hoverMessage: { value: e.message }
-                    }
-                }]);
-            }
-        }
-    });
-});
-
-// Copier le JSON dans le presse-papiers
-function copyJsonToClipboard() {
-    const jsonContent = editor.getValue();
-    
-    navigator.clipboard.writeText(jsonContent).then(function() {
-        // Feedback visuel
-        const btn = event.target.closest('.copy-btn');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check"></i> Copié !';
-        btn.style.background = '#22c55e';
-        
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.style.background = '#10b981';
-        }, 2000);
-    }).catch(function(err) {
-        console.error('Erreur lors de la copie: ', err);
-        alert('Erreur lors de la copie dans le presse-papiers');
-    });
-}
-
-// Sauvegarder les modifications du JSON
-async function saveJsonChanges() {
-    try {
-        const jsonContent = editor.getValue();
-        
-        // Valider que le JSON est bien formaté
-        JSON.parse(jsonContent);
-
-        // Envoyer le JSON au serveur
-        const response = await fetch(`/expert/annotation/page/{{ page.id }}/save-json/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({
-                json_content: jsonContent
-            })
-        });
-
-        if (response.ok) {
-            showSaveStatus('✅ JSON sauvegardé avec succès !', 'success');
-        } else {
-            const error = await response.json();
-            throw new Error(error.message || 'Erreur lors de la sauvegarde');
-        }
-    } catch (error) {
-        showSaveStatus('❌ ' + error.message, 'error');
-    }
-}
-
-// Afficher le statut de la sauvegarde
-function showSaveStatus(message, type) {
-    const statusDiv = document.getElementById('save-status');
-    statusDiv.className = 'alert alert-' + (type === 'success' ? 'success' : 'danger');
-    statusDiv.querySelector('span').textContent = message;
-    statusDiv.style.display = 'flex';
-    
-    setTimeout(() => {
-        statusDiv.style.display = 'none';
-    }, 3000);
-}
-
-// Générer le résumé
-function generateSummary(event) {
-    event.preventDefault();
-    const btn = event.target.closest('a');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération...';
-    
-    fetch(btn.href, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || getCookie('csrftoken')
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Résumé et JSON générés avec succès!');
-            location.reload();
-        } else {
-            alert('Erreur: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Erreur:', error);
-        alert('Erreur lors de la génération');
-    })
-    .finally(() => {
-        btn.innerHTML = originalText;
-    });
-}
-
-// Régénérer le résumé
-function regenerateSummary(event) {
-    event.preventDefault();
-    if (!confirm('Êtes-vous sûr de vouloir régénérer le résumé et le JSON? Cela remplacera les données existantes.')) {
-        return;
-    }
-    generateSummary(event);
-}
-
-// Retour en haut
-function scrollToTop() {
-    window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-    });
-}
-
-// Fonction utilitaire pour récupérer le token CSRF
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-// Formatage JSON avancé avec coloration syntaxique améliorée
-function formatJsonAdvanced(jsonElement) {
-    if (!jsonElement || !jsonElement.textContent) return;
-    
-    try {
-        const jsonContent = jsonElement.textContent.trim();
-        const parsedJson = JSON.parse(jsonContent);
-
-        // Format avec indentation de 2 espaces
-        const formattedJson = JSON.stringify(parsedJson, null, 2);
-
-        // Coloration syntaxique avancée
-        let highlightedJson = formattedJson
-            // Clés d'objet (propriétés)
-            .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")(\s*:)/g, '<span class="json-key">$1</span>$3')
-            // Chaînes de caractères
-            .replace(/:\s*("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")/g, ': <span class="json-string">$1</span>')
-            // Nombres (entiers et décimaux)
-            .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
-            // Booléens
-            .replace(/:\s*(true|false)/g, ': <span class="json-boolean">$1</span>')
-            // Null
-            .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>')
-            // Crochets et accolades
-            .replace(/([{}[\]])/g, '<span class="json-bracket">$1</span>')
-            // Virgules
-            .replace(/(,)$/gm, '<span class="json-comma">$1</span>');
-
-        jsonElement.innerHTML = highlightedJson;
-        
-        // Ajouter des numéros de ligne
-        addLineNumbers(jsonElement);
-        
-    } catch (e) {
-        console.log('JSON invalide ou déjà formaté:', e);
-        // En cas d'erreur, on laisse le contenu tel quel
-    }
-}
-
-// Ajouter des numéros de ligne au JSON
-function addLineNumbers(jsonElement) {
-    const lines = jsonElement.innerHTML.split('\n');
-    const numberedLines = lines.map((line, index) => {
-        const lineNumber = (index + 1).toString().padStart(3, ' ');
-        return `<span class="line-number">${lineNumber}</span><span class="line-content">${line}</span>`;
-    }).join('\n');
-    
-    jsonElement.innerHTML = numberedLines;
-    jsonElement.classList.add('json-with-lines');
-}
-
-// Initialisation au chargement de la page
-document.addEventListener('DOMContentLoaded', function() {
-    const jsonDisplay = document.getElementById('json-display');
-    if (jsonDisplay) {
-        // Le JSON est déjà formaté par le filtre Django, on applique juste la coloration syntaxique
-        applySyntaxHighlighting(jsonDisplay);
-    }
-});
-
-// Apply syntax highlighting to already formatted JSON
-function applySyntaxHighlighting(jsonElement) {
-    if (!jsonElement || !jsonElement.textContent) return;
-    
-    try {
-        const jsonContent = jsonElement.textContent.trim();
-        
-        // Coloration syntaxique avancée
-        let highlightedJson = jsonContent
-            // Clés d'objet (propriétés)
-            .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")(\s*:)/g, '<span class="json-key">$1</span>$3')
-            // Chaînes de caractères
-            .replace(/:\s*("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")/g, ': <span class="json-string">$1</span>')
-            // Nombres (entiers et décimaux)
-            .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
-            // Booléens
-            .replace(/:\s*(true|false)/g, ': <span class="json-boolean">$1</span>')
-            // Null
-            .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>')
-            // Crochets et accolades
-            .replace(/([{}[\]])/g, '<span class="json-bracket">$1</span>')
-            // Virgules
-            .replace(/(,)$/gm, '<span class="json-comma">$1</span>');
-
-        jsonElement.innerHTML = highlightedJson;
-        
-        // Ajouter des numéros de ligne
-        addLineNumbers(jsonElement);
-        
-    } catch (e) {
-        console.log('Erreur lors de l\'application de la coloration syntaxique:', e);
-        // En cas d'erreur, on laisse le contenu tel quel
-    }
-}
-</script>
 
 {% endblock %}
