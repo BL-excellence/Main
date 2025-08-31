@@ -255,30 +255,40 @@
 
     <!-- Action Buttons -->
     <div class="card">
-        <div class="d-flex gap-3 justify-content-center">
-            {% if not is_last_page %}
-                <!-- Validate & Next Page Button -->
-                <a href="{% url 'expert:review_document' document.id %}?page={{ next_page_num }}" 
-                class="btn btn-success btn-lg">
-                    <i class="fas fa-check-circle"></i>
-                    Valider JSON & Page Suivante ({{ next_page_num }})
-                </a>
-            {% else %}
-                <!-- Last Page - Go to Document Summary -->
-                <a href="{% url 'expert:view_document_annotation_json' document.id %}" 
-                class="btn btn-success btn-lg">
-                    <i class="fas fa-file-check"></i>
-                    Valider JSON & Résumé Document Complet
-                </a>
-            {% endif %}
+    <div class="d-flex gap-3 justify-content-center">
 
-            <a href="{% url 'expert:review_document' document.id %}?page={{ current_page_num }}" 
-               class="btn" style="background: var(--glass-bg); color: var(--text-secondary); border: 1px solid var(--card-border);">
-                <i class="fas fa-arrow-left"></i>
-                Retour Page {{ current_page_num }}
-            </a>
-        </div>
+        {# Bouton "Page suivante" si pas dernière page #}
+        {% if current_page_num < total_pages %}
+        <a href="{% url 'expert:review_document' document.id %}?page={{ current_page_num|add:'1' }}"
+            class="btn btn-success btn-lg">
+            <i class="fas fa-check-circle"></i>
+            Valider JSON & Page Suivante ({{ current_page_num|add:'1' }})
+        </a>
+        {% else %}
+        {# Dernière page : bouton qui envoie un POST vers validate_document #}
+        <button type="submit"
+                form="validateDocForm"
+                class="btn btn-success btn-lg">
+            <i class="fas fa-file-check me-2"></i>
+            Valider JSON & Résumé Document Complet
+            <small class="d-block">Marquer le document comme terminé</small>
+        </button>
+        {% endif %}
+
+        <a href="{% url 'expert:review_document' document.id %}?page={{ current_page_num }}"
+        class="btn" style="background: var(--glass-bg); color: var(--text-secondary); border: 1px solid var(--card-border);">
+        <i class="fas fa-arrow-left"></i>
+        Retour Page {{ current_page_num }}
+        </a>
     </div>
+    </div>
+
+    {# Formulaire autonome NON imbriqué, cible du bouton via form="validateDocForm" #}
+    <form id="validateDocForm" method="post" action="{% url 'expert:validate_document' document.id %}" style="display:none;">
+    {% csrf_token %}
+    </form>
+
+
 </div>
 
 {% endblock %}
