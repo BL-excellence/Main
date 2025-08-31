@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 {% load static %}
 {% load rawdocs_extras %}
@@ -607,6 +606,34 @@ body {
 </section>
 {% endif %}
 
+<!-- Sélection de la page -->
+<!-- Sélection de la page -->
+<div class="mb-4">
+  <label for="page_select" class="mr-2">Sélectionner une page :</label>
+  {% url 'rawdocs:dev_metier_document_json' document.id as json_url %}
+  <select id="page_select"
+          onchange="const v=this.value; window.location.href='{{ json_url }}'+(v?('?page='+v):'');">
+    <option value="">JSON Global</option>
+    {% for page in pages %}
+      <option value="{{ page.page_number }}"
+        {% if selected_page_number|add:'0' == page.page_number %}selected{% endif %}>
+        Page {{ page.page_number }}
+      </option>
+    {% endfor %}
+  </select>
+</div>
+
+
+{% if page_json %}
+<section class="json-container">
+  <h3><i class="fas fa-code"></i> JSON – Page {{ selected_page_number }}</h3>
+  <div class="alert alert-info" style="margin-bottom: 1.5rem;">
+    <i class="fas fa-info-circle"></i> JSON généré pour la page sélectionnée.
+  </div>
+  <div class="json-display" id="page-json">{{ page_json|format_json }}</div>
+</section>
+{% endif %}
+
 <!-- JSON global structuré -->
 <section class="json-container">
   <h3><i class="fas fa-code"></i> JSON Global Structuré</h3>
@@ -635,8 +662,6 @@ body {
   </div>
   {% endif %}
 </section>
-
-
 
 <!-- Floating action button -->
 <div class="floating-action">
