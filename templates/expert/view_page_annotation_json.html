@@ -3,6 +3,16 @@
 {% block title %}JSON Page {{ current_page_num }} - {{ document.title }}{% endblock %}
 {% block content %}
 
+<!-- JSON DATA SAFE PASSING -->
+{% if annotations_json %}
+{{ annotations_json|json_script:"json-data" }}
+{% else %}
+<script id="json-data" type="application/json">{}</script>
+{% endif %}
+
+<!-- Monaco loader to match global view -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
+
 <style>
     /* Copy the same beautiful styling from dashboard */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -58,16 +68,62 @@
         text-decoration: none;
     }
 
-    .json-content {
-        background: #f8f9fa;
-        border: 1px solid #e9ecef;
+    /* JSON Display - aligné avec la vue globale */
+    .json-display {
+        background: #ffffff;
+        border: 2px solid #e9ecef;
         border-radius: 8px;
-        padding: 1.5rem;
-        white-space: pre-wrap;
-        font-family: 'Monaco', 'Consolas', monospace;
+        padding: 0.75rem 1rem;
+        font-family: 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
         font-size: 0.9rem;
-        max-height: 400px;
+        line-height: 1.5;
+        overflow-x: auto;
+        white-space: pre;
+        max-height: 600px;
         overflow-y: auto;
+        color: #24292e;
+        position: relative;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .json-display .line-number {
+        display: inline-block;
+        width: 3em;
+        padding-right: 1em;
+        color: #858585;
+        font-size: 0.85em;
+        text-align: right;
+        user-select: none;
+        border-right: 1px solid #e0e0e0;
+        margin-right: 1em;
+        background: #f8f9fa;
+    }
+    .json-key { color: #0451a5; font-weight: 600; }
+    .json-string { color: #0a7d0a; }
+    .json-number { color: #098658; font-weight: 500; }
+    .json-boolean, .json-null { color: #0000ff; font-weight: 600; }
+
+    .copy-btn {
+        background: #10b981;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 0.6rem 1.25rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all .2s ease;
+    }
+    .copy-btn:hover { background: #059669; transform: translateY(-1px); }
+
+    /* Monaco Editor Styles */
+    .monaco-editor { border-radius: 8px; overflow: hidden; }
+    .squiggly-error {
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3' enable-background='new 0 0 6 3' height='3' width='6'%3E%3Cg fill='%23dc3545'%3E%3Cpolygon points='5.5,0 2.5,3 1.1,3 4.1,0'/%3E%3Cpolygon points='4,0 6,2 6,0.6 5.4,0'/%3E%3Cpolygon points='0,2 1,3 2.4,3 0,0.6'/%3E%3C/g%3E%3C/svg%3E") repeat-x bottom left;
+        padding-bottom: 2px;
     }
 </style>
 
@@ -100,12 +156,101 @@
     <!-- JSON Content -->
     {% if annotations_json %}
     <div class="card">
-        <h3 style="color: var(--text); margin-bottom: 1rem;">
+        <h3 style="color: var(--text); margin-bottom: 1rem; display:flex; align-items:center; gap:.6rem;">
             <i class="fas fa-code" style="color: var(--accent);"></i>
             JSON Structuré des Annotations
         </h3>
-        <div class="json-content">{{ annotations_json|safe }}</div>
+        <div id="monaco-editor" style="height: 600px; border: 2px solid #e9ecef; border-radius: 8px;"></div>
+        <div style="display:flex; gap: .75rem; margin-top: 1rem;">
+            <button class="copy-btn" onclick="copyJsonToClipboard(event)"><i class="fas fa-copy"></i> Copier le JSON</button>
+            <button class="copy-btn" onclick="downloadJson()"><i class="fas fa-download"></i> Télécharger</button>
+        </div>
     </div>
+
+    <script>
+    let editor = null;
+
+    // Config Monaco comme la vue globale
+    require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' }});
+
+    require(['vs/editor/editor.main'], function() {
+        try {
+            const jsonDataElement = document.getElementById('json-data');
+            let jsonData = {};
+            if (jsonDataElement && jsonDataElement.textContent.trim()) {
+                try { jsonData = JSON.parse(jsonDataElement.textContent); } catch(e) { jsonData = {}; }
+            }
+            editor = monaco.editor.create(document.getElementById('monaco-editor'), {
+                value: JSON.stringify(jsonData, null, 2),
+                language: 'json',
+                theme: 'vs',
+                automaticLayout: true,
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false,
+                fontSize: 14,
+                lineNumbers: 'on',
+                renderLineHighlight: 'all',
+                roundedSelection: false,
+                selectOnLineNumbers: true,
+                formatOnPaste: true,
+                formatOnType: true
+            });
+
+            let decorations = [];
+            editor.onDidChangeModelContent(() => {
+                const model = editor.getModel();
+                try {
+                    JSON.parse(model.getValue());
+                    decorations = editor.deltaDecorations(decorations, []);
+                } catch (e) {
+                    const match = e.message.match(/at position (\d+)/);
+                    if (match) {
+                        const pos = parseInt(match[1]);
+                        const position = model.getPositionAt(pos);
+                        decorations = editor.deltaDecorations(decorations, [{
+                            range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column + 1),
+                            options: { inlineClassName: 'squiggly-error', hoverMessage: { value: e.message } }
+                        }]);
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Erreur Monaco:', error);
+            document.getElementById('monaco-editor').innerHTML = '<div class="alert alert-danger">Erreur lors du chargement de l\'éditeur JSON.</div>';
+        }
+    });
+
+    function copyJsonToClipboard(evt) {
+        if (!editor) return alert('Éditeur non initialisé');
+        const jsonContent = editor.getValue();
+        navigator.clipboard.writeText(jsonContent).then(function() {
+            const btn = evt?.target?.closest('.copy-btn');
+            if (btn) {
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copié !';
+                btn.style.background = '#22c55e';
+                setTimeout(() => { btn.innerHTML = originalText; btn.style.background = '#10b981'; }, 2000);
+            }
+        }).catch(function(err) {
+            console.error('Erreur lors de la copie:', err);
+            alert('Erreur lors de la copie dans le presse-papiers');
+        });
+    }
+
+    function downloadJson() {
+        if (!editor) return alert('Éditeur non initialisé');
+        const jsonContent = editor.getValue();
+        const blob = new Blob([jsonContent], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `{{ document.title|slugify }}_page_{{ current_page_num }}_annotations.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+    </script>
     {% endif %}
 
     <!-- Action Buttons -->
