@@ -335,7 +335,7 @@ function handleTextSelection() {
     // Save annotation
     saveManualAnnotation({
         page_id: pageEl.dataset.pageId,
-        type_id: currentLabel.id,
+        entity_type: currentLabel.name,
         selected_text: selectedText,
         start_pos: startPos,
         end_pos: endPos

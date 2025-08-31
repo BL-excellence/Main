@@ -228,9 +228,31 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
-                full_result = json.loads(json_str)
-                print("✅ Mistral extraction with confidence successful!")
-                return full_result
+                try:
+                    # Fix unquoted property names
+                    json_str = re.sub(r'(\w+):', r'"\1":', json_str)
+                    full_result = json.loads(json_str)
+                    
+                    # Add quality metrics to metadata 
+                    if 'metadata' in full_result and 'confidence_scores' in full_result:
+                        confidence_scores = full_result.get('confidence_scores', {})
+                        overall_quality = calculate_overall_quality(confidence_scores)
+                        
+                        full_result['metadata']['quality'] = {
+                            'extraction_rate': overall_quality,
+                            'field_scores': confidence_scores,
+                            'extraction_reasoning': full_result.get('extraction_reasoning', {}),
+                            'extracted_fields': len([v for v in full_result['metadata'].values() if v]),
+                            'total_fields': len(full_result['metadata']),
+                            'llm_powered': True
+                        }
+                    
+                    print("✅ Mistral extraction with confidence successful!")
+                    return full_result
+                except json.JSONDecodeError as e:
+                    print(f"❌ JSON parse error: {e}")
+                    print(f"Raw JSON: {json_str[:300]}...")
+                    return None
             else:
                 print("❌ No JSON found in Mistral response")
                 return None

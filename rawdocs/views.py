@@ -324,7 +324,7 @@ def upload_pdf(request):
                 rd.file.save(os.path.join(ts, fn), ContentFile(resp.content))
 
             rd.save()
-            metadata = extract_metadonnees(rd.file.path, rd.url or "")
+            metadata = extract_metadonnees(rd.file.path, rd.url or "") or {}
             text = extract_full_text(rd.file.path)
             
             # Save extracted metadata to the model

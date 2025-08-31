@@ -296,6 +296,8 @@ def create_annotation_ajax(request):
             page_id = data.get('page_id')
             text = data.get('text')
             entity_type_name = data.get('entity_type')
+            if not entity_type_name:
+                return JsonResponse({'success': False, 'error': 'entity_type is required'})
 
             # Get the page
             page = get_object_or_404(DocumentPage, id=page_id)
@@ -2158,6 +2160,8 @@ def expert_save_manual_annotation(request):
         page_id = data.get('page_id')
         selected_text = data.get('selected_text')
         entity_type = data.get('entity_type')
+        if not entity_type:
+            return JsonResponse({'success': False, 'error': 'entity_type is required'})
         start_pos = data.get('start_pos', 0)
         end_pos = data.get('end_pos', 0)
 
