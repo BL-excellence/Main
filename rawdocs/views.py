@@ -1893,7 +1893,7 @@ def get_annotation_details(request, annotation_id):
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_dev_metier, login_url='rawdocs:login')
 def dev_metier_dashboard(request):
-    # Documents validés par l'EXPERT uniquement
+    # Derniers documents validés par l'EXPERT (liste à droite)
     validated_documents = (
         RawDocument.objects
         .filter(is_expert_validated=True)
@@ -1901,19 +1901,54 @@ def dev_metier_dashboard(request):
     )
 
     for doc in validated_documents:
-        # nom de fichier lisible dans le template
+        # Nom de fichier lisible dans le template
         doc.basename = os.path.basename(doc.file.name) if doc.file else ''
 
-    # Quelques stats simples pour les graphes
+    # KPIs cohérents pour Dev Métier
     total_docs = RawDocument.objects.count()
-    expert_validated_count = validated_documents.count()
-    remaining = max(total_docs - expert_validated_count, 0)
+    expert_validated_total = RawDocument.objects.filter(is_expert_validated=True).count()
+    ready_for_expert_total = RawDocument.objects.filter(is_ready_for_expert=True).count()
+    validated_metadonneur_total = RawDocument.objects.filter(is_validated=True).count()
 
-    bar_data = json.dumps([150, total_docs, expert_validated_count, remaining])
-    pie_data = json.dumps([30, 20, 25, 10, 15])  # garde tel quel si c'est du fake data
+    # Étapes exclusives pour la répartition
+    uploaded_count = max(total_docs - validated_metadonneur_total, 0)  # déposés mais pas encore validés par métadonneur
+    in_annotation_count = max(validated_metadonneur_total - ready_for_expert_total, 0)  # validés par métadonneur mais pas encore prêts expert
+    awaiting_expert_count = max(ready_for_expert_total - expert_validated_total, 0)  # prêts expert mais pas encore validés expert
+
+    processed_percent = int((expert_validated_total / total_docs) * 100) if total_docs else 0
+    validated_percent = int((validated_metadonneur_total / total_docs) * 100) if total_docs else 0
+    awaiting_percent = int(((uploaded_count + in_annotation_count) / total_docs) * 100) if total_docs else 0
+
+    # Données pour graphiques
+    # Bar: vue pipeline documents
+    bar_data = json.dumps([
+        total_docs,
+        validated_metadonneur_total,
+        ready_for_expert_total,
+        expert_validated_total,
+    ])
+
+    # Pie: répartition des statuts exclusifs
+    pie_data = json.dumps([
+        uploaded_count,
+        in_annotation_count,
+        awaiting_expert_count,
+        expert_validated_total,
+    ])
 
     return render(request, 'rawdocs/dev_metier_dashboard.html', {
         "validated_documents": validated_documents,
+        # KPIs
+        "total_docs": total_docs,
+        "expert_validated_total": expert_validated_total,
+        "validated_metadonneur_total": validated_metadonneur_total,
+        "uploaded_count": uploaded_count,
+        "in_annotation_count": in_annotation_count,
+        "awaiting_expert_count": awaiting_expert_count,
+        "processed_percent": processed_percent,
+        "validated_percent": validated_percent,
+        "awaiting_percent": awaiting_percent,
+        # Graph data
         "bar_data": bar_data,
         "pie_data": pie_data,
     })

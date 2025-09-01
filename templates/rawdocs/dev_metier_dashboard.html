@@ -518,10 +518,10 @@
                 <div class="stat-icon documents">
                     <i class="fas fa-file-medical text-white"></i>
                 </div>
-                <div class="stat-value">0</div>
-                <div class="stat-label">Documents traités sur 0 totaux</div>
+                <div class="stat-value">{{ expert_validated_total }}</div>
+                <div class="stat-label">Documents traités sur {{ total_docs }} totaux</div>
                 <div class="progress-container">
-                    <div class="progress-bar bg-gradient-to-r from-sky-500 to-sky-400" style="width: 0%"></div>
+                    <div class="progress-bar bg-gradient-to-r from-sky-500 to-sky-400" style="width: {{ processed_percent }}%"></div>
                 </div>
             </div>
 
@@ -530,10 +530,10 @@
                 <div class="stat-icon completed">
                     <i class="fas fa-check-circle text-white"></i>
                 </div>
-                <div class="stat-value">0</div>
-                <div class="stat-label">Documents validés</div>
+                <div class="stat-value">{{ validated_metadonneur_total }}</div>
+                <div class="stat-label">Documents validés (Métadonneur)</div>
                 <div class="progress-container">
-                    <div class="progress-bar bg-gradient-to-r from-emerald-500 to-teal-400" style="width: 0%"></div>
+                    <div class="progress-bar bg-gradient-to-r from-emerald-500 to-teal-400" style="width: {{ validated_percent }}%"></div>
                 </div>
             </div>
 
@@ -542,10 +542,10 @@
                 <div class="stat-icon progress">
                     <i class="fas fa-clock text-white"></i>
                 </div>
-                <div class="stat-value">0</div>
-                <div class="stat-label">En attente</div>
+                <div class="stat-value">{{ uploaded_count|add:in_annotation_count }}</div>
+                <div class="stat-label">En attente (Upload/Annotation)</div>
                 <div class="progress-container">
-                    <div class="progress-bar bg-gradient-to-r from-amber-500 to-yellow-400" style="width: 0%"></div>
+                    <div class="progress-bar bg-gradient-to-r from-amber-500 to-yellow-400" style="width: {{ awaiting_percent }}%"></div>
                 </div>
             </div>
         </div>
@@ -694,10 +694,10 @@
     document.addEventListener('DOMContentLoaded', () => {
         // Gestion des données charts avec fallback pour éviter les erreurs
         let barData = [0, 0, 0, 0]; // Valeurs par défaut
-        let pieData = [0, 0, 0, 0, 0]; // Valeurs par défaut
+        let pieData = [0, 0, 0, 0]; // Valeurs par défaut
         try {
             barData = JSON.parse('{{ bar_data|escapejs|default:"[0,0,0,0]" }}');
-            pieData = JSON.parse('{{ pie_data|escapejs|default:"[0,0,0,0,0]" }}');
+            pieData = JSON.parse('{{ pie_data|escapejs|default:"[0,0,0,0]" }}');
         } catch (e) {
             console.warn('Erreur parsing JSON pour charts:', e);
         }
@@ -716,7 +716,7 @@
         new Chart(barCtx, {
             type: 'bar',
             data: {
-                labels: ['Planifiés', 'Scrappés', 'Terminés', 'En cours'],
+                labels: ['Total', 'Validés Métadonneur', 'Prêts Expert', 'Validés Expert'],
                 datasets: [{
                     label: 'Documents',
                     data: barData,
@@ -775,7 +775,7 @@
         new Chart(pieCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Extraction', 'Validation', 'Annotation', 'Correction', 'Finalisation'],
+                labels: ['Upload', 'Annotation', 'En Attente Expert', 'Validés Expert'],
                 datasets: [{
                     data: pieData,
                     backgroundColor: [
