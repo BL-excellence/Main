@@ -46,21 +46,29 @@
     }
 
     .annotation-type-btn {
-        background: var(--card-bg);
-        border: 2px solid var(--primary);
-        color: var(--primary);
+        /* Background and border are set inline per type color */
+        border: 2px solid transparent;
         padding: 0.5rem 1rem;
         border-radius: 999px;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
         font-weight: 500;
+        position: relative;
     }
 
-    .annotation-type-btn:hover,
-    .annotation-type-btn.active {
-        background: var(--primary);
-        color: white;
+    .annotation-type-btn:hover {
+        filter: brightness(1.05);
         transform: translateY(-2px);
+    }
+
+    /* Clearly show the selected label by drawing a ring using its own color */
+    .annotation-type-btn.active {
+        outline: 3px solid var(--label-color);
+        outline-offset: 2px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        transform: translateY(-2px) scale(1.02);
+        filter: brightness(1.03);
+        color: #ffffff;
     }
 
     .text-content-card {
@@ -157,7 +165,8 @@
             <button class="annotation-type-btn" 
                     data-id="{{ ann_type.id }}" 
                     data-name="{{ ann_type.name }}" 
-                    data-color="{{ ann_type.color }}">
+                    data-color="{{ ann_type.color }}"
+                    style="background: {{ ann_type.color }}; color: #ffffff; border-color: {{ ann_type.color }}; --label-color: {{ ann_type.color }};">
                 {{ ann_type.display_name }}
             </button>
             {% endfor %}
@@ -227,8 +236,9 @@ function initializeAnnotationInterface() {
             // Remove active from all
             document.querySelectorAll('.annotation-type-btn').forEach(b => b.classList.remove('active'));
             
-            // Activate selected
+            // Activate selected and give clear visual feedback
             this.classList.add('active');
+            // Update current label for saving annotations
             currentLabel = {
                 id: this.dataset.id,
                 name: this.dataset.name,

@@ -660,11 +660,30 @@ def annotate_document(request, doc_id):
     pnum = int(request.GET.get('page', 1))
     page_obj = get_object_or_404(DocumentPage, document=document, page_number=pnum)
 
+    # Build contextual annotation types (reduced/dynamic)
+    used_type_ids = Annotation.objects.filter(page__document=document).values_list('annotation_type_id', flat=True).distinct()
+    context_text = " ".join([document.context or '', document.doc_type or '', document.source or '']).lower()
+    whitelist = set()
+    if any(k in context_text for k in ['pharma','pharmacie','medicament','drug','clinical','trial','essai']):
+        whitelist.update([AnnotationType.REQUIRED_DOCUMENT, AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.PROCEDURE_TYPE, AnnotationType.VARIATION_CODE, AnnotationType.REQUIRED_CONDITION, AnnotationType.FILE_TYPE])
+    elif any(k in context_text for k in ['regulatory','réglementaire','compliance']):
+        whitelist.update([AnnotationType.REQUIRED_DOCUMENT, AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.PROCEDURE_TYPE])
+    elif any(k in context_text for k in ['ema','europe','eu']):
+        whitelist.update([AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.PROCEDURE_TYPE, AnnotationType.REQUIRED_DOCUMENT])
+    elif any(k in context_text for k in ['fda','usa','united states']):
+        whitelist.update([AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.REQUIRED_DOCUMENT])
+    else:
+        whitelist.update([AnnotationType.REQUIRED_DOCUMENT, AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.PROCEDURE_TYPE])
+
+    base_qs = AnnotationType.objects.filter(name__in=list(whitelist))
+    used_qs = AnnotationType.objects.filter(id__in=used_type_ids)
+    annotation_types = (base_qs | used_qs).distinct().order_by('display_name')
+
     return render(request, 'rawdocs/annotate_document.html', {
         'document': document,
         'pages': pages,
         'current_page': page_obj,
-        'annotation_types': AnnotationType.objects.all(),
+        'annotation_types': annotation_types,
         'existing_annotations': page_obj.annotations.all().order_by('start_pos'),
         'total_pages': document.total_pages
     })
@@ -1658,11 +1677,30 @@ def annotate_document(request, doc_id):
     except DocumentRegulatoryAnalysis.DoesNotExist:
         global_analysis = None
 
+    # Build reduced, default annotation types + include types already used in this document
+    used_type_ids = Annotation.objects.filter(page__document=document).values_list('annotation_type_id', flat=True).distinct()
+
+    # Default whitelist (keywords-independent)
+    whitelist = {
+        AnnotationType.REQUIRED_DOCUMENT,
+        AnnotationType.AUTHORITY,
+        AnnotationType.LEGAL_REFERENCE,
+        AnnotationType.DELAY,
+        AnnotationType.PROCEDURE_TYPE,
+        AnnotationType.VARIATION_CODE,
+        AnnotationType.REQUIRED_CONDITION,
+        AnnotationType.FILE_TYPE,
+    }
+
+    base_qs = AnnotationType.objects.filter(name__in=list(whitelist))
+    used_qs = AnnotationType.objects.filter(id__in=used_type_ids)
+    annotation_types = (base_qs | used_qs).distinct().order_by('display_name')
+
     return render(request, 'rawdocs/annotate_document.html', {
         'document': document,
         'pages': pages,
         'current_page': page_obj,
-        'annotation_types': AnnotationType.objects.all(),
+        'annotation_types': annotation_types,
         'existing_annotations': page_obj.annotations.all().order_by('start_pos'),
         'total_pages': document.total_pages,
         # Nouvelles données pour l'analyse réglementaire

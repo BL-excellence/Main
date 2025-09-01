@@ -2062,8 +2062,23 @@ def expert_annotate_document(request, doc_id):
         validation_status__in=['pending', 'validated', 'expert_created', 'rejected']
     ).order_by('start_pos')
 
-    # Types d'annotations disponibles
-    annotation_types = AnnotationType.objects.all().order_by('display_name')
+    # Types d'annotations par défaut (mêmes que côté Annotateur) + types déjà utilisés
+    used_type_ids = Annotation.objects.filter(page__document=document).values_list('annotation_type_id', flat=True).distinct()
+
+    whitelist = {
+        AnnotationType.REQUIRED_DOCUMENT,
+        AnnotationType.AUTHORITY,
+        AnnotationType.LEGAL_REFERENCE,
+        AnnotationType.DELAY,
+        AnnotationType.PROCEDURE_TYPE,
+        AnnotationType.VARIATION_CODE,
+        AnnotationType.REQUIRED_CONDITION,
+        AnnotationType.FILE_TYPE,
+    }
+
+    base_qs = AnnotationType.objects.filter(name__in=list(whitelist))
+    used_qs = AnnotationType.objects.filter(id__in=used_type_ids)
+    annotation_types = (base_qs | used_qs).distinct().order_by('display_name')
 
     # Annotations existantes pour la page courante
     existing_annotations = current_page.annotations.all() if current_page else []
@@ -2072,7 +2087,7 @@ def expert_annotate_document(request, doc_id):
         'document': document,
         'pages': pages,
         'current_page': current_page,
-        'annotation_types': AnnotationType.objects.all(),
+        'annotation_types': annotation_types,
         'existing_annotations': existing_annotations,
         'total_pages': document.total_pages
     }
