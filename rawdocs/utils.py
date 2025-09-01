@@ -212,9 +212,9 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
 
         data = {
             "model": "mistral-large-latest",
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": [{"role": "user", "content": prompt + "\n\nReturn ONLY one JSON object or array. No markdown, no code fences, no explanations, no ellipses in values."}],
             "temperature": 0.1,
-            "max_tokens": 800
+            "max_tokens": 1200
         }
 
         response = requests.post(url, headers=headers, json=data, timeout=30)
@@ -242,10 +242,16 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
                 except Exception:
                     return None
 
-            def _extract_balanced_json(text: str):
-                start = text.find('{')
-                if start == -1:
+            def _extract_balanced_block(text: str):
+                # Support either object {..} or array [..]
+                start_obj = text.find('{')
+                start_arr = text.find('[')
+                starts = [s for s in [start_obj, start_arr] if s != -1]
+                if not starts:
                     return None
+                start = min(starts)
+                opener = text[start]
+                closer = '}' if opener == '{' else ']'
                 i = start
                 depth = 0
                 in_str = False
@@ -262,9 +268,9 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
                     else:
                         if ch == '"':
                             in_str = True
-                        elif ch == '{':
+                        elif ch == opener:
                             depth += 1
-                        elif ch == '}':
+                        elif ch == closer:
                             depth -= 1
                             if depth == 0:
                                 return text[start:i+1]
@@ -277,18 +283,18 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
                     return json.loads(text)
                 except Exception:
                     pass
-                # 2) Fenced code block ```json ... ``` or ``` ... ```
-                m = re.search(r"```(?:json|JSON)?\s*(\{[\s\S]*?\})\s*```", text)
+                # 2) Fenced code block ```json ... ``` or ``` ... ``` (object or array)
+                m = re.search(r"```(?:json|JSON)?\s*([\[{][\s\S]*?[\]}])\s*```", text)
                 if m:
+                    fragment = m.group(1)
                     try:
-                        return json.loads(m.group(1))
+                        return json.loads(fragment)
                     except Exception:
-                        # Try sanitize
-                        parsed = _sanitize_and_parse(m.group(1))
+                        parsed = _sanitize_and_parse(fragment)
                         if parsed is not None:
                             return parsed
-                # 3) Balanced-brace extraction
-                candidate = _extract_balanced_json(text)
+                # 3) Balanced block extraction (object or array)
+                candidate = _extract_balanced_block(text)
                 if candidate:
                     try:
                         return json.loads(candidate)
@@ -408,11 +414,11 @@ def call_llm_with_learned_prompt(prompt):
         response = client.chat.completions.create(
             messages=[{
                 "role": "user", 
-                "content": prompt
+                "content": prompt + "\n\nReturn ONLY one JSON object or array. No markdown, no code fences, no explanations, no ellipses in values."
             }],
             model="llama3-8b-8192",
             temperature=0.1,
-            max_tokens=1000
+            max_tokens=1500
         )
         
         result = response.choices[0].message.content

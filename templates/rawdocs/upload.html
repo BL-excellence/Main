@@ -961,13 +961,14 @@ document.getElementById('validateButton')?.addEventListener('click', function() 
     const popup = document.createElement('div');
     popup.id = 'validatePopup';
     popup.innerHTML = `
-        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card-bg); border-radius: 16px; border: 1.7px solid var(--card-border); padding: 2rem; box-shadow: var(--shadow); max-width: 450px; text-align: center; color: var(--text); z-index: 1001;">
-            <i class="fas fa-exclamation-triangle" style="font-size: 2.5rem; color: var(--danger-red); margin-bottom: 1.5rem;"></i>
-            <h3 style="color: var(--primary-dark); font-weight: 700; margin-bottom: 1rem;">Confirmation de Validation</h3>
-            <p style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 2rem;">Êtes-vous sûr ? Une fois validé, le document sera envoyé à l’annotateur pour annotation.</p>
-            <div style="display: flex; justify-content: center; gap: 1.5rem;">
-                <button class="btn btn-primary btn-yes" onclick="submitValidation(); document.getElementById('validatePopup').remove();">Oui</button>
-                <button class="btn btn-outline btn-no" onclick="document.getElementById('validatePopup').remove();">Non</button>
+        <div id="validateOverlay" style="position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(2px); z-index: 1000;"></div>
+        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #ffffff; border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); padding: 1.8rem; box-shadow: 0 20px 60px rgba(0,0,0,0.25); max-width: 520px; width: calc(100% - 2rem); text-align: center; color: #111827; z-index: 1001;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 2.5rem; color: #ef4444; margin-bottom: 1.2rem;"></i>
+            <h3 style="color: #0f172a; font-weight: 800; margin-bottom: 0.75rem; font-size: 1.25rem;">Confirmation de validation</h3>
+            <p style="color: #334155; font-size: 1.05rem; margin-bottom: 1.5rem;">Êtes-vous sûr ? Une fois validé, le document sera envoyé à l’annotateur pour annotation.</p>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button class="btn btn-primary btn-yes" onclick="submitValidation(); document.getElementById('validateOverlay').remove(); document.getElementById('validatePopup').remove();">Oui</button>
+                <button class="btn btn-outline btn-no" onclick="document.getElementById('validateOverlay').remove(); document.getElementById('validatePopup').remove();">Non</button>
             </div>
         </div>
     `;
