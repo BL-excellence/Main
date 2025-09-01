@@ -224,38 +224,101 @@ def call_mistral_with_confidence(text_chunk, document_url="", filename=""):
             result = response.json()
             response_text = result['choices'][0]['message']['content']
 
-            # Find JSON in response
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group()
+            # Try to robustly parse JSON from the response
+            def _sanitize_and_parse(candidate: str):
+                original = candidate
+                # Normalize smart quotes
+                candidate = candidate.replace('\u201c', '"').replace('\u201d', '"').replace('\u2019', "'")
+                # Remove trailing commas before } or ]
+                candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
+                # Fix single-quoted keys: 'key': value -> "key": value
+                candidate = re.sub(r"(?<=\{|,)\s*'([A-Za-z0-9_]+)'\s*:\s*", r'"\1": ', candidate)
+                # Fix single-quoted string values: key: 'value' -> key: "value"
+                candidate = re.sub(r":\s*'([^'\\]*(?:\\.[^'\\]*)*)'", r': "\1"', candidate)
+                # Fix unquoted keys only when at object boundaries
+                candidate = re.sub(r'(?<=\{|,)\s*([A-Za-z0-9_]+)\s*:', r'"\1":', candidate)
                 try:
-                    # Fix unquoted property names
-                    json_str = re.sub(r'(\w+):', r'"\1":', json_str)
-                    full_result = json.loads(json_str)
-                    
-                    # Add quality metrics to metadata 
-                    if 'metadata' in full_result and 'confidence_scores' in full_result:
-                        confidence_scores = full_result.get('confidence_scores', {})
-                        overall_quality = calculate_overall_quality(confidence_scores)
-                        
-                        full_result['metadata']['quality'] = {
-                            'extraction_rate': overall_quality,
-                            'field_scores': confidence_scores,
-                            'extraction_reasoning': full_result.get('extraction_reasoning', {}),
-                            'extracted_fields': len([v for v in full_result['metadata'].values() if v]),
-                            'total_fields': len(full_result['metadata']),
-                            'llm_powered': True
-                        }
-                    
-                    print("✅ Mistral extraction with confidence successful!")
-                    return full_result
-                except json.JSONDecodeError as e:
-                    print(f"❌ JSON parse error: {e}")
-                    print(f"Raw JSON: {json_str[:300]}...")
+                    return json.loads(candidate)
+                except Exception:
                     return None
-            else:
-                print("❌ No JSON found in Mistral response")
+
+            def _extract_balanced_json(text: str):
+                start = text.find('{')
+                if start == -1:
+                    return None
+                i = start
+                depth = 0
+                in_str = False
+                esc = False
+                while i < len(text):
+                    ch = text[i]
+                    if in_str:
+                        if esc:
+                            esc = False
+                        elif ch == '\\':
+                            esc = True
+                        elif ch == '"':
+                            in_str = False
+                    else:
+                        if ch == '"':
+                            in_str = True
+                        elif ch == '{':
+                            depth += 1
+                        elif ch == '}':
+                            depth -= 1
+                            if depth == 0:
+                                return text[start:i+1]
+                    i += 1
                 return None
+
+            def _try_parse_json(text: str):
+                # 1) Direct parse
+                try:
+                    return json.loads(text)
+                except Exception:
+                    pass
+                # 2) Fenced code block ```json ... ``` or ``` ... ```
+                m = re.search(r"```(?:json|JSON)?\s*(\{[\s\S]*?\})\s*```", text)
+                if m:
+                    try:
+                        return json.loads(m.group(1))
+                    except Exception:
+                        # Try sanitize
+                        parsed = _sanitize_and_parse(m.group(1))
+                        if parsed is not None:
+                            return parsed
+                # 3) Balanced-brace extraction
+                candidate = _extract_balanced_json(text)
+                if candidate:
+                    try:
+                        return json.loads(candidate)
+                    except Exception:
+                        parsed = _sanitize_and_parse(candidate)
+                        if parsed is not None:
+                            return parsed
+                return None
+
+            full_result = _try_parse_json(response_text)
+            if not full_result:
+                print("❌ No valid JSON found or parse failed")
+                return None
+
+            # Add quality metrics to metadata 
+            if 'metadata' in full_result and 'confidence_scores' in full_result:
+                confidence_scores = full_result.get('confidence_scores', {})
+                overall_quality = calculate_overall_quality(confidence_scores)
+                
+                full_result['metadata']['quality'] = {
+                    'extraction_rate': overall_quality,
+                    'field_scores': confidence_scores,
+                    'extraction_reasoning': full_result.get('extraction_reasoning', {}),
+                    'extracted_fields': len([v for v in full_result['metadata'].values() if v]),
+                    'total_fields': len(full_result['metadata']),
+                    'llm_powered': True
+                }
+            
+            print("✅ Mistral extraction with confidence successful!")
+            return full_result
         else:
             print(f"❌ Mistral API error: {response.status_code}")
             return None
@@ -353,16 +416,80 @@ def call_llm_with_learned_prompt(prompt):
         )
         
         result = response.choices[0].message.content
-        
-        # Try to parse JSON
-        try:
-            return json.loads(result)
-        except:
-            # Fallback: extract JSON from text
-            json_match = re.search(r'\{.*\}', result, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group())
+
+        # Robust JSON parsing similar to Mistral path
+        def _sanitize_and_parse(candidate: str):
+            # Normalize smart quotes
+            candidate = candidate.replace('\u201c', '"').replace('\u201d', '"').replace('\u2019', "'")
+            # Remove trailing commas before } or ]
+            candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
+            # Fix single-quoted keys: 'key': value -> "key": value
+            candidate = re.sub(r"(?<=\{|,)\s*'([A-Za-z0-9_]+)'\s*:\s*", r'"\1": ', candidate)
+            # Fix single-quoted string values: key: 'value' -> key: "value"
+            candidate = re.sub(r":\s*'([^'\\]*(?:\\.[^'\\]*)*)'", r': "\1"', candidate)
+            # Fix unquoted keys only when at object boundaries
+            candidate = re.sub(r'(?<=\{|,)\s*([A-Za-z0-9_]+)\s*:', r'"\1":', candidate)
+            try:
+                return json.loads(candidate)
+            except Exception:
+                return None
+
+        def _extract_balanced_json(text: str):
+            start = text.find('{')
+            if start == -1:
+                return None
+            i = start
+            depth = 0
+            in_str = False
+            esc = False
+            while i < len(text):
+                ch = text[i]
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif ch == '\\':
+                        esc = True
+                    elif ch == '"':
+                        in_str = False
+                else:
+                    if ch == '"':
+                        in_str = True
+                    elif ch == '{':
+                        depth += 1
+                    elif ch == '}':
+                        depth -= 1
+                        if depth == 0:
+                            return text[start:i+1]
+                i += 1
+            return None
+
+        def _try_parse_json(text: str):
+            # 1) Direct parse
+            try:
+                return json.loads(text)
+            except Exception:
+                pass
+            # 2) Fenced code block ```json ... ``` or ``` ... ```
+            m = re.search(r"```(?:json|JSON)?\s*(\{[\s\S]*?\})\s*```", text)
+            if m:
+                try:
+                    return json.loads(m.group(1))
+                except Exception:
+                    parsed = _sanitize_and_parse(m.group(1))
+                    if parsed is not None:
+                        return parsed
+            # 3) Balanced-brace extraction
+            candidate = _extract_balanced_json(text)
+            if candidate:
+                try:
+                    return json.loads(candidate)
+                except Exception:
+                    parsed = _sanitize_and_parse(candidate)
+                    if parsed is not None:
+                        return parsed
             return {}
+
+        return _try_parse_json(result)
             
     except Exception as e:
         print(f"LLM call error: {e}")

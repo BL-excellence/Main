@@ -5,248 +5,833 @@
 
 {% block content %}
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    :root {
-        --primary: #0ea5e9;
-        --primary-light: #38bdf8;
-        --primary-dark: #0284c7;
-        --secondary: #1e293b;
-        --secondary-dark: #0f172a;
-        --accent: #10b981;
-        --accent-light: #34d399;
-        --success: #059669;
-        --warning: #f59e0b;
-        --error: #dc2626;
-        --text: #000000;
-        --text-secondary: #4b5563;
-        --text-muted: #6b7280;
-        --card-bg: rgba(255, 255, 255, 0.08);
-        --card-border: rgba(14, 165, 233, 0.15);
-        --glass-bg: rgba(255, 255, 255, 0.05);
-        --hover-bg: rgba(255, 255, 255, 0.1);
-    }
-    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
 
-    .dashboard-container {
-        max-width: 1400px;
-        margin: 1.5rem auto 0;
-        padding: 0 1.5rem;
-    }
+:root {
+  --pharma-primary: #0ea5e9;
+  --pharma-primary-dark: #0284c7;
+  --pharma-primary-light: #38bdf8;
+  --pharma-accent: #10b981;
+  --pharma-accent-light: #34d399;
+  --pharma-success: #059669;
+  --pharma-warn: #f59e0b;
+  --pharma-error: #dc2626;
+  --pharma-text: #1f2937;
+  --pharma-text-soft: #6b7280;
+  --pharma-bg: #f8fafc;
+  --pharma-card: #ffffff;
+  --pharma-border: #e2e8f0;
+  --pharma-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --pharma-radius: 16px;
+  --pharma-radius-sm: 12px;
+  --pharma-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-    .card {
-        background: var(--card-bg);
-        backdrop-filter: blur(15px);
-        border: 1px solid var(--card-border);
-        border-radius: 16px;
-        padding: 1.5rem;
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
-    }
-    .card::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0; height: 1px;
-        background: linear-gradient(90deg, transparent, var(--primary-light), transparent);
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-    .card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 20px 40px rgba(14, 165, 233, 0.15);
-        border-color: var(--primary-light);
-    }
-    .card:hover::before { opacity: 1; }
+* {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
 
-    .btn {
-        padding: 0.75rem 1.5rem;
-        font-size: 0.95rem;
-        border-radius: 12px;
-        border: none;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        cursor: pointer;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-weight: 500;
-    }
-    .btn-outline-secondary {
-        background: var(--glass-bg);
-        color: var(--text-secondary);
-        border: 1px solid var(--card-border);
-    }
-    .btn-outline-secondary:hover {
-        background: var(--hover-bg);
-        transform: translateY(-2px);
-        color: var(--text-secondary);
-        text-decoration: none;
-    }
-    .btn-success {
-        background: linear-gradient(135deg, var(--success), var(--accent));
-        color: white;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-    }
-    .btn-success:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
-        color: white;
-        text-decoration: none;
-    }
-    .btn-primary {
-        background: linear-gradient(135deg, var(--primary), var(--primary-light));
-        color: white;
-        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
-    }
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4);
-        color: white;
-        text-decoration: none;
-    }
+body {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  min-height: 100vh;
+  color: var(--pharma-text);
+  margin: 0;
+  padding: 0;
+}
 
-    .summary-content {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 8px;
-        border-left: 4px solid #007bff;
-        margin: 1rem 0;
-    }
+.main-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  animation: fadeInUp 0.5s ease-out;
+}
 
-    .page-navigation {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: rgba(14, 165, 233, 0.05);
-        padding: 1rem;
-        border-radius: 12px;
-        margin-bottom: 1rem;
-    }
+.card {
+  background: var(--pharma-card);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  border: 1px solid var(--pharma-border);
+  transition: var(--pharma-transition);
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
 
-    .page-indicator {
-        background: linear-gradient(135deg, var(--primary), var(--primary-light));
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-        font-weight: 600;
-    }
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Header */
+.document-header {
+  background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
+  color: #fff;
+  padding: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.header-info h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  opacity: 0.9;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.btn-outline {
+  padding: 0.6rem 1.2rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: 500;
+  transition: var(--pharma-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+/* Page Navigation */
+.page-navigation {
+  background: var(--pharma-card);
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--pharma-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-btn {
+  padding: 0.6rem 1.2rem;
+  background: var(--pharma-primary);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: var(--pharma-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  cursor: pointer;
+}
+
+.nav-btn:hover {
+  background: var(--pharma-primary-dark);
+  color: #fff;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.nav-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.page-indicator-modern {
+  background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
+  color: #fff;
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+}
+
+.expert-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* Summary Card */
+.summary-card {
+  background: var(--pharma-card);
+  border: 1px solid var(--pharma-border);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  margin: 1.25rem 0;
+}
+
+.summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--pharma-border);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.05), rgba(16, 185, 129, 0.05));
+}
+
+.summary-head h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+  color: var(--pharma-text);
+}
+
+.summary-body {
+  padding: 1.25rem 1.5rem;
+}
+
+.summary-content {
+  background: #fafbfc;
+  border: 1px solid var(--pharma-border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  line-height: 1.6;
+  font-size: 1rem;
+  color: var(--pharma-text);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.badge-pill {
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  border: 1px solid transparent;
+}
+
+.badge-ok {
+  background: rgba(5, 150, 105, 0.12);
+  color: #047857;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+.badge-warn {
+  background: rgba(245, 158, 11, 0.12);
+  color: #a16207;
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+/* Action Buttons */
+.action-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.action-btn-card {
+  background: var(--pharma-card);
+  border: 2px solid var(--pharma-border);
+  border-radius: var(--pharma-radius-sm);
+  padding: 1.5rem;
+  text-decoration: none;
+  color: var(--pharma-text);
+  transition: var(--pharma-transition);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.action-btn-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.03), rgba(16, 185, 129, 0.03));
+  opacity: 0;
+  transition: var(--pharma-transition);
+}
+
+.action-btn-card:hover {
+  border-color: var(--pharma-primary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(14, 165, 233, 0.15);
+  text-decoration: none;
+  color: var(--pharma-text);
+}
+
+.action-btn-card:hover::before {
+  opacity: 1;
+}
+
+.action-btn-card .icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--pharma-success), var(--pharma-accent));
+  color: #fff;
+  border-radius: 12px;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.action-btn-card.primary .icon {
+  background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-primary-light));
+}
+
+.action-btn-card.semantic {
+  border-color: rgba(139, 92, 246, 0.4);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(16, 185, 129, 0.05));
+}
+
+.action-btn-card.semantic .icon {
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+}
+
+.action-btn-card.semantic:hover {
+  border-color: #a78bfa;
+  box-shadow: 0 8px 25px rgba(139, 92, 246, 0.15);
+}
+
+.action-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.action-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--pharma-text);
+}
+
+.action-desc {
+  font-size: 0.85rem;
+  color: var(--pharma-text-soft);
+  line-height: 1.4;
+}
+
+/* Final Document Actions */
+.final-actions-card {
+  background: var(--pharma-card);
+  border: 2px solid var(--pharma-accent);
+  border-radius: var(--pharma-radius);
+  padding: 2rem;
+  text-align: center;
+  margin-top: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.final-actions-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(52, 211, 153, 0.05));
+}
+
+.final-actions-card .content {
+  position: relative;
+  z-index: 1;
+}
+
+.final-actions-card h4 {
+  color: var(--pharma-accent);
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.final-actions-card p {
+  color: var(--pharma-text-soft);
+  margin-bottom: 2rem;
+  font-size: 1rem;
+}
+
+.final-actions-buttons {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-final {
+  padding: 0.8rem 1.5rem;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-final.success {
+  background: linear-gradient(135deg, var(--pharma-success), var(--pharma-accent));
+  color: #fff;
+}
+
+.btn-final.accent {
+  background: linear-gradient(135deg, var(--pharma-accent), var(--pharma-accent-light));
+  color: #fff;
+}
+
+.btn-final:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  text-decoration: none;
+  color: #fff;
+}
+
+.btn-final .btn-main {
+  font-weight: 600;
+}
+
+.btn-final .btn-sub {
+  font-size: 0.8rem;
+  opacity: 0.9;
+  display: block;
+  margin-top: 0.2rem;
+}
+
+/* Alert styles */
+.alert {
+  padding: 1rem 1.5rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.alert-info {
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.2);
+  color: var(--pharma-primary-dark);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes highlight-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 900px) {
+  .main-content {
+    max-width: 99vw;
+    padding: 1rem;
+  }
+
+  .document-header,
+  .page-navigation,
+  .summary-head,
+  .summary-body {
+    padding: 1.1rem 0.8rem !important;
+  }
+
+  .action-buttons-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .final-actions-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+@media (max-width: 700px) {
+  .document-header,
+  .page-navigation {
+    flex-direction: column !important;
+    gap: 1rem !important;
+  }
+
+  .header-actions,
+  .page-controls,
+  .expert-controls {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .action-btn-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .final-actions-buttons {
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  .btn-final {
+    width: 100%;
+    justify-content: center;
+  }
+}
 </style>
 
-<div class="dashboard-container">
+<div class="main-content">
+  <section class="card">
     <!-- Document Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text); margin-bottom: 0.5rem;">{{ document.title }}</h1>
-            <p class="text-muted mb-0">
-                <i class="fas fa-file-alt me-2"></i>{{ document.total_pages }} pages
-                <i class="fas fa-calendar ms-3 me-2"></i>{{ document.created_at|date:"d/m/Y" }}
-            </p>
+    <div class="document-header">
+      <div class="header-info">
+        <h1><i class="fas fa-file-pdf"></i> {{ document.title }}</h1>
+        <div class="document-meta">
+          <span class="meta-item"><i class="fas fa-file-alt"></i> {{ document.total_pages }} pages</span>
+          <span class="meta-item"><i class="fas fa-calendar"></i> {{ document.created_at|date:"d/m/Y" }}</span>
+          <span class="meta-item"><i class="fas fa-user"></i> Révision en cours</span>
         </div>
-        <a href="{% url 'expert:document_list' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-2"></i>Retour à la liste
+      </div>
+
+      <div class="header-actions">
+        <a href="{% url 'expert:document_list' %}" class="btn-outline" title="Retour à la liste">
+          <i class="fas fa-arrow-left"></i> Retour
         </a>
+      </div>
     </div>
 
     <!-- Page Navigation -->
     <div class="page-navigation">
+      <div class="page-controls">
         {% if current_page_num > 1 %}
-            <a href="?page={{ current_page_num|add:'-1' }}" class="btn btn-outline-secondary">
-                <i class="fas fa-chevron-left"></i> Page Précédente
-            </a>
+          <a href="?page={{ current_page_num|add:'-1' }}" class="nav-btn">
+            <i class="fas fa-chevron-left"></i> Page Précédente
+          </a>
         {% else %}
-            <span></span>
+          <button class="nav-btn" disabled>
+            <i class="fas fa-chevron-left"></i> Page Précédente
+          </button>
         {% endif %}
         
-        <span class="page-indicator">
-            <i class="fas fa-file-text"></i>
-            Page {{ current_page_num }} / {{ total_pages }}
-        </span>
+        <div class="page-indicator-modern">
+          <i class="fas fa-file-text"></i>
+          Page {{ current_page_num }} / {{ total_pages }}
+        </div>
         
         {% if not is_last_page %}
-            <a href="?page={{ current_page_num|add:'1' }}" class="btn btn-outline-secondary">
-                Page Suivante <i class="fas fa-chevron-right"></i>
-            </a>
+          <a href="?page={{ current_page_num|add:'1' }}" class="nav-btn">
+            Page Suivante <i class="fas fa-chevron-right"></i>
+          </a>
         {% else %}
-            <span style="color: var(--accent); font-weight: 600;">
-                <i class="fas fa-flag-checkered"></i> Dernière page
-            </span>
+          <button class="nav-btn" disabled style="background: var(--pharma-accent);">
+            <i class="fas fa-flag-checkered"></i> Dernière page
+          </button>
         {% endif %}
+      </div>
+
+      <div class="expert-controls">
+        <span style="color: var(--pharma-text-soft); font-size: 0.9rem;">
+          <i class="fas fa-info-circle"></i> Page {{ current_page_num }} sur {{ total_pages }}
+        </span>
+      </div>
     </div>
 
     <!-- Page Summary Section -->
-    <div class="card">
-        <div class="card-header bg-light">
-            <h5 class="card-title mb-0">
-                <i class="fas fa-file-text me-2"></i>Résumé Page {{ current_page_num }}
-            </h5>
-        </div>
-        <div class="card-body">
-            {% if page_summary %}
-                <div class="summary-content">
-                    <p class="lead">{{ page_summary|linebreaks }}</p>
-                </div>
-            {% else %}
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Aucun résumé disponible pour cette page.
-                </div>
-            {% endif %}
-        </div>
+    <div class="summary-card">
+      <div class="summary-head">
+        <h3>
+          <i class="fas fa-file-text"></i> Résumé Page {{ current_page_num }}
+        </h3>
+        {% if page_summary %}
+          <span class="badge-pill badge-ok">
+            <i class="fas fa-check-circle"></i> Disponible
+          </span>
+        {% else %}
+          <span class="badge-pill badge-warn">
+            <i class="fas fa-exclamation-triangle"></i> Manquant
+          </span>
+        {% endif %}
+      </div>
+      <div class="summary-body">
+        {% if page_summary %}
+          <div class="summary-content">
+            {{ page_summary|linebreaks }}
+          </div>
+        {% else %}
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            Aucun résumé disponible pour cette page.
+          </div>
+        {% endif %}
+      </div>
     </div>
 
     <!-- Action Buttons for Current Page -->
-    <div class="row mt-4">
-        <div class="col-md-6">
-            <div class="d-grid">
-                <a href="{% url 'expert:view_page_annotation_json' current_page.id %}" 
-                   class="btn btn-success btn-lg">
-                    <i class="fas fa-check-circle me-2"></i>Valider Page {{ current_page_num }}
-                    <small class="d-block">Voir et éditer le JSON de cette page</small>
-                </a>
-            </div>
+    <div class="action-buttons-grid">
+      <a href="{% url 'expert:view_page_annotation_json' current_page.id %}" 
+         class="action-btn-card">
+        <div class="icon">
+          <i class="fas fa-check-circle"></i>
         </div>
-        <div class="col-md-6">
-            <div class="d-grid">
-                <a href="{% url 'expert:annotate_document' document.id %}?page={{ current_page_num }}"
-                   class="btn btn-primary btn-lg">
-                    <i class="fas fa-edit me-2"></i>Voir Annotations
-                    <small class="d-block">Réviser les annotations de cette page</small>
-                </a>
-            </div>
+        <div class="action-content">
+          <span class="action-title">Valider Page {{ current_page_num }}</span>
+          <span class="action-desc">Voir et éditer le JSON de cette page</span>
         </div>
+      </a>
+
+      <a href="{% url 'expert:annotate_document' document.id %}?page={{ current_page_num }}"
+         class="action-btn-card primary">
+        <div class="icon">
+          <i class="fas fa-edit"></i>
+        </div>
+        <div class="action-content">
+          <span class="action-title">Voir Annotations</span>
+          <span class="action-desc">Réviser les annotations de cette page</span>
+        </div>
+      </a>
+
+      <a href="{% url 'expert:view_document_annotation_json_enriched' document.id %}"
+         class="action-btn-card semantic">
+        <div class="icon">
+          <i class="fas fa-brain"></i>
+        </div>
+        <div class="action-content">
+          <span class="action-title">JSON Sémantique</span>
+          <span class="action-desc">Relations, Q&A et enrichissement IA</span>
+        </div>
+      </a>
     </div>
 
     <!-- Final Document Actions (only show on last page) -->
     {% if is_last_page %}
-    <div class="card mt-4" style="border-color: var(--accent);">
-        <div class="card-body text-center">
-            <h4 style="color: var(--accent); margin-bottom: 1rem;">
-                <i class="fas fa-trophy me-2"></i>Document Complet
-            </h4>
-            <p style="color: var(--text-muted); margin-bottom: 2rem;">
-                Vous avez atteint la dernière page. Vous pouvez maintenant valider le document entier.
-            </p>
-            <div class="d-flex gap-3 justify-content-center">
-                <a href="{% url 'expert:view_document_annotation_json' document.id %}" 
-                   class="btn btn-success btn-lg">
-                    <i class="fas fa-file-check me-2"></i>JSON Document Complet
-                    <small class="d-block">Voir et valider le résumé global</small>
-                </a>
-                <a href="{% url 'expert:validate_document' document.id %}" 
-                   class="btn" style="background: linear-gradient(135deg, var(--accent), var(--accent-light)); color: white;">
-                    <i class="fas fa-certificate me-2"></i>Validation Finale
-                    <small class="d-block">Marquer le document comme terminé</small>
-                </a>
+    <div class="final-actions-card">
+      <div class="content">
+        <h4>
+          <i class="fas fa-trophy"></i> Document Complet
+        </h4>
+        <p>
+          Vous avez atteint la dernière page. Vous pouvez maintenant valider le document entier.
+        </p>
+        <div class="final-actions-buttons">
+          <a href="{% url 'expert:view_document_annotation_json' document.id %}" 
+             class="btn-final success">
+            <i class="fas fa-file-check"></i>
+            <div>
+              <span class="btn-main">JSON Document Complet</span>
+              <span class="btn-sub">Voir et valider le résumé global</span>
             </div>
+          </a>
+          <a href="{% url 'expert:validate_document' document.id %}" 
+             class="btn-final accent">
+            <i class="fas fa-certificate"></i>
+            <div>
+              <span class="btn-main">Validation Finale</span>
+              <span class="btn-sub">Marquer le document comme terminé</span>
+            </div>
+          </a>
         </div>
+      </div>
     </div>
     {% endif %}
+  </section>
 </div>
+
 <script>
 // Add JavaScript to handle annotation loading
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Page annotations:', {{ total_page_annotations|default:0 }});
+  console.log('Page annotations:', {{ total_page_annotations|default:0 }});
+  
+  // Add modern hover effects
+  document.querySelectorAll('.action-btn-card').forEach(card => {
+    card.addEventListener('mouseenter', function() {
+      this.style.transform = 'translateY(-4px)';
+    });
+    
+    card.addEventListener('mouseleave', function() {
+      this.style.transform = 'translateY(0)';
+    });
+  });
+
+  // Add ripple effect to buttons
+  document.querySelectorAll('.nav-btn, .btn-final').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      const ripple = document.createElement('span');
+      const rect = this.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height);
+      ripple.style.cssText = `
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.3);
+        transform: scale(0);
+        animation: ripple 0.6s linear;
+        width: ${size}px;
+        height: ${size}px;
+        left: ${e.clientX - rect.left - size/2}px;
+        top: ${e.clientY - rect.top - size/2}px;
+      `;
+      
+      if (!document.querySelector('#ripple-styles')) {
+        const style = document.createElement('style');
+        style.id = 'ripple-styles';
+        style.textContent = `
+          @keyframes ripple {
+            0% { transform: scale(0); opacity: 1; }
+            100% { transform: scale(4); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      
+      this.style.position = 'relative';
+      this.style.overflow = 'hidden';
+      this.appendChild(ripple);
+      
+      setTimeout(() => ripple.remove(), 600);
+    });
+  });
 });
+
+/* Notification System */
+function showSuccessNotification(message) {
+  const notification = document.createElement('div');
+  notification.className = 'expert-notification success';
+  notification.innerHTML = `
+    <div class="notification-content">
+      <i class="fas fa-check-circle"></i>
+      <span>${message}</span>
+    </div>
+  `;
+
+  if (!document.querySelector('#expert-notification-styles')) {
+    const style = document.createElement('style');
+    style.id = 'expert-notification-styles';
+    style.textContent = `
+      .expert-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,.15);
+        backdrop-filter: blur(10px);
+        animation: slideInRight .3s ease-out;
+        max-width: 400px;
+        font-family: Inter, sans-serif;
+      }
+      .expert-notification.success {
+        background: linear-gradient(135deg, rgba(16,185,129,.9), rgba(34,197,94,.9));
+        border: 1px solid rgba(16,185,129,.3);
+        color: #fff;
+      }
+      .expert-notification.error {
+        background: linear-gradient(135deg, rgba(239,68,68,.9), rgba(220,38,38,.9));
+        border: 1px solid rgba(239,68,68,.3);
+        color: #fff;
+      }
+      .notification-content {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        font-weight: 500;
+        font-size: .9rem;
+      }
+      .notification-content i {
+        font-size: 1.1rem;
+        flex-shrink: 0;
+      }
+      @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes slideOutRight {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.body.appendChild(notification);
+
+  setTimeout(() => {
+    notification.style.animation = 'slideOutRight .3s ease-in';
+    setTimeout(() => notification.remove(), 300);
+  }, 4000);
+}
+
+// Example usage for validation actions
+function validatePage() {
+  showSuccessNotification('Page validée avec succès !');
+}
+
+function validateDocument() {
+  showSuccessNotification('Document validé avec succès !');
+}
 </script>
 
 {% endblock %}

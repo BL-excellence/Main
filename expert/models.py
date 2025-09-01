@@ -1,5 +1,5 @@
 # expert/models.py
-
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -94,3 +94,166 @@ class ExpertLog(models.Model):
                 changes.append(f"Type: {self.old_entity_type} → {self.new_entity_type}")
             return " | ".join(changes)
         return ""
+
+from django.db import models
+from django.contrib.auth import get_user_model
+
+
+# app/expert/models.py
+
+
+# app/expert/models.py
+# from django.db import models
+# from django.conf import settings  # ✅ pas MyProject.settings !
+#
+# class ExpertDelta(models.Model):
+#     # ⬇︎ utiliser RawDocument (et le bon label d’app)
+#     document = models.ForeignKey(
+#         'rawdocs.RawDocument',            # <-- PAS 'rawdocs.Document'
+#         on_delete=models.CASCADE,
+#         related_name='expert_deltas'
+#     )
+#     payload = models.JSONField(default=dict)      # relations_added, relations_modified, qa_added, qa_modified, …
+#     created_by = models.ForeignKey(
+#         settings.AUTH_USER_MODEL,                 # supporte un User custom
+#         null=True, on_delete=models.SET_NULL
+#     )
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     active = models.BooleanField(default=True)
+#
+#     class Meta:
+#         ordering = ['-created_at']
+
+
+# expert/models.py - Ajout du modèle ExpertDelta
+
+from django.db import models
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+import json
+
+User = get_user_model()
+
+
+class ExpertDelta(models.Model):
+    """
+    Stocke les différences entre les résultats IA et les corrections de l'expert
+    pour permettre l'apprentissage incrémental
+    """
+
+    # Référence au document
+    document = models.ForeignKey(
+        'rawdocs.RawDocument',
+        on_delete=models.CASCADE,
+        related_name='expert_deltas'
+    )
+
+    # Métadonnées de la correction
+    expert = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    session_id = models.CharField(max_length=100, blank=True)
+
+    # Type de correction
+    DELTA_TYPES = [
+        ('relation_added', 'Relation ajoutée'),
+        ('relation_modified', 'Relation modifiée'),
+        ('relation_removed', 'Relation supprimée'),
+        ('entity_added', 'Entité ajoutée'),
+        ('entity_modified', 'Entité modifiée'),
+        ('qa_added', 'Q&A ajoutée'),
+        ('qa_corrected', 'Q&A corrigée'),
+        ('summary_corrected', 'Résumé corrigé'),
+    ]
+    delta_type = models.CharField(max_length=50, choices=DELTA_TYPES)
+
+    # Contenu de la correction
+    ai_version = models.JSONField(
+        help_text="Version générée par l'IA avant correction"
+    )
+    expert_version = models.JSONField(
+        help_text="Version corrigée par l'expert"
+    )
+
+    # Contexte de la correction
+    context = models.JSONField(
+        default=dict,
+        help_text="Contexte additionnel (document_summary, entity_context, etc.)"
+    )
+
+    # Feedback de qualité
+    confidence_before = models.FloatField(
+        null=True, blank=True,
+        help_text="Confiance de l'IA avant correction (0.0-1.0)"
+    )
+    expert_rating = models.IntegerField(
+        null=True, blank=True,
+        choices=[(i, f"{i}/5") for i in range(1, 6)],
+        help_text="Qualité de la correction selon l'expert (1-5)"
+    )
+
+    # Statut
+    is_validated = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+
+    # Métadonnées d'apprentissage
+    reused_count = models.IntegerField(
+        default=0,
+        help_text="Nombre de fois que cette correction a été réutilisée"
+    )
+    last_reused = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['document', 'delta_type']),
+            models.Index(fields=['expert', 'created_at']),
+            models.Index(fields=['is_active', 'is_validated']),
+        ]
+
+    def __str__(self):
+        return f"{self.expert.username} - {self.get_delta_type_display()} - {self.created_at.strftime('%d/%m/%Y')}"
+
+    @property
+    def correction_summary(self):
+        """Résumé lisible de la correction"""
+        if self.delta_type == 'relation_added':
+            rel = self.expert_version
+            return f"Ajout relation: {rel.get('source', {}).get('value')} --{rel.get('type')}--> {rel.get('target', {}).get('value')}"
+        elif self.delta_type == 'qa_added':
+            qa = self.expert_version
+            return f"Ajout Q&A: {qa.get('question', '')[:50]}..."
+        elif self.delta_type == 'qa_corrected':
+            return f"Correction réponse: {self.ai_version.get('answer', '')[:30]}... → {self.expert_version.get('answer', '')[:30]}..."
+        return f"{self.get_delta_type_display()}"
+
+    def mark_reused(self):
+        """Marque cette correction comme réutilisée"""
+        self.reused_count += 1
+        self.last_reused = timezone.now()
+        self.save(update_fields=['reused_count', 'last_reused'])
+
+
+class ExpertLearningStats(models.Model):
+    """Statistiques d'apprentissage pour le système IA"""
+
+    expert = models.ForeignKey(User, on_delete=models.CASCADE)
+    document_type = models.CharField(max_length=100, blank=True)
+
+    # Métriques d'apprentissage
+    total_corrections = models.IntegerField(default=0)
+    relations_improved = models.IntegerField(default=0)
+    qa_improved = models.IntegerField(default=0)
+
+    # Qualité moyenne des corrections
+    avg_expert_rating = models.FloatField(default=0.0)
+
+    # Réutilisation
+    corrections_reused = models.IntegerField(default=0)
+
+    # Période
+    period_start = models.DateTimeField()
+    period_end = models.DateTimeField()
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['expert', 'document_type', 'period_start']

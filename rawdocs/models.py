@@ -1,10 +1,10 @@
-
 # rawdocs/models.py
 from os.path import join
 from datetime import datetime
 from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db.models import SET_NULL
 
 
 def pdf_upload_to(instance, filename):
@@ -78,6 +78,11 @@ class RawDocument(models.Model):
         help_text="Date de génération du résumé global d'annotations"
     )
     
+    # Nouveaux champs pour l'enrichissement (ajoutés depuis le second modèle)
+    enriched_annotations_json = models.JSONField(null=True, blank=True)
+    enriched_at = models.DateTimeField(null=True, blank=True)
+    enriched_by = models.ForeignKey(User, on_delete=SET_NULL, null=True, blank=True, related_name='enriched_documents')
+    
     # Validation par expert
     is_expert_validated = models.BooleanField(default=False, help_text="Document validé par un expert")
     expert_validated_at = models.DateTimeField(null=True, blank=True, help_text="Date de validation par un expert")
@@ -119,41 +124,6 @@ class MetadataLog(models.Model):
         return f"{self.field_name}: {self.old_value} → {self.new_value}"
 
 
-# class DocumentPage(models.Model):
-#     """Pages individuelles extraites du PDF."""
-#     document = models.ForeignKey(RawDocument, on_delete=models.CASCADE, related_name='pages')
-#     page_number = models.IntegerField(help_text="Numéro de page (1-indexé)")
-#     raw_text = models.TextField(help_text="Texte brut extrait de la page")
-#     cleaned_text = models.TextField(help_text="Texte nettoyé pour annotation")
-#
-#     # Statut d'annotation
-#     is_annotated = models.BooleanField(default=False)
-#     annotated_at = models.DateTimeField(null=True, blank=True)
-#     annotated_by = models.ForeignKey(
-#         settings.AUTH_USER_MODEL,
-#         on_delete=models.SET_NULL,
-#         null=True, blank=True,
-#         related_name='annotated_pages'
-#     )
-#
-#     # Validation humaine
-#     is_validated_by_human = models.BooleanField(default=False)
-#     human_validated_at = models.DateTimeField(null=True, blank=True)
-#     validated_by = models.ForeignKey(
-#         settings.AUTH_USER_MODEL,
-#         on_delete=models.SET_NULL,
-#         null=True, blank=True,
-#         related_name='validated_pages'
-#     )
-#
-#     created_at = models.DateTimeField(auto_now_add=True)
-#
-#     class Meta:
-#         unique_together = ['document', 'page_number']
-#         ordering = ['page_number']
-#
-#     def __str__(self):
-#         return f"Page {self.page_number} – Doc #{self.document.pk}"
 class DocumentPage(models.Model):
     """Pages individuelles extraites du PDF."""
     document = models.ForeignKey(RawDocument, on_delete=models.CASCADE, related_name='pages')
@@ -231,6 +201,17 @@ class DocumentPage(models.Model):
         null=True, blank=True,
         related_name='validated_pages'
     )
+    
+    # Nouveaux champs pour validation du résumé (ajoutés depuis le second modèle)
+    summary_validated = models.BooleanField(default=False)
+    summary_validated_at = models.DateTimeField(null=True, blank=True)
+    summary_validated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=SET_NULL,
+        null=True, blank=True,
+        related_name='validated_page_summaries'
+    )
+    
     # JSON des annotations de la page
     annotations_json = models.JSONField(
         null=True, blank=True,
@@ -348,6 +329,8 @@ class DocumentRegulatoryAnalysis(models.Model):
         if self.total_pages_analyzed == 0:
             return 0
         return int((self.pages_with_regulatory_content / self.total_pages_analyzed) * 100)
+
+
 class AnnotationType(models.Model):
     """Types d'annotations possibles."""
     name = models.CharField(max_length=100, unique=True)
@@ -442,7 +425,7 @@ class UserProfile(models.Model):
         ('annotateur', 'Annotateur'),
         ('expert', 'Expert'),
         ('client', 'Client'),
-        ('dev_metier', 'Dev métier'),
+        ('dev_metier', 'Dev métier'),  # Gardé depuis le premier modèle
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -523,6 +506,7 @@ class PromptOptimization(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
 
+
 class CustomField(models.Model):
     name = models.CharField(max_length=100, unique=True)
     field_type = models.CharField(max_length=20, choices=[
@@ -536,6 +520,7 @@ class CustomField(models.Model):
     def __str__(self):
         return self.name
 
+
 class CustomFieldValue(models.Model):
     document = models.ForeignKey(RawDocument, on_delete=models.CASCADE)
     field = models.ForeignKey(CustomField, on_delete=models.CASCADE)
@@ -544,6 +529,8 @@ class CustomFieldValue(models.Model):
     class Meta:
         unique_together = ['document', 'field']
 
+
+# Classes présentes uniquement dans le premier modèle
 class GlobalSummaryEditHistory(models.Model):
     """Model pour garder l'historique des modifications du résumé global"""
     document = models.ForeignKey(RawDocument, on_delete=models.CASCADE)
@@ -553,6 +540,7 @@ class GlobalSummaryEditHistory(models.Model):
     modified_at = models.DateTimeField(auto_now_add=True)
     reason = models.TextField(blank=True)
 
+
 class MetadataFeedback(models.Model):
     document = models.ForeignKey(RawDocument, on_delete=models.CASCADE)
     metadonneur = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -561,6 +549,7 @@ class MetadataFeedback(models.Model):
     corrections_made = models.JSONField()
     feedback_score = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)
+
 
 class MetadataLearningMetrics(models.Model):
     field_performance = models.JSONField()

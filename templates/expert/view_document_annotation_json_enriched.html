@@ -1,0 +1,895 @@
+{#template/expert/view_document_json_enriched.html#}
+{% extends "base.html" %}
+{% load static %}
+{% load expert_extras %}
+{% block title %}JSON Sémantique Expert - {{ document.title }} – RegExpert{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'rawdocs/css/rlhf_styles.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
+
+{# --- JSON DATA SAFE PASSING --- #}
+{{ global_annotations_json|json_script:"basic-json-data" }}
+{{ enriched_annotations_json|default:"{}"|json_script:"enriched-json-data" }}
+{{ display_json|default:"{}"|json_script:"display-json-data" }}
+
+<style>
+:root{
+  --pharma-primary:#3b82f6;--pharma-accent:#10b981;--pharma-info:#06b6d4;
+  --pharma-success:#059669;--pharma-warning:#f59e0b;
+  --pharma-bg-card:#fff;--pharma-bg:#f8fafc;--pharma-text:#1e293b;--pharma-text-soft:#64748b;
+  --pharma-border:#e2e8f0;--pharma-radius:12px;--pharma-radius-sm:8px;--pharma-shadow:0 4px 16px rgba(15,23,42,.08);
+  --pharma-transition:.3s cubic-bezier(.4,0,.2,1);
+  --ai-color:#3b82f6;--expert-color:#10b981;--diff-bg:#f8fafc;--improvement-bg:#ecfdf5;--correction-bg:#fef2f2;
+}
+body{background:var(--pharma-bg);color:var(--pharma-text);font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif}
+
+/* Tabs */
+.mode-tabs{display:flex;background:linear-gradient(135deg,#f9fafb,#f3f4f6);border-radius:var(--pharma-radius);padding:.75rem;margin-bottom:2rem;box-shadow:var(--pharma-shadow);border:1px solid var(--pharma-border)}
+.mode-tab{flex:1;padding:1rem 1.5rem;text-align:center;border-radius:var(--pharma-radius-sm);background:transparent;border:1px solid transparent;color:var(--pharma-text-soft);cursor:pointer;transition:var(--pharma-transition);font-weight:600;display:flex;align-items:center;justify-content:center;gap:.5rem}
+.mode-tab:hover{background:rgba(59,130,246,.1);color:var(--pharma-primary)}
+.mode-tab.active{background:linear-gradient(135deg,var(--pharma-primary),var(--pharma-accent));color:#fff;border-color:var(--pharma-primary);box-shadow:0 4px 12px rgba(59,130,246,.3)}
+
+/* Cards */
+.semantic-card{background:var(--pharma-bg-card);border-radius:var(--pharma-radius);box-shadow:var(--pharma-shadow);border:1px solid var(--pharma-border);margin-bottom:1.5rem;overflow:hidden;transition:var(--pharma-transition)}
+.semantic-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(15,23,42,.12)}
+.semantic-card-header{background:linear-gradient(135deg,rgba(59,130,246,.1),rgba(16,185,129,.1));padding:1.5rem;border-bottom:1px solid var(--pharma-border)}
+.semantic-card-header h3{font-size:1.25rem;font-weight:600;color:var(--pharma-text);margin:0;display:flex;align-items:center;gap:.75rem}
+.semantic-card-body{padding:1.5rem}
+
+/* Relations */
+.relations-container{display:flex;flex-direction:column;gap:1rem}
+.relation-item{background:linear-gradient(135deg,rgba(59,130,246,.05),rgba(16,185,129,.05));border:1px solid rgba(59,130,246,.2);border-radius:var(--pharma-radius-sm);padding:1rem;display:flex;align-items:center;gap:1rem;transition:var(--pharma-transition)}
+.relation-item:hover{background:linear-gradient(135deg,rgba(59,130,246,.1),rgba(16,185,129,.1));border-color:var(--pharma-primary)}
+.entity-node{background:var(--pharma-primary);color:#fff;padding:.5rem 1rem;border-radius:20px;font-size:.9rem;font-weight:500;white-space:nowrap}
+.relation-arrow{color:var(--pharma-accent);font-size:1.2rem;font-weight:bold}
+.relation-type{background:var(--pharma-accent);color:#fff;padding:.3rem .8rem;border-radius:15px;font-size:.8rem;font-weight:500}
+
+/* Q&A */
+.qa-container{display:flex;flex-direction:column;gap:1rem}
+.qa-item{background:linear-gradient(135deg,rgba(6,182,212,.05),rgba(139,92,246,.05));border:1px solid rgba(6,182,212,.2);border-radius:var(--pharma-radius-sm);padding:1.5rem}
+.qa-question{font-weight:600;color:var(--pharma-text);margin-bottom:.75rem;display:flex;gap:.5rem}
+.qa-question::before{content:"Q:";color:var(--pharma-info);font-weight:700}
+.qa-answer{color:var(--pharma-text-soft);line-height:1.6;margin-left:1.75rem;display:flex;gap:.5rem}
+.qa-answer::before{content:"R:";color:var(--pharma-accent);font-weight:700}
+
+/* QA test */
+.qa-test-interface{background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(251,191,36,.1));border:1px solid rgba(245,158,11,.3);border-radius:var(--pharma-radius);padding:1.5rem;margin-bottom:2rem}
+.qa-input-group{display:flex;gap:1rem;align-items:flex-end;margin-bottom:1rem}
+.qa-input{flex:1;padding:.75rem 1rem;border:2px solid var(--pharma-border);border-radius:var(--pharma-radius-sm);font-size:1rem}
+.qa-input:focus{outline:none;border-color:var(--pharma-warning);box-shadow:0 0 0 3px rgba(245,158,11,.1)}
+.qa-test-btn{padding:.75rem 1.5rem;background:var(--pharma-warning);color:#fff;border:none;border-radius:var(--pharma-radius-sm);font-weight:600;cursor:pointer;display:flex;gap:.5rem}
+.qa-test-btn:hover{background:#d97706;transform:translateY(-1px)}
+.qa-result{background:#fff;border-radius:8px;padding:1rem;border-left:4px solid var(--pharma-success);margin-top:1rem;display:none}
+
+/* JSON panels */
+.json-comparison{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-bottom:2rem}
+.json-panel{background:#fff;border-radius:var(--pharma-radius);box-shadow:var(--pharma-shadow);border:1px solid var(--pharma-border);padding:1.5rem}
+.json-panel h4{font-size:1.1rem;font-weight:600;margin-bottom:1rem;color:var(--pharma-text);display:flex;align-items:center;gap:.5rem}
+
+/* Learning Section */
+.learning-section{background:linear-gradient(135deg,rgba(16,185,129,.05),rgba(59,130,246,.05));border:2px solid var(--pharma-accent);border-radius:var(--pharma-radius);padding:1.5rem;margin-bottom:2rem}
+.learning-header{display:flex;justify-content:between;align-items:center;margin-bottom:1.5rem}
+.learning-header h4{color:var(--pharma-text);margin:0;display:flex;align-items:center;gap:.5rem}
+.learning-actions{display:flex;gap:.75rem;flex-wrap:wrap}
+.learning-btn{padding:.5rem 1rem;border:none;border-radius:var(--pharma-radius-sm);font-weight:600;cursor:pointer;display:flex;gap:.4rem;align-items:center;transition:var(--pharma-transition)}
+.learning-btn.primary{background:linear-gradient(135deg,var(--expert-color),#059669);color:#fff}
+.learning-btn.secondary{background:var(--pharma-text-soft);color:#fff}
+.learning-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+
+/* Comparison cards */
+.comparison-card{border-radius:12px;box-shadow:0 4px 16px rgba(15,23,42,.08);margin-bottom:1rem;overflow:hidden;background:white;position:relative}
+.delta-header{background:linear-gradient(135deg,var(--diff-bg),#e2e8f0);padding:1rem 1.5rem;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center}
+.delta-type-badge{padding:.4rem 1rem;border-radius:20px;font-size:.85rem;font-weight:600}
+.delta-type-relation_added{background:var(--improvement-bg);color:var(--expert-color)}
+.delta-type-relation_modified{background:#fef3c7;color:#d97706}
+.delta-type-qa_added{background:var(--improvement-bg);color:var(--expert-color)}
+.delta-type-qa_corrected{background:#fef3c7;color:#d97706}
+.version-comparison{display:grid;grid-template-columns:1fr 1fr;gap:1rem;padding:1rem}
+.ai-version,.expert-version{padding:1rem;border-radius:8px;border:2px solid}
+.ai-version{border-color:var(--ai-color);background:rgba(59,130,246,.05)}
+.expert-version{border-color:var(--expert-color);background:rgba(16,185,129,.05)}
+.version-header{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;font-weight:600}
+.ai-version .version-header{color:var(--ai-color)}
+.expert-version .version-header{color:var(--expert-color)}
+.relation-display{background:#f8fafc;padding:.75rem;border-radius:6px;font-family:'Courier New',monospace;margin-bottom:.5rem}
+.description-text{font-style:italic;color:#64748b;margin-top:.5rem}
+.improvement-indicator{position:absolute;top:-5px;right:-5px;background:var(--expert-color);color:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.learning-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1rem}
+.learning-stat{background:white;padding:1rem;border-radius:8px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.learning-stat-value{font-size:1.5rem;font-weight:800;color:var(--expert-color);margin-bottom:.25rem}
+.learning-stat-label{font-size:.8rem;color:var(--pharma-text-soft)}
+
+/* Actions */
+.enrichment-actions{display:flex;gap:1rem;margin-bottom:2rem;flex-wrap:wrap}
+.enrichment-btn{padding:.75rem 1.5rem;border:none;border-radius:var(--pharma-radius-sm);font-weight:600;cursor:pointer;display:flex;gap:.5rem}
+.enrichment-btn.primary{background:linear-gradient(135deg,var(--pharma-primary),var(--pharma-accent));color:#fff}
+.enrichment-btn.secondary{background:var(--pharma-text-soft);color:#fff}
+
+/* Modales */
+.semantic-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:none;align-items:center;justify-content:center}
+.semantic-modal.show{display:flex;animation:fadeIn .3s ease-out}
+.modal-content-semantic{background:#fff;border-radius:var(--pharma-radius);box-shadow:0 20px 60px rgba(0,0,0,.3);width:90%;max-width:700px;max-height:80vh;overflow-y:auto}
+.modal-header-semantic{background:linear-gradient(135deg,var(--pharma-primary),var(--pharma-accent));color:#fff;padding:1.5rem 2rem;border-radius:var(--pharma-radius) var(--pharma-radius) 0 0;display:flex;justify-content:space-between;align-items:center}
+.modal-body-semantic{padding:2rem}
+.form-group{margin-bottom:1.5rem}.form-label{display:block;margin-bottom:.5rem;font-weight:600;color:var(--pharma-text)}
+.form-control{width:100%;padding:.75rem 1rem;border:2px solid var(--pharma-border);border-radius:var(--pharma-radius-sm);font-size:1rem}
+.form-control:focus{outline:none;border-color:var(--pharma-primary);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+
+@media (max-width:768px){.json-comparison{grid-template-columns:1fr}.enrichment-actions{flex-direction:column}.mode-tabs{flex-direction:column}.qa-input-group{flex-direction:column}.version-comparison{grid-template-columns:1fr}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* Stats (Overview) */
+.stats-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:1rem;
+  margin-bottom:1rem;
+}
+.stat-card{
+  display:flex;align-items:center;gap:12px;
+  background:var(--pharma-bg-card);
+  border:1px solid var(--pharma-border);
+  border-radius:var(--pharma-radius);
+  box-shadow:var(--pharma-shadow);
+  padding:1rem 1.25rem;
+}
+.stat-icon{
+  width:44px;height:44px;border-radius:50%;
+  display:grid;place-items:center;
+  background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(16,185,129,.12));
+  color:var(--pharma-primary);
+  flex:0 0 44px;
+}
+.stat-content{display:flex;flex-direction:column;line-height:1.1}
+.stat-value{
+  font-size:1.6rem;font-weight:800;color:var(--pharma-primary);
+}
+.stat-label{
+  font-size:.95rem;color:var(--pharma-text-soft);margin-top:2px
+}
+</style>
+
+<section class="semantic-card">
+  <div class="semantic-card-header">
+    <h2><i class="fas fa-brain"></i> JSON Sémantique Expert - {{ document.title|truncatechars:50 }}</h2>
+  </div>
+  <div class="semantic-card-body">
+    <div class="mode-tabs">
+      <div class="mode-tab active" data-mode="overview"><i class="fas fa-chart-pie"></i>Vue d'ensemble</div>
+      <div class="mode-tab" data-mode="relations"><i class="fas fa-project-diagram"></i>Relations ({{ enriched_stats.relations_count|default:0 }})</div>
+      <div class="mode-tab" data-mode="qa"><i class="fas fa-question-circle"></i>Q&A ({{ enriched_stats.qa_pairs_count|default:0 }})</div>
+      <div class="mode-tab" data-mode="json"><i class="fas fa-graduation-cap"></i>JSON & Apprentissage</div>
+    </div>
+
+    <div class="enrichment-actions">
+      {% if not has_enriched %}
+        <button class="enrichment-btn primary" onclick="enrichDocumentJSON()"><i class="fas fa-magic"></i>Enrichir Automatiquement</button>
+      {% else %}
+        <button class="enrichment-btn secondary" onclick="regenerateEnrichment()"><i class="fas fa-sync-alt"></i>Régénérer</button>
+      {% endif %}
+      <button class="enrichment-btn primary" onclick="showAddRelationModal()"><i class="fas fa-plus"></i>Ajouter Relation</button>
+      <button class="enrichment-btn primary" onclick="showAddQAModal()"><i class="fas fa-question"></i>Ajouter Q&A</button>
+      <button class="enrichment-btn primary" onclick="showAddTextModal()"><i class="fas fa-file-alt"></i> Depuis un paragraphe</button>
+      <a href="{% url 'expert:annotation_dashboard' %}" class="enrichment-btn secondary"><i class="fas fa-arrow-left"></i>Retour Dashboard</a>
+    </div>
+  </div>
+</section>
+
+{# --- OVERVIEW --- #}
+<div id="overview-tab" class="tab-content">
+  {% if has_enriched %}
+  <div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-project-diagram"></i></div>
+    <div class="stat-content">
+      <div class="stat-value">{{ enriched_stats.relations_count|default:0 }}</div>
+      <div class="stat-label">Relations identifiées</div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
+    <div class="stat-content">
+      <div class="stat-value">{{ enriched_stats.qa_pairs_count|default:0 }}</div>
+      <div class="stat-label">Questions-Réponses</div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-layer-group"></i></div>
+    <div class="stat-content">
+      <div class="stat-value">{{ enriched_stats.contexts_count|default:0 }}</div>
+      <div class="stat-label">Contextes sémantiques</div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-list-check"></i></div>
+    <div class="stat-content">
+      <div class="stat-value">{{ total_annotations|default:0 }}</div>
+      <div class="stat-label">Annotations totales</div>
+    </div>
+  </div>
+</div>
+
+  {% if enriched_annotations_json.semantic_summary %}
+  <div class="semantic-card">
+    <div class="semantic-card-header"><h3><i class="fas fa-lightbulb"></i> Résumé Sémantique Intelligent</h3></div>
+    <div class="semantic-card-body"><p style="font-size:1.1rem;line-height:1.8">{{ enriched_annotations_json.semantic_summary }}</p></div>
+  </div>
+  {% endif %}
+
+  <div class="qa-test-interface">
+    <h4><i class="fas fa-vial"></i> Tester le Système de Questions-Réponses</h4>
+    <div style="display:flex;gap:1rem;align-items:center;margin:.25rem 0 1rem">
+      <label style="display:flex;gap:.4rem;align-items:center"><input type="radio" name="qa-source" value="basic"> JSON basique</label>
+      <label style="display:flex;gap:.4rem;align-items:center"><input type="radio" name="qa-source" value="enriched" checked> JSON enrichi</label>
+    </div>
+    <div class="qa-input-group">
+      <input type="text" id="test-question" class="qa-input" placeholder="ex: Quel est le dosage du produit ?">
+      <button class="qa-test-btn" onclick="testQASystem()"><i class="fas fa-search"></i>Tester</button>
+    </div>
+    <div id="qa-test-result" class="qa-result"></div>
+    <div id="qa-correction" class="qa-result" style="display:none;border-left-color:#f59e0b">
+      <div style="font-weight:600;margin-bottom:.5rem;color:#1e293b"><i class="fas fa-edit"></i> Corriger la réponse</div>
+      <textarea id="qa-corrected" class="form-control" rows="4" placeholder="Proposez la meilleure réponse..."></textarea>
+      <div style="text-align:right;margin-top:.5rem">
+        <button class="enrichment-btn secondary" onclick="sendQACorrection()"><i class="fas fa-save"></i>Enregistrer la correction</button>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="semantic-card">
+    <div class="semantic-card-body" style="text-align:center;padding:3rem">
+      <i class="fas fa-brain" style="font-size:4rem;color:var(--pharma-text-soft);margin-bottom:1rem"></i>
+      <h3>JSON Non Enrichi</h3>
+      <p>Ce document possède un JSON basique mais pas encore d'enrichissement sémantique.</p>
+      <button class="enrichment-btn primary" onclick="enrichDocumentJSON()"><i class="fas fa-magic"></i>Enrichir Automatiquement</button>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# --- RELATIONS --- #}
+<div id="relations-tab" class="tab-content" style="display:none">
+  <div class="semantic-card">
+    <div class="semantic-card-header"><h3><i class="fas fa-project-diagram"></i> Relations Entre Entités</h3></div>
+    <div class="semantic-card-body">
+      <div id="relations-container" class="relations-container">
+        {% if enriched_annotations_json.relations %}
+          {% for relation in enriched_annotations_json.relations %}
+          <div class="relation-item">
+            <div class="entity-node">{{ relation.source.value }}</div>
+            <div class="relation-type">{{ relation.type|default:"relation" }}</div>
+            <div class="relation-arrow">→</div>
+            <div class="entity-node">{{ relation.target.value }}</div>
+            {% if relation.description %}<small style="color:var(--pharma-text-soft);margin-left:auto">{{ relation.description }}</small>{% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="text-align:center;padding:2rem;color:var(--pharma-text-soft)">
+            <i class="fas fa-project-diagram" style="font-size:3rem;margin-bottom:1rem"></i>
+            <p>Aucune relation identifiée. Utilisez "Ajouter Relation".</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# --- Q&A --- #}
+<div id="qa-tab" class="tab-content" style="display:none">
+  <div class="semantic-card">
+    <div class="semantic-card-header"><h3><i class="fas fa-question-circle"></i> Questions-Réponses Automatiques</h3></div>
+    <div class="semantic-card-body">
+      <div id="qa-container" class="qa-container">
+        {% if enriched_annotations_json.questions_answers %}
+          {% for qa in enriched_annotations_json.questions_answers %}
+          <div class="qa-item">
+            <div class="qa-question">{{ qa.question }}</div>
+            <div class="qa-answer">{{ qa.answer }}</div>
+            {% if qa.created_by == "expert" %}
+              <div style="margin-top:.5rem">
+                <span style="background:var(--pharma-success);color:#fff;padding:.2rem .5rem;border-radius:10px;font-size:.7rem"><i class="fas fa-user-check"></i> Expert</span>
+              </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="text-align:center;padding:2rem;color:var(--pharma-text-soft)">
+            <i class="fas fa-question-circle" style="font-size:3rem;margin-bottom:1rem"></i>
+            <p>Aucune Q&A générée. Utilisez "Ajouter Q&A".</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# --- JSON & APPRENTISSAGE --- #}
+<div id="json-tab" class="tab-content" style="display:none">
+
+  {# Section Apprentissage Expert #}
+  <div class="learning-section">
+    <div class="learning-header">
+      <h4><i class="fas fa-graduation-cap"></i> Apprentissage Expert IA</h4>
+      <div class="learning-actions">
+        <button class="learning-btn primary" onclick="compareWithFreshAI()">
+          <i class="fas fa-balance-scale"></i>Comparer avec IA
+        </button>
+        <button class="learning-btn primary" onclick="regenerateWithLearning()">
+          <i class="fas fa-magic"></i>Régénérer +Apprentissage
+        </button>
+        <button class="learning-btn secondary" onclick="viewDetailedHistory()">
+          <i class="fas fa-history"></i>Historique détaillé
+        </button>
+      </div>
+    </div>
+
+    <div class="learning-stats" id="learning-stats">
+      <div class="learning-stat">
+        <div class="learning-stat-value" id="corrections-count">-</div>
+        <div class="learning-stat-label">Corrections totales</div>
+      </div>
+      <div class="learning-stat">
+        <div class="learning-stat-value" id="relations-improved">-</div>
+        <div class="learning-stat-label">Relations améliorées</div>
+      </div>
+      <div class="learning-stat">
+        <div class="learning-stat-value" id="qa-improved">-</div>
+        <div class="learning-stat-label">Q&A améliorées</div>
+      </div>
+      <div class="learning-stat">
+        <div class="learning-stat-value" id="patterns-reused">-</div>
+        <div class="learning-stat-label">Patterns réutilisés</div>
+      </div>
+    </div>
+
+    <div id="comparison-results" style="display:none">
+      <h5><i class="fas fa-microscope"></i> Dernière comparaison IA vs Expert</h5>
+      <div id="comparison-cards-container"></div>
+    </div>
+  </div>
+
+  {# JSON Editors #}
+  <div class="json-comparison">
+    <div class="json-panel">
+      <h4><i class="fas fa-file-code"></i> JSON Basique</h4>
+      <div id="basic-json-editor" style="height:500px;border:1px solid var(--pharma-border);border-radius:8px"></div>
+    </div>
+
+    {% if has_enriched %}
+    <div class="json-panel">
+      <h4><i class="fas fa-brain"></i> JSON Enrichi</h4>
+      <div id="enriched-json-editor" style="height:500px;border:1px solid var(--pharma-border);border-radius:8px"></div>
+    </div>
+    {% else %}
+    <div class="json-panel" style="display:flex;align-items:center;justify-content:center;background:var(--pharma-bg)">
+      <div style="text-align:center;color:var(--pharma-text-soft)">
+        <i class="fas fa-brain" style="font-size:3rem;margin-bottom:1rem"></i>
+        <p>JSON enrichi disponible après enrichissement</p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div style="text-align:center;margin-top:1rem">
+    <button class="enrichment-btn primary" onclick="saveJSONChanges()"><i class="fas fa-save"></i>Sauvegarder les Modifications</button>
+  </div>
+</div>
+
+{# --- MODALES --- #}
+<div id="add-relation-modal" class="semantic-modal">
+  <div class="modal-content-semantic">
+    <div class="modal-header-semantic">
+      <h3><i class="fas fa-plus"></i> Ajouter une Relation</h3>
+      <button style="background:none;border:none;color:#fff;font-size:1.5rem" onclick="hideModal('add-relation-modal')">×</button>
+    </div>
+    <div class="modal-body-semantic">
+      <div class="form-group">
+        <label class="form-label">Entité Source</label>
+        <select id="relation-source" class="form-control"><option value="">Sélectionner...</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Type de Relation</label>
+        <select id="relation-type" class="form-control">
+          <option value="contains">contient</option>
+          <option value="manufactured_by">fabriqué par</option>
+          <option value="has_dosage">a pour dosage</option>
+          <option value="used_for">utilisé pour</option>
+          <option value="contraindicated_with">contre-indiqué avec</option>
+          <option value="interacts_with">interagit avec</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Entité Cible</label>
+        <select id="relation-target" class="form-control"><option value="">Sélectionner...</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description (optionnelle)</label>
+        <input type="text" id="relation-description" class="form-control" placeholder="Description de la relation...">
+      </div>
+      <div style="text-align:right;display:flex;gap:1rem;justify-content:flex-end">
+        <button class="enrichment-btn secondary" onclick="hideModal('add-relation-modal')">Annuler</button>
+        <button class="enrichment-btn primary" onclick="addRelation()"><i class="fas fa-plus"></i>Ajouter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="add-qa-modal" class="semantic-modal">
+  <div class="modal-content-semantic">
+    <div class="modal-header-semantic">
+      <h3><i class="fas fa-question"></i> Ajouter Question-Réponse</h3>
+      <button style="background:none;border:none;color:#fff;font-size:1.5rem" onclick="hideModal('add-qa-modal')">×</button>
+    </div>
+    <div class="modal-body-semantic">
+      <div class="form-group"><label class="form-label">Question</label><input type="text" id="qa-question" class="form-control" placeholder="ex: Quel est le dosage du produit ?"></div>
+      <div class="form-group"><label class="form-label">Réponse</label><textarea id="qa-answer" class="form-control" rows="3" placeholder="Réponse complète..."></textarea></div>
+      <div class="form-group"><label class="form-label">Tags (optionnel)</label><input type="text" id="qa-tags" class="form-control" placeholder="dosage, posologie, administration"></div>
+      <div style="text-align:right;display:flex;gap:1rem;justify-content:flex-end">
+        <button class="enrichment-btn secondary" onclick="hideModal('add-qa-modal')">Annuler</button>
+        <button class="enrichment-btn primary" onclick="addQAPair()"><i class="fas fa-plus"></i>Ajouter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="add-text-modal" class="semantic-modal">
+  <div class="modal-content-semantic">
+    <div class="modal-header-semantic">
+      <h3><i class="fas fa-file-alt"></i> Extraire des relations depuis un paragraphe</h3>
+      <button style="background:none;border:none;color:#fff;font-size:1.5rem" onclick="hideModal('add-text-modal')">×</button>
+    </div>
+    <div class="modal-body-semantic">
+      <div class="form-group">
+        <label class="form-label">Paragraphe</label>
+        <textarea id="free-text" class="form-control" rows="6" placeholder="Collez ici un extrait du document (procédures, obligations, interactions, etc.)"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Aide (optionnelle)</label>
+        <input id="free-text-hint" class="form-control" placeholder="ex: réglementation, posologie, interactions...">
+      </div>
+      <div style="text-align:right;display:flex;gap:1rem;justify-content:flex-end">
+        <button class="enrichment-btn secondary" onclick="hideModal('add-text-modal')">Annuler</button>
+        <button class="enrichment-btn primary" onclick="addFromParagraph()">
+          <i class="fas fa-magic"></i> Analyser & ajouter
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  /* ========== Utils (exportés) ========== */
+  function fromJsonScript(id, fallback) {
+    const n = document.getElementById(id);
+    if (!n) return fallback;
+    try { return JSON.parse(n.textContent.trim() || '{}'); }
+    catch (e) { console.warn('JSON invalide pour', id, e); return fallback; }
+  }
+
+  function getCookie(name) {
+    const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  window.getCookie = getCookie;
+
+  function notify(msg, type) {
+    const el = document.createElement('div');
+    el.className = `expert-notification ${type || 'info'}`;
+    el.innerHTML = `<div class="notification-content">
+      <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+      <span>${msg}</span>
+    </div>`;
+    if (!document.getElementById('expert-notification-styles')) {
+      const css = document.createElement('style'); css.id = 'expert-notification-styles';
+      css.textContent =
+        `.expert-notification{position:fixed;top:20px;right:20px;z-index:10000;padding:1rem 1.5rem;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.15);backdrop-filter:blur(10px);animation:slideIn .25s ease-out;max-width:400px}
+         .expert-notification.success{background:linear-gradient(135deg,rgba(16,185,129,.9),rgba(34,197,94,.9));color:#fff}
+         .expert-notification.error{background:linear-gradient(135deg,rgba(239,68,68,.9),rgba(220,38,38,.9));color:#fff}
+         .expert-notification.info{background:linear-gradient(135deg,rgba(59,130,246,.9),rgba(16,185,129,.9));color:#fff}
+         .notification-content{display:flex;align-items:center;gap:.75rem;font-weight:500;font-size:.9rem}
+         @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+         @keyframes slideOut{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}`;
+      document.head.appendChild(css);
+    }
+    document.body.appendChild(el);
+    setTimeout(() => { el.style.animation = 'slideOut .25s ease-in'; setTimeout(() => el.remove(), 280); }, 3000);
+  }
+  window.notify = notify;
+
+  /* ========== Données depuis les balises <script type="application/json"> ========== */
+  const BASIC    = fromJsonScript('basic-json-data',   {});
+  const ENRICHED = fromJsonScript('enriched-json-data',{});
+  const DISPLAY  = fromJsonScript('display-json-data', {});
+
+  /* ========== Monaco ========== */
+  require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' } });
+
+  function makeEditor(id, val, readOnly) {
+    const el = document.getElementById(id); if (!el) return null;
+    return monaco.editor.create(el, {
+      value: JSON.stringify(val ?? {}, null, 2),
+      language: 'json', theme: 'vs', readOnly: !!readOnly,
+      automaticLayout: true, minimap: { enabled: false }, wordWrap: 'on', scrollBeyondLastLine: false
+    });
+  }
+
+  let basicEditor = null, enrichedEditor = null;
+
+  document.addEventListener('DOMContentLoaded', function () {
+    // Tabs
+    document.querySelectorAll('.mode-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const mode = tab.dataset.mode;
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t === tab));
+        document.querySelectorAll('.tab-content').forEach(c => c.style.display = (c.id === mode + '-tab') ? 'block' : 'none');
+        [basicEditor, enrichedEditor].forEach(ed => ed && ed.layout());
+      });
+    });
+
+    // Monaco init
+    require(['vs/editor/editor.main'], function () {
+      basicEditor    = makeEditor('basic-json-editor',    BASIC,    true);
+      enrichedEditor = makeEditor('enriched-json-editor', ENRICHED, false);
+
+      if (enrichedEditor && (!ENRICHED || Object.keys(ENRICHED).length === 0)) {
+        enrichedEditor.setValue('// Pas encore enrichi. Cliquez sur « Régénérer » pour créer le JSON enrichi.');
+      }
+
+      // Validation simple
+      let decorations = [];
+      function validate(ed) {
+        if (!ed || ed.getRawOptions().readOnly) return;
+        try { JSON.parse(ed.getValue()); decorations = ed.deltaDecorations(decorations, []); }
+        catch (e) {
+          const model = ed.getModel(); const m = String(e.message).match(/position\s+(\d+)/i); if (!m) return;
+          const pos = model.getPositionAt(+m[1]);
+          decorations = ed.deltaDecorations(decorations, [{
+            range: new monaco.Range(pos.lineNumber, pos.column, pos.lineNumber, pos.column + 1),
+            options: { inlineClassName: 'squiggly-error', hoverMessage: { value: e.message } }
+          }]);
+        }
+      }
+      enrichedEditor && enrichedEditor.onDidChangeModelContent(() => validate(enrichedEditor));
+    });
+
+    populateEntitySelectors(BASIC);
+    loadLearningStats();
+  });
+
+  function populateEntitySelectors(basicJson) {
+    const src = document.getElementById('relation-source');
+    const tgt = document.getElementById('relation-target');
+    if (!(src && tgt)) return;
+    src.innerHTML = '<option value="">Sélectionner...</option>';
+    tgt.innerHTML = '<option value="">Sélectionner...</option>';
+    const entities = (basicJson && basicJson.entities) || {};
+    Object.entries(entities).forEach(([type, items]) => {
+      const list = Array.isArray(items) ? items : ((items && items.items) || []);
+      list.forEach(it => {
+        const val = (typeof it === 'string') ? it : ((it && it.value) || '');
+        if (!val) return;
+        src.add(new Option(`${type}: ${val}`, JSON.stringify({ type, value: val })));
+        tgt.add(new Option(`${type}: ${val}`, JSON.stringify({ type, value: val })));
+      });
+    });
+  }
+
+  /* ========== Actions principales (exportées) ========== */
+  async function enrichDocumentJSON(force = false) {
+    notify('Enrichissement en cours...', 'info');
+    try {
+      const url = `/expert/annotation/document/{{ document.id }}/enrich-json/` + (force ? `?force=1` : ``);
+      const res = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' } });
+      const data = await res.json();
+      if (data.success) { notify(`✅ JSON enrichi. ${data.relations_count} relations, ${data.qa_pairs_count} Q&A.`, 'success'); setTimeout(() => location.reload(), 900); }
+      else { notify('❌ ' + (data.error || 'Erreur inconnue'), 'error'); }
+    } catch (e) { notify('❌ ' + e.message, 'error'); }
+  }
+  window.enrichDocumentJSON = enrichDocumentJSON;
+  window.regenerateEnrichment = () => enrichDocumentJSON(true);
+
+  async function saveJSONChanges() {
+    if (!enrichedEditor) { notify('Aucun éditeur enrichi', 'error'); return; }
+    try {
+      const payload = JSON.parse(enrichedEditor.getValue());
+      const res = await fetch(`/expert/annotation/document/{{ document.id }}/save-enriched-edits/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manual_edits: payload })
+      });
+      const data = await res.json();
+      if (data.success) notify('✅ Modifications sauvegardées', 'success');
+      else notify('❌ ' + (data.error || 'Erreur inconnue'), 'error');
+    } catch (e) { notify('❌ JSON invalide : ' + e.message, 'error'); }
+  }
+  window.saveJSONChanges = saveJSONChanges;
+
+  async function addRelation() {
+    const s = document.getElementById('relation-source'), t = document.getElementById('relation-target');
+    const r = document.getElementById('relation-type'), d = document.getElementById('relation-description');
+    if (!(s && t && r) || !s.value || !t.value || !r.value) { alert('Veuillez remplir tous les champs'); return; }
+    try {
+      const src = JSON.parse(s.value), tgt = JSON.parse(t.value);
+      const res = await fetch(`/expert/annotation/document/{{ document.id }}/add-relation/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_type: src.type, source_value: src.value,
+          target_type: tgt.type, target_value: tgt.value,
+          relation_type: r.value, description: (d && d.value) || ''
+        })
+      });
+      const data = await res.json();
+      if (data.success) { notify('✅ Relation ajoutée', 'success'); hideModal('add-relation-modal'); setTimeout(() => location.reload(), 700); }
+      else notify('❌ ' + data.error, 'error');
+    } catch (e) { notify('❌ ' + e.message, 'error'); }
+  }
+  window.addRelation = addRelation;
+
+  async function addQAPair() {
+    const q = (document.getElementById('qa-question') || {}).value?.trim();
+    const a = (document.getElementById('qa-answer')   || {}).value?.trim();
+    const tags = (document.getElementById('qa-tags')   || {}).value?.split(',').map(s => s.trim()).filter(Boolean) || [];
+    if (!q || !a) { alert('Question et réponse requises'); return; }
+    try {
+      const res = await fetch(`/expert/annotation/document/{{ document.id }}/add-qa/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q, answer: a, tags, entity_refs: [] })
+      });
+      const data = await res.json();
+      if (data.success) { notify('✅ Q&A ajoutée', 'success'); hideModal('add-qa-modal'); setTimeout(() => location.reload(), 700); }
+      else notify('❌ ' + data.error, 'error');
+    } catch (e) { notify('❌ ' + e.message, 'error'); }
+  }
+  window.addQAPair = addQAPair;
+
+  async function testQASystem() {
+    const qEl = document.getElementById('test-question');
+    const resEl = document.getElementById('qa-test-result');
+    const corrBox = document.getElementById('qa-correction');
+    const source = (document.querySelector('input[name="qa-source"]:checked') || {}).value || 'enriched';
+    const question = (qEl && qEl.value || '').trim();
+    if (!question) { alert('Veuillez saisir une question'); return; }
+
+    resEl.style.display = 'block';
+    resEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Recherche de la réponse...';
+    corrBox.style.display = 'none';
+
+    try {
+      const r = await fetch(`/expert/annotation/document/{{ document.id }}/test-qa/`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({ question, source })
+      });
+      const data = await r.json();
+      if (data.success) {
+        const conf = data.confidence || 0;
+        const color = conf > 0.8 ? '#10b981' : (conf > 0.5 ? '#f59e0b' : '#64748b');
+        resEl.innerHTML =
+          `<div style="display:flex;align-items:flex-start;gap:1rem;">
+            <div style="flex:1;">
+              <div style="font-weight:600;margin-bottom:.5rem;color:#1e293b;"><i class="fas fa-robot"></i> Réponse (${source}) :</div>
+              <div id="qa-answer-text" style="color:#64748b;line-height:1.6;">${data.answer}</div>
+            </div>
+            <div style="background:${color};color:#fff;padding:.3rem .8rem;border-radius:15px;font-size:.8rem;font-weight:600;white-space:nowrap;">
+              ${Math.round(conf*100)}% confiance
+            </div>
+          </div>
+          ${data.answer_type === 'no_match' ? `<div style="margin-top:1rem;padding:1rem;background:rgba(245,158,11,.1);border-radius:8px;border-left:4px solid #f59e0b;"><strong>💡 Suggestion :</strong> ${data.suggestion || ''}</div>` : ''}
+          <div style="margin-top:.75rem;text-align:right;">
+            <button class="enrichment-btn secondary" onclick="openCorrection('${source}')"><i class="fas fa-edit"></i> Corriger cette réponse</button>
+          </div>`;
+        window.__lastQA__ = { question, source, answer: data.answer };
+      } else {
+        resEl.innerHTML = `<div style="color:#ef4444;"><i class="fas fa-exclamation-triangle"></i> ${data.error}</div>`;
+      }
+    } catch (e) {
+      resEl.innerHTML = `<div style="color:#ef4444;"><i class="fas fa-times-circle"></i> Erreur: ${e.message}</div>`;
+    }
+  }
+  window.testQASystem = testQASystem;
+
+  function openCorrection(source) {
+    const corrBox = document.getElementById('qa-correction');
+    const ta = document.getElementById('qa-corrected');
+    const ans = (window.__lastQA__ || {}).answer || '';
+    if (ta) ta.value = ans;
+    corrBox.style.display = 'block';
+  }
+  window.openCorrection = openCorrection;
+
+  async function sendQACorrection() {
+    const ctx = window.__lastQA__ || {};
+    const corrected = (document.getElementById('qa-corrected') || {}).value?.trim();
+    if (!ctx.question || !corrected) { alert('Question ou correction manquante.'); return; }
+    try {
+      const r = await fetch(`/expert/annotation/document/{{ document.id }}/qa-feedback/`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({ question: ctx.question, corrected_answer: corrected, source: ctx.source })
+      });
+      const data = await r.json();
+      if (data.success) { notify('✅ Correction enregistrée. Merci !', 'success'); document.getElementById('qa-correction').style.display = 'none'; loadLearningStats(); }
+      else { notify('❌ ' + (data.error || 'Erreur inconnue'), 'error'); }
+    } catch (e) { notify('❌ ' + e.message, 'error'); }
+  }
+  window.sendQACorrection = sendQACorrection;
+
+  /* ========== Fonctions d'apprentissage ========== */
+  async function loadLearningStats() {
+    try {
+      const response = await fetch(`/expert/document/{{ document.id }}/learning-history/`);
+      const data = await response.json();
+      if (data.success) {
+        document.getElementById('corrections-count').textContent = data.history.total_corrections || 0;
+        document.getElementById('relations-improved').textContent = data.history.history?.filter(h => h.type.includes('relation')).length || 0;
+        document.getElementById('qa-improved').textContent = data.history.history?.filter(h => h.type.includes('Q&A')).length || 0;
+        document.getElementById('patterns-reused').textContent = data.history.history?.reduce((sum, h) => sum + (h.reused_count || 0), 0) || 0;
+      }
+    } catch (e) {
+      console.warn('Could not load learning stats:', e);
+    }
+  }
+
+  async function compareWithFreshAI() {
+    const btn = document.querySelector('button[onclick="compareWithFreshAI()"]');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Comparaison...';
+
+    try {
+      const expertJson = enrichedEditor ? JSON.parse(enrichedEditor.getValue()) : ENRICHED;
+      const response = await fetch(`/expert/document/{{ document.id }}/compare-and-learn/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+          expert_json: expertJson,
+          context: {
+            document_title: "{{ document.title }}",
+            doc_type: "{{ document.doc_type }}"
+          }
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        notify(`✅ ${data.message}`, 'success');
+        displayComparisonResults(data.comparison);
+        loadLearningStats();
+      } else {
+        notify(`❌ ${data.error}`, 'error');
+      }
+    } catch (e) {
+      notify('❌ Erreur lors de la comparaison', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-balance-scale"></i>Comparer avec IA';
+    }
+  }
+  window.compareWithFreshAI = compareWithFreshAI;
+
+  async function regenerateWithLearning() {
+    const btn = document.querySelector('button[onclick="regenerateWithLearning()"]');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Régénération...';
+
+    try {
+      const response = await fetch(`/expert/document/{{ document.id }}/regenerate-with-learning/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        notify(data.message, 'success');
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        notify(data.error, 'error');
+      }
+    } catch (e) {
+      notify('❌ Erreur lors de la régénération', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-magic"></i>Régénérer +Apprentissage';
+    }
+  }
+  window.regenerateWithLearning = regenerateWithLearning;
+
+  function viewDetailedHistory() {
+    window.open(`/expert/document/{{ document.id }}/view-expert-deltas/`, '_blank');
+  }
+  window.viewDetailedHistory = viewDetailedHistory;
+
+  function displayComparisonResults(comparison) {
+    const container = document.getElementById('comparison-cards-container');
+    const resultsSection = document.getElementById('comparison-results');
+
+    if (!comparison || !comparison.summary) {
+      return;
+    }
+
+    let html = '';
+    const summary = comparison.summary;
+
+    if (summary.key_improvements && summary.key_improvements.length > 0) {
+      html += '<div style="margin-bottom:1rem">';
+      summary.key_improvements.forEach(improvement => {
+        html += `
+          <div class="comparison-card">
+            <div class="delta-header">
+              <span class="delta-type-badge delta-type-relation_added">Amélioration détectée</span>
+            </div>
+            <div style="padding:1rem">
+              <div class="description-text">${improvement}</div>
+            </div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    }
+
+    if (summary.changes_by_type) {
+      html += '<div class="learning-stats">';
+      Object.entries(summary.changes_by_type).forEach(([type, count]) => {
+        const displayType = type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        html += `
+          <div class="learning-stat">
+            <div class="learning-stat-value">${count}</div>
+            <div class="learning-stat-label">${displayType}</div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    }
+
+    container.innerHTML = html;
+    resultsSection.style.display = 'block';
+  }
+
+  /* ========== Modales (exportées) ========== */
+  function showModal(id){ document.getElementById(id)?.classList.add('show'); }
+  function hideModal(id){ document.getElementById(id)?.classList.remove('show'); }
+  window.showModal = showModal;
+  window.hideModal = hideModal;
+  window.showAddRelationModal = () => showModal('add-relation-modal');
+  window.showAddQAModal      = () => showModal('add-qa-modal');
+  window.showAddTextModal    = () => showModal('add-text-modal');
+
+  document.addEventListener('click', e => {
+    if (e.target.classList?.contains('semantic-modal')) e.target.classList.remove('show');
+  });
+
+  /* ========== Extraction depuis un paragraphe (exportée) ========== */
+  async function addFromParagraph() {
+    const text = (document.getElementById('free-text') || {}).value?.trim();
+    const hint = (document.getElementById('free-text-hint') || {}).value?.trim();
+    if (!text) { alert('Collez un paragraphe.'); return; }
+    try {
+      notify('Analyse du paragraphe...', 'info');
+      const res = await fetch(`/expert/annotation/document/{{ document.id }}/from-paragraph/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({ text, hint })
+      });
+      const data = await res.json();
+      if (data.success) {
+        notify(`✅ Ajouté: ${data.added_relations} relations, ${data.added_entities} entités.`, 'success');
+        hideModal('add-text-modal');
+        setTimeout(() => location.reload(), 800);
+      } else {
+        notify('❌ ' + (data.error || 'Erreur inconnue'), 'error');
+      }
+    } catch (e) { notify('❌ ' + e.message, 'error'); }
+  }
+  window.addFromParagraph = addFromParagraph;
+
+})();
+</script>
+
+{% endblock %}

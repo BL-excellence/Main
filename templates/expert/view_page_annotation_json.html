@@ -14,282 +14,851 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
 
 <style>
-    /* Copy the same beautiful styling from dashboard */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    :root {
-        --primary: #0ea5e9;
-        --primary-light: #38bdf8;
-        --accent: #10b981;
-        --success: #059669;
-        --text: #000000;
-        --text-secondary: #4b5563;
-        --text-muted: #6b7280;
-        --card-bg: rgba(255, 255, 255, 0.08);
-        --card-border: rgba(14, 165, 233, 0.15);
-        --glass-bg: rgba(255, 255, 255, 0.05);
-    }
-    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
 
-    .dashboard-container {
-        max-width: 1400px;
-        margin: 1.5rem auto;
-        padding: 0 1.5rem;
-    }
+:root {
+  --pharma-primary: #0ea5e9;
+  --pharma-primary-dark: #0284c7;
+  --pharma-primary-light: #38bdf8;
+  --pharma-accent: #10b981;
+  --pharma-accent-light: #34d399;
+  --pharma-success: #059669;
+  --pharma-warn: #f59e0b;
+  --pharma-error: #dc2626;
+  --pharma-text: #1f2937;
+  --pharma-text-soft: #6b7280;
+  --pharma-bg: #f8fafc;
+  --pharma-card: #ffffff;
+  --pharma-border: #e2e8f0;
+  --pharma-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --pharma-radius: 16px;
+  --pharma-radius-sm: 12px;
+  --pharma-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-    .card {
-        background: var(--card-bg);
-        border: 1px solid var(--card-border);
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-    }
+* {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
 
-    .btn {
-        padding: 0.75rem 1.5rem;
-        border-radius: 12px;
-        border: none;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        cursor: pointer;
-    }
+body {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  min-height: 100vh;
+  color: var(--pharma-text);
+  margin: 0;
+  padding: 0;
+}
 
-    .btn-success {
-        background: linear-gradient(135deg, var(--success), var(--accent));
-        color: white;
-    }
-    
-    .btn-success:hover {
-        transform: translateY(-2px);
-        color: white;
-        text-decoration: none;
-    }
+.main-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  animation: fadeInUp 0.5s ease-out;
+}
 
-    /* JSON Display - aligné avec la vue globale */
-    .json-display {
-        background: #ffffff;
-        border: 2px solid #e9ecef;
-        border-radius: 8px;
-        padding: 0.75rem 1rem;
-        font-family: 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-        font-size: 0.9rem;
-        line-height: 1.5;
-        overflow-x: auto;
-        white-space: pre;
-        max-height: 600px;
-        overflow-y: auto;
-        color: #24292e;
-        position: relative;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
-    }
-    .json-display .line-number {
-        display: inline-block;
-        width: 3em;
-        padding-right: 1em;
-        color: #858585;
-        font-size: 0.85em;
-        text-align: right;
-        user-select: none;
-        border-right: 1px solid #e0e0e0;
-        margin-right: 1em;
-        background: #f8f9fa;
-    }
-    .json-key { color: #0451a5; font-weight: 600; }
-    .json-string { color: #0a7d0a; }
-    .json-number { color: #098658; font-weight: 500; }
-    .json-boolean, .json-null { color: #0000ff; font-weight: 600; }
+.card {
+  background: var(--pharma-card);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  border: 1px solid var(--pharma-border);
+  transition: var(--pharma-transition);
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
 
-    .copy-btn {
-        background: #10b981;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 0.6rem 1.25rem;
-        font-size: 0.95rem;
-        font-weight: 600;
-        cursor: pointer;
-        margin-top: 1rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        transition: all .2s ease;
-    }
-    .copy-btn:hover { background: #059669; transform: translateY(-1px); }
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+}
 
-    /* Monaco Editor Styles */
-    .monaco-editor { border-radius: 8px; overflow: hidden; }
-    .squiggly-error {
-        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3' enable-background='new 0 0 6 3' height='3' width='6'%3E%3Cg fill='%23dc3545'%3E%3Cpolygon points='5.5,0 2.5,3 1.1,3 4.1,0'/%3E%3Cpolygon points='4,0 6,2 6,0.6 5.4,0'/%3E%3Cpolygon points='0,2 1,3 2.4,3 0,0.6'/%3E%3C/g%3E%3C/svg%3E") repeat-x bottom left;
-        padding-bottom: 2px;
-    }
+/* Header */
+.document-header {
+  background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
+  color: #fff;
+  padding: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.header-info h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  opacity: 0.9;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.btn-outline {
+  padding: 0.6rem 1.2rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: 500;
+  transition: var(--pharma-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+/* Page Navigation */
+.page-navigation {
+  background: var(--pharma-card);
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--pharma-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-btn {
+  padding: 0.6rem 1.2rem;
+  background: var(--pharma-primary);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: var(--pharma-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  cursor: pointer;
+}
+
+.nav-btn:hover {
+  background: var(--pharma-primary-dark);
+  color: #fff;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.nav-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.page-indicator-modern {
+  background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
+  color: #fff;
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+}
+
+.expert-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* Summary Card */
+.summary-card {
+  background: var(--pharma-card);
+  border: 1px solid var(--pharma-border);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  margin: 1.25rem 0;
+}
+
+.summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--pharma-border);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.05), rgba(16, 185, 129, 0.05));
+}
+
+.summary-head h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+  color: var(--pharma-text);
+}
+
+.summary-body {
+  padding: 1.25rem 1.5rem;
+}
+
+.summary-content {
+  background: #fafbfc;
+  border: 1px solid var(--pharma-border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  line-height: 1.6;
+  font-size: 1rem;
+  color: var(--pharma-text);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.badge-pill {
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  border: 1px solid transparent;
+}
+
+.badge-ok {
+  background: rgba(5, 150, 105, 0.12);
+  color: #047857;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+.badge-warn {
+  background: rgba(245, 158, 11, 0.12);
+  color: #a16207;
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+/* JSON Editor Styles */
+.json-editor-card {
+  background: var(--pharma-card);
+  border: 1px solid var(--pharma-border);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  margin: 1.25rem 0;
+}
+
+.json-editor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--pharma-border);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(52, 211, 153, 0.05));
+}
+
+.json-editor-head h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+  color: var(--pharma-text);
+}
+
+.json-editor-body {
+  padding: 1.25rem 1.5rem;
+}
+
+.monaco-editor {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #e9ecef;
+}
+
+.json-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.copy-btn {
+  background: linear-gradient(135deg, var(--pharma-accent), var(--pharma-accent-light));
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: var(--pharma-transition);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.copy-btn:hover {
+  background: linear-gradient(135deg, var(--pharma-success), var(--pharma-accent));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.25);
+}
+
+/* Action Buttons */
+.action-buttons-section {
+  background: var(--pharma-card);
+  border: 1px solid var(--pharma-border);
+  border-radius: var(--pharma-radius);
+  box-shadow: var(--pharma-shadow);
+  padding: 2rem;
+  margin-top: 2rem;
+}
+
+.action-buttons-grid {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  padding: 0.8rem 1.5rem;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  min-width: 200px;
+  justify-content: center;
+}
+
+.action-btn.success {
+  background: linear-gradient(135deg, var(--pharma-success), var(--pharma-accent));
+  color: #fff;
+}
+
+.action-btn.secondary {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--pharma-text-soft);
+  border: 1px solid var(--pharma-border);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  text-decoration: none;
+}
+
+.action-btn.success:hover {
+  color: #fff;
+}
+
+.action-btn.secondary:hover {
+  color: var(--pharma-text);
+  background: #fff;
+}
+
+.btn-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.btn-main {
+  font-weight: 600;
+}
+
+.btn-sub {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+/* Alert styles */
+.alert {
+  padding: 1rem 1.5rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.alert-info {
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.2);
+  color: var(--pharma-primary-dark);
+}
+
+/* JSON Syntax Highlighting */
+.squiggly-error {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3' enable-background='new 0 0 6 3' height='3' width='6'%3E%3Cg fill='%23dc3545'%3E%3Cpolygon points='5.5,0 2.5,3 1.1,3 4.1,0'/%3E%3Cpolygon points='4,0 6,2 6,0.6 5.4,0'/%3E%3Cpolygon points='0,2 1,3 2.4,3 0,0.6'/%3E%3C/g%3E%3C/svg%3E") repeat-x bottom left;
+  padding-bottom: 2px;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 900px) {
+  .main-content {
+    max-width: 99vw;
+    padding: 1rem;
+  }
+
+  .document-header,
+  .page-navigation,
+  .summary-head,
+  .summary-body,
+  .json-editor-head,
+  .json-editor-body,
+  .action-buttons-section {
+    padding: 1.1rem 0.8rem !important;
+  }
+
+  .action-buttons-grid {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .action-btn {
+    width: 100%;
+    max-width: 300px;
+  }
+}
+
+@media (max-width: 700px) {
+  .document-header,
+  .page-navigation {
+    flex-direction: column !important;
+    gap: 1rem !important;
+  }
+
+  .header-actions,
+  .page-controls,
+  .expert-controls {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .json-actions {
+    flex-direction: column;
+  }
+
+  .copy-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .action-buttons-grid {
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
 </style>
 
-<div class="dashboard-container">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text);">
-                JSON Page {{ current_page_num }} - {{ document.title }}
-            </h1>
-            <p style="color: var(--text-muted);">
-                Validation et édition du JSON pour cette page
-            </p>
+<div class="main-content">
+  <section class="card">
+    <!-- Document Header -->
+    <div class="document-header">
+      <div class="header-info">
+        <h1><i class="fas fa-code"></i> JSON Page {{ current_page_num }} - {{ document.title }}</h1>
+        <div class="document-meta">
+          <span class="meta-item"><i class="fas fa-file-alt"></i> Validation et édition du JSON</span>
+          <span class="meta-item"><i class="fas fa-calendar"></i> Page {{ current_page_num }}</span>
+          <span class="meta-item"><i class="fas fa-cog"></i> Mode Expert</span>
         </div>
+      </div>
+
+      <div class="header-actions">
+        <a href="{% url 'expert:review_document' document.id %}?page={{ current_page_num }}" class="btn-outline" title="Retour à la révision">
+          <i class="fas fa-arrow-left"></i> Retour
+        </a>
+      </div>
     </div>
 
-    <!-- Page Summary -->
-    {% if annotations_summary %}
-    <div class="card">
-        <h3 style="color: var(--text); margin-bottom: 1rem;">
-            <i class="fas fa-file-text" style="color: var(--primary);"></i>
-            Résumé des Annotations (Page {{ current_page_num }})
-        </h3>
-        <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--primary);">
-            <p>{{ annotations_summary|linebreaks }}</p>
+    <!-- Page Navigation -->
+    <div class="page-navigation">
+      <div class="page-controls">
+        <div class="page-indicator-modern">
+          <i class="fas fa-file-code"></i>
+          JSON Page {{ current_page_num }}
         </div>
+      </div>
+
+      <div class="expert-controls">
+        <span style="color: var(--pharma-text-soft); font-size: 0.9rem;">
+          <i class="fas fa-info-circle"></i> Validation et édition JSON
+        </span>
+      </div>
+    </div>
+
+    <!-- Page Summary Section -->
+    {% if annotations_summary %}
+    <div class="summary-card">
+      <div class="summary-head">
+        <h3>
+          <i class="fas fa-file-text"></i> Résumé des Annotations (Page {{ current_page_num }})
+        </h3>
+        <span class="badge-pill badge-ok">
+          <i class="fas fa-check-circle"></i> Disponible
+        </span>
+      </div>
+      <div class="summary-body">
+        <div class="summary-content">
+          {{ annotations_summary|linebreaks }}
+        </div>
+      </div>
     </div>
     {% endif %}
 
-    <!-- JSON Content -->
+    <!-- JSON Editor Section -->
     {% if annotations_json %}
-    <div class="card">
-        <h3 style="color: var(--text); margin-bottom: 1rem; display:flex; align-items:center; gap:.6rem;">
-            <i class="fas fa-code" style="color: var(--accent);"></i>
-            JSON Structuré des Annotations
+    <div class="json-editor-card">
+      <div class="json-editor-head">
+        <h3>
+          <i class="fas fa-code"></i> JSON Structuré des Annotations
         </h3>
-        <div id="monaco-editor" style="height: 600px; border: 2px solid #e9ecef; border-radius: 8px;"></div>
-        <div style="display:flex; gap: .75rem; margin-top: 1rem;">
-            <button class="copy-btn" onclick="copyJsonToClipboard(event)"><i class="fas fa-copy"></i> Copier le JSON</button>
-            <button class="copy-btn" onclick="downloadJson()"><i class="fas fa-download"></i> Télécharger</button>
+        <span class="badge-pill badge-ok">
+          <i class="fas fa-check-circle"></i> Chargé
+        </span>
+      </div>
+      <div class="json-editor-body">
+        <div id="monaco-editor" style="height: 600px;"></div>
+        <div class="json-actions">
+          <button class="copy-btn" onclick="copyJsonToClipboard(event)">
+            <i class="fas fa-copy"></i> Copier le JSON
+          </button>
+          <button class="copy-btn" onclick="downloadJson()">
+            <i class="fas fa-download"></i> Télécharger
+          </button>
         </div>
+      </div>
     </div>
-
-    <script>
-    let editor = null;
-
-    // Config Monaco comme la vue globale
-    require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' }});
-
-    require(['vs/editor/editor.main'], function() {
-        try {
-            const jsonDataElement = document.getElementById('json-data');
-            let jsonData = {};
-            if (jsonDataElement && jsonDataElement.textContent.trim()) {
-                try { jsonData = JSON.parse(jsonDataElement.textContent); } catch(e) { jsonData = {}; }
-            }
-            editor = monaco.editor.create(document.getElementById('monaco-editor'), {
-                value: JSON.stringify(jsonData, null, 2),
-                language: 'json',
-                theme: 'vs',
-                automaticLayout: true,
-                minimap: { enabled: true },
-                scrollBeyondLastLine: false,
-                fontSize: 14,
-                lineNumbers: 'on',
-                renderLineHighlight: 'all',
-                roundedSelection: false,
-                selectOnLineNumbers: true,
-                formatOnPaste: true,
-                formatOnType: true
-            });
-
-            let decorations = [];
-            editor.onDidChangeModelContent(() => {
-                const model = editor.getModel();
-                try {
-                    JSON.parse(model.getValue());
-                    decorations = editor.deltaDecorations(decorations, []);
-                } catch (e) {
-                    const match = e.message.match(/at position (\d+)/);
-                    if (match) {
-                        const pos = parseInt(match[1]);
-                        const position = model.getPositionAt(pos);
-                        decorations = editor.deltaDecorations(decorations, [{
-                            range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column + 1),
-                            options: { inlineClassName: 'squiggly-error', hoverMessage: { value: e.message } }
-                        }]);
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Erreur Monaco:', error);
-            document.getElementById('monaco-editor').innerHTML = '<div class="alert alert-danger">Erreur lors du chargement de l\'éditeur JSON.</div>';
-        }
-    });
-
-    function copyJsonToClipboard(evt) {
-        if (!editor) return alert('Éditeur non initialisé');
-        const jsonContent = editor.getValue();
-        navigator.clipboard.writeText(jsonContent).then(function() {
-            const btn = evt?.target?.closest('.copy-btn');
-            if (btn) {
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-check"></i> Copié !';
-                btn.style.background = '#22c55e';
-                setTimeout(() => { btn.innerHTML = originalText; btn.style.background = '#10b981'; }, 2000);
-            }
-        }).catch(function(err) {
-            console.error('Erreur lors de la copie:', err);
-            alert('Erreur lors de la copie dans le presse-papiers');
-        });
-    }
-
-    function downloadJson() {
-        if (!editor) return alert('Éditeur non initialisé');
-        const jsonContent = editor.getValue();
-        const blob = new Blob([jsonContent], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `{{ document.title|slugify }}_page_{{ current_page_num }}_annotations.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-    </script>
+    {% else %}
+    <div class="summary-card">
+      <div class="summary-head">
+        <h3>
+          <i class="fas fa-exclamation-triangle"></i> JSON Non Disponible
+        </h3>
+        <span class="badge-pill badge-warn">
+          <i class="fas fa-exclamation-triangle"></i> Manquant
+        </span>
+      </div>
+      <div class="summary-body">
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle"></i>
+          Aucune donnée JSON disponible pour cette page.
+        </div>
+      </div>
+    </div>
     {% endif %}
 
     <!-- Action Buttons -->
-    <div class="card">
-    <div class="d-flex gap-3 justify-content-center">
-
+    <div class="action-buttons-section">
+      <div class="action-buttons-grid">
         {# Bouton "Page suivante" si pas dernière page #}
         {% if current_page_num < total_pages %}
         <a href="{% url 'expert:review_document' document.id %}?page={{ current_page_num|add:'1' }}"
-            class="btn btn-success btn-lg">
-            <i class="fas fa-check-circle"></i>
-            Valider JSON & Page Suivante ({{ current_page_num|add:'1' }})
+           class="action-btn success">
+          <i class="fas fa-check-circle"></i>
+          <div class="btn-content">
+            <span class="btn-main">Valider JSON & Page Suivante</span>
+            <span class="btn-sub">Aller à la page {{ current_page_num|add:'1' }}</span>
+          </div>
         </a>
         {% else %}
         {# Dernière page : bouton qui envoie un POST vers validate_document #}
         <button type="submit"
                 form="validateDocForm"
-                class="btn btn-success btn-lg"
+                class="action-btn success"
                 onclick="alert('Le document a été envoyé au Dev Métier.');">
-            <i class="fas fa-file-check me-2"></i>
-            Valider JSON & Résumé Document Complet
-            <small class="d-block">Marquer le document comme terminé</small>
+          <i class="fas fa-file-check"></i>
+          <div class="btn-content">
+            <span class="btn-main">Valider JSON & Résumé Document Complet</span>
+            <span class="btn-sub">Marquer le document comme terminé</span>
+          </div>
         </button>
         {% endif %}
 
         <a href="{% url 'expert:review_document' document.id %}?page={{ current_page_num }}"
-        class="btn" style="background: var(--glass-bg); color: var(--text-secondary); border: 1px solid var(--card-border);">
-        <i class="fas fa-arrow-left"></i>
-        Retour Page {{ current_page_num }}
+           class="action-btn secondary">
+          <i class="fas fa-arrow-left"></i>
+          <div class="btn-content">
+            <span class="btn-main">Retour Page {{ current_page_num }}</span>
+            <span class="btn-sub">Continuer la révision</span>
+          </div>
         </a>
+      </div>
     </div>
-    </div>
-
-    {# Formulaire autonome NON imbriqué, cible du bouton via form="validateDocForm" #}
-    <form id="validateDocForm" method="post" action="{% url 'expert:validate_document' document.id %}" style="display:none;">
-    {% csrf_token %}
-    </form>
-
-
+  </section>
 </div>
+
+{# Formulaire autonome NON imbriqué, cible du bouton via form="validateDocForm" #}
+<form id="validateDocForm" method="post" action="{% url 'expert:validate_document' document.id %}" style="display:none;">
+  {% csrf_token %}
+</form>
+
+<script>
+let editor = null;
+
+// Config Monaco comme la vue globale
+require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' }});
+
+require(['vs/editor/editor.main'], function() {
+    try {
+        const jsonDataElement = document.getElementById('json-data');
+        let jsonData = {};
+        if (jsonDataElement && jsonDataElement.textContent.trim()) {
+            try { jsonData = JSON.parse(jsonDataElement.textContent); } catch(e) { jsonData = {}; }
+        }
+        editor = monaco.editor.create(document.getElementById('monaco-editor'), {
+            value: JSON.stringify(jsonData, null, 2),
+            language: 'json',
+            theme: 'vs',
+            automaticLayout: true,
+            minimap: { enabled: true },
+            scrollBeyondLastLine: false,
+            fontSize: 14,
+            lineNumbers: 'on',
+            renderLineHighlight: 'all',
+            roundedSelection: false,
+            selectOnLineNumbers: true,
+            formatOnPaste: true,
+            formatOnType: true
+        });
+
+        let decorations = [];
+        editor.onDidChangeModelContent(() => {
+            const model = editor.getModel();
+            try {
+                JSON.parse(model.getValue());
+                decorations = editor.deltaDecorations(decorations, []);
+            } catch (e) {
+                const match = e.message.match(/at position (\d+)/);
+                if (match) {
+                    const pos = parseInt(match[1]);
+                    const position = model.getPositionAt(pos);
+                    decorations = editor.deltaDecorations(decorations, [{
+                        range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column + 1),
+                        options: { inlineClassName: 'squiggly-error', hoverMessage: { value: e.message } }
+                    }]);
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Erreur Monaco:', error);
+        document.getElementById('monaco-editor').innerHTML = '<div class="alert alert-info"><i class="fas fa-exclamation-circle"></i> Erreur lors du chargement de l\'éditeur JSON.</div>';
+    }
+});
+
+function copyJsonToClipboard(evt) {
+    if (!editor) return alert('Éditeur non initialisé');
+    const jsonContent = editor.getValue();
+    navigator.clipboard.writeText(jsonContent).then(function() {
+        const btn = evt?.target?.closest('.copy-btn');
+        if (btn) {
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Copié !';
+            btn.style.background = 'linear-gradient(135deg, #22c55e, #34d399)';
+            setTimeout(() => { 
+                btn.innerHTML = originalText; 
+                btn.style.background = 'linear-gradient(135deg, var(--pharma-accent), var(--pharma-accent-light))'; 
+            }, 2000);
+        }
+        showSuccessNotification('JSON copié dans le presse-papiers !');
+    }).catch(function(err) {
+        console.error('Erreur lors de la copie:', err);
+        alert('Erreur lors de la copie dans le presse-papiers');
+    });
+}
+
+function downloadJson() {
+    if (!editor) return alert('Éditeur non initialisé');
+    const jsonContent = editor.getValue();
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `{{ document.title|slugify }}_page_{{ current_page_num }}_annotations.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showSuccessNotification('JSON téléchargé avec succès !');
+}
+
+// Add JavaScript to handle modern interactions
+document.addEventListener('DOMContentLoaded', function() {
+  // Add modern hover effects
+  document.querySelectorAll('.action-btn').forEach(btn => {
+    btn.addEventListener('mouseenter', function() {
+      this.style.transform = 'translateY(-4px)';
+    });
+    
+    btn.addEventListener('mouseleave', function() {
+      this.style.transform = 'translateY(-2px)';
+    });
+  });
+
+  // Add ripple effect to buttons
+  document.querySelectorAll('.nav-btn, .action-btn, .copy-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      const ripple = document.createElement('span');
+      const rect = this.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height);
+      ripple.style.cssText = `
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.3);
+        transform: scale(0);
+        animation: ripple 0.6s linear;
+        width: ${size}px;
+        height: ${size}px;
+        left: ${e.clientX - rect.left - size/2}px;
+        top: ${e.clientY - rect.top - size/2}px;
+      `;
+      
+      if (!document.querySelector('#ripple-styles')) {
+        const style = document.createElement('style');
+        style.id = 'ripple-styles';
+        style.textContent = `
+          @keyframes ripple {
+            0% { transform: scale(0); opacity: 1; }
+            100% { transform: scale(4); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      
+      this.style.position = 'relative';
+      this.style.overflow = 'hidden';
+      this.appendChild(ripple);
+      
+      setTimeout(() => ripple.remove(), 600);
+    });
+  });
+});
+
+/* Notification System */
+function showSuccessNotification(message) {
+  const notification = document.createElement('div');
+  notification.className = 'expert-notification success';
+  notification.innerHTML = `
+    <div class="notification-content">
+      <i class="fas fa-check-circle"></i>
+      <span>${message}</span>
+    </div>
+  `;
+
+  if (!document.querySelector('#expert-notification-styles')) {
+    const style = document.createElement('style');
+    style.id = 'expert-notification-styles';
+    style.textContent = `
+      .expert-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,.15);
+        backdrop-filter: blur(10px);
+        animation: slideInRight .3s ease-out;
+        max-width: 400px;
+        font-family: Inter, sans-serif;
+      }
+      .expert-notification.success {
+        background: linear-gradient(135deg, rgba(16,185,129,.9), rgba(34,197,94,.9));
+        border: 1px solid rgba(16,185,129,.3);
+        color: #fff;
+      }
+      .expert-notification.error {
+        background: linear-gradient(135deg, rgba(239,68,68,.9), rgba(220,38,38,.9));
+        border: 1px solid rgba(239,68,68,.3);
+        color: #fff;
+      }
+      .notification-content {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        font-weight: 500;
+        font-size: .9rem;
+      }
+      .notification-content i {
+        font-size: 1.1rem;
+        flex-shrink: 0;
+      }
+      @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes slideOutRight {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.body.appendChild(notification);
+
+  setTimeout(() => {
+    notification.style.animation = 'slideOutRight .3s ease-in';
+    setTimeout(() => notification.remove(), 300);
+  }, 4000);
+}
+</script>
 
 {% endblock %}

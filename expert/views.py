@@ -2870,3 +2870,172 @@ def generate_regulatory_analysis(request, doc_id):
             'error': f'Error generating regulatory analysis: {str(e)}'
         }, status=500)
     
+
+# Fonctions pour la gestion des résumés de page
+@expert_required
+@csrf_exempt
+def save_page_summary(request, page_id):
+    """Sauvegarde du résumé d'une page"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        data = json.loads(request.body)
+        summary_text = data.get('summary_text', '').strip()
+        
+        page.page_summary = summary_text
+        page.summary_validated = False  # Réinitialiser la validation
+        page.summary_validated_at = None
+        page.summary_validated_by = None
+        page.save(update_fields=['page_summary', 'summary_validated', 'summary_validated_at', 'summary_validated_by'])
+        
+        return JsonResponse({'success': True, 'message': 'Résumé sauvegardé'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@expert_required
+@csrf_exempt
+def validate_page_summary(request, page_id):
+    """Validation du résumé d'une page"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    try:
+        page = get_object_or_404(DocumentPage, id=page_id)
+        data = json.loads(request.body)
+        summary_text = data.get('summary_text', '').strip()
+        
+        if not summary_text:
+            return JsonResponse({'error': 'Résumé vide'}, status=400)
+        
+        page.page_summary = summary_text
+        page.summary_validated = True
+        page.summary_validated_at = timezone.now()
+        page.summary_validated_by = request.user
+        page.save(update_fields=['page_summary', 'summary_validated', 'summary_validated_at', 'summary_validated_by'])
+        
+        return JsonResponse({'success': True, 'message': 'Résumé validé'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+    
+
+# Fonctions pour l'enrichissement sémantique du JSON
+@expert_required
+@csrf_exempt
+def enrich_document_json(request, doc_id):
+    """Enrichit le JSON d'un document avec du contexte sémantique"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id)
+        basic_json = document.global_annotations_json or {}
+
+        if not basic_json.get('entities'):
+            return JsonResponse({
+                'error': 'Aucune entité trouvée dans le document. Veuillez d\'abord générer le JSON de base.'
+            }, status=400)
+
+        # Utiliser votre fonction d'enrichissement existante
+        from .json_enrichment import enrich_document_json_for_expert
+        enriched_json = enrich_document_json_for_expert(document, basic_json)
+
+        document.enriched_annotations_json = enriched_json
+        document.enriched_at = timezone.now()
+        document.enriched_by = request.user
+        document.save(update_fields=['enriched_annotations_json', 'enriched_at', 'enriched_by'])
+
+        log_expert_action(
+            user=request.user,
+            action='json_enriched',
+            annotation=None,
+            document_id=document.id,
+            document_title=document.title,
+            reason="JSON enrichi automatiquement avec contexte sémantique"
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'JSON enrichi avec succès',
+            'enriched_json': enriched_json
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+    
+
+@expert_required
+def expert_view_document_annotation_json_enriched(request, doc_id):
+    """Vue pour le JSON enrichi sémantique"""
+    document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+
+    if not getattr(document, 'global_annotations_json', None):
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        fake_request = factory.post(f'/expert/annotation/document/{doc_id}/generate-summary/')
+        fake_request.user = request.user
+        expert_generate_document_annotation_summary(fake_request, doc_id)
+        document.refresh_from_db()
+
+    document_json = document.global_annotations_json or {}
+    enriched_json = getattr(document, 'enriched_annotations_json', None)
+
+    context = {
+        'document': document,
+        'global_annotations_json': document_json,
+        'enriched_annotations_json': enriched_json,
+        'display_json': enriched_json or document_json,
+        'global_annotations_summary': getattr(document, 'global_annotations_summary', '') or '',
+        'total_annotations': sum(p.annotations.count() for p in document.pages.all()),
+        'annotated_pages': document.pages.filter(annotations__isnull=False).distinct().count(),
+        'total_pages': document.total_pages,
+        'allowed_entity_types': list(document_json.get('entities', {}).keys()),
+        'has_enriched': bool(enriched_json),
+        'enriched_stats': {
+            'relations_count': len(enriched_json.get('relations', [])) if enriched_json else 0,
+            'qa_pairs_count': len(enriched_json.get('questions_answers', [])) if enriched_json else 0,
+            'contexts_count': len(enriched_json.get('contexts', {})) if enriched_json else 0,
+        },
+        'last_updated': (enriched_json or {}).get('last_updated'),
+        'last_updated_by': (enriched_json or {}).get('last_updated_by'),
+        'can_edit': True,
+    }
+    return render(request, 'expert/view_document_annotation_json_enriched.html', context)
+
+@expert_required
+@csrf_exempt
+def qa_feedback(request, doc_id):
+    """Gestion du feedback Q&A pour l'expert"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id)
+        data = json.loads(request.body)
+        question = data.get('question', '').strip()
+        corrected_answer = data.get('corrected_answer', '').strip()
+        source = data.get('source', 'enriched').lower()
+
+        if not question or not corrected_answer:
+            return JsonResponse({'error': 'Question ou réponse manquante'}, status=400)
+
+        enriched_json = document.enriched_annotations_json or {}
+        qa_list = enriched_json.setdefault('questions_answers', [])
+        
+        qa_list.append({
+            'question': question,
+            'answer': corrected_answer,
+            'confidence': 1.0,
+            'answer_type': 'expert_correction',
+            'source': source,
+            'created_by': 'expert',
+            'created_at': timezone.now().isoformat()
+        })
+        
+        document.enriched_annotations_json = enriched_json
+        document.save(update_fields=['enriched_annotations_json'])
+        
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
