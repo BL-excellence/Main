@@ -320,47 +320,7 @@ label.block { margin-bottom: 0.4rem; font-weight:500; font-size:0.98rem;}
 
         <!-- Sidebar -->
         <div class="sidebar-panel" style="display:flex; flex-direction:column; gap:2.2rem;">
-            {% if metadata.quality %}
-            <div class="card">
-                <h3 class="card-title">
-                    <i class="fas fa-chart-pie" style="color:var(--primary-light);"></i>
-                    Qualité d'extraction
-                </h3>
-                <div style="margin-bottom:1.5rem;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
-                        <span style="font-size:0.99rem; color:var(--text-muted);">Taux d'extraction</span>
-                        <strong style="font-size:1.1rem; color:var(--primary-dark);">{{ metadata.quality.extraction_rate }}%</strong>
-                    </div>
-                    <div class="progress-container">
-                        <div class="progress-bar" style="width: {{ metadata.quality.extraction_rate }}%"></div>
-                    </div>
-                </div>
-                <div style="margin-bottom:1.2rem;">
-                    <small style="color:var(--text-muted); font-weight:500;">Champs extraits :</small>
-                    <div style="margin-top:0.7rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
-                        {% for field, score in metadata.quality.field_scores.items %}
-                            <span class="champ-badge"><i class="fas fa-check-circle" style="margin-right:0.35em;"></i>{{ field|title }}</span>
-                        {% endfor %}
-                    </div>
-                </div>
-                <div>
-                    <small style="color:var(--text-muted); font-weight:500;">Scores de confiance :</small>
-                    <div style="margin-top:0.7rem;">
-                        {% for field, score in metadata.quality.field_scores.items %}
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.18rem;">
-                                <span style="color:var(--primary-dark); font-size:0.99rem;">{{ field|title }}</span>
-                                <span style="font-size:0.98rem; font-weight:600;
-                                    {% if score >= 80 %} color:#10b981;
-                                    {% elif score >= 50 %} color:#f59e0b;
-                                    {% else %} color:#dc2626; {% endif %}">
-                                    {{ score }}%
-                                </span>
-                            </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
+
 
             <div class="card">
                 <h3 class="card-title">
