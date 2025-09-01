@@ -311,4 +311,7 @@ urlpatterns = [
         name='dev_metier_document_json'
     ),
     path('clear_page_annotations/<int:page_id>/', views.clear_page_annotations, name='clear_page_annotations'),
+
+    path('dev-metier/documents/<int:doc_id>/save-json/', views.save_document_json_devmetier, name='save_document_json_devmetier'),
+
 ]

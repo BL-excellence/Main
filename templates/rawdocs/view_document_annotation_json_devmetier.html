@@ -534,7 +534,7 @@ body {
   </div>
 
   <div class="header-actions">
-    <a href="{% url 'rawdocs:annotation_dashboard' %}" class="btn-action">
+    <a href="{% url 'rawdocs:dev_metier_dashboard' %}" class="btn-action">
       <i class="fas fa-arrow-left"></i> Retour au Dashboard
     </a>
   </div>
@@ -635,32 +635,27 @@ body {
 {% endif %}
 
 <!-- JSON global structuré -->
+ {% if global_annotations_json %}
+  {{ global_annotations_json|json_script:"global-json" }}
+{% else %}
+  <script id="global-json" type="application/json">{}</script>
+{% endif %}
 <section class="json-container">
-  <h3><i class="fas fa-code"></i> JSON Global Structuré</h3>
-  {% if global_annotations_json %}
-  <div class="alert alert-info" style="margin-bottom: 1.5rem;">
-    <i class="fas fa-info-circle"></i> Ce JSON contient toutes les annotations consolidées pour ce document, organisées par type et par page.
-  </div>
+  <h3><i class="fas fa-code"></i> JSON Global (Éditable)</h3>
 
-  <div class="json-display" id="json-display">{{ global_annotations_json|format_json }}</div>
+  <div id="global-json-editor" style="height: 600px; border: 2px solid #e9ecef; border-radius: 8px;"></div>
 
-  <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-    <button class="copy-btn" onclick="copyJsonToClipboard()">
-      <i class="fas fa-copy"></i> Copier le JSON
+  <div style="display:flex; gap: 0.75rem; margin-top: 1rem;">
+    <button class="btn-action" onclick="saveGlobalJson()">
+      <i class="fas fa-save"></i> Enregistrer
     </button>
-    <button class="copy-btn" style="background: var(--pharma-primary);" onclick="downloadGlobalJson()">
+    <button class="btn-action" onclick="downloadGlobalJson()">
       <i class="fas fa-download"></i> Télécharger
     </button>
-    <button class="copy-btn" style="background: #6b7280;" onclick="toggleJsonFormat()">
-      <i class="fas fa-compress-alt"></i> Minifier
+    <button class="btn-action" onclick="beautifyGlobalJson()">
+      <i class="fas fa-magic"></i> Beautifier
     </button>
   </div>
-  {% else %}
-  <div class="alert alert-warning">
-    <i class="fas fa-exclamation-triangle"></i>
-    Aucun JSON global généré pour ce document. Les annotations n'ont peut-être pas encore été consolidées.
-  </div>
-  {% endif %}
 </section>
 
 <!-- Floating action button -->
@@ -720,6 +715,8 @@ body {
     </div>
   </div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
 
 <script>
 // Formatage JSON avancé avec coloration syntaxique améliorée
@@ -1007,5 +1004,102 @@ function applySyntaxHighlighting(jsonElement) {
         // En cas d'erreur, on laisse le contenu tel quel
     }
 }
+
+
+
+  let globalEditor = null;
+
+  function getCookie(name){
+    const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return m ? decodeURIComponent(m[2]) : null;
+  }
+
+  // Init Monaco
+  require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' }});
+  require(['vs/editor/editor.main'], function () {
+    const el = document.getElementById('global-json');
+    let data = {};
+    try { data = JSON.parse(el?.textContent || '{}'); } catch(e) { data = {}; }
+
+    globalEditor = monaco.editor.create(document.getElementById('global-json-editor'), {
+      value: JSON.stringify(data, null, 2),
+      language: 'json',
+      theme: 'vs',
+      automaticLayout: true,
+      minimap: { enabled: true },
+      scrollBeyondLastLine: false,
+      fontSize: 14,
+      lineNumbers: 'on',
+      formatOnPaste: true,
+      formatOnType: true
+    });
+  });
+
+  function beautifyGlobalJson(){
+    if(!globalEditor) return;
+    try{
+      const obj = JSON.parse(globalEditor.getValue());
+      globalEditor.setValue(JSON.stringify(obj, null, 2));
+      showToast('JSON formaté.', 'info');
+    }catch(e){
+      showToast('JSON invalide: ' + e.message, 'error');
+    }
+  }
+
+  async function saveGlobalJson() {
+    if (!globalEditor) {
+        alert('Éditeur non initialisé. Rechargez la page.');
+        return;
+    }
+
+    let payload;
+    try {
+        payload = JSON.parse(globalEditor.getValue());
+        console.log('JSON à sauvegarder :', payload);
+    } catch (e) {
+        alert('Le JSON est invalide : ' + e.message);
+        return;
+    }
+
+    try {
+        const url = "{% url 'rawdocs:save_document_json_devmetier' document.id %}";
+        console.log('Envoi vers :', url);
+
+        const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ json_content: payload })
+        });
+
+        const text = await res.text();
+        console.log('Réponse brute :', text);
+
+        let data;
+        try {
+        data = JSON.parse(text);
+        } catch (e) {
+        console.error('Erreur de parsing de la réponse :', e, text);
+        alert('Réponse du serveur invalide.');
+        return;
+        }
+
+        if (!res.ok || !data.success) {
+        const errorMsg = data.error || `Erreur HTTP ${res.status}`;
+        alert('Échec de la sauvegarde : ' + errorMsg);
+        return;
+        }
+
+        alert('JSON global sauvegardé avec succès !');
+    } catch (err) {
+        console.error('Erreur réseau :', err);
+        alert('Erreur lors de la connexion au serveur.');
+    }
+    }
+
 </script>
 {% endblock %}

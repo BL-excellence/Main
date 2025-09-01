@@ -24,7 +24,10 @@ from django.contrib.auth import views as auth_views
 from django.http import HttpResponse
 from django.views.decorators.http import require_POST
 from .metadata_rlhf_learning import MetadataRLHFLearner
-
+from datetime import timezone as dt_timezone
+from django.conf import settings
+from pymongo import MongoClient
+from django.utils import timezone
 
 
 from .models import (
@@ -38,6 +41,17 @@ from .utils import extract_metadonnees, extract_full_text
 from .annotation_utils import extract_pages_from_pdf
 from .rlhf_learning import RLHFGroqAnnotator
 from .table_image_extractor import TableImageExtractor
+
+
+# --- Mongo client (réutilisé) ---
+try:
+    _mongo_client = MongoClient(settings.MONGO_URI, serverSelectionTimeoutMS=5000)
+    _mongo_coll   = _mongo_client[settings.MONGO_DB][settings.MONGO_COLLECTION]
+    print("✅ Mongo prêt :", settings.MONGO_URI, settings.MONGO_DB, settings.MONGO_COLLECTION)
+except Exception as e:
+    _mongo_client = None
+    _mongo_coll   = None
+    print("⚠️ Mongo init KO:", e)
 
 
 # ——— Forms ——————————————————————————————————————————
@@ -2676,3 +2690,84 @@ def clear_page_annotations(request, page_id):
         return JsonResponse({'success': True})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@user_passes_test(is_dev_metier)
+@csrf_exempt
+def save_document_json_devmetier(request, doc_id):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'}, status=405)
+
+    try:
+        # 1) Charger le doc validé (même logique qu’avant)
+        document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+
+        # 2) Sécurité groupe
+        if not is_dev_metier(request.user):
+            return JsonResponse({'success': False, 'error': 'Permission refusée'}, status=403)
+
+        # 3) Parser JSON
+        data = json.loads(request.body)
+        json_content = data.get('json_content')
+        if json_content is None:
+            return JsonResponse({'success': False, 'error': 'Contenu JSON manquant'}, status=400)
+        try:
+            json.dumps(json_content)  # vérifie sérialisable
+        except (TypeError, ValueError):
+            return JsonResponse({'success': False, 'error': 'JSON invalide'}, status=400)
+
+        # 4) Historique (ancien JSON)
+        old_json = document.global_annotations_json or {}
+
+        # 5) Sauvegarde côté Django (SQLite) - complète (pas update_fields)
+        document.global_annotations_json = json_content
+        document.save()
+
+        # 6) Sauvegarde Mongo (UPsert par rawdoc_id)
+        mongo_write = {'matched': None, 'modified': None, 'upserted': None}
+        if _mongo_coll is not None:
+            payload = {
+                "rawdoc_id": int(doc_id),
+                "title": getattr(document, "title", None),
+                "file_name": getattr(document, "file_name", None),
+                "owner": getattr(getattr(document, "owner", None), "username", None),
+                "total_pages": getattr(document, "total_pages", None),
+                "global_annotations_json": json_content,
+                "updated_at": timezone.now(),
+                "updated_by": request.user.username,
+            }
+            res = _mongo_coll.update_one(
+                {"rawdoc_id": int(doc_id)},
+                {"$set": payload},
+                upsert=True,
+            )
+            mongo_write = {
+                'matched': res.matched_count,
+                'modified': res.modified_count,
+                'upserted': getattr(res, "upserted_id", None) is not None
+            }
+            print(f"✅ Mongo write d{doc_id}: matched={res.matched_count} modified={res.modified_count} upserted={getattr(res,'upserted_id',None)}")
+        else:
+            print("⚠️ Pas de connexion Mongo (_mongo_coll is None)")
+
+        # 7) Historique application
+        GlobalSummaryEditHistory.objects.create(
+            document=document,
+            old_summary=json.dumps(old_json),
+            new_summary=json.dumps(json_content),
+            modified_by=request.user,
+            reason='Modification JSON via éditeur Dev Métier'
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'JSON global sauvegardé dans MongoDB',
+            'mongo': mongo_write
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'JSON invalide dans la requête'}, status=400)
+    except Exception as e:
+        print(f"❌ Erreur sauvegarde JSON document {doc_id}: {e}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
