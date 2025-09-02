@@ -2168,6 +2168,16 @@ function renderInlineAnnotations(originalText, annotations) {
             window.getSelection().removeAllRanges();
 
             const annotationId = this.dataset.annotationId;
+
+            // Unwrap the span to keep only the original text (exclude the label)
+            const parent = this.parentNode;
+            const textOnly = this.childNodes && this.childNodes.length > 0 ? (this.childNodes[0].textContent || '') : this.textContent;
+            if (parent) {
+                parent.replaceChild(document.createTextNode(textOnly), this);
+                parent.normalize();
+            }
+
+            // Then persist deletion in backend
             deleteAnnotationSimple(annotationId);
         });
     });
@@ -2347,9 +2357,18 @@ function addClickHandlerToTempAnnotation(span) {
         e.stopPropagation();
         window.getSelection().removeAllRanges();
         
-        // For temporary annotations, just remove them visually
+        // For temporary annotations, unwrap the span and keep original text
         if (this.dataset.annotationId.startsWith('temp-')) {
-            this.remove();
+            const parent = this.parentNode;
+            // Only keep the textual part (exclude the label span)
+            const textOnly = this.childNodes && this.childNodes.length > 0 ? (this.childNodes[0].textContent || '') : this.textContent;
+            if (parent) {
+                parent.replaceChild(document.createTextNode(textOnly), this);
+                parent.normalize();
+            } else {
+                const label = this.querySelector('.ann-label');
+                if (label) label.remove();
+            }
         } else {
             deleteAnnotationSimple(this.dataset.annotationId);
         }
