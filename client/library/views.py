@@ -420,8 +420,54 @@ def documents_by_country(request, country):
     return render(request, 'client/library/documents_by_country.html', context)
 
 def document_detail(request, pk):
-    """Détail d'un RawDocument avec ses métadonnées extraites par les métadonneurs"""
+    """Détail d'un RawDocument (métadonneur) avec contenu structuré comme côté Client"""
     document = get_object_or_404(RawDocument, pk=pk, is_validated=True)
+
+    # Générer/charger HTML structuré (avec ?regen=1)
+    structured_html = document.structured_html or ''
+    method = document.structured_html_method or ''
+    confidence = document.structured_html_confidence
+    regen = request.GET.get('regen') in ['1', 'true', 'True']
+
+    if (regen or not structured_html) and getattr(document, 'file', None):
+        try:
+            # 1) UltraAdvancedPDFExtractor
+            try:
+                from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
+                ultra = UltraAdvancedPDFExtractor()
+                ultra_result = ultra.extract_ultra_structured_content(document.file.path)
+                structured_html = (ultra_result or {}).get('html') or ''
+                method = (ultra_result or {}).get('extraction_method', 'ultra_advanced_combined')
+                confidence = (ultra_result or {}).get('confidence_score')
+            except Exception as e:
+                logger.warning(f"UltraAdvancedPDFExtractor KO (doc {document.pk}): {e}")
+                structured_html = ''
+
+            # 2) Fallback tables+images
+            if not structured_html:
+                try:
+                    from rawdocs.table_image_extractor import TableImageExtractor
+                    tiex = TableImageExtractor(document.file.path)
+                    tiex.extract_tables_with_structure()
+                    tiex.extract_images()
+                    structured_html = tiex.get_combined_html()
+                    method = 'table_image_extractor'
+                    confidence = None
+                except Exception as e:
+                    logger.warning(f"Fallback TableImageExtractor KO (doc {document.pk}): {e}")
+
+            # Sauvegarde cache: éviter d'écraser si doc non client / non propriétaire
+            if structured_html:
+                if (document.source == 'Client') or (document.owner_id == getattr(request.user, 'id', None)):
+                    document.structured_html = structured_html
+                    document.structured_html_generated_at = timezone.now()
+                    document.structured_html_method = method
+                    document.structured_html_confidence = confidence
+                    document.save(update_fields=['structured_html','structured_html_generated_at','structured_html_method','structured_html_confidence'])
+        except Exception as e:
+            logger.error(f"Erreur génération HTML structuré (doc {document.pk}): {e}")
+
+    # Métadonnées
     metadata = {
         'title': document.title or 'Non spécifié',
         'doc_type': document.doc_type or 'Non spécifié', 
@@ -441,15 +487,20 @@ def document_detail(request, pk):
         'is_ready_for_expert': document.is_ready_for_expert,
         'expert_ready_at': document.expert_ready_at,
     }
+
     related_documents = RawDocument.objects.filter(
         doc_type=document.doc_type,
         country=document.country,
         is_validated=True
     ).exclude(pk=document.pk)[:5]
+
     context = {
         'document': document,
         'metadata': metadata,
         'related_documents': related_documents,
+        'structured_html': document.structured_html or structured_html or '',
+        'structured_html_method': method,
+        'structured_html_confidence': confidence,
     }
     return render(request, 'client/library/document_detail.html', context)
 

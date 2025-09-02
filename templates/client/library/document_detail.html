@@ -576,12 +576,32 @@
         </div>
     </div>
 
-    <!-- Metadata Section -->
+    <!-- Tabs: Métadonnées / Contenu structuré -->
     <div class="metadata-section">
-        <h2 class="metadata-title">
-            <i class="material-icons">info</i>
-            Métadonnées Extraites par les Métadonneurs
-        </h2>
+        <div style="display:flex; gap:12px; border-bottom:1px solid #e5e7eb; margin-bottom:16px; align-items:center;">
+            <button id="tab-meta" class="btn" style="background:#eef2ff; color:#1e293b;">Métadonnées</button>
+            <button id="tab-structured" class="btn" style="background:#f1f5f9; color:#1e293b;">Contenu structuré</button>
+            <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+                {% if structured_html %}
+                <span style="font-size:0.85rem; color:#64748b;">Généré: {{ document.structured_html_generated_at|date:"d/m/Y H:i" }} • Méthode: {{ structured_html_method|default:"auto" }}</span>
+                {% endif %}
+                <a href="?regen=1" class="btn btn-primary" title="Régénérer le contenu structuré">
+                    <i class="material-icons">refresh</i>
+                    <span class="text">Régénérer</span>
+                </a>
+                <a href="{% url 'client:library:download_document' document.pk %}" class="btn btn-primary" title="Télécharger">
+                    <i class="material-icons">download</i>
+                    <span class="text">Télécharger</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Panel Métadonnées -->
+        <div id="panel-meta">
+            <h2 class="metadata-title">
+                <i class="material-icons">info</i>
+                Métadonnées Extraites par les Métadonneurs
+            </h2>
 
         <div class="metadata-grid">
             <!-- Titre du document -->
@@ -740,6 +760,21 @@
         {% endif %}
     </div>
 
+        <!-- Panel Contenu structuré -->
+        <div id="panel-structured" style="display:none;">
+            {% if structured_html %}
+            <div class="structured-wrapper" style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; max-height:70vh; overflow:auto;">
+                {{ structured_html|safe }}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="material-icons">pending</i>
+                <h3>Contenu structuré non disponible</h3>
+                <p>Cliquez sur Régénérer pour lancer l'extraction complète (texte, tableaux, images).</p>
+            </div>
+            {% endif %}
+        </div>
+
     <!-- Content Sections -->
     <div class="content-sections">
         <div class="main-content">
@@ -834,23 +869,44 @@
 {% block extra_js %}
 <script src="{% static 'js/library.js' %}"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Track document view (could be used for analytics)
-    console.log('Document viewed: {{ document.title|escapejs }}');
+(function(){
+  // Onglets Meta / Structuré
+  const tabMeta = document.getElementById('tab-meta');
+  const tabStructured = document.getElementById('tab-structured');
+  const panelMeta = document.getElementById('panel-meta');
+  const panelStructured = document.getElementById('panel-structured');
+  function activate(tab){
+    if (!panelMeta || !panelStructured || !tabMeta || !tabStructured) return;
+    const isMeta = (tab === 'meta');
+    panelMeta.style.display = isMeta ? 'block' : 'none';
+    panelStructured.style.display = isMeta ? 'none' : 'block';
+    tabMeta.style.background = isMeta ? '#eef2ff' : '#f1f5f9';
+    tabStructured.style.background = isMeta ? '#f1f5f9' : '#eef2ff';
+  }
+  if (tabMeta && tabStructured){
+    tabMeta.addEventListener('click', function(){ activate('meta'); });
+    tabStructured.addEventListener('click', function(){ activate('structured'); });
+    {% if structured_html %}
+    activate('structured');
+    {% else %}
+    activate('meta');
+    {% endif %}
+  }
 
-    // Animation pour les metadata items
-    const metadataItems = document.querySelectorAll('.metadata-item');
-    metadataItems.forEach((item, index) => {
-        item.style.animationDelay = `${index * 0.1}s`;
-        item.style.opacity = '0';
-        item.style.transform = 'translateY(20px)';
-
-        setTimeout(() => {
-            item.style.transition = 'all 0.6s ease';
-            item.style.opacity = '1';
-            item.style.transform = 'translateY(0)';
-        }, index * 100);
+  // Animation légère métadonnées
+  document.addEventListener('DOMContentLoaded', function() {
+    const items = document.querySelectorAll('.metadata-item');
+    items.forEach((item, index) => {
+      item.style.animationDelay = `${index * 0.1}s`;
+      item.style.opacity = '0';
+      item.style.transform = 'translateY(20px)';
+      setTimeout(() => {
+        item.style.transition = 'all 0.6s ease';
+        item.style.opacity = '1';
+        item.style.transform = 'translateY(0)';
+      }, index * 100);
     });
-});
+  });
+})();
 </script>
 {% endblock %}
