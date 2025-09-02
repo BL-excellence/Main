@@ -675,9 +675,8 @@ def annotate_document(request, doc_id):
     else:
         whitelist.update([AnnotationType.REQUIRED_DOCUMENT, AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.PROCEDURE_TYPE])
 
-    base_qs = AnnotationType.objects.filter(name__in=list(whitelist))
-    used_qs = AnnotationType.objects.filter(id__in=used_type_ids)
-    annotation_types = (base_qs | used_qs).distinct().order_by('display_name')
+    # Show all types so newly created custom types are available immediately
+    annotation_types = AnnotationType.objects.all().order_by('display_name')
 
     return render(request, 'rawdocs/annotate_document.html', {
         'document': document,
@@ -1692,9 +1691,8 @@ def annotate_document(request, doc_id):
         AnnotationType.FILE_TYPE,
     }
 
-    base_qs = AnnotationType.objects.filter(name__in=list(whitelist))
-    used_qs = AnnotationType.objects.filter(id__in=used_type_ids)
-    annotation_types = (base_qs | used_qs).distinct().order_by('display_name')
+    # Show all types so newly created custom types are available immediately
+    annotation_types = AnnotationType.objects.all().order_by('display_name')
 
     return render(request, 'rawdocs/annotate_document.html', {
         'document': document,

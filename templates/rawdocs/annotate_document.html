@@ -2122,53 +2122,43 @@ function loadAndRenderAnnotations() {
 
 function renderInlineAnnotations(originalText, annotations) {
     const pageEl = document.getElementById("page-text");
-    
+
     if (!annotations || annotations.length === 0) {
         pageEl.textContent = originalText;
         return;
     }
-    
-    console.log('🎨 Rendering', annotations.length, 'annotations');
-    
-    // Start with clean text
-    let cleanText = originalText;
-    let workingText = cleanText;
-    
-    // Sort annotations by length (longest first) to avoid overlapping issues
-    const sortedAnnotations = [...annotations].sort((a, b) => b.selected_text.length - a.selected_text.length);
-    
-    let processedAnnotations = 0;
-    
-    for (let ann of sortedAnnotations) {
-        const searchText = ann.selected_text.trim();
-        
-        // Find the text in the working text (case-insensitive)
-        const searchTextLower = searchText.toLowerCase();
-        const workingTextLower = workingText.toLowerCase();
-        
-        let startIndex = workingTextLower.indexOf(searchTextLower);
-        
-        if (startIndex !== -1) {
-            // Get the actual text (preserving case)
-            const actualText = workingText.slice(startIndex, startIndex + searchText.length);
-            
-            // Create the replacement HTML
-            const annotationHtml = `<span class="inline-annotation" data-annotation-id="${ann.id}" style="background:${ann.color}; padding: 2px 4px; margin: 0 1px; border-radius: 3px; cursor: pointer;">${actualText}<span class="ann-label">${ann.type_display}</span></span>`;
-            
-            // Replace the text
-            workingText = workingText.slice(0, startIndex) + annotationHtml + workingText.slice(startIndex + searchText.length);
-            
-            processedAnnotations++;
-            console.log('✅ Processed annotation:', searchText);
-        } else {
-            console.log('❌ Could not find text in document:', searchText);
+
+    // Escape helper to keep HTML safe
+    const escapeHtml = (str) => String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    // Render by saved positions to ensure persistence after refresh
+    const anns = [...annotations].sort((a, b) => a.start_pos - b.start_pos);
+    let html = '';
+    let cursor = 0;
+    const maxLen = originalText.length;
+
+    for (const ann of anns) {
+        const start = Math.max(0, Math.min(ann.start_pos ?? 0, maxLen));
+        const end = Math.max(start, Math.min(ann.end_pos ?? start, maxLen));
+
+        if (cursor < start) {
+            html += escapeHtml(originalText.slice(cursor, start));
         }
+
+        const rawText = originalText.slice(start, end);
+        html += `<span class="inline-annotation" data-annotation-id="${ann.id}" style="background:${ann.color}; padding: 2px 4px; margin: 0 1px; border-radius: 3px; cursor: pointer;">${escapeHtml(rawText)}<span class="ann-label">${ann.type_display}</span></span>`;
+
+        cursor = end;
     }
-    
-    console.log(`🎨 Successfully processed ${processedAnnotations}/${annotations.length} annotations`);
-    
-    // Set the HTML content
-    pageEl.innerHTML = workingText;
+
+    if (cursor < maxLen) {
+        html += escapeHtml(originalText.slice(cursor));
+    }
+
+    pageEl.innerHTML = html;
 
     // Add click events for deletion
     pageEl.querySelectorAll('.inline-annotation').forEach(annotation => {
@@ -2176,13 +2166,13 @@ function renderInlineAnnotations(originalText, annotations) {
             e.preventDefault();
             e.stopPropagation();
             window.getSelection().removeAllRanges();
-            
+
             const annotationId = this.dataset.annotationId;
             deleteAnnotationSimple(annotationId);
         });
     });
-    
-    console.log('🎨 Annotations rendered successfully');
+
+    console.log('🎨 Annotations rendered using positions successfully');
 }
 
 
