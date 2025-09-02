@@ -1555,12 +1555,37 @@ class UltraAdvancedPDFExtractor:
     def _determine_reading_order(self, elements: List[Dict]) -> List[Dict]:
         return sorted(elements, key=lambda x: (x.get('position', {}).get('y', 0), x.get('position', {}).get('x', 0)))
 
+    def _normalize_whitespace(self, text: str) -> str:
+        """Fixe les coupures de mots et retours à la ligne indésirables.
+        - Dé-hyphénation: "Detai-\nls" -> "Details"
+        - Coupures simples: "Detai\nls" -> "Details"
+        - Espace unique entre mots.
+        """
+        try:
+            import re
+            if not text:
+                return text
+            # 1) Coller les mots coupés par tiret de fin de ligne
+            text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)
+            # 2) Coller les mots coupés sans tiret (petites lignes)
+            text = re.sub(r"(\w)\n(\w)", r"\1 \2", text)
+            # 3) Remplacer les multiples espaces/retours par un espace
+            text = re.sub(r"[\t\x0b\x0c\r ]+", " ", text)
+            # 4) Normaliser doubles sauts en paragraphes
+            text = re.sub(r"\n{2,}", "\n\n", text)
+            return text.strip()
+        except Exception:
+            return text
+
     def _generate_optimized_combined_text(self, elements: List[Dict], reading_order: List[Dict]) -> str:
         text_parts = []
         for element in reading_order:
             if element.get('type') == 'text' and element.get('text'):
-                text_parts.append(element['text'])
-        return '\n\n'.join(text_parts)
+                cleaned = self._normalize_whitespace(element['text'])
+                text_parts.append(cleaned)
+        # Regrouper les paragraphes proprement
+        combined = '\n\n'.join(t for t in text_parts if t)
+        return self._normalize_whitespace(combined)
 
     def _validate_table_structure(self, table: Dict) -> Optional[Dict]:
         return table if table.get('data') else None
@@ -1672,7 +1697,8 @@ class UltraAdvancedPDFExtractor:
         return '\n'.join(parts)
 
     def _generate_text_element_html(self, el: Dict, style: str) -> str:
-        text = el.get('text', '')
+        raw = el.get('text', '')
+        text = self._normalize_whitespace(raw)
         cls = 'ultra-element ultra-text'
         return f'<div class="{cls}" style="{style}"><div class="editable-content">{text}</div></div>'
 
