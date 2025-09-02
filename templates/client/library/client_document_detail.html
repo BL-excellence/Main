@@ -554,80 +554,112 @@
         </div>
     </div>
 
-    <!-- Metadata Section -->
+    <!-- Tabs: Métadonnées / Contenu structuré -->
     <div class="metadata-section">
-        <h2 class="section-title">Métadonnées Extraites</h2>
-        
-        <div class="metadata-grid">
-            <div class="metadata-item">
-                <div class="metadata-icon">
-                    <i class="material-icons">title</i>
-                </div>
-                <div class="metadata-content">
-                    <h4>Titre</h4>
-                    <p>{{ metadata.title }}</p>
-                </div>
+        <div style="display:flex; gap:12px; border-bottom:1px solid #e5e7eb; margin-bottom:16px;">
+            <button id="tab-meta" class="btn" style="background:#eef2ff; color:#1e293b;">Métadonnées</button>
+            <button id="tab-structured" class="btn" style="background:#f1f5f9; color:#1e293b;">Contenu structuré</button>
+            <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+                {% if structured_html %}
+                <span style="font-size:0.85rem; color:#64748b;">Généré: {{ document.structured_html_generated_at|date:"d/m/Y H:i" }} • Méthode: {{ structured_html_method|default:"auto" }}</span>
+                {% endif %}
+                <a href="?regen=1" class="btn btn-primary" title="Régénérer le contenu structuré">
+                    <i class="material-icons">refresh</i>
+                    <span class="text">Régénérer</span>
+                </a>
             </div>
+        </div>
+
+        <!-- Panel Métadonnées -->
+        <div id="panel-meta">
+            <h2 class="section-title">Métadonnées Extraites</h2>
             
-            <div class="metadata-item">
-                <div class="metadata-icon">
-                    <i class="material-icons">category</i>
+            <div class="metadata-grid">
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">title</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Titre</h4>
+                        <p>{{ metadata.title }}</p>
+                    </div>
                 </div>
-                <div class="metadata-content">
-                    <h4>Type de Document</h4>
-                    <p>{{ metadata.doc_type }}</p>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">category</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Type de Document</h4>
+                        <p>{{ metadata.doc_type }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">calendar_today</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Date de Publication</h4>
+                        <p>{{ metadata.publication_date }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">tag</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Version</h4>
+                        <p>{{ metadata.version }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">business</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Source</h4>
+                        <p>{{ metadata.source }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">public</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Pays</h4>
+                        <p>{{ metadata.country }}</p>
+                    </div>
+                </div>
+                
+                <div class="metadata-item">
+                    <div class="metadata-icon">
+                        <i class="material-icons">language</i>
+                    </div>
+                    <div class="metadata-content">
+                        <h4>Langue</h4>
+                        <p>{{ metadata.language }}</p>
+                    </div>
                 </div>
             </div>
-            
-            <div class="metadata-item">
-                <div class="metadata-icon">
-                    <i class="material-icons">calendar_today</i>
-                </div>
-                <div class="metadata-content">
-                    <h4>Date de Publication</h4>
-                    <p>{{ metadata.publication_date }}</p>
-                </div>
+        </div>
+
+        <!-- Panel Contenu structuré -->
+        <div id="panel-structured" style="display:none;">
+            {% if structured_html %}
+            <div class="structured-wrapper" style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; max-height:70vh; overflow:auto;">
+                {{ structured_html|safe }}
             </div>
-            
-            <div class="metadata-item">
-                <div class="metadata-icon">
-                    <i class="material-icons">tag</i>
-                </div>
-                <div class="metadata-content">
-                    <h4>Version</h4>
-                    <p>{{ metadata.version }}</p>
-                </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="material-icons">pending</i>
+                <h3>Contenu structuré non disponible</h3>
+                <p>Cliquez sur Régénérer pour lancer l'extraction complète (texte, tableaux, images).</p>
             </div>
-            
-            <div class="metadata-item">
-                <div class="metadata-icon">
-                    <i class="material-icons">business</i>
-                </div>
-                <div class="metadata-content">
-                    <h4>Source</h4>
-                    <p>{{ metadata.source }}</p>
-                </div>
-            </div>
-            
-            <div class="metadata-item">
-                <div class="metadata-icon">
-                    <i class="material-icons">public</i>
-                </div>
-                <div class="metadata-content">
-                    <h4>Pays</h4>
-                    <p>{{ metadata.country }}</p>
-                </div>
-            </div>
-            
-            <div class="metadata-item">
-                <div class="metadata-icon">
-                    <i class="material-icons">language</i>
-                </div>
-                <div class="metadata-content">
-                    <h4>Langue</h4>
-                    <p>{{ metadata.language }}</p>
-                </div>
-            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -663,4 +695,35 @@
     </div>
     {% endif %}
 </div>
+
+{% block extra_js %}
+<script>
+(function(){
+  const tabMeta = document.getElementById('tab-meta');
+  const tabStructured = document.getElementById('tab-structured');
+  const panelMeta = document.getElementById('panel-meta');
+  const panelStructured = document.getElementById('panel-structured');
+  if (!tabMeta || !tabStructured || !panelMeta || !panelStructured) return;
+
+  function activate(tab){
+    const isMeta = (tab === 'meta');
+    panelMeta.style.display = isMeta ? 'block' : 'none';
+    panelStructured.style.display = isMeta ? 'none' : 'block';
+    tabMeta.style.background = isMeta ? '#eef2ff' : '#f1f5f9';
+    tabStructured.style.background = isMeta ? '#f1f5f9' : '#eef2ff';
+  }
+
+  tabMeta.addEventListener('click', function(){ activate('meta'); });
+  tabStructured.addEventListener('click', function(){ activate('structured'); });
+
+  // Default: open Structured if available
+  {% if structured_html %}
+  activate('structured');
+  {% else %}
+  activate('meta');
+  {% endif %}
+})();
+</script>
+{% endblock %}
+
 {% endblock %}

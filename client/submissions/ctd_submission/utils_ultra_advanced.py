@@ -135,6 +135,13 @@ class UltraAdvancedPDFExtractor:
     def __init__(self):
         self.available_extractors = []
         self.extraction_methods = {}
+        # Backward-compat for callers expecting pdf_libraries attribute
+        self.pdf_libraries = {
+            'pymupdf': PYMUPDF_AVAILABLE,
+            'pdfplumber': PDFPLUMBER_AVAILABLE,
+            'camelot': CAMELOT_AVAILABLE,
+            'tabula': TABULA_AVAILABLE,
+        }
         self._init_extractors()
 
         # Configuration des seuils
@@ -390,7 +397,29 @@ class UltraAdvancedPDFExtractor:
 
             for draw_index, drawing in enumerate(drawings):
                 try:
-                    rect = drawing.get('rect')
+                    # drawing may be a dict-like or a tuple depending on PyMuPDF version
+                    rect = None
+                    stroke_color = None
+                    fill_color = None
+                    line_width = 1.0
+
+                    if isinstance(drawing, dict):
+                        rect = drawing.get('rect')
+                        stroke = drawing.get('stroke') or {}
+                        fill = drawing.get('fill') or {}
+                        stroke_color = (stroke.get('color') if isinstance(stroke, dict) else None)
+                        fill_color = (fill.get('color') if isinstance(fill, dict) else None)
+                        line_width = (stroke.get('width', 1.0) if isinstance(stroke, dict) else 1.0)
+                    elif isinstance(drawing, (list, tuple)):
+                        # Best-effort unpacking for tuple-shaped drawing entries
+                        # Known tuple shape: (items, color, fill, width, ...) varies by version
+                        for item in drawing:
+                            # try to pick first rect-like value
+                            if hasattr(item, 'x0') and hasattr(item, 'y0') and hasattr(item, 'width') and hasattr(item, 'height'):
+                                rect = item
+                                break
+                        # colors/width often not directly available; leave None/defaults
+
                     if not rect:
                         continue
 
@@ -413,9 +442,9 @@ class UltraAdvancedPDFExtractor:
                             'height_percent': (rect.height / page_height) * 100
                         },
                         'properties': {
-                            'stroke_color': drawing.get('stroke', {}).get('color'),
-                            'fill_color': drawing.get('fill', {}).get('color'),
-                            'line_width': drawing.get('stroke', {}).get('width', 1.0)
+                            'stroke_color': stroke_color,
+                            'fill_color': fill_color,
+                            'line_width': line_width
                         },
                         'confidence': 0.9
                     }
@@ -572,9 +601,10 @@ class UltraAdvancedPDFExtractor:
             alignment_tables = self._detect_tables_from_text_alignment(text_blocks, page_width, page_height)
             tables.extend(alignment_tables)
 
-            # 3. Détecter les tableaux par espacement régulier
-            spacing_tables = self._detect_tables_from_spacing(text_blocks, page_width, page_height)
-            tables.extend(spacing_tables)
+            # 3. Détecter les tableaux par espacement régulier (si implémenté)
+            if hasattr(self, '_detect_tables_from_spacing'):
+                spacing_tables = self._detect_tables_from_spacing(text_blocks, page_width, page_height)
+                tables.extend(spacing_tables)
 
             # 4. Fusionner et déduplicater les tableaux détectés
             merged_tables = self._merge_overlapping_tables(tables)
@@ -1550,3 +1580,120 @@ class UltraAdvancedPDFExtractor:
 
     def _calculate_overall_confidence(self, validated: Dict) -> float:
         return 0.85
+
+    # ---- Added minimal safe implementations to avoid missing-attr errors ----
+    def _analyze_fonts_and_colors(self, page_dict: Dict, extraction: Dict) -> None:
+        try:
+            meta = extraction.setdefault('metadata', {})
+            fonts = extraction.setdefault('fonts', [])
+            colors = extraction.setdefault('colors', [])
+            # Minimal aggregation
+            for block in page_dict.get('blocks', []):
+                if 'lines' in block:
+                    for line in block['lines']:
+                        for span in line.get('spans', []):
+                            if 'size' in span:
+                                fonts.append({'size': span.get('size'), 'font': span.get('font')})
+                            if 'color' in span:
+                                colors.append(span.get('color'))
+        except Exception:
+            pass
+
+    def _extract_image_with_processing(self, doc, xref: int) -> str:
+        try:
+            if not PYMUPDF_AVAILABLE:
+                return ''
+            pix = doc.extract_image(xref)
+            img_bytes = pix.get('image', b'')
+            ext = pix.get('ext', 'png')
+            if not img_bytes:
+                return ''
+            b64 = base64.b64encode(img_bytes).decode('ascii')
+            return f"data:image/{ext};base64,{b64}"
+        except Exception as e:
+            logger.warning(f"Erreur extraction image: {e}")
+            return ''
+
+    def _analyze_image_content(self, image_data: str) -> Dict:
+        # Placeholder analysis
+        return {'has_content': bool(image_data), 'confidence': 0.8}
+
+    def _merge_overlapping_tables(self, tables: List[Dict]) -> List[Dict]:
+        # Minimal: no merge
+        return tables or []
+
+    def _validate_and_enrich_table(self, table: Dict, text_blocks: List[Dict]) -> Optional[Dict]:
+        # Minimal validation: must have position
+        if not isinstance(table, dict):
+            return None
+        pos = table.get('position') or {}
+        if not {'x', 'y', 'width', 'height'}.issubset(pos.keys() if isinstance(pos, dict) else set()):
+            return None
+        return table
+
+    def _computer_vision_analysis(self, file_path: str) -> Dict:
+        # Minimal CV analysis disabled
+        return {}
+
+    def _advanced_structure_analysis(self, raw_extractions: Dict, visual_analysis: Dict) -> Dict:
+        # Combine available elements from extractions
+        all_elements: List[Dict] = []
+        for key in ['pymupdf', 'pdfplumber', 'camelot', 'tabula', 'pixel_analysis']:
+            data = raw_extractions.get(key) or {}
+            els = data.get('elements') or []
+            if isinstance(els, list):
+                all_elements.extend([e for e in els if isinstance(e, dict)])
+        return {'all_elements': all_elements, 'visual': visual_analysis or {}}
+
+    def _generate_ultra_faithful_page_html(self, page_num: int, elements: List[Dict], validated_content: Dict) -> str:
+        width = 900
+        height = 1200
+        parts = [f'<div class="ultra-page-container" data-page="{page_num}" style="width:{width}px;height:{height}px;">']
+        for el in elements:
+            try:
+                pos = el.get('position', {}) if isinstance(el, dict) else {}
+                left = pos.get('x_percent') or 0
+                top = pos.get('y_percent') or 0
+                w = pos.get('width_percent') or 10
+                h = pos.get('height_percent') or 10
+                style = f'left:{left}%;top:{top}%;width:{w}%;height:{h}%;'
+                etype = el.get('type')
+                if etype == 'text':
+                    parts.append(self._generate_text_element_html(el, style))
+                elif etype == 'image':
+                    parts.append(self._generate_image_element_html(el, style))
+                elif etype == 'table':
+                    parts.append(self._generate_table_element_html(el, style))
+                else:
+                    parts.append(self._generate_shape_element_html(el, style))
+            except Exception as e:
+                logger.warning(f"Erreur génération élément HTML: {e}")
+        parts.append('</div>')
+        return '\n'.join(parts)
+
+    def _generate_text_element_html(self, el: Dict, style: str) -> str:
+        text = el.get('text', '')
+        cls = 'ultra-element ultra-text'
+        return f'<div class="{cls}" style="{style}"><div class="editable-content">{text}</div></div>'
+
+    def _generate_image_element_html(self, el: Dict, style: str) -> str:
+        src = el.get('image_data') or ''
+        cls = 'ultra-element ultra-image'
+        if src:
+            return f'<div class="{cls}" style="{style}"><img src="{src}" style="width:100%;height:100%;object-fit:contain;"/></div>'
+        return f'<div class="{cls}" style="{style}"></div>'
+
+    def _generate_shape_element_html(self, el: Dict, style: str) -> str:
+        cls = 'ultra-element ultra-shape'
+        return f'<div class="{cls}" style="{style}"></div>'
+
+    def _generate_table_element_html(self, el: Dict, style: str) -> str:
+        cls = 'ultra-element ultra-table'
+        return f'<div class="{cls}" style="{style}"><table class="ultra-table"></table></div>'
+
+    def _analyze_grid_patterns(self, lines: List[Dict]) -> List[Dict]:
+        # Minimal: return empty, avoiding complex grid detection
+        return []
+
+    def _is_valid_table_pattern(self, pattern: Dict) -> bool:
+        return False

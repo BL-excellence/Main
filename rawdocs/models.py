@@ -83,6 +83,12 @@ class RawDocument(models.Model):
     enriched_at = models.DateTimeField(null=True, blank=True)
     enriched_by = models.ForeignKey(User, on_delete=SET_NULL, null=True, blank=True, related_name='enriched_documents')
     
+    # Contenu structuré (cache HTML fidèle au PDF)
+    structured_html = models.TextField(blank=True, help_text="HTML structuré fidèle au PDF (mise en page, tableaux, images)")
+    structured_html_generated_at = models.DateTimeField(null=True, blank=True, help_text="Date de génération du HTML structuré")
+    structured_html_method = models.CharField(max_length=100, blank=True, help_text="Méthode d'extraction utilisée")
+    structured_html_confidence = models.FloatField(null=True, blank=True, help_text="Confiance globale de l'extraction")
+    
     # Validation par expert
     is_expert_validated = models.BooleanField(default=False, help_text="Document validé par un expert")
     expert_validated_at = models.DateTimeField(null=True, blank=True, help_text="Date de validation par un expert")

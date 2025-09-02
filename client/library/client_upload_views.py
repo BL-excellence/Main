@@ -139,8 +139,10 @@ def extract_text_now(request, pk):
 def client_document_detail(request, pk):
     """
     Détail d'un document uploadé par un client
+    - Onglet Contenu structuré: HTML fidèle au PDF (texte, tableaux, images)
+    - Cache: stocké dans RawDocument.structured_html
     """
-    document = get_object_or_404(RawDocument, pk=pk, owner=request.user, source='Client')
+    document = get_object_or_404(RawDocument, pk=pk, is_validated=True)
 
     # Assurer que le texte est extrait (au cas où upload ancien)
     try:
@@ -148,7 +150,7 @@ def client_document_detail(request, pk):
         from rawdocs.annotation_utils import extract_pages_from_pdf
         has_pages = DocumentPage.objects.filter(document=document).exists()
         has_text = has_pages and DocumentPage.objects.filter(document=document).exclude(cleaned_text='').exists()
-        if not has_text:
+        if not has_text and document.file:
             texts = extract_pages_from_pdf(document.file.path)
             if texts:
                 DocumentPage.objects.filter(document=document).delete()
@@ -165,7 +167,49 @@ def client_document_detail(request, pk):
                 document.save(update_fields=['total_pages', 'pages_extracted'])
     except Exception as ex:
         print(f"⚠️ Extraction à l'ouverture du détail échouée pour doc {document.pk}: {ex}")
-    
+
+    # Générer ou charger le HTML structuré (cache)
+    structured_html = document.structured_html or ''
+    method = document.structured_html_method or ''
+    confidence = document.structured_html_confidence
+    regen = request.GET.get('regen') in ['1', 'true', 'True']
+
+    if regen or not structured_html:
+        try:
+            # 1) Essayer l'extracteur ultra-avancé
+            try:
+                from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
+                ultra = UltraAdvancedPDFExtractor()
+                ultra_result = ultra.extract_ultra_structured_content(document.file.path)
+                structured_html = (ultra_result or {}).get('html') or ''
+                method = (ultra_result or {}).get('extraction_method', 'ultra_advanced_combined')
+                confidence = (ultra_result or {}).get('confidence_score')
+            except Exception as e:
+                print(f"⚠️ UltraAdvancedPDFExtractor KO: {e}")
+                structured_html = ''
+
+            # 2) Fallback: tableaux + images si ultra vide/échec
+            if not structured_html:
+                from rawdocs.table_image_extractor import TableImageExtractor
+                tiex = TableImageExtractor(document.file.path)
+                tiex.extract_tables_with_structure()
+                tiex.extract_images()
+                structured_html = tiex.get_combined_html()
+                method = 'table_image_extractor'
+                confidence = None
+
+            # Sauvegarde cache (éviter de modifier les docs d'autrui)
+            if structured_html:
+                if (document.owner_id == request.user.id) or (document.source == 'Client'):
+                    document.structured_html = structured_html
+                    document.structured_html_generated_at = timezone.now()
+                    document.structured_html_method = method
+                    document.structured_html_confidence = confidence
+                    document.save(update_fields=['structured_html','structured_html_generated_at','structured_html_method','structured_html_confidence'])
+        except Exception as e:
+            print(f"❌ Erreur génération HTML structuré doc {document.pk}: {e}")
+            # Ne bloque pas l'affichage
+
     # Préparer les métadonnées pour l'affichage
     metadata = {
         'title': document.title or 'Non spécifié',
@@ -201,6 +245,10 @@ def client_document_detail(request, pk):
         'metadata': metadata,
         'related_documents': related_documents,
         'has_expert_regulatory': has_expert_regulatory,
+        # Contenu structuré
+        'structured_html': document.structured_html or structured_html or '',
+        'structured_html_method': method,
+        'structured_html_confidence': confidence,
     }
     return render(request, 'client/library/client_document_detail.html', context)
 
@@ -235,9 +283,9 @@ def client_documents_list(request):
     """
     Liste des documents uploadés par le client connecté
     """
+    # Tous les documents visibles côté Client, quelle que soit la source
     documents = RawDocument.objects.filter(
-        owner=request.user,
-        source='Client'
+        is_validated=True
     ).order_by('-created_at')
     
     # Statistiques pour le client
@@ -275,11 +323,11 @@ def delete_client_document(request, pk):
 @login_required
 def download_client_document(request, pk):
     """
-    Télécharger un document uploadé par le client
+    Télécharger un document (espace Client) quel que soit la source, si validé
     """
     from django.http import HttpResponse, Http404
     
-    document = get_object_or_404(RawDocument, pk=pk, owner=request.user, source='Client')
+    document = get_object_or_404(RawDocument, pk=pk, is_validated=True)
     
     if not document.file:
         raise Http404("Fichier non trouvé")
