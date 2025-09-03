@@ -865,11 +865,29 @@ def validate_page_annotations(request, page_id):
                 doc.save(update_fields=['is_ready_for_expert', 'expert_ready_at'])
         except Exception:
             pass
-
+        
+        # Format score with enhanced details
+        score_pct = int(feedback_result["feedback_score"] * 100)
+        quality_label = "Excellente" if score_pct >= 85 else "Bonne" if score_pct >= 70 else "Moyenne" if score_pct >= 50 else "À améliorer"
+        
+        # Get details from feedback result if available
+        precision = feedback_result.get("precision", 0)
+        recall = feedback_result.get("recall", 0)
+        
+        # Build detailed message
+        detailed_message = f'Page validée! Score: {score_pct}% ({quality_label}) - IA améliorée!'
+        
+        # If we have precision and recall info, include it
+        if precision and recall:
+            detailed_message = f'Page validée! Score: {score_pct}% ({quality_label}) - Précision: {int(precision*100)}%, Rappel: {int(recall*100)}% - IA améliorée!'
+            
         return JsonResponse({
             'success': True,
-            'message': f'Page validée! Score: {feedback_result["feedback_score"]:.0%} - IA améliorée!',
+            'message': detailed_message,
             'feedback_score': feedback_result['feedback_score'],
+            'quality_label': quality_label,
+            'precision': precision,
+            'recall': recall,
             'corrections_summary': feedback_result['corrections_summary'],
             'ai_improved': True
         })
@@ -1691,8 +1709,9 @@ def annotate_document(request, doc_id):
         AnnotationType.FILE_TYPE,
     }
 
-    # Show all types so newly created custom types are available immediately
-    annotation_types = AnnotationType.objects.all().order_by('display_name')
+    base_qs = AnnotationType.objects.filter(name__in=list(whitelist))
+    used_qs = AnnotationType.objects.filter(id__in=used_type_ids)
+    annotation_types = (base_qs | used_qs).distinct().order_by('display_name')
 
     return render(request, 'rawdocs/annotate_document.html', {
         'document': document,
@@ -2842,3 +2861,396 @@ def save_document_json_devmetier(request, doc_id):
     except Exception as e:
         print(f"❌ Erreur sauvegarde JSON document {doc_id}: {e}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+
+@login_required
+@require_POST
+def mistral_suggest_annotations(request, page_id):
+    """
+    Endpoint API pour suggérer des annotations à l'aide de Mistral AI
+    Cette fonction utilise l'API Mistral pour analyser le texte d'une page
+    et générer des suggestions d'entités à annoter
+    
+    Si un document_id est fourni dans le corps de la requête et que le page_id est fictif (1),
+    nous utilisons le document_id pour trouver la première page non annotée
+    """
+    from .annotation_utils import call_mistral_annotation  # Import ici pour éviter les imports circulaires
+    from .models import DocumentPage, Annotation, AnnotationType, Document
+
+    try:
+        # Vérifier si nous avons reçu un document_id dans le corps de la requête
+        data = json.loads(request.body.decode('utf-8')) if request.body else {}
+        document_id = data.get('document_id')
+        
+        # Si nous avons un document_id et que le page_id est l'ID fictif (1)
+        if document_id and page_id == 1:
+            # Récupérer le document
+            document = get_object_or_404(Document, id=document_id)
+            
+            # Vérifier les permissions
+            if not document.is_accessible_by(request.user):
+                return JsonResponse({'success': False, 'error': 'Accès non autorisé'}, status=403)
+            
+            # Trouver la première page du document
+            page = DocumentPage.objects.filter(document=document).order_by('page_number').first()
+            
+            if not page:
+                return JsonResponse({'success': False, 'error': 'Aucune page trouvée pour ce document'}, status=404)
+            
+        else:
+            # Récupérer la page directement par son ID
+            page = get_object_or_404(DocumentPage, id=page_id)
+            document = page.document
+            
+            # Vérifier les permissions
+            if not document.is_accessible_by(request.user):
+                return JsonResponse({'success': False, 'error': 'Accès non autorisé'}, status=403)
+        
+        # Supprimer les annotations existantes sur cette page
+        Annotation.objects.filter(page=page).delete()
+        
+        # Obtenir le texte de la page
+        page_text = page.cleaned_text or ""
+        
+        # Appeler l'API Mistral pour obtenir des suggestions d'annotations
+        annotations_data = call_mistral_annotation(page_text, page.page_number)
+        
+        # Créer les nouvelles annotations basées sur les suggestions de Mistral
+        created_count = 0
+        for ann_data in annotations_data:
+            # Vérifier que les données sont valides
+            if not (isinstance(ann_data, dict) and 'text' in ann_data and 'type' in ann_data and 
+                   'start_pos' in ann_data and 'end_pos' in ann_data):
+                continue
+            
+            # Récupérer ou créer le type d'annotation
+            ann_type_name = ann_data['type'].lower().strip()
+            ann_type, created = AnnotationType.objects.get_or_create(
+                name=ann_type_name,
+                defaults={
+                    'color': '#' + ''.join([format(hash(ann_type_name) % 256, '02x') for _ in range(3)]),
+                    'description': f"Type détecté par Mistral AI: {ann_type_name}"
+                }
+            )
+            
+            # Créer l'annotation
+            annotation = Annotation.objects.create(
+                page=page,
+                text=ann_data['text'],
+                start_pos=ann_data['start_pos'],
+                end_pos=ann_data['end_pos'],
+                annotation_type=ann_type,
+                confidence=ann_data.get('confidence', 0.75),
+                created_by=request.user,
+                is_ai_generated=True,
+                ai_reasoning=ann_data.get('reasoning', 'Détecté par Mistral AI')
+            )
+            created_count += 1
+        
+        # Construire l'URL de redirection vers la page d'annotation
+        redirect_url = f"/rawdocs/annotate/{document.id}/?page={page.page_number}"
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Mistral AI a suggéré {created_count} annotations',
+            'annotations_count': created_count,
+            'redirect_url': redirect_url
+        })
+        
+    except Exception as e:
+        print(f"❌ Erreur lors de la suggestion d'annotations avec Mistral: {e}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def test_mistral_page(request):
+    """
+    Page de test pour le fonctionnement de Mistral Annotation
+    """
+    return render(request, 'rawdocs/test_mistral.html')
+
+
+def mistral_direct_analysis(request):
+    """
+    Analyse directe d'un texte avec Mistral AI sans l'associer à une page de document
+    Utilisé principalement pour la page de test
+    """
+    import json
+    import traceback
+    from django.http import JsonResponse
+    from .annotation_utils import call_mistral_annotation
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode HTTP non autorisée'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        text = data.get('text')
+        page_number = data.get('page_number', 1)
+        
+        if not text:
+            return JsonResponse({'success': False, 'error': 'Aucun texte fourni'}, status=400)
+        
+        # Limiter la taille du texte pour éviter les abus
+        if len(text) > 10000:
+            return JsonResponse({'success': False, 'error': 'Texte trop long (max 10000 caractères)'}, status=400)
+        
+        # Appel à l'API Mistral
+        print(f"🔍 Analyse directe Mistral d'un texte de {len(text)} caractères")
+        annotations_data = call_mistral_annotation(text, page_number)
+        
+        return JsonResponse({
+            'success': True,
+            'annotations': annotations_data,
+            'text_length': len(text)
+        })
+        
+    except Exception as e:
+        traceback.print_exc()
+        print(f"❌ Exception lors de l'analyse Mistral: {e}")
+        return JsonResponse({
+            'success': False, 
+            'error': f"Une erreur est survenue lors de l'analyse: {str(e)}"
+        }, status=500)
+
+def mistral_analyze_document(request, document_id):
+    """
+    Analyse un document avec Mistral AI pour proposer des types d'entités d'annotation pertinents
+    en fonction du contexte et de la langue du document.
+    """
+    from .annotation_utils import analyze_document_context_with_mistral
+    import traceback
+    
+    # Débogage: Ajouter des logs au début
+    print(f"🔵 API mistral_analyze_document appelée pour document_id={document_id}")
+    print(f"🔵 Méthode: {request.method}, Utilisateur: {request.user}")
+    
+    # Pour débogage: Retourner un succès simulé pour tester la redirection
+    if request.GET.get('debug') == '1':
+        print("🟠 MODE DEBUG: Retour d'une réponse simulée")
+        first_page = 1
+        return JsonResponse({
+            'success': True,
+            'message': "Test de redirection réussi",
+            'document_domain': "Test",
+            'document_language': "fr",
+            'entity_types': [
+                {"id": 1, "name": "test", "display_name": "Test", "description": "Entité de test", "color": "#FF5733"}
+            ],
+            'entity_types_count': 1,
+            'annotation_url': f"/rawdocs/annotate_document/{document_id}/?page=1"
+        })
+    
+    try:
+        # Récupérer le document
+        document = get_object_or_404(RawDocument, id=document_id)
+        
+        # Vérifier que l'utilisateur a accès au document
+        if not document.is_accessible_by(request.user):
+            print(f"🔴 Accès refusé: L'utilisateur {request.user} n'a pas accès au document {document_id}")
+            return JsonResponse({
+                'success': False, 
+                'error': 'Vous n\'avez pas l\'autorisation d\'accéder à ce document'
+            }, status=403)
+        
+        # Log pour débuguer
+        print(f"🔍 Début analyse Mistral du document ID={document_id}")
+        
+        # Récupérer les pages du document pour l'analyse
+        pages = DocumentPage.objects.filter(document=document).order_by('page_number')
+        
+        if not pages.exists():
+            return JsonResponse({
+                'success': False, 
+                'error': 'Aucune page trouvée pour ce document'
+            }, status=404)
+        
+        # Préparer un échantillon de texte pour l'analyse (premières pages)
+        document_text = ""
+        for page in pages[:5]:  # Limiter à 5 pages pour l'analyse
+            document_text += page.cleaned_text + "\n\n"
+            if len(document_text) > 15000:  # Limiter la taille
+                document_text = document_text[:15000]
+                break
+                
+        # Toujours détecter automatiquement la langue du document
+        # et utiliser cette langue pour les annotations
+        detect_document_language = True
+        annotation_language = None  # Pas de langue forcée, on utilisera celle du document
+        
+        # Détecter la langue avec une méthode qui prend en charge de nombreuses langues
+        
+        # Marqueurs pour un large éventail de langues (ajout de langues européennes et mondiales)
+        language_markers = {
+            # Langues latines
+            'fr': ["le", "la", "les", "des", "pour", "avec", "par", "dans", "ce", "cette", "ces", "est", "sont", "était", "qui", "que"],
+            'es': ["el", "la", "los", "las", "de", "en", "para", "con", "por", "es", "son", "fue", "que", "pero", "como", "cuando"],
+            'it': ["il", "la", "i", "le", "di", "in", "per", "con", "da", "è", "sono", "era", "che", "ma", "come", "quando"],
+            'pt': ["o", "a", "os", "as", "de", "em", "para", "com", "por", "é", "são", "foi", "que", "mas", "como", "quando"],
+            'ro': ["un", "o", "și", "în", "la", "cu", "de", "pe", "pentru", "este", "sunt", "care", "că", "dar", "acest", "acesta"],
+            
+            # Langues germaniques
+            'en': ["the", "and", "of", "in", "to", "for", "with", "by", "this", "that", "is", "are", "was", "were", "which", "who"],
+            'de': ["der", "die", "das", "und", "in", "mit", "für", "von", "zu", "ist", "sind", "war", "wenn", "aber", "oder", "wie"],
+            'nl': ["de", "het", "een", "in", "op", "voor", "met", "door", "en", "is", "zijn", "was", "waren", "die", "dat", "als"],
+            'sv': ["en", "ett", "och", "att", "det", "är", "som", "för", "med", "på", "av", "den", "till", "inte", "har", "från"],
+            
+            # Langues slaves
+            'bg': ["на", "и", "за", "се", "от", "да", "в", "с", "по", "е", "са", "като", "че", "това", "тези", "този"],
+            'ru': ["и", "в", "не", "на", "с", "по", "для", "от", "из", "о", "что", "это", "этот", "как", "так", "когда"],
+            'pl': ["w", "i", "z", "na", "do", "się", "jest", "to", "że", "dla", "nie", "jak", "przez", "od", "po", "który"],
+            'cs': ["a", "v", "na", "s", "z", "do", "je", "to", "že", "pro", "jako", "když", "od", "nebo", "také", "který"],
+            
+            # Autres langues européennes
+            'el': ["και", "του", "της", "τη", "σε", "από", "με", "για", "ο", "η", "το", "οι", "τα", "είναι", "που", "αυτό"],
+            'hu': ["a", "az", "és", "van", "egy", "hogy", "nem", "ez", "azt", "mint", "csak", "de", "ha", "vagy", "aki", "ami"],
+            'fi': ["ja", "on", "että", "ei", "se", "hän", "ovat", "oli", "kun", "mitä", "tai", "kuin", "mutta", "vain", "jos", "myös"]
+        }
+        
+        # Mapper le code de langue à un nom plus explicite pour les logs
+        lang_names = {
+            'fr': 'Français', 
+            'en': 'Anglais',
+            'de': 'Allemand',
+            'es': 'Espagnol',
+            'it': 'Italien',
+            'pt': 'Portugais'
+        }
+        
+        # Préparer le texte pour la détection
+        document_text_lower = " " + document_text.lower() + " "
+        
+        # Compter les occurrences de chaque marqueur de langue
+        language_counts = {}
+        for lang, markers in language_markers.items():
+            count = sum(document_text_lower.count(f" {marker} ") for marker in markers)
+            language_counts[lang] = count
+        
+        # Mapper le code de langue à un nom plus explicite pour les logs
+        lang_names = {
+            'fr': 'Français', 
+            'en': 'Anglais',
+            'de': 'Allemand',
+            'es': 'Espagnol',
+            'it': 'Italien',
+            'pt': 'Portugais',
+            'ro': 'Roumain',
+            'nl': 'Néerlandais',
+            'sv': 'Suédois',
+            'bg': 'Bulgare',
+            'ru': 'Russe',
+            'pl': 'Polonais',
+            'cs': 'Tchèque',
+            'el': 'Grec',
+            'hu': 'Hongrois',
+            'fi': 'Finnois'
+        }
+        
+        # Détection automatique de la langue du document
+        document_language = "fr"  # Valeur par défaut
+        
+        if detect_document_language:
+            # Trouver la langue avec le plus de marqueurs
+            if language_counts:
+                detected_lang = max(language_counts, key=language_counts.get)
+                lang_count = language_counts[detected_lang]
+                
+                # Vérifier si la détection est fiable (au moins 3 marqueurs trouvés)
+                if lang_count >= 3:
+                    document_language = detected_lang
+                    lang_name = lang_names.get(document_language, f'Autre ({document_language})')
+                    print(f"🔍 Langue du document détectée: {lang_name} ({document_language}) avec {lang_count} marqueurs")
+                else:
+                    # Pas assez de marqueurs, utiliser la langue par défaut
+                    document_language = "fr"
+                    print(f"⚠️ Détection de langue peu fiable ({lang_count} marqueurs). Document considéré en français par défaut")
+            else:
+                # Aucun marqueur trouvé, utiliser la langue par défaut
+                document_language = "fr"
+                print("⚠️ Aucun marqueur de langue trouvé. Document considéré en français par défaut")
+        
+        # Toujours utiliser la langue du document pour les annotations
+        language = document_language
+        print(f"🔄 Utilisation automatique de la langue du document pour les annotations: {language}")
+            
+        # Appeler Mistral pour l'analyse contextuelle
+        print(f"📝 Appel à Mistral pour analyse document (langue: {language})")
+        context_analysis = analyze_document_context_with_mistral(document_text, language)
+        
+        if "error" in context_analysis and not context_analysis.get("entity_types"):
+            print(f"❌ Erreur lors de l'analyse Mistral: {context_analysis['error']}")
+            return JsonResponse({
+                'success': False, 
+                'error': f"Erreur lors de l'analyse: {context_analysis['error']}"
+            }, status=500)
+        
+        # Traiter les types d'entités proposés par Mistral
+        entity_types = context_analysis.get("entity_types", [])
+        print(f"✅ Mistral a proposé {len(entity_types)} types d'entités")
+        
+        # Créer ou mettre à jour les types d'annotation dans la base de données
+        created_types = []
+        for entity_type in entity_types:
+            name = entity_type.get("name", "").lower().strip()
+            display_name = entity_type.get("display_name", name).strip()
+            description = entity_type.get("description", "").strip()
+            
+            if not name:
+                continue
+                
+            # Générer une couleur aléatoire basée sur le nom (pour être cohérent)
+            color = '#' + ''.join([format(hash(name + str(i)) % 256, '02x') for i in range(3)])
+            
+            # Créer ou mettre à jour le type d'annotation
+            ann_type, created = AnnotationType.objects.get_or_create(
+                name=name,
+                defaults={
+                    'display_name': display_name,
+                    'description': description,
+                    'color': color
+                }
+            )
+            
+            # Mettre à jour si le type existe déjà
+            if not created:
+                ann_type.description = description
+                ann_type.display_name = display_name
+                ann_type.save()
+                
+            created_types.append({
+                "id": ann_type.id,
+                "name": ann_type.name,
+                "display_name": ann_type.display_name,
+                "description": ann_type.description,
+                "color": ann_type.color
+            })
+        
+        # Construire l'URL de redirection
+        first_page = pages.first()
+        annotation_url = f"/rawdocs/annotate/{document.id}/?page={first_page.page_number}"
+        
+        # Obtenir le nom d'affichage de la langue
+        detected_lang_name = lang_names.get(document_language, document_language)
+        
+        # Retourner la réponse
+        return JsonResponse({
+            'success': True,
+            'message': f"Mistral a identifié {len(created_types)} types d'entités pour ce document",
+            'document_domain': context_analysis.get('document_domain', 'Non spécifié'),
+            'document_language': document_language,  # Code ISO de la langue du document (fr, en, de, etc.)
+            'displayed_language': detected_lang_name,  # Nom de la langue pour affichage (Français, Anglais, etc.)
+            'entity_types': created_types,
+            'entity_types_count': len(created_types),
+            'annotation_url': annotation_url
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Exception lors de l'analyse Mistral: {e}")
+        return JsonResponse({
+            'success': False, 
+            'error': f"Une erreur est survenue: {str(e)}"
+        }, status=500)

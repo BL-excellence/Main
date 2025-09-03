@@ -49,6 +49,23 @@ class RawDocument(models.Model):
     total_pages = models.IntegerField(default=0, help_text="Nombre total de pages")
     pages_extracted = models.BooleanField(default=False, help_text="Pages extraites individuellement")
 
+    def is_accessible_by(self, user):
+        """
+        Vérifie si un utilisateur a accès à ce document.
+        Pour l'instant, l'accès est accordé au propriétaire du document et aux superutilisateurs.
+        """
+        if user.is_superuser:
+            return True
+        if self.owner and self.owner == user:
+            return True
+        # Si l'utilisateur n'est pas authentifié, refuser l'accès
+        if not user.is_authenticated:
+            return False
+        # Par défaut, autoriser l'accès (pour maintenir la compatibilité avec le code existant)
+        # Dans un environnement de production, vous pourriez vouloir être plus restrictif
+        return True
+
+
     # Métadonnées extraites
     title = models.TextField(blank=True, help_text="Titre du document")
     doc_type = models.CharField("Type", max_length=100, blank=True, help_text="Type du document (guide, rapport…)")

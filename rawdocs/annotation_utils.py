@@ -3,8 +3,13 @@
 import re
 import json
 import requests
-from typing import List, Dict, Tuple
+import logging
+from typing import List, Dict, Tuple, Set
 from PyPDF2 import PdfReader
+
+# Configurer le logging pour tracer les appels à Mistral
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def extract_pages_from_pdf(file_path: str) -> List[str]:
@@ -561,3 +566,140 @@ def fix_overlapping_annotations(annotations, text):
                 fixed_annotations.append(ann)
 
     return fixed_annotations
+
+
+def analyze_document_context_with_mistral(document_text: str, document_language: str = "fr") -> Dict:
+    """
+    Analyse le contexte d'un document avec Mistral AI pour proposer des entités d'annotation pertinentes
+    
+    Args:
+        document_text: Texte du document à analyser
+        document_language: Langue du document (fr, en, etc.)
+        
+    Returns:
+        Dict contenant les types d'entités proposés et leurs descriptions
+    """
+    logger.info("🔍 Lancement de l'analyse contextuelle Mistral pour un document")
+    
+    # Utiliser la même clé API que pour l'annotation
+    MISTRAL_API_KEY = "oKdjCl98ACUqpUc4TCyqcfZFMzNNdapl"
+    
+    # Limiter la taille du texte pour l'analyse (premiers 10000 caractères)
+    sample_text = document_text[:10000]
+    
+    try:
+        url = "https://api.mistral.ai/v1/chat/completions"
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {MISTRAL_API_KEY}"
+        }
+        
+        # Déterminer les instructions de langue en fonction de la langue détectée
+        language_instructions = {
+            'fr': {
+                'context': "en français",
+                'instruction': "Tu DOIS utiliser le français pour tous les noms et descriptions",
+                'prompt_intro': "En tant qu'expert en analyse de documents réglementaires pharmaceutiques, ton objectif est d'identifier les types d'entités pertinents pour ce document en français."
+            },
+            'en': {
+                'context': "in English",
+                'instruction': "You MUST use English for all names and descriptions",
+                'prompt_intro': "As an expert in pharmaceutical regulatory document analysis, your goal is to identify relevant entity types for this document in English."
+            },
+            'de': {
+                'context': "auf Deutsch",
+                'instruction': "Du MUSST Deutsch für alle Namen und Beschreibungen verwenden",
+                'prompt_intro': "Als Experte für die Analyse pharmazeutischer Zulassungsdokumente ist es dein Ziel, relevante Entitätstypen für dieses Dokument auf Deutsch zu identifizieren."
+            },
+            'es': {
+                'context': "en español",
+                'instruction': "DEBES usar español para todos los nombres y descripciones",
+                'prompt_intro': "Como experto en análisis de documentos regulatorios farmacéuticos, tu objetivo es identificar tipos de entidades relevantes para este documento en español."
+            },
+            'it': {
+                'context': "in italiano",
+                'instruction': "DEVI usare l'italiano per tutti i nomi e le descrizioni",
+                'prompt_intro': "Come esperto nell'analisi di documenti normativi farmaceutici, il tuo obiettivo è identificare i tipi di entità rilevanti per questo documento in italiano."
+            },
+            'pt': {
+                'context': "em português",
+                'instruction': "Você DEVE usar português para todos os nomes e descrições",
+                'prompt_intro': "Como especialista em análise de documentos regulatórios farmacêuticos, seu objetivo é identificar tipos de entidades relevantes para este documento em português."
+            }
+        }
+        
+        # Obtenir les instructions pour la langue détectée ou utiliser l'anglais comme fallback universel
+        lang_info = language_instructions.get(document_language, language_instructions['en'])
+        
+        # Toujours ajouter une instruction explicite de langue, quelle que soit la langue détectée
+        prompt = f"""
+        {lang_info['prompt_intro']}
+        
+        INSTRUCTION IMPORTANTE: {lang_info['instruction']}. Utilise la langue du document pour toutes les réponses.
+        
+        Voici un extrait du document:
+        
+        ```
+        {sample_text}
+        ```
+        
+        1. Identifie le domaine exact du document.
+        2. Propose 5 à 10 types d'entités qui seraient pertinents à annoter dans ce document.
+        3. Pour chaque type d'entité, fournis UNIQUEMENT DANS LA LANGUE DU DOCUMENT:
+           - Un nom court et descriptif
+           - Une définition claire
+           - Des exemples probables qu'on pourrait trouver dans ce type de document
+        
+        Format de réponse UNIQUEMENT en JSON:
+        {{
+            "document_domain": "domaine détecté",
+            "document_language": "langue détectée",
+            "entity_types": [
+                {{
+                    "name": "nom_entite",
+                    "display_name": "Nom Affiché",
+                    "description": "Description claire de l'entité",
+                    "examples": ["exemple1", "exemple2"]
+                }}
+            ]
+        }}
+        
+        Retourne UNIQUEMENT le JSON, sans aucun texte avant ou après.
+        """
+        
+        logger.info("📤 Envoi de la requête à Mistral AI pour l'analyse contextuelle")
+        
+        data = {
+            "model": "mistral-large-latest",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.4,
+            "max_tokens": 2000
+        }
+        
+        response = requests.post(url, headers=headers, json=data, timeout=60)
+        
+        if response.status_code == 200:
+            result = response.json()
+            response_text = result['choices'][0]['message']['content']
+            
+            logger.info("✅ Réponse reçue de Mistral AI pour l'analyse contextuelle")
+            
+            # Nettoyer la réponse pour extraire uniquement le JSON
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                context_data = json.loads(json_str)
+                
+                logger.info(f"🎯 Mistral a proposé {len(context_data.get('entity_types', []))} types d'entités")
+                return context_data
+            else:
+                logger.error("❌ Impossible d'extraire le JSON de la réponse Mistral")
+                return {"error": "Format de réponse incorrect", "entity_types": []}
+        else:
+            logger.error(f"❌ Erreur API Mistral: {response.status_code}")
+            return {"error": f"Erreur API: {response.status_code}", "entity_types": []}
+            
+    except Exception as e:
+        logger.error(f"❌ Exception lors de l'appel à Mistral: {e}")
+        return {"error": str(e), "entity_types": []}

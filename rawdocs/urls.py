@@ -313,5 +313,17 @@ urlpatterns = [
     path('clear_page_annotations/<int:page_id>/', views.clear_page_annotations, name='clear_page_annotations'),
 
     path('dev-metier/documents/<int:doc_id>/save-json/', views.save_document_json_devmetier, name='save_document_json_devmetier'),
+    
+        # API pour la suggestion d'annotations avec Mistral
+    path('api/mistral/suggest_annotations/<int:page_id>/', views.mistral_suggest_annotations, name='mistral_suggest_annotations'),
+    
+    # API pour l'analyse du document avec Mistral (types d'entités dynamiques)
+    path('api/mistral/analyze_document/<int:document_id>/', views.mistral_analyze_document, name='mistral_analyze_document'),
+
+    # Page de test pour Mistral Annotation (temporaire pour débogage)
+    path('test_mistral/', views.test_mistral_page, name='test_mistral'),
+    
+    # API pour l'analyse directe de texte avec Mistral (pour la page de test)
+    path('api/mistral/direct_analysis/', views.mistral_direct_analysis, name='mistral_direct_analysis'),
 
 ]
