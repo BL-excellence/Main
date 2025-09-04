@@ -153,7 +153,13 @@ class UltraAdvancedPDFExtractor:
             'ocr_confidence_threshold': 0.6,
             'structure_validation_threshold': 0.8,
             'alignment_tolerance': 3.0,
-            'merge_distance_threshold': 10.0
+            'merge_distance_threshold': 10.0,
+            'line_height_tolerance': 5.0,
+            'sentence_break_threshold': 10.0,
+            # Paramètres spécifiques au footer (bas de page)
+            'footer_height_ratio': 0.12,         # 12% bas de page considéré footer
+            'footer_overlap_threshold': 0.4,     # plus strict que global (0.4)
+            'footer_keep_highest_conf': True     # garder le texte avec meilleure confiance
         }
 
         # Modèles pré-entraînés (simulés)
@@ -492,135 +498,143 @@ class UltraAdvancedPDFExtractor:
         return text_blocks
 
     def _cluster_text_spans(self, spans: List[Dict]) -> Dict[int, List[Dict]]:
-        """Clustering des spans de texte par ML"""
+        """Clustering des spans de texte avec détection des phrases"""
         if not SKLEARN_AVAILABLE or len(spans) < 2:
             return {0: spans}
-
         try:
-            # Préparer les features pour le clustering
             features = []
             for span in spans:
                 bbox = span.get('bbox', [0, 0, 0, 0])
                 font_size = span.get('size', 12)
-
-                features.append([
-                    bbox[0],  # x
-                    bbox[1],  # y
-                    bbox[2] - bbox[0],  # width
-                    bbox[3] - bbox[1],  # height
-                    font_size,
-                    len(span.get('text', ''))  # text length
-                ])
-
-            # Normaliser les features
+                text = span.get('text', '').strip()
+                is_end_of_sentence = 1.0 if re.search(r'[.!?]$', text) else 0.0
+                features.append([bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1], font_size, len(text), is_end_of_sentence])
             scaler = StandardScaler()
             features_scaled = scaler.fit_transform(features)
-
-            # DBSCAN clustering
-            clustering = DBSCAN(
-                eps=self.config['text_clustering_eps'] / 100,  # Normalized
-                min_samples=1
-            ).fit(features_scaled)
-
-            # Grouper par clusters
+            clustering = DBSCAN(eps=self.config['text_clustering_eps'] / 100, min_samples=1, metric='euclidean').fit(features_scaled)
             clustered = defaultdict(list)
             for i, label in enumerate(clustering.labels_):
-                clustered[label].append(spans[i])
-
-            return dict(clustered)
-
+                if label != -1:
+                    clustered[label].append(spans[i])
+            # Ajuster pour les phrases continues
+            adjusted_clusters = {}
+            for cluster_id, cluster_spans in clustered.items():
+                current_cluster = []
+                prev_y = cluster_spans[0]['bbox'][1]
+                for span in sorted(cluster_spans, key=lambda s: (s['bbox'][1], s['bbox'][0])):
+                    if (abs(span['bbox'][1] - prev_y) > self.config['sentence_break_threshold'] or
+                        re.search(r'[.!?]$', span.get('text', ''))):
+                        if current_cluster:
+                            adjusted_clusters[len(adjusted_clusters)] = current_cluster
+                            current_cluster = [span]
+                        else:
+                            current_cluster.append(span)
+                    else:
+                        current_cluster.append(span)
+                    prev_y = span['bbox'][1]
+                if current_cluster:
+                    adjusted_clusters[len(adjusted_clusters)] = current_cluster
+            return adjusted_clusters if adjusted_clusters else {0: spans}
         except Exception as e:
             logger.error(f"Erreur clustering ML: {e}")
             return {0: spans}
-
-    def _create_text_block_from_spans(self, spans: List[Dict], page_num: int,
-                                      page_width: float, page_height: float) -> Optional[Dict]:
-        """Créer un bloc de texte cohérent à partir des spans"""
+    
+    def _create_text_block_from_spans(self, spans: List[Dict], page_num: int, page_width: float, page_height: float) -> Optional[Dict]:
+        """Créer un bloc de texte cohérent avec préservation des phrases"""
         if not spans:
             return None
-
         try:
-            # Calculer la bounding box globale
             min_x = min(span['bbox'][0] for span in spans)
             min_y = min(span['bbox'][1] for span in spans)
             max_x = max(span['bbox'][2] for span in spans)
             max_y = max(span['bbox'][3] for span in spans)
-
-            # Trier les spans par position (lecture naturelle)
             sorted_spans = sorted(spans, key=lambda s: (s['bbox'][1], s['bbox'][0]))
-
-            # Combiner le texte
-            combined_text = ' '.join(span['text'].strip() for span in sorted_spans if span['text'].strip())
-
-            if not combined_text:
+            lines = []
+            current_line = []
+            prev_y = sorted_spans[0]['bbox'][1]
+            for span in sorted_spans:
+                if abs(span['bbox'][1] - prev_y) > self.config['line_height_tolerance']:
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = [span]
+                    prev_y = span['bbox'][1]
+                else:
+                    current_line.append(span)
+            if current_line:
+                lines.append(current_line)
+            combined_text = ''
+            prev_line_text = ''
+            for i, line_spans in enumerate(lines):
+                line_text = self._join_spans_with_spacing(line_spans).strip()
+                if i > 0:
+                    # Gestion de la césure (hyphenation) entre lignes
+                    if self._should_merge_hyphen(prev_line_text, line_text):
+                        combined_text = combined_text.rstrip()
+                        if combined_text.endswith('-'):
+                            combined_text = combined_text[:-1]
+                    else:
+                        last_char = combined_text[-1] if combined_text else ''
+                        if last_char and not re.search(r'[.!?]$', last_char):
+                            combined_text += ' '
+                combined_text += line_text
+                prev_line_text = line_text
+            combined_text = self._normalize_whitespace(combined_text)
+            if not combined_text.strip():
                 return None
-
-            # Analyser le style dominant
             style_analysis = self._analyze_dominant_style(spans)
-
-            # Classifier le type d'élément
             element_type = self._classify_text_element(combined_text, style_analysis)
-
             text_block = {
-                'type': 'text',
-                'element_type': element_type,
-                'page': page_num,
-                'text': combined_text,
+                'type': 'text', 'element_type': element_type, 'page': page_num, 'text': combined_text,
                 'position': {
-                    'x': float(min_x),
-                    'y': float(min_y),
-                    'width': float(max_x - min_x),
-                    'height': float(max_y - min_y),
-                    'x_percent': (min_x / page_width) * 100,
-                    'y_percent': (min_y / page_height) * 100,
-                    'width_percent': ((max_x - min_x) / page_width) * 100,
-                    'height_percent': ((max_y - min_y) / page_height) * 100
+                    'x': float(min_x), 'y': float(min_y), 'width': float(max_x - min_x), 'height': float(max_y - min_y),
+                    'x_percent': (min_x / page_width) * 100, 'y_percent': (min_y / page_height) * 100,
+                    'width_percent': ((max_x - min_x) / page_width) * 100, 'height_percent': ((max_y - min_y) / page_height) * 100
                 },
-                'style': style_analysis,
-                'spans_count': len(spans),
-                'confidence': self._calculate_text_confidence(spans, combined_text)
+                'style': style_analysis, 'spans_count': len(spans), 'confidence': self._calculate_text_confidence(spans, combined_text)
             }
-
             return text_block
-
         except Exception as e:
             logger.error(f"Erreur création bloc texte: {e}")
             return None
+    
 
-    def _detect_tables_geometric_analysis(self, text_blocks: List[Dict], shapes: List[Dict],
-                                          page_width: float, page_height: float) -> List[Dict]:
-        """Détection avancée de tableaux par analyse géométrique"""
+    def _detect_tables_geometric_analysis(self, text_blocks: List[Dict], shapes: List[Dict], page_width: float, page_height: float) -> List[Dict]:
+        """Détection avancée de tableaux par analyse géométrique avec intégration texte"""
         tables = []
-
         try:
-            # 1. Détecter les grilles de lignes
             grid_tables = self._detect_tables_from_lines(shapes, page_width, page_height)
             tables.extend(grid_tables)
-
-            # 2. Détecter les tableaux par alignement de texte
             alignment_tables = self._detect_tables_from_text_alignment(text_blocks, page_width, page_height)
             tables.extend(alignment_tables)
-
-            # 3. Détecter les tableaux par espacement régulier (si implémenté)
-            if hasattr(self, '_detect_tables_from_spacing'):
-                spacing_tables = self._detect_tables_from_spacing(text_blocks, page_width, page_height)
-                tables.extend(spacing_tables)
-
-            # 4. Fusionner et déduplicater les tableaux détectés
             merged_tables = self._merge_overlapping_tables(tables)
-
-            # 5. Valider et enrichir les tableaux
             validated_tables = []
             for table in merged_tables:
-                validated = self._validate_and_enrich_table(table, text_blocks)
-                if validated:
-                    validated_tables.append(validated)
-
+                validated_table = self._validate_and_enrich_table(table, text_blocks)
+                if validated_table:
+                    # Associer le tableau au texte adjacent s'il est proche
+                    adjacent_text = self._find_adjacent_text(table, text_blocks)
+                    if adjacent_text:
+                        validated_table['adjacent_text'] = adjacent_text
+                    validated_tables.append(validated_table)
             return validated_tables
-
         except Exception as e:
             logger.error(f"Erreur détection tableaux géométrique: {e}")
             return []
+        
+
+    def _find_adjacent_text(self, table: Dict, text_blocks: List[Dict]) -> Optional[str]:
+        """Trouver le texte adjacent à un tableau"""
+        table_pos = Position(**table['position'])
+        min_distance = float('inf')
+        closest_text = None
+        for block in text_blocks:
+            block_pos = Position(**block['position'])
+            distance = table_pos.distance_to(block_pos)
+            if distance < self.config['merge_distance_threshold'] and not table_pos.overlaps(block_pos):
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_text = block['text']
+        return closest_text    
 
     def _detect_tables_from_lines(self, shapes: List[Dict], page_width: float, page_height: float) -> List[Dict]:
         """Détection de tableaux à partir des lignes tracées"""
@@ -952,21 +966,20 @@ class UltraAdvancedPDFExtractor:
     def _intelligent_reconstruction(self, structure_analysis: Dict) -> Dict:
         """Phase 4: Reconstruction intelligente de la structure"""
         try:
-            # Éléments validés par consensus
             validated_elements = self._validate_elements_by_consensus(structure_analysis)
-
-            # Reconstruction de tableaux intelligente
             reconstructed_tables = self._reconstruct_tables_intelligently(validated_elements)
-
-            # Reconstruction de la hiérarchie de contenu
             content_hierarchy = self._reconstruct_content_hierarchy(validated_elements)
-
-            # Ordre de lecture naturel
             reading_order = self._determine_reading_order(validated_elements)
-
-            # Génération de texte combiné optimisé
-            combined_text = self._generate_optimized_combined_text(validated_elements, reading_order)
-
+            combined_text = ''
+            for element in reading_order:
+                if element.get('type') == 'text':
+                    combined_text += element['text'] + '\n'
+                elif element.get('type') == 'table' and 'adjacent_text' in element:
+                    combined_text += element['adjacent_text'] + '\n'
+                    # Ajouter une représentation simple de la table si disponible
+                    if 'data' in element:
+                        combined_text += "Tableau:\n" + str(element['data']) + '\n'
+            combined_text = combined_text.strip()
             return {
                 'validated_elements': validated_elements,
                 'tables': reconstructed_tables,
@@ -979,7 +992,6 @@ class UltraAdvancedPDFExtractor:
                     'hierarchy_levels': len(content_hierarchy)
                 }
             }
-
         except Exception as e:
             logger.error(f"Erreur reconstruction intelligente: {e}")
             return {}
@@ -1066,6 +1078,8 @@ class UltraAdvancedPDFExtractor:
             position: relative;
             overflow: hidden;
             border: 1px solid #ddd;
+            /* Désactiver zoom automatique navigateur sur mobiles */
+            image-rendering: pixelated;
         }
 
         .ultra-element {
@@ -1081,7 +1095,10 @@ class UltraAdvancedPDFExtractor:
         .ultra-text {
             font-family: inherit;
             line-height: 1.2;
-            word-wrap: break-word;
+            /* Fidèle au PDF: pas de wraps imprévus */
+            word-break: normal;
+            overflow-wrap: normal;
+            white-space: pre; /* garder exactement les espaces/retours fournis */
             cursor: text;
         }
 
@@ -1089,6 +1106,7 @@ class UltraAdvancedPDFExtractor:
             border-collapse: collapse;
             width: 100%;
             height: 100%;
+            table-layout: fixed; /* positions stables, pas de reflow inattendu */
         }
 
         .ultra-table td, .ultra-table th {
@@ -1097,6 +1115,8 @@ class UltraAdvancedPDFExtractor:
             vertical-align: top;
             font-size: inherit;
             line-height: 1.1;
+            /* Empêche les retours à la ligne indésirables dans les cellules */
+            white-space: nowrap;
         }
 
         .ultra-image {
@@ -1173,22 +1193,79 @@ class UltraAdvancedPDFExtractor:
                     page_height = element['page_dimensions']['height']
                     break
 
-            # Calculer le ratio pour responsive
-            aspect_ratio = (page_height / page_width) * 100
-
+            # Rendu fidèle: utiliser les dimensions réelles du PDF en pixels (non responsive)
             html = f'''
             <div class="ultra-page-container" data-page="{page_num}" 
-                 style="width: 100%; max-width: 800px; padding-bottom: {aspect_ratio:.2f}%;">
+                 style="width: {page_width:.0f}px; height: {page_height:.0f}px;">
                 <div class="page-label" style="position: absolute; top: -25px; left: 0; font-size: 12px; color: #666;">
                     Page {page_num}
                 </div>
             '''
 
+            # Dédoublonner plus agressivement les textes en footer
+            elements = self._deduplicate_footer_text_elements(elements, page_width, page_height)
+
             # Trier les éléments par ordre de profondeur (z-index)
             sorted_elements = sorted(elements, key=lambda x: self._get_element_z_index(x))
 
-            # Générer chaque élément
-            for element in sorted_elements:
+            # Générer chaque élément avec déduplication et filtrage de chevauchement
+            seen_positions = set()
+            text_boxes = []  # [(x1,y1,x2,y2,conf,idx)] pour éviter superpositions
+            for idx, element in enumerate(sorted_elements):
+                # Éviter les doublons de texte au même emplacement (arrondi)
+                if element.get('type') == 'text':
+                    pos = element.get('position', {})
+                    x1, y1 = float(pos.get('x', 0)), float(pos.get('y', 0))
+                    x2 = x1 + float(pos.get('width', 0))
+                    y2 = y1 + float(pos.get('height', 0))
+                    conf = float(element.get('confidence', 0.5))
+
+                    # Footer detection (bas de page)
+                    is_footer = False
+                    try:
+                        footer_threshold_y = page_height * (1.0 - self.config.get('footer_height_ratio', 0.12))
+                        is_footer = y1 >= footer_threshold_y
+                    except Exception:
+                        pass
+
+                    key = self._position_to_key(pos)
+                    if key in seen_positions:
+                        # déjà un texte à la même position arrondie
+                        continue
+
+                    # Filtrer les chevauchements avec des textes déjà placés
+                    overlaps = False
+                    replace_index = None
+                    best_ratio = 0.0
+                    for j, (bx1, by1, bx2, by2, bconf, bidx) in enumerate(text_boxes):
+                        ix1, iy1 = max(x1, bx1), max(y1, by1)
+                        ix2, iy2 = min(x2, bx2), min(y2, by2)
+                        iw, ih = max(0.0, ix2 - ix1), max(0.0, iy2 - iy1)
+                        inter = iw * ih
+                        area = max(1.0, (x2 - x1) * (y2 - y1))
+                        bratio = inter / area
+                        # Seuil plus strict en footer
+                        threshold = self.config.get('footer_overlap_threshold', 0.4) if is_footer else 0.6
+                        if bratio > threshold:
+                            # En footer, on garde le plus confiant si activé
+                            if is_footer and self.config.get('footer_keep_highest_conf', True):
+                                if conf > bconf:
+                                    replace_index = j  # on remplace l’ancien
+                                    best_ratio = bratio
+                                    overlaps = False
+                                else:
+                                    overlaps = True
+                                    break
+                            else:
+                                overlaps = True
+                                break
+                    if overlaps:
+                        continue
+                    if replace_index is not None:
+                        text_boxes[replace_index] = (x1, y1, x2, y2, conf, idx)
+                    else:
+                        text_boxes.append((x1, y1, x2, y2, conf, idx))
+                    seen_positions.add(key)
                 element_html = self._generate_element_html_ultra_faithful(element, page_width, page_height)
                 html += element_html
 
@@ -1220,12 +1297,12 @@ class UltraAdvancedPDFExtractor:
                 'low-confidence'
             )
 
-            # Style de position commun
+            # Style de position commun en pixels pour correspondre exactement au PDF
             position_style = f'''
-                left: {x_percent:.3f}%;
-                top: {y_percent:.3f}%;
-                width: {width_percent:.3f}%;
-                height: {height_percent:.3f}%;
+                left: {position.get('x', 0):.2f}px;
+                top: {position.get('y', 0):.2f}px;
+                width: {position.get('width', 0):.2f}px;
+                height: {position.get('height', 0):.2f}px;
             '''
 
             # Générer selon le type
@@ -1257,14 +1334,17 @@ class UltraAdvancedPDFExtractor:
         # Tag HTML selon le type
         tag = 'h1' if element_type == 'heading' else 'p'
 
+        # Normaliser le texte pour éviter espacements/coupures non voulus
+        safe_text = self._normalize_whitespace(text)
+
         return f'''
         <{tag} class="ultra-element ultra-text {confidence_class} editable-content" 
              contenteditable="true"
              data-element-id="{element_id}"
-             data-original-text="{text}"
+             data-original-text="{safe_text}"
              data-confidence="{element.get('confidence', 0.5):.2f}"
              style="{position_style} {text_style}">
-            {text}
+            {safe_text}
         </{tag}>
         '''
 
@@ -1284,7 +1364,9 @@ class UltraAdvancedPDFExtractor:
         for row_idx, row in enumerate(table_data):
             html += '<tr>'
             for col_idx, cell in enumerate(row):
-                cell_content = str(cell or '').strip()
+                # Nettoyage doux: supprimer retours à la ligne internes et normaliser espaces
+                raw_cell = str(cell or '')
+                cell_content = self._normalize_whitespace(raw_cell.replace('\n', ' '))
                 cell_id = f"{table_id}-r{row_idx}-c{col_idx}"
 
                 tag = 'th' if row_idx == 0 else 'td'
@@ -1333,6 +1415,134 @@ class UltraAdvancedPDFExtractor:
             '''
 
     # MÉTHODES UTILITAIRES
+
+    def _is_footer_box(self, pos: Dict, page_height: float) -> bool:
+        try:
+            y = float(pos.get('y', 0))
+            footer_threshold_y = page_height * (1.0 - self.config.get('footer_height_ratio', 0.12))
+            return y >= footer_threshold_y
+        except Exception:
+            return False
+
+    def _footer_box_key(self, pos: Dict, page_width: float, page_height: float) -> str:
+        # Regroupe par zones horizontales pour éviter doublons gauche/centre/droite
+        try:
+            x = float(pos.get('x', 0)); y = float(pos.get('y', 0))
+            w = float(pos.get('width', 0)); h = float(pos.get('height', 0))
+            # bucketiser X en 3 colonnes: gauche, centre, droite
+            col = 'L' if x < page_width * 0.33 else ('C' if x < page_width * 0.66 else 'R')
+            # bucketiser Y en 2 bandes proches du bas
+            band = 'B1' if y >= page_height * 0.92 else 'B2'
+            # Normaliser légèrement la largeur/hauteur
+            wb = int(round(w / 10.0)); hb = int(round(h / 5.0))
+            return f"{col}-{band}-{wb}x{hb}"
+        except Exception:
+            return "UNK"
+
+    def _deduplicate_footer_text_elements(self, elements: List[Dict], page_width: float, page_height: float) -> List[Dict]:
+        """Supprime les doublons/chevauchements agressivement dans le footer en gardant le plus fiable."""
+        try:
+            texts = [e for e in elements if e.get('type') == 'text']
+            others = [e for e in elements if e.get('type') != 'text']
+            footer_groups: Dict[str, List[Dict]] = defaultdict(list)
+            non_footer_texts: List[Dict] = []
+
+            for t in texts:
+                pos = t.get('position', {})
+                if self._is_footer_box(pos, page_height):
+                    key = self._footer_box_key(pos, page_width, page_height)
+                    footer_groups[key].append(t)
+                else:
+                    non_footer_texts.append(t)
+
+            pruned_footer_texts: List[Dict] = []
+            overlap_threshold = self.config.get('footer_overlap_threshold', 0.4)
+
+            for key, group in footer_groups.items():
+                # Trier par confiance décroissante pour garder les meilleurs
+                group_sorted = sorted(group, key=lambda e: float(e.get('confidence', 0.5)), reverse=True)
+                kept: List[Dict] = []
+                boxes: List[Tuple[float,float,float,float]] = []
+                for e in group_sorted:
+                    pos = e.get('position', {})
+                    x1 = float(pos.get('x', 0)); y1 = float(pos.get('y', 0))
+                    x2 = x1 + float(pos.get('width', 0)); y2 = y1 + float(pos.get('height', 0))
+                    # Vérifier chevauchement avec ceux déjà gardés
+                    too_much = False
+                    for (bx1, by1, bx2, by2) in boxes:
+                        ix1, iy1 = max(x1, bx1), max(y1, by1)
+                        ix2, iy2 = min(x2, bx2), min(y2, by2)
+                        iw, ih = max(0.0, ix2 - ix1), max(0.0, iy2 - iy1)
+                        inter = iw * ih
+                        area = max(1.0, (x2 - x1) * (y2 - y1))
+                        if inter / area > overlap_threshold:
+                            too_much = True
+                            break
+                    if not too_much:
+                        kept.append(e)
+                        boxes.append((x1, y1, x2, y2))
+
+                # En cas de texte identique répété, supprimer doublons exacts
+                seen_texts = set()
+                dedup_kept = []
+                for e in kept:
+                    txt = self._normalize_whitespace(e.get('text', '') or '')
+                    if txt in seen_texts:
+                        continue
+                    seen_texts.add(txt)
+                    e['text'] = txt
+                    dedup_kept.append(e)
+
+                pruned_footer_texts.extend(dedup_kept)
+
+            return others + non_footer_texts + pruned_footer_texts
+        except Exception:
+            return elements
+
+    def _normalize_whitespace(self, text: str) -> str:
+        """Normalise les espaces et supprime les retours inutiles"""
+        if not isinstance(text, str):
+            return ''
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
+
+    def _should_merge_hyphen(self, prev: str, nxt: str) -> bool:
+        """Vérifie si fin de ligne avec tiret doit être fusionnée avec début de la suivante"""
+        if not prev or not nxt:
+            return False
+        if not prev.rstrip().endswith('-'):
+            return False
+        # Si la prochaine ligne commence par une lettre (souvent minuscule), on fusionne sans espace
+        return bool(re.match(r'^[A-Za-zÀ-ÖØ-öø-ÿ]', nxt.lstrip()))
+
+    def _join_spans_with_spacing(self, spans: List[Dict]) -> str:
+        """Assemble les spans d'une même ligne en ajoutant espaces si nécessaire et gérant les tirets"""
+        if not spans:
+            return ''
+        spans_sorted = sorted(spans, key=lambda s: (s.get('bbox', [0, 0, 0, 0])[0]))
+        line_text = ''
+        prev_span = None
+        for span in spans_sorted:
+            t = span.get('text', '') or ''
+            if not t:
+                continue
+            if prev_span is not None:
+                bbox_prev = prev_span.get('bbox', [0, 0, 0, 0])
+                bbox_cur = span.get('bbox', [0, 0, 0, 0])
+                gap = (bbox_cur[0] - bbox_prev[2]) if bbox_prev and bbox_cur else 0
+                prev_size = prev_span.get('size', 12) or 12
+                # Gestion hyphenation intra-ligne
+                if self._should_merge_hyphen(prev_span.get('text', ''), t):
+                    line_text = line_text.rstrip()
+                    if line_text.endswith('-'):
+                        line_text = line_text[:-1]
+                else:
+                    # Ajouter un espace si le gap est grand (probable espace)
+                    if gap > max(1.0, prev_size * 0.5) and not (line_text.endswith(' ') or t.startswith(' ')):
+                        line_text += ' '
+            line_text += t
+            prev_span = span
+        return self._normalize_whitespace(line_text)
 
     def _extract_image_with_processing(self, doc, xref):
         """Extraire et traiter une image"""
@@ -1555,26 +1765,43 @@ class UltraAdvancedPDFExtractor:
     def _determine_reading_order(self, elements: List[Dict]) -> List[Dict]:
         return sorted(elements, key=lambda x: (x.get('position', {}).get('y', 0), x.get('position', {}).get('x', 0)))
 
-    def _normalize_whitespace(self, text: str) -> str:
-        """Fixe les coupures de mots et retours à la ligne indésirables.
-        - Dé-hyphénation: "Detai-\nls" -> "Details"
-        - Coupures simples: "Detai\nls" -> "Details"
-        - Espace unique entre mots.
+    def _normalize_whitespace_advanced(self, text: str) -> str:
         """
+        Normalisation avancée du texte avec gestion intelligente des coupures.
+        Traite les problèmes de mots coupés et de mise en page.
+        """
+        if not text:
+            return text
+        
         try:
             import re
-            if not text:
-                return text
-            # 1) Coller les mots coupés par tiret de fin de ligne
-            text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)
-            # 2) Coller les mots coupés sans tiret (petites lignes)
-            text = re.sub(r"(\w)\n(\w)", r"\1 \2", text)
-            # 3) Remplacer les multiples espaces/retours par un espace
-            text = re.sub(r"[\t\x0b\x0c\r ]+", " ", text)
-            # 4) Normaliser doubles sauts en paragraphes
-            text = re.sub(r"\n{2,}", "\n\n", text)
-            return text.strip()
-        except Exception:
+            
+            # Étape 1: Identifier et corriger les mots coupés avec tiret
+            # Pattern pour détecter: mot-\n(espace*)mot
+            text = re.sub(r'(\w+)-\s*\n\s*(\w+)', self._handle_hyphenated_word, text)
+            
+            # Étape 2: Gérer les mots coupés sans tiret (détection intelligente)
+            text = re.sub(r'(\w+)\s*\n\s*(\w+)', self._handle_potential_split_word, text)
+            
+            # Étape 3: Préserver les vrais paragraphes (double saut de ligne)
+            paragraphs = re.split(r'\n\s*\n', text)
+            
+            # Étape 4: Nettoyer chaque paragraphe individuellement
+            cleaned_paragraphs = []
+            for para in paragraphs:
+                # Remplacer les retours à la ligne simples par des espaces
+                para = re.sub(r'\s*\n\s*', ' ', para)
+                # Normaliser les espaces multiples
+                para = re.sub(r'\s+', ' ', para)
+                para = para.strip()
+                if para:
+                    cleaned_paragraphs.append(para)
+            
+            # Rejoindre les paragraphes avec double saut de ligne
+            return '\n\n'.join(cleaned_paragraphs)
+            
+        except Exception as e:
+            logger.warning(f"Erreur normalisation avancée: {e}")
             return text
 
     def _generate_optimized_combined_text(self, elements: List[Dict], reading_order: List[Dict]) -> str:
@@ -1723,3 +1950,314 @@ class UltraAdvancedPDFExtractor:
 
     def _is_valid_table_pattern(self, pattern: Dict) -> bool:
         return False
+    
+
+    def _handle_hyphenated_word(self, match) -> str:
+        """
+        Gère les mots coupés avec tiret en fin de ligne.
+        Utilise un dictionnaire pour vérifier la validité.
+        """
+        part1 = match.group(1)
+        part2 = match.group(2)
+        
+        # Reconstituer le mot potentiel
+        full_word = part1 + part2
+        hyphenated_word = f"{part1}-{part2}"
+        
+        # Si le mot reconstitué semble valide (heuristique simple)
+        # On pourrait utiliser un dictionnaire ou une API de vérification
+        if self._is_likely_word(full_word):
+            return full_word
+        else:
+            # Garder le tiret si c'est un mot composé légitime
+            return hyphenated_word
+
+    def _handle_potential_split_word(self, match) -> str:
+        """
+        Gère les mots potentiellement coupés sans tiret.
+        """
+        part1 = match.group(1)
+        part2 = match.group(2)
+        
+        # Si part1 se termine par une minuscule et part2 commence par une minuscule
+        # C'est probablement un mot coupé
+        if part1[-1].islower() and part2[0].islower():
+            # Vérifier si c'est la fin d'une phrase
+            if not part1[-1] in '.!?':
+                return part1 + part2
+        
+        # Sinon, garder l'espace
+        return f"{part1} {part2}"
+
+    def _is_likely_word(self, word: str) -> bool:
+        """
+        Vérifie si un mot reconstitué est probablement valide.
+        """
+        # Heuristiques simples
+        if len(word) < 2 or len(word) > 30:
+            return False
+        
+        # Vérifier le pattern de voyelles/consonnes
+        vowels = set('aeiouAEIOU')
+        has_vowel = any(c in vowels for c in word)
+        
+        return has_vowel
+
+    def _cluster_text_spans_improved(self, spans: List[Dict]) -> Dict[int, List[Dict]]:
+        """
+        Clustering amélioré avec détection de superposition et espacement intelligent.
+        """
+        if not SKLEARN_AVAILABLE or len(spans) < 2:
+            return {0: spans}
+        
+        try:
+            # Préparer les features avec plus de précision spatiale
+            features = []
+            for span in spans:
+                bbox = span.get('bbox', [0, 0, 0, 0])
+                font_size = span.get('size', 12)
+                
+                # Position et dimensions
+                x_start = bbox[0]
+                y_start = bbox[1]
+                x_end = bbox[2]
+                y_end = bbox[3]
+                width = x_end - x_start
+                height = y_end - y_start
+                
+                # Caractéristiques du texte
+                text = span.get('text', '').strip()
+                text_len = len(text)
+                ends_with_punct = 1.0 if re.search(r'[.!?:;,]$', text) else 0.0
+                starts_with_capital = 1.0 if text and text[0].isupper() else 0.0
+                
+                features.append([
+                    x_start, y_start, x_end, y_end,
+                    width, height,
+                    font_size, text_len,
+                    ends_with_punct, starts_with_capital
+                ])
+            
+            # Normaliser les features
+            scaler = StandardScaler()
+            features_scaled = scaler.fit_transform(features)
+            
+            # DBSCAN avec paramètres ajustés pour éviter la superposition
+            eps_value = self.config.get('text_clustering_eps', 0.3)
+            clustering = DBSCAN(
+                eps=eps_value,
+                min_samples=1,
+                metric='euclidean'
+            ).fit(features_scaled)
+            
+            # Organiser par clusters et vérifier les superpositions
+            clustered = defaultdict(list)
+            for i, label in enumerate(clustering.labels_):
+                if label != -1:
+                    clustered[label].append(spans[i])
+            
+            # Post-traitement: séparer les éléments qui se superposent
+            final_clusters = {}
+            cluster_id = 0
+            
+            for _, cluster_spans in clustered.items():
+                # Trier par position (Y puis X)
+                sorted_spans = sorted(
+                    cluster_spans,
+                    key=lambda s: (s['bbox'][1], s['bbox'][0])
+                )
+                
+                # Vérifier et corriger les superpositions
+                non_overlapping_groups = self._separate_overlapping_spans(sorted_spans)
+                
+                for group in non_overlapping_groups:
+                    final_clusters[cluster_id] = group
+                    cluster_id += 1
+            
+            return final_clusters if final_clusters else {0: spans}
+            
+        except Exception as e:
+            logger.error(f"Erreur clustering amélioré: {e}")
+            return {0: spans}
+
+    def _separate_overlapping_spans(self, spans: List[Dict]) -> List[List[Dict]]:
+        """
+        Sépare les spans qui se superposent en groupes distincts.
+        """
+        if not spans:
+            return []
+        
+        groups = []
+        current_group = [spans[0]]
+        
+        for i in range(1, len(spans)):
+            current_span = spans[i]
+            overlaps = False
+            
+            # Vérifier la superposition avec chaque span du groupe actuel
+            for existing_span in current_group:
+                if self._spans_overlap(existing_span, current_span):
+                    overlaps = True
+                    break
+            
+            if overlaps:
+                # Commencer un nouveau groupe si superposition détectée
+                groups.append(current_group)
+                current_group = [current_span]
+            else:
+                # Ajouter au groupe actuel si pas de superposition
+                current_group.append(current_span)
+        
+        if current_group:
+            groups.append(current_group)
+        
+        return groups
+
+    def _spans_overlap(self, span1: Dict, span2: Dict) -> bool:
+        """
+        Vérifie si deux spans se superposent.
+        """
+        bbox1 = span1.get('bbox', [0, 0, 0, 0])
+        bbox2 = span2.get('bbox', [0, 0, 0, 0])
+        
+        # Extraire les coordonnées
+        x1_start, y1_start, x1_end, y1_end = bbox1
+        x2_start, y2_start, x2_end, y2_end = bbox2
+        
+        # Vérifier la superposition horizontale
+        h_overlap = not (x1_end < x2_start or x2_end < x1_start)
+        
+        # Vérifier la superposition verticale
+        v_overlap = not (y1_end < y2_start or y2_end < y1_start)
+        
+        return h_overlap and v_overlap
+
+    def _create_text_block_from_spans_improved(
+    self, 
+    spans: List[Dict], 
+    page_num: int,
+    page_width: float,
+    page_height: float
+) -> Optional[Dict]:
+        """
+        Création améliorée de blocs de texte avec gestion intelligente de l'espacement.
+        """
+        if not spans:
+            return None
+        
+        try:
+            # Calculer la boîte englobante
+            min_x = min(span['bbox'][0] for span in spans)
+            min_y = min(span['bbox'][1] for span in spans)
+            max_x = max(span['bbox'][2] for span in spans)
+            max_y = max(span['bbox'][3] for span in spans)
+            
+            # Trier les spans par position
+            sorted_spans = sorted(spans, key=lambda s: (s['bbox'][1], s['bbox'][0]))
+            
+            # Regrouper en lignes avec détection d'espacement intelligent
+            lines = self._group_spans_into_lines(sorted_spans)
+            
+            # Construire le texte avec gestion appropriée des espaces
+            combined_text = self._build_text_from_lines(lines)
+            
+            # Normaliser le texte final
+            combined_text = self._normalize_whitespace_advanced(combined_text)
+            
+            if not combined_text.strip():
+                return None
+            
+            # Analyser le style dominant
+            style_analysis = self._analyze_dominant_style(spans)
+            element_type = self._classify_text_element(combined_text, style_analysis)
+            
+            text_block = {
+                'type': 'text',
+                'element_type': element_type,
+                'page': page_num,
+                'text': combined_text,
+                'position': {
+                    'x': float(min_x),
+                    'y': float(min_y),
+                    'width': float(max_x - min_x),
+                    'height': float(max_y - min_y),
+                    'x_percent': (min_x / page_width) * 100,
+                    'y_percent': (min_y / page_height) * 100,
+                    'width_percent': ((max_x - min_x) / page_width) * 100,
+                    'height_percent': ((max_y - min_y) / page_height) * 100
+                },
+                'style': style_analysis,
+                'spans_count': len(spans),
+                'lines_count': len(lines),
+                'confidence': self._calculate_text_confidence(spans, combined_text)
+            }
+            
+            return text_block
+            
+        except Exception as e:
+            logger.error(f"Erreur création bloc texte amélioré: {e}")
+            return None
+
+    def _group_spans_into_lines(self, spans: List[Dict]) -> List[List[Dict]]:
+        """
+        Regroupe les spans en lignes avec tolérance adaptative.
+        """
+        if not spans:
+            return []
+        
+        lines = []
+        current_line = [spans[0]]
+        prev_y_center = (spans[0]['bbox'][1] + spans[0]['bbox'][3]) / 2
+        
+        # Calculer la hauteur moyenne pour la tolérance
+        avg_height = sum(s['bbox'][3] - s['bbox'][1] for s in spans) / len(spans)
+        tolerance = avg_height * 0.3  # 30% de la hauteur moyenne
+        
+        for span in spans[1:]:
+            y_center = (span['bbox'][1] + span['bbox'][3]) / 2
+            
+            # Si le span est sur la même ligne (dans la tolérance)
+            if abs(y_center - prev_y_center) <= tolerance:
+                current_line.append(span)
+            else:
+                # Nouvelle ligne détectée
+                lines.append(sorted(current_line, key=lambda s: s['bbox'][0]))
+                current_line = [span]
+                prev_y_center = y_center
+        
+        if current_line:
+            lines.append(sorted(current_line, key=lambda s: s['bbox'][0]))
+        
+        return lines
+
+    def _build_text_from_lines(self, lines: List[List[Dict]]) -> str:
+        """
+        Construit le texte à partir des lignes avec espacement intelligent.
+        """
+        text_parts = []
+        
+        for line in lines:
+            line_text = ""
+            prev_x_end = None
+            
+            for span in line:
+                span_text = span.get('text', '')
+                
+                if prev_x_end is not None:
+                    # Calculer l'espace entre les spans
+                    gap = span['bbox'][0] - prev_x_end
+                    
+                    # Ajouter un espace si l'écart est significatif
+                    if gap > 2:  # Seuil minimal pour un espace
+                        # Calculer le nombre d'espaces approximatif
+                        avg_char_width = (span['bbox'][2] - span['bbox'][0]) / max(len(span_text), 1)
+                        num_spaces = max(1, int(gap / avg_char_width))
+                        line_text += ' ' * min(num_spaces, 3)  # Limiter à 3 espaces max
+                
+                line_text += span_text
+                prev_x_end = span['bbox'][2]
+            
+            text_parts.append(line_text)
+        
+        # Joindre les lignes avec des espaces (seront normalisés après)
+        return '\n'.join(text_parts)
