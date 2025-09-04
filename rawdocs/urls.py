@@ -190,6 +190,13 @@ urlpatterns = [
         name='document_tables_images'
     ),
     
+    # 22b) Affichage du contenu structuré
+    path(
+        'documents/<int:document_id>/structured/',
+        views.document_structured,
+        name='document_structured'
+    ),
+    
     # 23) Export des tableaux vers Excel
     path(
         'documents/<int:document_id>/export-tables-excel/',

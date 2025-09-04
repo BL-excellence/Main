@@ -1225,6 +1225,75 @@ def document_tables_images(request, document_id):
         return redirect('rawdocs:document_detail', document_id=document_id)
 
 @login_required
+def document_structured(request, document_id):
+    """
+    Affiche le contenu structuré (HTML) du document, comme dans Library.
+    - Utilise le cache RawDocument.structured_html si présent
+    - Sinon tente UltraAdvancedPDFExtractor, puis fallback TableImageExtractor
+    - Permet forcer régénération via ?regen=1
+    """
+    try:
+        document = RawDocument.objects.get(id=document_id)
+        
+        # Permissions identiques à tables/images
+        if not request.user.is_staff and document.owner != request.user:
+            messages.error(request, "Vous n'avez pas accès à ce document.")
+            return redirect('rawdocs:document_list')
+        
+        # Charger/générer HTML structuré
+        structured_html = document.structured_html or ''
+        method = document.structured_html_method or ''
+        confidence = document.structured_html_confidence
+        regen = request.GET.get('regen') in ['1', 'true', 'True']
+        
+        if (regen or not structured_html) and getattr(document, 'file', None):
+            # 1) UltraAdvancedPDFExtractor
+            try:
+                from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
+                ultra = UltraAdvancedPDFExtractor()
+                ultra_result = ultra.extract_ultra_structured_content(document.file.path)
+                structured_html = (ultra_result or {}).get('html') or ''
+                method = (ultra_result or {}).get('extraction_method', 'ultra_advanced_combined')
+                confidence = (ultra_result or {}).get('confidence_score')
+            except Exception:
+                structured_html = ''
+            
+            # 2) Fallback TableImageExtractor
+            if not structured_html:
+                try:
+                    extractor = TableImageExtractor(document.file.path)
+                    extractor.extract_tables_with_structure()
+                    extractor.extract_images()
+                    structured_html = extractor.get_combined_html()
+                    method = 'table_image_extractor'
+                    confidence = None
+                except Exception:
+                    structured_html = ''
+        
+        # Sauvegarde cache si on a du contenu
+        if structured_html:
+            document.structured_html = structured_html
+            document.structured_html_generated_at = timezone.now()
+            document.structured_html_method = method
+            document.structured_html_confidence = confidence
+            document.save(update_fields=['structured_html','structured_html_generated_at','structured_html_method','structured_html_confidence'])
+        
+        context = {
+            'document': document,
+            'structured_html': structured_html or '',
+            'structured_html_method': method,
+            'structured_html_confidence': confidence,
+        }
+        return render(request, 'rawdocs/document_structured.html', context)
+        
+    except RawDocument.DoesNotExist:
+        messages.error(request, "Document non trouvé.")
+        return redirect('rawdocs:document_list')
+    except Exception as e:
+        messages.error(request, f"Erreur lors de la génération du contenu structuré: {str(e)}")
+        return redirect('rawdocs:document_detail', document_id=document_id)
+
+@login_required
 def export_tables_excel(request, document_id):
     """
     Exporte les tableaux d'un document vers Excel
