@@ -588,9 +588,9 @@
                     <i class="material-icons">refresh</i>
                     <span class="text">Régénérer</span>
                 </a>
-                <a href="{% url 'client:library:download_document' document.pk %}" class="btn btn-primary" title="Télécharger">
-                    <i class="material-icons">download</i>
-                    <span class="text">Télécharger</span>
+                <a href="{% url 'rawdocs:view_original_document' document.pk %}" class="btn btn-primary" title="Voir PDF original" target="_blank" rel="noopener">
+                    <i class="material-icons">picture_as_pdf</i>
+                    <span class="text">Voir PDF original</span>
                 </a>
             </div>
         </div>

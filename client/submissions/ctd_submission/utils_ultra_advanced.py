@@ -72,6 +72,13 @@ try:
 except ImportError:
     NLTK_AVAILABLE = False
 
+# OCR (optionnel)
+try:
+    import pytesseract
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -156,6 +163,13 @@ class UltraAdvancedPDFExtractor:
             'merge_distance_threshold': 10.0,
             'line_height_tolerance': 5.0,
             'sentence_break_threshold': 10.0,
+            # Nouveau: contrôle des espaces entre spans (évite les lettres séparées)
+            'text_gap_factor': 1.6,                  # agressif: gap ~160% de la taille de police
+            'single_char_no_space_factor': 3.0,      # agressif: évite "T H E"
+            # Fusion agressive par ligne
+            'line_merge_vertical_tolerance_ratio': 0.006,  # 0.6% de la hauteur de page
+            'line_merge_min_band_tol_px': 3.0,             # min 3px de tolérance verticale
+            'line_merge_gap_factor': 1.8,                  # seuil de fusion horizontal plus grand
             # Paramètres spécifiques au footer (bas de page)
             'footer_height_ratio': 0.12,         # 12% bas de page considéré footer
             'footer_overlap_threshold': 0.4,     # plus strict que global (0.4)
@@ -283,7 +297,7 @@ class UltraAdvancedPDFExtractor:
 
             for page_num in range(doc.page_count):
                 page = doc.load_page(page_num)
-                page_dict = page.get_text("dict")
+                page_dict = self._safe_get_text_dict(page)
 
                 # Extraction ultra-détaillée
                 page_data = self._process_pymupdf_page_ultra(page, page_dict, page_num + 1)
@@ -295,8 +309,9 @@ class UltraAdvancedPDFExtractor:
                 extraction['images'].extend(page_data.get('images', []))
                 extraction['text_blocks'].extend(page_data.get('text_blocks', []))
 
-                # Analyser les fonts et couleurs
-                self._analyze_fonts_and_colors(page_dict, extraction)
+                # Analyser les fonts et couleurs (si dict non vide pour éviter erreurs)
+                if page_dict and isinstance(page_dict, dict):
+                    self._analyze_fonts_and_colors(page_dict, extraction)
 
             doc.close()
             return extraction
@@ -304,6 +319,43 @@ class UltraAdvancedPDFExtractor:
         except Exception as e:
             logger.error(f"Erreur PyMuPDF avancé: {e}")
             return {}
+
+    def _safe_get_text_dict(self, page) -> Dict:
+        """Obtenir le texte en dict en gérant les PDFs avec layers (OCG/OCMD) et erreurs MuPDF.
+        Essaie différents modes et fallback en cas d'erreur 'No default Layer config'.
+        """
+        try:
+            return page.get_text("dict")
+        except Exception as e:
+            # Tentative: ignorer les calques si MuPDF lève une erreur de Layer config
+            try:
+                # flags=0 désactive les options (dont celles liées aux calques)
+                return page.get_text("dict", flags=0)
+            except Exception:
+                pass
+            # Fallback: 'rawdict' puis conversion minimale
+            try:
+                raw = page.get_text("rawdict")
+                if isinstance(raw, dict):
+                    return raw
+            except Exception:
+                pass
+            # Dernier fallback: rasteriser la page et tenter l'OCR si disponible
+            try:
+                if PYMUPDF_AVAILABLE and OCR_AVAILABLE:
+                    mat = fitz.Matrix(2, 2)  # 144 DPI ~ (2x)
+                    pix = page.get_pixmap(matrix=mat)
+                    img_data = pix.tobytes("png")
+                    nparr = np.frombuffer(img_data, np.uint8)
+                    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    if image is not None:
+                        ocr_text = pytesseract.image_to_string(image)
+                        if ocr_text and ocr_text.strip():
+                            # Fabriquer un dict minimal compatible avec pipeline
+                            return {"blocks": [{"lines": [{"spans": [{"text": ocr_text, "bbox": [0,0,image.shape[1], image.shape[0]], "size": 12}]}]}]}
+            except Exception:
+                pass
+            return {"blocks": []}
 
     def _process_pymupdf_page_ultra(self, page, page_dict: Dict, page_num: int) -> Dict:
         """Traitement ultra-avancé d'une page PyMuPDF"""
@@ -467,7 +519,7 @@ class UltraAdvancedPDFExtractor:
 
     def _extract_text_blocks_with_clustering(self, page_dict: Dict, page_num: int,
                                              page_width: float, page_height: float) -> List[Dict]:
-        """Extraction de blocs de texte avec clustering ML"""
+        """Extraction de blocs de texte avec clustering ML, avec fallback 'linewise' si le PDF est fragmenté (lettre par lettre)."""
         text_blocks = []
 
         try:
@@ -486,11 +538,27 @@ class UltraAdvancedPDFExtractor:
             # Clustering des spans par position et style
             clustered_spans = self._cluster_text_spans(all_spans)
 
-            # Créer des blocs de texte à partir des clusters
-            for cluster_id, spans in clustered_spans.items():
-                block = self._create_text_block_from_spans(spans, page_num, page_width, page_height)
-                if block:
-                    text_blocks.append(block)
+            # Heuristique de détection 'lettres isolées': trop de clusters unitaires ou peu de caractères par cluster
+            total_clusters = max(1, len(clustered_spans))
+            singleton_clusters = sum(1 for spans in clustered_spans.values() if len(spans) == 1 and len((spans[0].get('text','') or '').strip()) <= 2)
+            total_chars = sum(len((s.get('text','') or '').strip()) for spans in clustered_spans.values() for s in spans)
+            avg_chars_per_cluster = total_chars / total_clusters
+
+            fragmented = (singleton_clusters / total_clusters) > 0.5 or avg_chars_per_cluster < 5
+
+            if fragmented:
+                # Fallback robuste: regrouper par lignes Y, puis assembler chaque ligne proprement
+                line_groups = self._group_spans_into_lines(all_spans)
+                for spans in line_groups:
+                    block = self._create_text_block_from_spans(spans, page_num, page_width, page_height)
+                    if block:
+                        text_blocks.append(block)
+            else:
+                # Créer des blocs de texte à partir des clusters
+                for cluster_id, spans in clustered_spans.items():
+                    block = self._create_text_block_from_spans(spans, page_num, page_width, page_height)
+                    if block:
+                        text_blocks.append(block)
 
         except Exception as e:
             logger.error(f"Erreur clustering texte page {page_num}: {e}")
@@ -540,7 +608,7 @@ class UltraAdvancedPDFExtractor:
             return {0: spans}
     
     def _create_text_block_from_spans(self, spans: List[Dict], page_num: int, page_width: float, page_height: float) -> Optional[Dict]:
-        """Créer un bloc de texte cohérent avec préservation des phrases"""
+        """Créer un bloc de texte cohérent avec préservation des phrases et fallback anti-fragmentation."""
         if not spans:
             return None
         try:
@@ -562,10 +630,17 @@ class UltraAdvancedPDFExtractor:
                     current_line.append(span)
             if current_line:
                 lines.append(current_line)
+
             combined_text = ''
             prev_line_text = ''
             for i, line_spans in enumerate(lines):
-                line_text = self._join_spans_with_spacing(line_spans).strip()
+                # Si la ligne est ultra fragmentée en caractères unitaires, concaténer sans ajouter d'espaces artificiels
+                single_chars = sum(1 for s in line_spans if len((s.get('text','') or '').strip()) == 1)
+                if len(line_spans) > 0 and (single_chars / len(line_spans)) > 0.6:
+                    line_text = ''.join((s.get('text','') or '') for s in sorted(line_spans, key=lambda s: s.get('bbox',[0,0,0,0])[0]))
+                else:
+                    line_text = self._join_spans_with_spacing(line_spans).strip()
+
                 if i > 0:
                     # Gestion de la césure (hyphenation) entre lignes
                     if self._should_merge_hyphen(prev_line_text, line_text):
@@ -578,6 +653,7 @@ class UltraAdvancedPDFExtractor:
                             combined_text += ' '
                 combined_text += line_text
                 prev_line_text = line_text
+
             combined_text = self._normalize_whitespace(combined_text)
             if not combined_text.strip():
                 return None
@@ -766,6 +842,20 @@ class UltraAdvancedPDFExtractor:
                 'table_regions': [],
                 'image_regions': []
             }
+
+            # Détection rapide de zones de texte denses (aide pour le fallback quand spans sont lettre par lettre)
+            try:
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                thr = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 2))
+                morph = cv2.morphologyEx(thr, cv2.MORPH_CLOSE, kernel, iterations=2)
+                contours, _ = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                for cnt in contours:
+                    x, y, w, h = cv2.boundingRect(cnt)
+                    if w > 40 and h > 8:
+                        analysis['text_regions'].append({'position': {'x': x, 'y': y, 'width': w, 'height': h}, 'page': page_num, 'type': 'text_region'})
+            except Exception:
+                pass
 
             # 1. Détection de mise en page par contours
             layout_regions = self._detect_layout_regions(image)
@@ -1205,6 +1295,9 @@ class UltraAdvancedPDFExtractor:
             # Dédoublonner plus agressivement les textes en footer
             elements = self._deduplicate_footer_text_elements(elements, page_width, page_height)
 
+            # Fusionner les fragments de texte sur la même ligne pour éviter lettres isolées
+            elements = self._merge_line_text_fragments(elements, page_width, page_height)
+
             # Trier les éléments par ordre de profondeur (z-index)
             sorted_elements = sorted(elements, key=lambda x: self._get_element_z_index(x))
 
@@ -1516,7 +1609,10 @@ class UltraAdvancedPDFExtractor:
         return bool(re.match(r'^[A-Za-zÀ-ÖØ-öø-ÿ]', nxt.lstrip()))
 
     def _join_spans_with_spacing(self, spans: List[Dict]) -> str:
-        """Assemble les spans d'une même ligne en ajoutant espaces si nécessaire et gérant les tirets"""
+        """Assemble les spans d'une même ligne en ajoutant des espaces uniquement quand le gap indique un espace réel.
+        - Utilise la taille de police pour estimer le seuil.
+        - Cas spécial: si deux spans sont d'un seul caractère, on est plus conservateur (évite les lettres séparées).
+        """
         if not spans:
             return ''
         spans_sorted = sorted(spans, key=lambda s: (s.get('bbox', [0, 0, 0, 0])[0]))
@@ -1530,15 +1626,21 @@ class UltraAdvancedPDFExtractor:
                 bbox_prev = prev_span.get('bbox', [0, 0, 0, 0])
                 bbox_cur = span.get('bbox', [0, 0, 0, 0])
                 gap = (bbox_cur[0] - bbox_prev[2]) if bbox_prev and bbox_cur else 0
-                prev_size = prev_span.get('size', 12) or 12
+                prev_size = float(prev_span.get('size', 12) or 12)
+                prev_text = prev_span.get('text', '') or ''
                 # Gestion hyphenation intra-ligne
-                if self._should_merge_hyphen(prev_span.get('text', ''), t):
+                if self._should_merge_hyphen(prev_text, t):
                     line_text = line_text.rstrip()
                     if line_text.endswith('-'):
                         line_text = line_text[:-1]
                 else:
-                    # Ajouter un espace si le gap est grand (probable espace)
-                    if gap > max(1.0, prev_size * 0.5) and not (line_text.endswith(' ') or t.startswith(' ')):
+                    # Seuils dynamiques pour insertion d'un espace
+                    gap_threshold = max(0.5, prev_size * float(self.config.get('text_gap_factor', 0.95)))
+                    # Si les deux spans ne contiennent qu'un seul caractère: seuil plus grand (évite "T H E")
+                    if len(prev_text.strip()) == 1 and len(t.strip()) == 1:
+                        gap_threshold = max(gap_threshold, prev_size * float(self.config.get('single_char_no_space_factor', 1.6)))
+                    # Insérer un espace uniquement si le gap dépasse clairement le seuil
+                    if gap > gap_threshold and not (line_text.endswith(' ') or t.startswith(' ')):
                         line_text += ' '
             line_text += t
             prev_span = span
@@ -1663,6 +1765,115 @@ class UltraAdvancedPDFExtractor:
             css_parts.append("font-style: italic")
 
         return '; '.join(css_parts) + ';' if css_parts else ''
+
+    def _merge_line_text_fragments(self, elements: List[Dict], page_width: float, page_height: float) -> List[Dict]:
+        """Fusionne les fragments de texte colinéaires de la même ligne en un seul bloc.
+        Objectif: éviter qu'une lettre soit isolée dans un div séparé.
+        """
+        try:
+            texts = [e for e in elements if e.get('type') == 'text']
+            others = [e for e in elements if e.get('type') != 'text']
+            if not texts:
+                return elements
+
+            # Grouper par bande horizontale (même ligne)
+            band_tol = max(float(self.config.get('line_merge_min_band_tol_px', 3.0)), page_height * float(self.config.get('line_merge_vertical_tolerance_ratio', 0.006)))  # tolérance verticale agressive
+            bands: List[List[Dict]] = []
+            for t in sorted(texts, key=lambda e: float(e.get('position', {}).get('y', 0))):
+                y = float(t.get('position', {}).get('y', 0))
+                placed = False
+                for band in bands:
+                    by = float(band[0].get('position', {}).get('y', 0))
+                    if abs(y - by) <= band_tol:
+                        band.append(t)
+                        placed = True
+                        break
+                if not placed:
+                    bands.append([t])
+
+            merged_texts: List[Dict] = []
+            for band in bands:
+                # Trier gauche->droite
+                band_sorted = sorted(band, key=lambda e: float(e.get('position', {}).get('x', 0)))
+                # Fusionner séquentiellement si gap faible
+                current_group: List[Dict] = []
+                for t in band_sorted:
+                    if not current_group:
+                        current_group = [t]
+                        continue
+                    prev = current_group[-1]
+                    px = float(prev['position']['x']); pw = float(prev['position']['width'])
+                    x = float(t['position']['x']); w = float(t['position']['width'])
+                    gap = x - (px + pw)
+                    # seuil dynamique basé sur hauteur/size moyenne
+                    size_prev = float(prev.get('style', {}).get('size', 12) or 12)
+                    size_cur = float(t.get('style', {}).get('size', size_prev) or size_prev)
+                    size_avg = (size_prev + size_cur) / 2.0
+                    # seuil agressif basé sur config
+                    base_factor = float(self.config.get('line_merge_gap_factor', 1.8))
+                    gap_threshold = max(0.5, size_avg * base_factor)
+                    # si les deux sont petits (ex. une lettre), poussez seuil
+                    prev_txt = (prev.get('text', '') or '').strip()
+                    cur_txt = (t.get('text', '') or '').strip()
+                    if len(prev_txt) == 1 and len(cur_txt) == 1:
+                        gap_threshold = max(gap_threshold, size_avg * float(self.config.get('single_char_no_space_factor', 3.0)))
+                    if gap <= gap_threshold:
+                        current_group.append(t)
+                    else:
+                        merged_texts.append(self._merge_text_group(current_group, page_width, page_height))
+                        current_group = [t]
+                if current_group:
+                    merged_texts.append(self._merge_text_group(current_group, page_width, page_height))
+
+            return others + merged_texts
+        except Exception:
+            return elements
+
+    def _merge_text_group(self, group: List[Dict], page_width: float, page_height: float) -> Dict:
+        """Fusionne un groupe de fragments texte en un bloc unique, position englobante."""
+        if not group:
+            return {}
+        # Concat texte avec notre jointure prudente
+        spans_like = []
+        for g in sorted(group, key=lambda e: float(e.get('position', {}).get('x', 0))):
+            # synthèse d'un span-like minimal
+            spans_like.append({
+                'text': g.get('text', ''),
+                'bbox': [
+                    float(g['position']['x']),
+                    float(g['position']['y']),
+                    float(g['position']['x']) + float(g['position']['width']),
+                    float(g['position']['y']) + float(g['position']['height'])
+                ],
+                'size': float(g.get('style', {}).get('size', 12) or 12)
+            })
+        text = self._join_spans_with_spacing(spans_like)
+        # Bounding box englobante
+        xs = [s['bbox'][0] for s in spans_like]; ys = [s['bbox'][1] for s in spans_like]
+        x2s = [s['bbox'][2] for s in spans_like]; y2s = [s['bbox'][3] for s in spans_like]
+        min_x, min_y, max_x, max_y = min(xs), min(ys), max(x2s), max(y2s)
+        # Style dominant
+        style = self._analyze_dominant_style([{'size': s['size']} for s in spans_like])
+        # Garder le type d’origine si commun, sinon paragraph
+        element_type = 'paragraph'
+        if all((g.get('element_type') == group[0].get('element_type')) for g in group):
+            element_type = group[0].get('element_type', 'paragraph')
+        # Confiance moyenne
+        conf = float(sum(float(g.get('confidence', 0.5) or 0.5) for g in group) / max(1, len(group)))
+        return {
+            'type': 'text',
+            'element_type': element_type,
+            'page': group[0].get('page', 1),
+            'text': text,
+            'position': {
+                'x': float(min_x), 'y': float(min_y),
+                'width': float(max_x - min_x), 'height': float(max_y - min_y),
+                'x_percent': (min_x / page_width) * 100, 'y_percent': (min_y / page_height) * 100,
+                'width_percent': ((max_x - min_x) / page_width) * 100, 'height_percent': ((max_y - min_y) / page_height) * 100
+            },
+            'style': style,
+            'confidence': conf
+        }
 
     def _get_element_z_index(self, element: Dict) -> int:
         """Déterminer l'ordre de profondeur d'un élément"""
