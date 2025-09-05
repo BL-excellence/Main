@@ -44,6 +44,13 @@ try:
 except ImportError:
     TABULA_AVAILABLE = False
 
+# Docling (optionnel)
+try:
+    import docling  # IBM Project Docling
+    DOCLING_AVAILABLE = True
+except ImportError:
+    DOCLING_AVAILABLE = False
+
 # Imports pour Computer Vision
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -187,6 +194,7 @@ class UltraAdvancedPDFExtractor:
             'pdfplumber': PDFPLUMBER_AVAILABLE,
             'camelot': CAMELOT_AVAILABLE,
             'tabula': TABULA_AVAILABLE,
+            'docling': DOCLING_AVAILABLE,
             'computer_vision': PIL_AVAILABLE and cv2 is not None,
             'ml_clustering': SKLEARN_AVAILABLE
         }
@@ -274,10 +282,20 @@ class UltraAdvancedPDFExtractor:
         if TABULA_AVAILABLE:
             extractions['tabula'] = self._extract_with_tabula_advanced(file_path)
 
-        # 5. Extraction par analyse de pixels
+        # 5. Docling - Extraction structurée alternative
+        if DOCLING_AVAILABLE:
+            extractions['docling'] = self._extract_with_docling(file_path)
+            if extractions.get('docling'):
+                logger.info("🧠 Docling: extraction réalisée")
+            else:
+                logger.warning("🧠 Docling: extraction vide ou échouée")
+        else:
+            logger.warning("🧠 Docling non disponible - package manquant")
+
+        # 6. Extraction par analyse de pixels
         extractions['pixel_analysis'] = self._extract_with_pixel_analysis(file_path)
 
-        logger.info(f"📊 Multi-source: {len(extractions)} méthodes utilisées")
+        logger.info(f"📊 Multi-source: {len(extractions)} méthodes utilisées -> {list(extractions.keys())}")
         return extractions
 
     def _extract_with_pymupdf_advanced(self, file_path: str) -> Dict:
@@ -1902,6 +1920,76 @@ class UltraAdvancedPDFExtractor:
     def _extract_with_tabula_advanced(self, file_path: str) -> Dict:
         """Extraction tabula avancée (simplifié)"""
         return {}
+
+    def _extract_with_docling(self, file_path: str) -> Dict:
+        """Extraction via Docling (si disponible). Retourne un dictionnaire compatible pipeline."""
+        try:
+            if not DOCLING_AVAILABLE:
+                return {}
+            # Docling API minimale (pseudo-code robuste):
+            # Certaines distributions utilisent docling.Document ou docling.parse
+            text = ''
+            pages = []
+            elements = []
+            tables = []
+            images = []
+
+            # Essayons d'abord une API générique
+            try:
+                # ex: parsed = docling.parse(file_path)
+                parsed = None
+                if hasattr(docling, 'parse'):
+                    parsed = docling.parse(file_path)
+                elif hasattr(docling, 'Document'):  # style OO
+                    doc = docling.Document.from_file(file_path)
+                    parsed = doc.to_dict() if hasattr(doc, 'to_dict') else None
+
+                if parsed:
+                    # Normalisation minimale: convertir en structure pipeline
+                    # Récupérer texte global si dispo
+                    if isinstance(parsed, dict):
+                        text = parsed.get('text', '') or parsed.get('content', '') or ''
+                        # Pages
+                        pgs = parsed.get('pages') or parsed.get('document', {}).get('pages') if isinstance(parsed.get('document'), dict) else []
+                        for i, p in enumerate(pgs or []):
+                            pages.append({
+                                'page_number': i + 1,
+                                'text': p.get('text', '') if isinstance(p, dict) else '',
+                                'elements': [], 'tables': [], 'images': [], 'text_blocks': []
+                            })
+                        # Tables si présentes
+                        tbls = parsed.get('tables') or []
+                        for ti, t in enumerate(tbls):
+                            tables.append({'index': ti, 'data': t.get('data') if isinstance(t, dict) else t})
+                    else:
+                        # Si parsed est objet inconnu, on tente str
+                        text = str(parsed)
+            except Exception:
+                pass
+
+            # Fallback: si API spécifique existe (exemples courants)
+            if not text:
+                try:
+                    if hasattr(docling, 'PdfDoc'):  # exemple d’API alternative
+                        pdfdoc = docling.PdfDoc(file_path)
+                        text = getattr(pdfdoc, 'text', '') or ''
+                except Exception:
+                    pass
+
+            # Construire extraction docling minimale
+            extraction = {
+                'pages': pages,
+                'elements': elements,
+                'tables': tables,
+                'images': images,
+                'text_blocks': [],
+                'text': text,
+                'metadata': {'source': 'docling'}
+            }
+            return extraction
+        except Exception as e:
+            logger.warning(f"Docling extraction error: {e}")
+            return {}
 
     def _extract_with_pixel_analysis(self, file_path: str) -> Dict:
         """Extraction par analyse de pixels (simplifié)"""
