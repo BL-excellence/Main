@@ -40,7 +40,6 @@ from .models import (
 from .utils import extract_metadonnees, extract_full_text
 from .annotation_utils import extract_pages_from_pdf
 from .rlhf_learning import RLHFGroqAnnotator
-from .table_image_extractor import TableImageExtractor
 
 
 # --- Mongo client (réutilisé) ---
@@ -1180,56 +1179,14 @@ def view_original_document(request, document_id):
             "<script>window.close();</script></body></html>"
         )
 
-@login_required
-def document_tables_images(request, document_id):
-    """
-    Vue pour afficher les tableaux et images extraits d'un document
-    """
-    try:
-        document = RawDocument.objects.get(id=document_id)
-        
-        # Vérifier les permissions
-        if not request.user.is_staff and document.owner != request.user:
-            messages.error(request, "Vous n'avez pas accès à ce document.")
-            return redirect('rawdocs:document_list')
-        
-        # Créer l'extracteur
-        extractor = TableImageExtractor(document.file.path)
-        
-        # Extraire tableaux et images
-        tables = extractor.extract_tables_with_structure()
-        images = extractor.extract_images()
-        
-        # Obtenir le HTML combiné
-        combined_html = extractor.get_combined_html()
-        
-        # Résumé de l'extraction
-        summary = extractor.get_extraction_summary()
-        
-        context = {
-            'document': document,
-            'tables': tables,
-            'images': images,
-            'combined_html': combined_html,
-            'summary': summary,
-            'total_elements': len(tables) + len(images)
-        }
-        
-        return render(request, 'rawdocs/document_tables_images.html', context)
-        
-    except RawDocument.DoesNotExist:
-        messages.error(request, "Document non trouvé.")
-        return redirect('rawdocs:document_list')
-    except Exception as e:
-        messages.error(request, f"Erreur lors de l'extraction: {str(e)}")
-        return redirect('rawdocs:document_detail', document_id=document_id)
+
 
 @login_required
 def document_structured(request, document_id):
     """
     Affiche le contenu structuré (HTML) du document, comme dans Library.
     - Utilise le cache RawDocument.structured_html si présent
-    - Sinon tente UltraAdvancedPDFExtractor, puis fallback TableImageExtractor
+    - Utilise uniquement UltraAdvancedPDFExtractor (pas de fallback)
     - Permet forcer régénération via ?regen=1
     """
     try:
@@ -1247,7 +1204,7 @@ def document_structured(request, document_id):
         regen = request.GET.get('regen') in ['1', 'true', 'True']
         
         if (regen or not structured_html) and getattr(document, 'file', None):
-            # 1) UltraAdvancedPDFExtractor
+            # UltraAdvancedPDFExtractor uniquement
             try:
                 from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
                 ultra = UltraAdvancedPDFExtractor()
@@ -1257,18 +1214,6 @@ def document_structured(request, document_id):
                 confidence = (ultra_result or {}).get('confidence_score')
             except Exception:
                 structured_html = ''
-            
-            # 2) Fallback TableImageExtractor
-            if not structured_html:
-                try:
-                    extractor = TableImageExtractor(document.file.path)
-                    extractor.extract_tables_with_structure()
-                    extractor.extract_images()
-                    structured_html = extractor.get_combined_html()
-                    method = 'table_image_extractor'
-                    confidence = None
-                except Exception:
-                    structured_html = ''
         
         # Sauvegarde cache si on a du contenu
         if structured_html:
@@ -1293,56 +1238,7 @@ def document_structured(request, document_id):
         messages.error(request, f"Erreur lors de la génération du contenu structuré: {str(e)}")
         return redirect('rawdocs:document_detail', document_id=document_id)
 
-@login_required
-def export_tables_excel(request, document_id):
-    """
-    Exporte les tableaux d'un document vers Excel
-    """
-    try:
-        document = RawDocument.objects.get(id=document_id)
-        
-        # Vérifier les permissions
-        if not request.user.is_staff and document.owner != request.user:
-            return JsonResponse({'error': 'Accès non autorisé'}, status=403)
-        
-        # Créer l'extracteur et extraire les tableaux
-        extractor = TableImageExtractor(document.file.path)
-        tables = extractor.extract_tables_with_structure()
-        
-        if not tables:
-            return JsonResponse({'error': 'Aucun tableau trouvé dans ce document'}, status=404)
-        
-        # Créer le fichier Excel
-        response = HttpResponse(
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        filename = f"tableaux_{document.title}_{document.id}.xlsx"
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        # Utiliser un buffer pour créer le fichier Excel
-        import io
-        import pandas as pd
-        
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            for table in tables:
-                sheet_name = f"Page_{table['page']}_Table_{table['table_number']}"
-                # Limiter la longueur du nom de feuille
-                if len(sheet_name) > 31:
-                    sheet_name = f"P{table['page']}_T{table['table_number']}"
-                
-                table['dataframe'].to_excel(writer, sheet_name=sheet_name, index=False)
-        
-        buffer.seek(0)
-        response.write(buffer.getvalue())
-        buffer.close()
-        
-        return response
-        
-    except RawDocument.DoesNotExist:
-        return JsonResponse({'error': 'Document non trouvé'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': f'Erreur lors de l\'export: {str(e)}'}, status=500)
+
 
 @login_required
 def document_detail(request, document_id):

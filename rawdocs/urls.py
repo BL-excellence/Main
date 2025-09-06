@@ -181,27 +181,11 @@ urlpatterns = [
         name='document_detail'
     ),
     
-    # ——— URLs Extraction Tableaux et Images ——————————————————
-    
-    # 22) Affichage des tableaux et images extraits
-    path(
-        'documents/<int:document_id>/tables-images/',
-        views.document_tables_images,
-        name='document_tables_images'
-    ),
-    
-    # 22b) Affichage du contenu structuré
+    # ——— URL Contenu structuré ——————————————————
     path(
         'documents/<int:document_id>/structured/',
         views.document_structured,
         name='document_structured'
-    ),
-    
-    # 23) Export des tableaux vers Excel
-    path(
-        'documents/<int:document_id>/export-tables-excel/',
-        views.export_tables_excel,
-        name='export_tables_excel'
     ),
     path('add-field/', views.add_field_ajax, name='add_field_ajax'),
     path('save-custom/', views.save_custom_field, name='save_custom_field'),

@@ -72,6 +72,15 @@ input[type="text"], input[type="url"], input[type="date"], textarea, select {
     padding: 0.7rem 1rem;
     transition: border 0.3s, box-shadow 0.3s;
 }
+/* Placeholder transparency for metadata form */
+input[type="text"]::placeholder,
+input[type="url"]::placeholder,
+input[type="date"]::placeholder,
+textarea::placeholder,
+select::placeholder {
+    color: rgba(100, 116, 139, 0.6);
+    opacity: 0.6;
+}
 input[type="text"]:focus, input[type="url"]:focus, input[type="date"]:focus,
 textarea:focus, select:focus {
     outline: none;

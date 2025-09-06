@@ -188,15 +188,7 @@ def client_document_detail(request, pk):
                 print(f"⚠️ UltraAdvancedPDFExtractor KO: {e}")
                 structured_html = ''
 
-            # 2) Fallback: tableaux + images si ultra vide/échec
-            if not structured_html:
-                from rawdocs.table_image_extractor import TableImageExtractor
-                tiex = TableImageExtractor(document.file.path)
-                tiex.extract_tables_with_structure()
-                tiex.extract_images()
-                structured_html = tiex.get_combined_html()
-                method = 'table_image_extractor'
-                confidence = None
+            # Pas de fallback: UltraAdvanced uniquement
 
             # Sauvegarde cache (éviter de modifier les docs d'autrui)
             if structured_html:

@@ -39,4 +39,5 @@ urlpatterns = [
     path('api/documents/<int:pk>/analyze/', api_views.analyze_document_groq, name='api_analyze'),
     path('api/documents/<int:pk>/summary/', api_views.document_summary, name='api_summary'),
     path('api/documents/<int:pk>/raw-text/', api_views.document_raw_text, name='api_raw_text'),
+    path("convertio-preview/<int:pk>/", views.convertio_preview, name="convertio_preview"),
 ]

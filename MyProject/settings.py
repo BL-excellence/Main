@@ -176,6 +176,8 @@ OAUTH_REDIRECT_URI = 'http://127.0.0.1:8000/client/products/api/oauth/callback/'
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
+CONVERTIO_API_KEY = "c14c6e0d62a6a7a98acb9bc629bbd273"
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

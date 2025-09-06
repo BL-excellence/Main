@@ -443,18 +443,7 @@ def document_detail(request, pk):
                 logger.warning(f"UltraAdvancedPDFExtractor KO (doc {document.pk}): {e}")
                 structured_html = ''
 
-            # 2) Fallback tables+images
-            if not structured_html:
-                try:
-                    from rawdocs.table_image_extractor import TableImageExtractor
-                    tiex = TableImageExtractor(document.file.path)
-                    tiex.extract_tables_with_structure()
-                    tiex.extract_images()
-                    structured_html = tiex.get_combined_html()
-                    method = 'table_image_extractor'
-                    confidence = None
-                except Exception as e:
-                    logger.warning(f"Fallback TableImageExtractor KO (doc {document.pk}): {e}")
+            # Pas de fallback: on reste sur UltraAdvanced uniquement
 
             # Sauvegarde cache: éviter d'écraser si doc non client / non propriétaire
             if structured_html:
@@ -513,6 +502,95 @@ def download_document(request, pk):
     filename = document.file.name.split('/')[-1]
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+
+######################
+import os, time, requests
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from rawdocs.models import RawDocument 
+from MyProject.settings import CONVERTIO_API_KEY 
+@csrf_exempt
+@require_http_methods(["GET"])
+def convertio_preview(request, pk):
+    """
+    Test rapide Convertio: convertit le PDF du RawDocument(pk) via Convertio et renvoie le résultat.
+    Usage:
+      GET /library/convertio-preview/<pk>/?fmt=html&ocr=0
+    - fmt: 'html' (défaut) ou 'txt'
+    - ocr: '1' pour activer l'OCR (si PDF scanné et quota OCR dispo)
+    Nécessite la variable d'env CONVERTIO_API_KEY.
+    """
+    # 1) Récup doc
+    document = get_object_or_404(RawDocument, pk=pk, is_validated=True)
+    if not getattr(document, 'file', None):
+        return HttpResponse('Aucun fichier PDF attaché.', status=404)
+    pdf_path = document.file.path
+
+    # 2) Config
+    api_key = CONVERTIO_API_KEY.strip()    
+    if not api_key:
+        return HttpResponse("Clé API manquante. Définis CONVERTIO_API_KEY.", status=500)
+
+    outputformat = request.GET.get("fmt", "html").lower()
+    if outputformat not in ("html", "txt"):
+        outputformat = "html"
+    ocr_enabled = request.GET.get("ocr", "0") in ("1", "true", "True")
+
+    try:
+        # 3) Étape 1: init conversion (POST JSON)
+        payload = {
+            "apikey": api_key,
+            "input": "upload",
+            "outputformat": outputformat,
+        }
+        if ocr_enabled:
+            payload["options"] = {"ocr_enabled": True}
+
+        r = requests.post("https://api.convertio.co/convert", json=payload, timeout=60)
+        if r.status_code != 200:
+            return HttpResponse(f"POST /convert HTTP {r.status_code}: {r.text}", status=502)
+        j = r.json()
+        if j.get("status") != "ok":
+            return HttpResponse(f"Init conversion refusée: {j}", status=502)
+        conv_id = j["data"]["id"]
+
+        # 4) Étape 2: upload binaire (PUT)
+        upload_url = f"https://api.convertio.co/convert/{conv_id}/{os.path.basename(pdf_path)}"
+        with open(pdf_path, "rb") as f:
+            r = requests.put(upload_url, data=f, headers={"Content-Type": "application/octet-stream"}, timeout=600)
+        if r.status_code != 200 or r.json().get("status") != "ok":
+            return HttpResponse(f"PUT upload échoué: {r.status_code} {r.text}", status=502)
+
+        # 5) Étape 3: poll status -> finish
+        status_url = f"https://api.convertio.co/convert/{conv_id}/status"
+        for _ in range(90):  # ~7.5 min si sleep 5s
+            s = requests.get(status_url, timeout=30).json()
+            if s.get("status") != "ok":
+                return HttpResponse(f"Erreur statut: {s}", status=502)
+            step = s["data"]["step"]
+            if step == "finish":
+                out_url = s["data"]["output"]["url"]
+                resp = requests.get(out_url, timeout=120)
+                if resp.status_code != 200:
+                    return HttpResponse(f"Téléchargement échoué: {resp.status_code}", status=502)
+                content = resp.content
+                if outputformat == "html":
+                    return HttpResponse(content, content_type="text/html; charset=utf-8")
+                else:  # txt
+                    return HttpResponse(content, content_type="text/plain; charset=utf-8")
+            time.sleep(5)
+
+        return HttpResponse("Timeout en attente de Convertio.", status=504)
+
+    except Exception as e:
+        logger.exception("Erreur Convertio")
+        return HttpResponse(f"Erreur: {e}", status=500)
+######################
+
+
 
 @api_view(['GET'])
 def search_documents(request):
