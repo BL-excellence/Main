@@ -195,7 +195,224 @@
     .meta-badge.warning { background: rgba(251,191,36,0.15); border-color: rgba(251,191,36,0.3); color: #fff; }
     .meta-badge.info { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.3); color: #fff; }
 
-    /* Responsive design from example */
+    /* Content card to display structured HTML below header */
+    .content-card { 
+        background: #fff; 
+        border: 1px solid #e5e7eb; 
+        border-radius: 12px; 
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .empty { text-align: center; padding: 40px 10px; color: #6b7280; }
+
+    /* ===== ENHANCED EDITING STYLES ===== */
+    
+    /* Editor toolbar */
+    .editor-toolbar {
+        position: sticky;
+        top: 0;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        padding: 16px;
+        border-bottom: 2px solid #e2e8f0;
+        z-index: 100;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .editor-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border: 2px solid #cbd5e1;
+        border-radius: 8px;
+        background: #fff;
+        color: #475569;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+
+    .editor-btn:hover {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        color: #334155;
+    }
+
+    .editor-btn.active {
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        color: white;
+        border-color: #1d4ed8;
+        box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .editor-btn.save-btn {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        border-color: #059669;
+    }
+
+    .editor-btn.save-btn:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .editor-status {
+        margin-left: auto;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .editor-status.success {
+        background: rgba(16, 185, 129, 0.1);
+        color: #059669;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .editor-status.error {
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .editor-status.info {
+        background: rgba(59, 130, 246, 0.1);
+        color: #2563eb;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    /* Content area with enhanced editing */
+    .content-area {
+        padding: 24px;
+        min-height: 400px;
+    }
+
+    /* Editable content styles */
+    [contenteditable="true"] {
+        outline: none;
+        border: 2px dashed transparent;
+        border-radius: 4px;
+        padding: 8px;
+        margin: 4px 0;
+        transition: all 0.2s ease;
+        cursor: text;
+        position: relative;
+    }
+
+    [contenteditable="true"]:hover {
+        border-color: rgba(59, 130, 246, 0.3);
+        background: rgba(59, 130, 246, 0.02);
+    }
+
+    [contenteditable="true"]:focus {
+        border-color: #3b82f6;
+        background: rgba(59, 130, 246, 0.05);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    /* Enhanced table editing */
+    .editable-table {
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+        margin: 16px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .editable-table th,
+    .editable-table td {
+        border: 1px solid #e5e7eb;
+        padding: 12px;
+        text-align: left;
+        transition: all 0.2s ease;
+    }
+
+    .editable-table th {
+        background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .editable-table td[contenteditable="true"]:hover {
+        background: rgba(59, 130, 246, 0.05);
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .editable-table td[contenteditable="true"]:focus {
+        background: rgba(59, 130, 246, 0.1);
+        border-color: #3b82f6;
+        outline: none;
+        box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Add content buttons */
+    .add-content-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: rgba(59, 130, 246, 0.1);
+        color: #2563eb;
+        border: 2px dashed #93c5fd;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin: 8px 4px;
+        transition: all 0.2s ease;
+    }
+
+    .add-content-btn:hover {
+        background: rgba(59, 130, 246, 0.15);
+        border-color: #3b82f6;
+        transform: translateY(-1px);
+    }
+
+    /* Enhanced visual feedback */
+    .editing-mode .content-area {
+        background: repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 20px,
+            rgba(59, 130, 246, 0.02) 20px,
+            rgba(59, 130, 246, 0.02) 40px
+        );
+    }
+
+    .has-changes {
+        position: relative;
+    }
+
+    .has-changes::after {
+        content: '●';
+        color: #f59e0b;
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        font-size: 12px;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    /* Responsive design */
     @media (max-width: 768px) {
         .structured-header { padding: 24px; border-radius: 20px; }
         .sh-top { grid-template-columns: 1fr; gap: 20px; }
@@ -208,6 +425,20 @@
         .btn { padding: 10px 14px; font-size: 0.85rem; }
         .sh-metadata { gap: 8px; }
         .meta-badge { padding: 8px 12px; font-size: 0.8rem; }
+        
+        .editor-toolbar {
+            padding: 12px;
+            gap: 8px;
+        }
+        
+        .editor-btn {
+            padding: 8px 12px;
+            font-size: 0.8rem;
+        }
+        
+        .content-area {
+            padding: 16px;
+        }
     }
 
     @media (max-width: 480px) {
@@ -215,23 +446,17 @@
         .document-subtitle { gap: 12px; }
         .sh-actions { width: 100%; }
         .btn { flex: 1; justify-content: center; }
+        
+        .editor-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .editor-status {
+            margin-left: 0;
+            margin-top: 8px;
+        }
     }
-
-    /* Content card to display structured HTML below header */
-    .content-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
-    .empty { text-align: center; padding: 40px 10px; color: #6b7280; }
-
-    /* Ensure editable areas are actually editable and show caret */
-    #structured-host, .content-card { user-select: text; -webkit-user-select: text; }
-    [contenteditable="true"] {
-        outline: 1px dashed rgba(0,0,0,0.2);
-        cursor: text;
-        user-select: text;
-        -webkit-user-select: text;
-        caret-color: auto;
-    }
-    /* Avoid accidental blocking of pointer events */
-    #structured-host * { pointer-events: auto; }
 </style>
 {% endblock %}
 
@@ -304,17 +529,67 @@
         </div>
     </div>
 
-    <div class="content-card">
+    <div class="content-card" id="main-content-card">
         {% if structured_html %}
-        <div id="structured-host">
+        <!-- Enhanced Editor Toolbar -->
+        <div class="editor-toolbar">
+            <button class="editor-btn active" id="toggle-edit" type="button">
+                <i class="fas fa-edit"></i>
+                <span>Mode édition</span>
+            </button>
+            
+            <button class="editor-btn" id="add-paragraph" type="button">
+                <i class="fas fa-paragraph"></i>
+                <span>+ Paragraphe</span>
+            </button>
+            
+            <button class="editor-btn" id="add-heading" type="button">
+                <i class="fas fa-heading"></i>
+                <span>+ Titre</span>
+            </button>
+            
+            <button class="editor-btn" id="add-table" type="button">
+                <i class="fas fa-table"></i>
+                <span>+ Tableau</span>
+            </button>
+            
+            <button class="editor-btn" id="add-list" type="button">
+                <i class="fas fa-list"></i>
+                <span>+ Liste</span>
+            </button>
+            
+            <button class="editor-btn save-btn" id="save-edits" type="button">
+                <i class="fas fa-save"></i>
+                <span>Sauvegarder</span>
+            </button>
+            
+            <span class="editor-status info" id="save-status">Prêt à éditer</span>
+        </div>
+
+        <div class="content-area" id="structured-host">
             {{ structured_html|safe }}
         </div>
         {% else %}
-        <div class="empty">
-            <i class="far fa-file"></i>
-            <p>Aucun contenu structuré disponible pour l'instant. Cliquez sur "Régénérer".</p>
+        <div class="content-area">
+            <div class="empty">
+                <i class="far fa-file" style="font-size: 3rem; margin-bottom: 16px; opacity: 0.5;"></i>
+                <p style="font-size: 1.1rem; margin-bottom: 8px;">Aucun contenu structuré disponible</p>
+                <p style="color: #9ca3af;">Cliquez sur "Régénérer" pour extraire le contenu du document.</p>
+            </div>
         </div>
         {% endif %}
+    </div>
+</div>
+
+<!-- Modal for adding content -->
+<div id="add-content-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:white; padding:24px; border-radius:12px; max-width:500px; width:90%;">
+        <h3 style="margin:0 0 16px 0;">Ajouter du contenu</h3>
+        <div id="modal-content"></div>
+        <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
+            <button id="modal-cancel" style="padding:8px 16px; border:1px solid #ccc; background:white; border-radius:6px; cursor:pointer;">Annuler</button>
+            <button id="modal-confirm" style="padding:8px 16px; border:none; background:#3b82f6; color:white; border-radius:6px; cursor:pointer;">Ajouter</button>
+        </div>
     </div>
 </div>
 
@@ -323,133 +598,529 @@
 {% block extra_js %}
 <script>
 (function(){
-  // Activer l'édition inline pour le contenu structuré généré par UltraAdvancedPDFExtractor
-  function setEditable(on) {
-    const host = document.getElementById('structured-host') || document;
+    let editingMode = true;
+    let hasUnsavedChanges = false;
+    let currentElementCount = 0;
 
-    // If extractor didn't add markers, infer reasonable defaults
-    const hasMarkers = host.querySelector('.editable-content, .table-cell-editable');
-    if (!hasMarkers) {
-      // Make typical text elements editable
-      host.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, caption').forEach((el, idx) => {
-        el.classList.add('editable-content');
-        if (!el.getAttribute('data-element-id')) {
-          el.setAttribute('data-element-id', 'el-' + idx);
-        }
-        if (!el.getAttribute('data-original-text')) {
-          el.setAttribute('data-original-text', (el.innerText || el.textContent || '').trim());
-        }
-      });
-      // Make table cells editable
-      host.querySelectorAll('td, th').forEach((td, idx) => {
-        td.classList.add('table-cell-editable');
-        if (!td.getAttribute('data-cell-id')) {
-          td.setAttribute('data-cell-id', 'cell-' + idx);
-        }
-        if (!td.getAttribute('data-original-value')) {
-          td.setAttribute('data-original-value', (td.innerText || td.textContent || '').trim());
-        }
-      });
+    // Initialize editing functionality
+    function initializeEditor() {
+        const host = document.getElementById('structured-host');
+        if (!host) return;
+
+        // Make existing content editable
+        makeContentEditable(host);
+        
+        // Add event listeners
+        addEventListeners();
+        
+        // Set up change detection
+        setupChangeDetection();
+        
+        // Update UI
+        updateEditingMode();
     }
 
-    host.querySelectorAll('.editable-content, .table-cell-editable')
-      .forEach(el => el.setAttribute('contenteditable', on ? 'true' : 'false'));
-    const btn = document.getElementById('toggle-edit');
-    if (btn) btn.textContent = on ? 'Mode édition: ON' : 'Mode édition: OFF';
-  }
+    // Make content editable with proper IDs and attributes
+    function makeContentEditable(container) {
+        // Text elements
+        container.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, caption, div:not([class*="table"]):not([id]):not([contenteditable])').forEach((el, idx) => {
+            if (!el.classList.contains('editable-content') && !el.querySelector('table, img, iframe')) {
+                el.classList.add('editable-content');
+                if (!el.getAttribute('data-element-id')) {
+                    el.setAttribute('data-element-id', 'text-' + (currentElementCount++));
+                }
+                if (!el.getAttribute('data-original-text')) {
+                    el.setAttribute('data-original-text', getText(el));
+                }
+                el.setAttribute('contenteditable', editingMode ? 'true' : 'false');
+            }
+        });
 
-  function getText(el){ return (el.innerText || el.textContent || '').trim(); }
+        // Table cells
+        container.querySelectorAll('td, th').forEach((cell, idx) => {
+            if (!cell.classList.contains('table-cell-editable')) {
+                cell.classList.add('table-cell-editable');
+                if (!cell.getAttribute('data-cell-id')) {
+                    cell.setAttribute('data-cell-id', 'cell-' + (currentElementCount++));
+                }
+                if (!cell.getAttribute('data-original-value')) {
+                    cell.setAttribute('data-original-value', getText(cell));
+                }
+                cell.setAttribute('contenteditable', editingMode ? 'true' : 'false');
+            }
+        });
 
-  function collectEdits(){
-    const edits = [];
-    // Text nodes
-    document.querySelectorAll('.editable-content').forEach(el => {
-      const elementId = el.getAttribute('data-element-id') || ''; // si le wrapper a l'attribut, remonte
-      const original = el.getAttribute('data-original-text') || '';
-      const modified = getText(el);
-      if (elementId && original !== modified) {
-        edits.push({ type: 'text', element_id: elementId, original, modified });
-      }
+        // Style tables
+        container.querySelectorAll('table').forEach(table => {
+            if (!table.classList.contains('editable-table')) {
+                table.classList.add('editable-table');
+            }
+        });
+    }
+
+    // Add event listeners
+    function addEventListeners() {
+        // Toggle editing mode
+        document.getElementById('toggle-edit')?.addEventListener('click', toggleEditingMode);
+        
+        // Add content buttons
+        document.getElementById('add-paragraph')?.addEventListener('click', () => showAddContentModal('paragraph'));
+        document.getElementById('add-heading')?.addEventListener('click', () => showAddContentModal('heading'));
+        document.getElementById('add-table')?.addEventListener('click', () => showAddContentModal('table'));
+        document.getElementById('add-list')?.addEventListener('click', () => showAddContentModal('list'));
+        
+        // Save button
+        document.getElementById('save-edits')?.addEventListener('click', saveEdits);
+        
+        // Modal events
+        document.getElementById('modal-cancel')?.addEventListener('click', hideAddContentModal);
+        document.getElementById('modal-confirm')?.addEventListener('click', confirmAddContent);
+    }
+
+    // Setup change detection
+    function setupChangeDetection() {
+        const host = document.getElementById('structured-host');
+        if (!host) return;
+
+        host.addEventListener('input', function(e) {
+            if (e.target.getAttribute('contenteditable') === 'true') {
+                markAsChanged(e.target);
+                hasUnsavedChanges = true;
+                updateSaveStatus('Modifications non sauvegardées', 'info');
+            }
+        });
+
+        // Detect paste events
+        host.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                if (e.target.getAttribute('contenteditable') === 'true') {
+                    markAsChanged(e.target);
+                    hasUnsavedChanges = true;
+                    updateSaveStatus('Contenu collé - Sauvegardez vos modifications', 'info');
+                }
+            }, 100);
+        });
+    }
+
+    // Toggle editing mode
+    function toggleEditingMode() {
+        editingMode = !editingMode;
+        updateEditingMode();
+        
+        const host = document.getElementById('structured-host');
+        if (host) {
+            host.querySelectorAll('[contenteditable]').forEach(el => {
+                el.setAttribute('contenteditable', editingMode ? 'true' : 'false');
+            });
+        }
+    }
+
+    // Update editing mode UI
+    function updateEditingMode() {
+        const toggleBtn = document.getElementById('toggle-edit');
+        const mainCard = document.getElementById('main-content-card');
+        
+        if (toggleBtn) {
+            toggleBtn.classList.toggle('active', editingMode);
+            toggleBtn.innerHTML = editingMode 
+                ? '<i class="fas fa-edit"></i><span>Mode lecture</span>'
+                : '<i class="fas fa-eye"></i><span>Mode édition</span>';
+        }
+        
+        if (mainCard) {
+            mainCard.classList.toggle('editing-mode', editingMode);
+        }
+        
+        // Show/hide add content buttons
+        document.querySelectorAll('.editor-btn:not(#toggle-edit):not(#save-edits)').forEach(btn => {
+            btn.style.display = editingMode ? 'inline-flex' : 'none';
+        });
+    }
+
+    // Mark element as changed
+    function markAsChanged(element) {
+        element.classList.add('has-changes');
+    }
+
+    // Show add content modal
+    function showAddContentModal(type) {
+        const modal = document.getElementById('add-content-modal');
+        const modalContent = document.getElementById('modal-content');
+        
+        let content = '';
+        switch (type) {
+            case 'paragraph':
+                content = '<label>Texte du paragraphe:</label><textarea id="new-content" style="width:100%; height:100px; padding:8px; border:1px solid #ccc; border-radius:4px; resize:vertical;" placeholder="Saisissez votre texte ici..."></textarea>';
+                break;
+            case 'heading':
+                content = `
+                    <label>Niveau du titre:</label>
+                    <select id="heading-level" style="width:100%; padding:8px; margin-bottom:12px; border:1px solid #ccc; border-radius:4px;">
+                        <option value="h2">Titre 2 (H2)</option>
+                        <option value="h3">Titre 3 (H3)</option>
+                        <option value="h4">Titre 4 (H4)</option>
+                    </select>
+                    <label>Texte du titre:</label>
+                    <input type="text" id="new-content" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" placeholder="Titre de la section">
+                `;
+                break;
+            case 'table':
+                content = `
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+                        <div>
+                            <label>Nombre de lignes:</label>
+                            <input type="number" id="table-rows" value="3" min="2" max="10" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        </div>
+                        <div>
+                            <label>Nombre de colonnes:</label>
+                            <input type="number" id="table-cols" value="3" min="2" max="6" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        </div>
+                    </div>
+                    <label>Titre du tableau (optionnel):</label>
+                    <input type="text" id="table-caption" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" placeholder="Titre du tableau">
+                `;
+                break;
+            case 'list':
+                content = `
+                    <label>Type de liste:</label>
+                    <select id="list-type" style="width:100%; padding:8px; margin-bottom:12px; border:1px solid #ccc; border-radius:4px;">
+                        <option value="ul">Liste à puces</option>
+                        <option value="ol">Liste numérotée</option>
+                    </select>
+                    <label>Éléments de la liste (un par ligne):</label>
+                    <textarea id="new-content" style="width:100%; height:100px; padding:8px; border:1px solid #ccc; border-radius:4px; resize:vertical;" placeholder="Élément 1&#10;Élément 2&#10;Élément 3"></textarea>
+                `;
+                break;
+        }
+        
+        modalContent.innerHTML = content;
+        modal.style.display = 'flex';
+        modal.setAttribute('data-type', type);
+        
+        // Focus first input
+        setTimeout(() => {
+            const firstInput = modalContent.querySelector('input, textarea, select');
+            if (firstInput) firstInput.focus();
+        }, 100);
+    }
+
+    // Hide add content modal
+    function hideAddContentModal() {
+        document.getElementById('add-content-modal').style.display = 'none';
+    }
+
+    // Confirm add content
+    function confirmAddContent() {
+        const modal = document.getElementById('add-content-modal');
+        const type = modal.getAttribute('data-type');
+        const host = document.getElementById('structured-host');
+        
+        if (!host) return;
+        
+        let newElement = null;
+        
+        switch (type) {
+            case 'paragraph':
+                const pText = document.getElementById('new-content').value.trim();
+                if (pText) {
+                    newElement = document.createElement('p');
+                    newElement.textContent = pText;
+                }
+                break;
+                
+            case 'heading':
+                const hLevel = document.getElementById('heading-level').value;
+                const hText = document.getElementById('new-content').value.trim();
+                if (hText) {
+                    newElement = document.createElement(hLevel);
+                    newElement.textContent = hText;
+                }
+                break;
+                
+            case 'table':
+                const rows = parseInt(document.getElementById('table-rows').value);
+                const cols = parseInt(document.getElementById('table-cols').value);
+                const caption = document.getElementById('table-caption').value.trim();
+                
+                newElement = document.createElement('table');
+                newElement.className = 'editable-table';
+                
+                if (caption) {
+                    const captionEl = document.createElement('caption');
+                    captionEl.textContent = caption;
+                    newElement.appendChild(captionEl);
+                }
+                
+                // Header row
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                for (let c = 0; c < cols; c++) {
+                    const th = document.createElement('th');
+                    th.textContent = `Colonne ${c + 1}`;
+                    th.setAttribute('data-cell-id', 'cell-' + (currentElementCount++));
+                    th.setAttribute('data-original-value', th.textContent);
+                    th.classList.add('table-cell-editable');
+                    th.setAttribute('contenteditable', 'true');
+                    headerRow.appendChild(th);
+                }
+                thead.appendChild(headerRow);
+                newElement.appendChild(thead);
+                
+                // Data rows
+                const tbody = document.createElement('tbody');
+                for (let r = 0; r < rows - 1; r++) {
+                    const row = document.createElement('tr');
+                    for (let c = 0; c < cols; c++) {
+                        const td = document.createElement('td');
+                        td.textContent = `Ligne ${r + 1}, Col ${c + 1}`;
+                        td.setAttribute('data-cell-id', 'cell-' + (currentElementCount++));
+                        td.setAttribute('data-original-value', td.textContent);
+                        td.classList.add('table-cell-editable');
+                        td.setAttribute('contenteditable', 'true');
+                        row.appendChild(td);
+                    }
+                    tbody.appendChild(row);
+                }
+                newElement.appendChild(tbody);
+                break;
+                
+            case 'list':
+                const listType = document.getElementById('list-type').value;
+                const listItems = document.getElementById('new-content').value.trim().split('\n').filter(item => item.trim());
+                
+                if (listItems.length > 0) {
+                    newElement = document.createElement(listType);
+                    listItems.forEach(itemText => {
+                        const li = document.createElement('li');
+                        li.textContent = itemText.trim();
+                        li.setAttribute('data-element-id', 'text-' + (currentElementCount++));
+                        li.setAttribute('data-original-text', li.textContent);
+                        li.classList.add('editable-content');
+                        li.setAttribute('contenteditable', 'true');
+                        newElement.appendChild(li);
+                    });
+                }
+                break;
+        }
+        
+        if (newElement) {
+            // Add the new element to the content
+            if (type !== 'table') {
+                newElement.setAttribute('data-element-id', 'text-' + (currentElementCount++));
+                newElement.setAttribute('data-original-text', getText(newElement));
+                newElement.classList.add('editable-content');
+                newElement.setAttribute('contenteditable', 'true');
+            }
+            
+            // Add before the last element or at the end
+            host.appendChild(newElement);
+            
+            // Mark as changed and scroll to it
+            markAsChanged(newElement);
+            hasUnsavedChanges = true;
+            updateSaveStatus('Nouvel élément ajouté - Sauvegardez vos modifications', 'info');
+            
+            // Scroll to new element
+            newElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Focus on new element if it's editable
+            if (newElement.getAttribute('contenteditable') === 'true') {
+                setTimeout(() => {
+                    newElement.focus();
+                    // Place cursor at end
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    range.selectNodeContents(newElement);
+                    range.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }, 200);
+            }
+        }
+        
+        hideAddContentModal();
+    }
+
+    // Helper function to get text content
+    function getText(el) {
+        return (el.innerText || el.textContent || '').trim();
+    }
+
+    // Update save status
+    function updateSaveStatus(message, type = 'info') {
+        const status = document.getElementById('save-status');
+        if (status) {
+            status.textContent = message;
+            status.className = `editor-status ${type}`;
+        }
+    }
+
+    // Collect all edits
+    function collectEdits() {
+        const edits = [];
+        
+        // Text elements
+        document.querySelectorAll('.editable-content').forEach(el => {
+            const elementId = el.getAttribute('data-element-id');
+            const original = el.getAttribute('data-original-text') || '';
+            const modified = getText(el);
+            
+            if (elementId && original !== modified) {
+                edits.push({
+                    type: 'text',
+                    element_id: elementId,
+                    original: original,
+                    modified: modified,
+                    tag_name: el.tagName.toLowerCase()
+                });
+            }
+        });
+        
+        // Table cells
+        document.querySelectorAll('.table-cell-editable').forEach(cell => {
+            const cellId = cell.getAttribute('data-cell-id');
+            const original = cell.getAttribute('data-original-value') || '';
+            const modified = getText(cell);
+            
+            if (cellId && original !== modified) {
+                edits.push({
+                    type: 'cell',
+                    cell_id: cellId,
+                    original: original,
+                    modified: modified,
+                    tag_name: cell.tagName.toLowerCase()
+                });
+            }
+        });
+        
+        return edits;
+    }
+
+    // Save edits function
+    async function saveEdits() {
+        const edits = collectEdits();
+        
+        if (edits.length === 0) {
+            updateSaveStatus('Aucune modification à sauvegarder', 'info');
+            return;
+        }
+        
+        updateSaveStatus('Sauvegarde en cours...', 'info');
+        
+        try {
+            const response = await fetch('{% url "rawdocs:save_structured_edits" document.id %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ 
+                    edits: edits,
+                    full_html: document.getElementById('structured-host').innerHTML
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.message || 'Erreur de sauvegarde');
+            }
+            
+            // Update original values for changed elements
+            document.querySelectorAll('.editable-content').forEach(el => {
+                const elementId = el.getAttribute('data-element-id');
+                if (elementId && data.details && data.details.some(d => d.type === 'text' && d.element_id === elementId)) {
+                    el.setAttribute('data-original-text', getText(el));
+                    el.classList.remove('has-changes');
+                }
+            });
+            
+            document.querySelectorAll('.table-cell-editable').forEach(cell => {
+                const cellId = cell.getAttribute('data-cell-id');
+                if (cellId && data.details && data.details.some(d => d.type === 'cell' && d.cell_id === cellId)) {
+                    cell.setAttribute('data-original-value', getText(cell));
+                    cell.classList.remove('has-changes');
+                }
+            });
+            
+            hasUnsavedChanges = false;
+            updateSaveStatus(
+                `✓ Sauvegardé: ${data.saved_count || edits.length} modification(s)` + 
+                (data.avg_confidence ? ` • Confiance: ${Math.round(data.avg_confidence * 100)}%` : ''), 
+                'success'
+            );
+            
+        } catch (error) {
+            console.error('Save error:', error);
+            updateSaveStatus(`✗ Erreur de sauvegarde: ${error.message}`, 'error');
+        }
+    }
+
+    // Get CSRF token
+    function getCSRFToken() {
+        const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfElement) {
+            return csrfElement.value;
+        }
+        
+        // Alternative: get from cookies
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrftoken') {
+                return value;
+            }
+        }
+        
+        return '';
+    }
+
+    // Warn user about unsaved changes
+    window.addEventListener('beforeunload', function(e) {
+        if (hasUnsavedChanges) {
+            e.preventDefault();
+            e.returnValue = 'Vous avez des modifications non sauvegardées. Êtes-vous sûr de vouloir quitter ?';
+            return e.returnValue;
+        }
     });
-    // Table cells
-    document.querySelectorAll('.table-cell-editable').forEach(td => {
-      const cellId = td.getAttribute('data-cell-id') || '';
-      const original = td.getAttribute('data-original-value') || '';
-      const modified = getText(td);
-      if (cellId && original !== modified) {
-        edits.push({ type: 'cell', cell_id: cellId, original, modified });
-      }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+S to save
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            saveEdits();
+        }
+        
+        // Ctrl+E to toggle editing
+        if (e.ctrlKey && e.key === 'e') {
+            e.preventDefault();
+            toggleEditingMode();
+        }
     });
-    return edits;
-  }
 
-  async function saveEdits(){
-    const status = document.getElementById('save-status');
-    const edits = collectEdits();
-    if (!edits.length) { status.textContent = 'Aucun changement à sauvegarder.'; return; }
-    status.textContent = 'Sauvegarde en cours…';
-    try {
-      const resp = await fetch('{% url "rawdocs:save_structured_edits" document.id %}', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
-        },
-        body: JSON.stringify({ edits })
-      });
-      const data = await resp.json();
-      if (!resp.ok || !data.success) throw new Error(data.message || 'Erreur de sauvegarde');
-      // Mettre à jour les originaux
-      document.querySelectorAll('.editable-content').forEach(el => {
-        const elementId = el.getAttribute('data-element-id') || '';
-        if (elementId && data.details.some(d => d.type==='text' && d.element_id===elementId)) {
-          el.setAttribute('data-original-text', getText(el));
-        }
-      });
-      document.querySelectorAll('.table-cell-editable').forEach(td => {
-        const cellId = td.getAttribute('data-cell-id') || '';
-        if (cellId && data.details.some(d => d.type==='cell' && d.cell_id===cellId)) {
-          td.setAttribute('data-original-value', getText(td));
-        }
-      });
-      status.textContent = `Sauvegardé: ${data.saved_count} élément(s) • Score moyen: ${Math.round(data.avg_confidence*100)}%`;
-    } catch(e){ status.textContent = 'Erreur: ' + e.message; }
-  }
-
-  // Barre d’actions simple
-  const bar = document.createElement('div');
-  bar.style = 'position:sticky;top:8px;background:#fff;padding:8px;border:1px solid #eee;border-radius:8px;z-index:50;display:flex;gap:8px;';
-  bar.innerHTML = `
-    <button id="toggle-edit" type="button">Mode édition: ON</button>
-    <button id="save-edits" type="button">Sauvegarder</button>
-    <span id="save-status" style="margin-left:8px;color:#555;"></span>
-  `;
-  const host = document.querySelector('.content-card');
-  if (host) host.prepend(bar);
-
-  // Initial editable setup
-  setEditable(true);
-
-  // Fallback: if nothing is editable, make the whole structured area editable
-  setTimeout(() => {
-    const hasAnyEditable = document.querySelector('[contenteditable="true"]');
-    const structured = document.getElementById('structured-host');
-    if (!hasAnyEditable && structured) {
-      structured.setAttribute('contenteditable', 'true');
-      structured.classList.add('editable-content');
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeEditor);
+    } else {
+        initializeEditor();
     }
-  }, 0);
 
-  document.getElementById('toggle-edit').addEventListener('click', () => {
-    const on = document.querySelector('.editable-content[contenteditable="true"], .table-cell-editable[contenteditable="true"], #structured-host[contenteditable="true"]') !== null;
-    setEditable(!on);
-    // Toggle fallback container too
-    const structured = document.getElementById('structured-host');
-    if (structured && !structured.querySelector('[contenteditable="true"]')) {
-      structured.setAttribute('contenteditable', (!on) ? 'true' : 'false');
-    }
-  });
-  document.getElementById('save-edits').addEventListener('click', saveEdits);
+    // Auto-save every 2 minutes if there are changes
+    setInterval(function() {
+        if (hasUnsavedChanges && editingMode) {
+            const edits = collectEdits();
+            if (edits.length > 0) {
+                updateSaveStatus('Sauvegarde automatique...', 'info');
+                saveEdits();
+            }
+        }
+    }, 120000); // 2 minutes
+
 })();
 </script>
 {% endblock %}
