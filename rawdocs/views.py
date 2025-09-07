@@ -575,7 +575,7 @@ def validate_document(request, doc_id):
                     document.pages_extracted = True
 
                     document.is_validated = True
-                    document.validated_at = datetime.now()
+                    document.validated_at = timezone.now()
                     document.save()
 
                     messages.success(request, f"Document validé ({document.total_pages} pages)")
