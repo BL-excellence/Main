@@ -1,3 +1,4 @@
+{#template/expert/document_review.html#}
 {% extends "base.html" %}
 {% load static %}
 
@@ -189,7 +190,7 @@ body {
   align-items: center;
 }
 
-/* Summary Card */
+/* Summary Card avec Éditeur */
 .summary-card {
   background: var(--pharma-card);
   border: 1px solid var(--pharma-border);
@@ -222,16 +223,180 @@ body {
   padding: 1.25rem 1.5rem;
 }
 
-.summary-content {
-  background: #fafbfc;
-  border: 1px solid var(--pharma-border);
-  border-radius: 10px;
+/* Contrôles de Synchronisation */
+.sync-controls {
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
   padding: 1.5rem;
-  margin: 1rem 0;
-  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.sync-controls-header h5 {
+  color: #475569;
+  margin: 0 0 1rem 0;
   font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sync-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.sync-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.sync-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: #cbd5e1;
+  border-radius: 24px;
+  transition: background 0.3s;
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.sync-toggle input:checked + .toggle-slider {
+  background: #10b981;
+}
+
+.sync-toggle input:checked + .toggle-slider::after {
+  transform: translateX(20px);
+}
+
+.sync-status {
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+#sync-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* Éditeur de Résumé */
+.summary-editor-container {
+  position: relative;
+}
+
+.summary-editor {
+  width: 100%;
+  min-height: 150px;
+  padding: 1rem;
+  border: 2px solid var(--pharma-border);
+  border-radius: var(--pharma-radius-sm);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
   color: var(--pharma-text);
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+  background: #ffffff;
+  resize: vertical;
+  transition: var(--pharma-transition);
+}
+
+.summary-editor:focus {
+  outline: none;
+  border-color: var(--pharma-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.summary-editor.modified {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.summary-editor.auto-updated {
+  background: linear-gradient(90deg, #f0fdf4, #ffffff);
+  animation: highlightUpdate 3s ease-out;
+}
+
+@keyframes highlightUpdate {
+  0% { background: #f0fdf4; }
+  100% { background: #ffffff; }
+}
+
+.summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.summary-status {
+  font-size: 0.9rem;
+  padding: 0.5rem 0;
+  font-weight: 500;
+}
+
+.summary-status.success { color: #059669; }
+.summary-status.error { color: #dc2626; }
+.summary-status.warning { color: #d97706; }
+.summary-status.info { color: #0284c7; }
+
+/* Boutons d'Action */
+.action-btn {
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--pharma-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-primary-light));
+  color: #fff;
+}
+
+.action-btn.success {
+  background: linear-gradient(135deg, var(--pharma-success), var(--pharma-accent));
+  color: #fff;
+}
+
+.action-btn.accent {
+  background: linear-gradient(135deg, var(--pharma-accent), var(--pharma-accent-light));
+  color: #fff;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  text-decoration: none;
+  color: #fff;
 }
 
 .badge-pill {
@@ -254,7 +419,7 @@ body {
   border-color: rgba(245, 158, 11, 0.25);
 }
 
-/* Action Buttons */
+/* Action Buttons Grid */
 .action-buttons-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -464,6 +629,94 @@ body {
   color: var(--pharma-primary-dark);
 }
 
+/* Entity Preview */
+.entity-extraction-preview {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: var(--pharma-radius-sm);
+  border: 1px solid var(--pharma-border);
+}
+
+.entity-tag {
+  display: inline-block;
+  background: var(--pharma-primary);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  margin: 0.2rem;
+  font-weight: 500;
+}
+
+.entity-tag.new {
+  background: #22c55e;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Notifications */
+.advanced-notification {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  overflow: hidden;
+  border-left: 4px solid;
+}
+
+.advanced-notification.success {
+  border-left-color: #10b981;
+}
+
+.advanced-notification.error {
+  border-left-color: #dc2626;
+}
+
+.advanced-notification.info {
+  border-left-color: #3b82f6;
+}
+
+.notification-content {
+  padding: 1rem;
+}
+
+.notification-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.notification-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #64748b;
+}
+
+.notification-close:hover {
+  color: #374151;
+}
+
+.notification-details {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.detail-item {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+
 /* Animations */
 @keyframes fadeInUp {
   from {
@@ -476,15 +729,6 @@ body {
   }
 }
 
-@keyframes highlight-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
-  }
-  50% {
-    box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
-  }
-}
-
 /* Responsive Design */
 @media (max-width: 900px) {
   .main-content {
@@ -492,20 +736,12 @@ body {
     padding: 1rem;
   }
 
-  .document-header,
-  .page-navigation,
-  .summary-head,
-  .summary-body {
-    padding: 1.1rem 0.8rem !important;
+  .sync-options {
+    grid-template-columns: 1fr;
   }
 
   .action-buttons-grid {
     grid-template-columns: 1fr;
-  }
-
-  .final-actions-buttons {
-    flex-direction: column;
-    align-items: center;
   }
 }
 
@@ -516,31 +752,77 @@ body {
     gap: 1rem !important;
   }
 
-  .header-actions,
-  .page-controls,
-  .expert-controls {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .action-btn-card {
+  .summary-actions {
     flex-direction: column;
-    text-align: center;
-    gap: 1rem;
+    align-items: stretch;
   }
 }
 
-@media (max-width: 480px) {
-  .final-actions-buttons {
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-  }
+/* Popup de détails de synchronisation */
+.sync-details-popup {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  max-width: 400px;
+  z-index: 10000;
+  transform: translateX(450px);
+  transition: transform 0.3s ease;
+  overflow: hidden;
+}
 
-  .btn-final {
-    width: 100%;
-    justify-content: center;
-  }
+.sync-details-popup.show {
+  transform: translateX(0);
+}
+
+.sync-details-popup .popup-header {
+  background: linear-gradient(135deg, #0ea5e9, #10b981);
+  color: white;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.sync-details-popup .popup-content {
+  padding: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.sync-section {
+  margin-bottom: 1rem;
+}
+
+.sync-section h4 {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sync-section.removed h4 {
+  color: #dc2626;
+}
+
+.sync-section.added h4 {
+  color: #059669;
+}
+
+.entity-group {
+  padding: 0.5rem;
+  background: #f8fafc;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.entity-group strong {
+  color: #475569;
 }
 </style>
 
@@ -553,7 +835,7 @@ body {
         <div class="document-meta">
           <span class="meta-item"><i class="fas fa-file-alt"></i> {{ document.total_pages }} pages</span>
           <span class="meta-item"><i class="fas fa-calendar"></i> {{ document.created_at|date:"d/m/Y" }}</span>
-          <span class="meta-item"><i class="fas fa-user"></i> Révision en cours</span>
+          <span class="meta-item"><i class="fas fa-sync-alt"></i> Synchronisation intelligente</span>
         </div>
       </div>
 
@@ -576,12 +858,12 @@ body {
             <i class="fas fa-chevron-left"></i> Page Précédente
           </button>
         {% endif %}
-        
+
         <div class="page-indicator-modern">
           <i class="fas fa-file-text"></i>
           Page {{ current_page_num }} / {{ total_pages }}
         </div>
-        
+
         {% if not is_last_page %}
           <a href="?page={{ current_page_num|add:'1' }}" class="nav-btn">
             Page Suivante <i class="fas fa-chevron-right"></i>
@@ -595,20 +877,20 @@ body {
 
       <div class="expert-controls">
         <span style="color: var(--pharma-text-soft); font-size: 0.9rem;">
-          <i class="fas fa-info-circle"></i> Page {{ current_page_num }} sur {{ total_pages }}
+          <i class="fas fa-robot"></i> IA Synchronisée
         </span>
       </div>
     </div>
 
-    <!-- Page Summary Section -->
+    <!-- Page Summary Section avec Éditeur et Synchronisation -->
     <div class="summary-card">
       <div class="summary-head">
         <h3>
-          <i class="fas fa-file-text"></i> Résumé Page {{ current_page_num }}
+          <i class="fas fa-edit"></i> Résumé Page {{ current_page_num }} (Éditable)
         </h3>
         {% if page_summary %}
           <span class="badge-pill badge-ok">
-            <i class="fas fa-check-circle"></i> Disponible
+            <i class="fas fa-sync-alt"></i> Synchronisé
           </span>
         {% else %}
           <span class="badge-pill badge-warn">
@@ -616,54 +898,97 @@ body {
           </span>
         {% endif %}
       </div>
+
       <div class="summary-body">
-        {% if page_summary %}
-          <div class="summary-content">
-            {{ page_summary|linebreaks }}
+        <!-- Contrôles de Synchronisation -->
+        <div class="sync-controls">
+          <div class="sync-controls-header">
+            <h5><i class="fas fa-sync-alt"></i> Synchronisation Automatique</h5>
           </div>
-        {% else %}
+          <div class="sync-options">
+            <label class="sync-toggle">
+              <input type="checkbox" id="summary-auto-sync" checked>
+              <span class="toggle-slider"></span>
+              <span class="toggle-label">Résumé → Annotations (IA)</span>
+            </label>
+            <label class="sync-toggle">
+              <input type="checkbox" id="annotation-auto-sync" checked>
+              <span class="toggle-slider"></span>
+              <span class="toggle-label">Annotations → Résumé</span>
+            </label>
+          </div>
+          <div class="sync-status">
+            <div id="sync-status-indicator">
+              <i class="fas fa-circle text-success"></i>
+              <span>Synchronisation active</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Éditeur de Résumé -->
+        <div class="summary-editor-container">
           <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i>
-            Aucun résumé disponible pour cette page.
+            <i class="fas fa-magic"></i>
+            Éditez ce résumé pour créer automatiquement des annotations. L'IA détectera les nouvelles informations et les annotera dans le document.
           </div>
-        {% endif %}
+
+          <textarea
+            id="page-summary-editor"
+            class="summary-editor"
+            placeholder="Rédigez ou modifiez le résumé de cette page. Les changements créeront automatiquement des annotations..."
+            rows="6">{% if page_summary %}{{ page_summary }}{% else %}Page {{ current_page_num }} : Aucun résumé disponible. Commencez par décrire le contenu de cette page...{% endif %}</textarea>
+
+          <div class="summary-actions">
+            <button class="action-btn success" onclick="savePageSummaryChanges()">
+              <i class="fas fa-save"></i> Sauvegarder Résumé
+            </button>
+            <button class="action-btn primary" onclick="extractEntitiesFromPageSummary()">
+              <i class="fas fa-sync-alt"></i> Extraire Entités
+            </button>
+            <button class="action-btn accent" onclick="triggerPageRegenerationManual()">
+              <i class="fas fa-robot"></i> Régénérer via IA
+            </button>
+            <div id="page-summary-status" class="summary-status"></div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Action Buttons for Current Page -->
     <div class="action-buttons-grid">
-      <a href="{% url 'expert:view_page_annotation_json' current_page.id %}" 
+      <a href="{% url 'expert:view_page_annotation_json' current_page.id %}"
          class="action-btn-card">
         <div class="icon">
-          <i class="fas fa-check-circle"></i>
+          <i class="fas fa-code"></i>
         </div>
         <div class="action-content">
-          <span class="action-title">Valider Page {{ current_page_num }}</span>
-          <span class="action-desc">Voir et éditer le JSON de cette page</span>
+          <span class="action-title">JSON Page {{ current_page_num }}</span>
+          <span class="action-desc">Voir et éditer le JSON structuré</span>
         </div>
       </a>
 
       <a href="{% url 'expert:annotate_document' document.id %}?page={{ current_page_num }}"
          class="action-btn-card primary">
         <div class="icon">
-          <i class="fas fa-edit"></i>
+          <i class="fas fa-highlighter"></i>
         </div>
         <div class="action-content">
-          <span class="action-title">Voir Annotations</span>
-          <span class="action-desc">Réviser les annotations de cette page</span>
+          <span class="action-title">Annoter Manuellement</span>
+          <span class="action-desc">Interface d'annotation avancée</span>
         </div>
       </a>
 
       <a href="{% url 'expert:view_document_annotation_json_enriched' document.id %}"
-         class="action-btn-card semantic">
-        <div class="icon">
-          <i class="fas fa-brain"></i>
-        </div>
-        <div class="action-content">
-          <span class="action-title">JSON Sémantique</span>
-          <span class="action-desc">Relations, Q&A et enrichissement IA</span>
-        </div>
-      </a>
+   class="action-btn-card semantic">
+  <div class="icon">
+    <i class="fas fa-brain"></i>
+  </div>
+  <div class="action-content">
+    <span class="action-title">JSON Sémantique</span>
+    <span class="action-desc">Relations, Q&A et enrichissement IA</span>
+  </div>
+</a>
+
     </div>
 
     <!-- Final Document Actions (only show on last page) -->
@@ -674,23 +999,23 @@ body {
           <i class="fas fa-trophy"></i> Document Complet
         </h4>
         <p>
-          Vous avez atteint la dernière page. Vous pouvez maintenant valider le document entier.
+          Vous avez atteint la dernière page. Le système de synchronisation a maintenu la cohérence entre résumé et annotations.
         </p>
         <div class="final-actions-buttons">
-          <a href="{% url 'expert:view_document_annotation_json' document.id %}" 
+          <a href="{% url 'expert:view_document_annotation_json' document.id %}"
              class="btn-final success">
             <i class="fas fa-file-check"></i>
             <div>
-              <span class="btn-main">JSON Document Complet</span>
-              <span class="btn-sub">Voir et valider le résumé global</span>
+              <span class="btn-main">Résumé Global Synchronisé</span>
+              <span class="btn-sub">Voir le document complet</span>
             </div>
           </a>
-          <a href="{% url 'expert:validate_document' document.id %}" 
+          <a href="{% url 'expert:validate_document' document.id %}"
              class="btn-final accent">
             <i class="fas fa-certificate"></i>
             <div>
               <span class="btn-main">Validation Finale</span>
-              <span class="btn-sub">Marquer le document comme terminé</span>
+              <span class="btn-sub">Terminer et créer le produit</span>
             </div>
           </a>
         </div>
@@ -701,137 +1026,483 @@ body {
 </div>
 
 <script>
-// Add JavaScript to handle annotation loading
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('Page annotations:', {{ total_page_annotations|default:0 }});
-  
-  // Add modern hover effects
-  document.querySelectorAll('.action-btn-card').forEach(card => {
-    card.addEventListener('mouseenter', function() {
-      this.style.transform = 'translateY(-4px)';
-    });
-    
-    card.addEventListener('mouseleave', function() {
-      this.style.transform = 'translateY(0)';
-    });
-  });
+/* --------- Contexte Django --------- */
+var currentPageId  = {{ current_page.id }};
+var documentId     = {{ document.id }};
+var currentPageNum = {{ current_page_num }};
+var totalPages     = {{ total_pages }};
 
-  // Add ripple effect to buttons
-  document.querySelectorAll('.nav-btn, .btn-final').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      const ripple = document.createElement('span');
-      const rect = this.getBoundingClientRect();
-      const size = Math.max(rect.width, rect.height);
-      ripple.style.cssText = `
-        position: absolute;
-        border-radius: 50%;
-        background: rgba(255,255,255,0.3);
-        transform: scale(0);
-        animation: ripple 0.6s linear;
-        width: ${size}px;
-        height: ${size}px;
-        left: ${e.clientX - rect.left - size/2}px;
-        top: ${e.clientY - rect.top - size/2}px;
-      `;
-      
-      if (!document.querySelector('#ripple-styles')) {
-        const style = document.createElement('style');
-        style.id = 'ripple-styles';
-        style.textContent = `
-          @keyframes ripple {
-            0% { transform: scale(0); opacity: 1; }
-            100% { transform: scale(4); opacity: 0; }
-          }
-        `;
-        document.head.appendChild(style);
+/* --------- Endpoints centralisés --------- */
+const ENDPOINTS = {
+  saveSummary:            `/expert/annotation/page/${currentPageId}/save-summary/`,
+  generateSummary:        `/expert/annotation/page/${currentPageId}/generate-summary/`,
+  updateFromAnnotations:  `/expert/annotation/page/${currentPageId}/update-from-annotations/`,
+  getAnnotations:(pageId)=> `/expert/api/get-annotations/${pageId}/`  // remplace /rawdocs/…
+};
+
+/* --------- État UI --------- */
+let pageSummaryAutoSyncEnabled   = true;
+let pageAnnotationAutoSyncEnabled= true;
+let pageSummaryChangeTimer = null;
+let lastSavedPageSummary  = '';
+let isPageAutoAnnotating  = false;
+
+let annotationChangeListener = null;
+
+/* --------- Utils --------- */
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let c of cookies) {
+      const cookie = c.trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
       }
-      
-      this.style.position = 'relative';
-      this.style.overflow = 'hidden';
-      this.appendChild(ripple);
-      
-      setTimeout(() => ripple.remove(), 600);
-    });
-  });
-});
+    }
+  }
+  return cookieValue;
+}
 
-/* Notification System */
-function showSuccessNotification(message) {
+async function fetchJson(url, opts = {}) {
+  const resp = await fetch(url, {
+    headers: {'Accept':'application/json', ...(opts.headers || {})},
+    cache: 'no-store',
+    ...opts
+  });
+  const text = await resp.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // Rend l’erreur lisible au lieu de “Unexpected token <”
+    const snippet = text.replace(/\s+/g,' ').slice(0,160);
+    throw new Error(`${resp.status} ${resp.statusText} — Réponse non JSON: ${snippet}`);
+  }
+}
+
+function updatePageSummaryStatus(message, type) {
+  const el = document.getElementById('page-summary-status');
+  if (!el) return;
+  el.textContent = message;
+  el.className = `summary-status ${type}`;
+  if (type !== 'error') {
+    setTimeout(() => { if (el.textContent === message) el.textContent = ''; }, 8000);
+  }
+}
+
+function showPageNotification(id, config) {
+  const existing = document.getElementById(`page-notification-${id}`);
+  if (existing) existing.remove();
+
   const notification = document.createElement('div');
-  notification.className = 'expert-notification success';
+  notification.id = `page-notification-${id}`;
+  notification.className = `advanced-notification ${config.type}`;
+  const icon = config.type === 'success' ? 'fa-check-circle' :
+               config.type === 'error'   ? 'fa-exclamation-circle' : 'fa-info-circle';
+
+  let detailsHtml = '';
+  if (config.details && config.details.length > 0) {
+    detailsHtml = `<div class="notification-details">
+      ${config.details.map(d => `<div class="detail-item">• ${d.text || d}</div>`).join('')}
+    </div>`;
+  }
+
   notification.innerHTML = `
     <div class="notification-content">
-      <i class="fas fa-check-circle"></i>
-      <span>${message}</span>
+      <div class="notification-header">
+        <i class="fas ${icon}"></i>
+        <strong>${config.title}</strong>
+        <button class="notification-close">&times;</button>
+      </div>
+      <div class="notification-message">${config.message}</div>
+      ${detailsHtml}
+    </div>
+  `;
+  notification.style.cssText = `
+    position: fixed; top: 20px; right: 20px; z-index: 10000; max-width: 400px;
+    transform: translateX(100%); transition: transform .3s ease;
+  `;
+  document.body.appendChild(notification);
+  setTimeout(() => notification.style.transform = 'translateX(0)', 100);
+  notification.querySelector('.notification-close').onclick = () => closePageNotification(notification);
+  setTimeout(() => closePageNotification(notification), config.type === 'error' ? 8000 : 5000);
+}
+function closePageNotification(n) {
+  n.style.transform = 'translateX(100%)';
+  setTimeout(() => n.remove(), 300);
+}
+
+/* --------- UI init --------- */
+document.addEventListener('DOMContentLoaded', () => {
+  initializePageSummarySync();
+  setupPageSyncControls();
+  setupPageSyncIndicators();
+  setupInteractiveEffects();
+  setupAnnotationChangeDetection();
+  setupAnnotationIntegration();
+
+  console.log('✅ Système de synchronisation bidirectionnelle initialisé');
+  console.log('📝 Résumé → Annotations IA: enabled');
+  console.log('🏷️ Annotations → Résumé: enabled');
+});
+
+window.addEventListener('beforeunload', () => {
+  if (annotationChangeListener) annotationChangeListener.disconnect();
+});
+
+/* --------- Synchronisation Résumé → Annotations --------- */
+function initializePageSummarySync() {
+  const summaryEl = document.getElementById('page-summary-editor');
+  if (!summaryEl) return;
+
+  lastSavedPageSummary = summaryEl.value;
+
+  summaryEl.addEventListener('input', () => {
+    clearTimeout(pageSummaryChangeTimer);
+    updatePageSummaryStatus('Modifications détectées...', 'warning');
+    summaryEl.classList.add('modified');
+    pageSummaryChangeTimer = setTimeout(() => {
+      if (pageSummaryAutoSyncEnabled && !isPageAutoAnnotating) savePageSummaryChanges();
+    }, 3000);
+  });
+
+  summaryEl.addEventListener('blur', () => {
+    if (summaryEl.value !== lastSavedPageSummary && pageSummaryAutoSyncEnabled) {
+      savePageSummaryChanges();
+    }
+  });
+}
+
+async function savePageSummaryChanges() {
+  const el = document.getElementById('page-summary-editor');
+  if (!el || isPageAutoAnnotating) return;
+
+  const currentSummary = el.value.trim();
+  if (currentSummary === lastSavedPageSummary) return;
+
+  isPageAutoAnnotating = true;
+  updatePageSummaryStatus("Synchronisation bidirectionnelle des annotations...", 'info');
+
+  try {
+    const data = await fetchJson(ENDPOINTS.saveSummary, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
+      body: JSON.stringify({
+        summary_text: currentSummary,
+        auto_annotate: true,
+        auto_delete: pageSummaryAutoSyncEnabled, // Activer la suppression auto
+        page_id: currentPageId
+      })
+    });
+
+    if (!data.success) throw new Error(data.error || 'Erreur de sauvegarde');
+
+    lastSavedPageSummary = currentSummary;
+    el.classList.remove('modified');
+
+    // Afficher les détails de synchronisation
+    if (data.sync_result) {
+      const {annotations_created, annotations_deleted, annotations_rejected} = data.sync_result;
+      let message = 'Résumé synchronisé: ';
+
+      if (annotations_created > 0) {
+        message += `${annotations_created} annotation(s) créée(s)`;
+      }
+
+      if (annotations_deleted + annotations_rejected > 0) {
+        if (annotations_created > 0) message += ', ';
+        message += `${annotations_deleted + annotations_rejected} annotation(s) supprimée(s)`;
+      }
+
+      if (annotations_created === 0 && annotations_deleted === 0 && annotations_rejected === 0) {
+        message = 'Résumé sauvegardé (aucun changement d\'annotation)';
+      }
+
+      updatePageSummaryStatus(message, 'success');
+
+      // Afficher les détails dans une popup
+      if (data.sync_result.details) {
+        showSyncDetails(data.sync_result.details);
+      }
+    }
+
+    // Rafraîchir l'affichage des annotations
+    await refreshPageAnnotations();
+
+  } catch (e) {
+    console.error('Erreur synchronisation résumé:', e);
+    updatePageSummaryStatus('Erreur: ' + e.message, 'error');
+  } finally {
+    isPageAutoAnnotating = false;
+  }
+}
+
+function showSyncDetails(details) {
+  if (!details.added && !details.removed) return;
+
+  const popup = document.createElement('div');
+  popup.className = 'sync-details-popup';
+  popup.innerHTML = `
+    <div class="popup-header">
+      <i class="fas fa-sync-alt"></i>
+      <strong>Détails de synchronisation</strong>
+    </div>
+    <div class="popup-content">
+      ${details.removed ? `
+        <div class="sync-section removed">
+          <h4><i class="fas fa-minus-circle"></i> Annotations supprimées</h4>
+          ${Object.entries(details.removed).map(([type, values]) =>
+            `<div class="entity-group">
+              <strong>${type}:</strong> ${values.join(', ')}
+            </div>`
+          ).join('')}
+        </div>
+      ` : ''}
+      ${details.added ? `
+        <div class="sync-section added">
+          <h4><i class="fas fa-plus-circle"></i> Annotations créées</h4>
+          ${Object.entries(details.added).map(([type, values]) =>
+            `<div class="entity-group">
+              <strong>${type}:</strong> ${values.join(', ')}
+            </div>`
+          ).join('')}
+        </div>
+      ` : ''}
     </div>
   `;
 
-  if (!document.querySelector('#expert-notification-styles')) {
-    const style = document.createElement('style');
-    style.id = 'expert-notification-styles';
-    style.textContent = `
-      .expert-notification {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 10000;
-        padding: 1rem 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0,0,0,.15);
-        backdrop-filter: blur(10px);
-        animation: slideInRight .3s ease-out;
-        max-width: 400px;
-        font-family: Inter, sans-serif;
+  document.body.appendChild(popup);
+  setTimeout(() => popup.classList.add('show'), 100);
+  setTimeout(() => {
+    popup.classList.remove('show');
+    setTimeout(() => popup.remove(), 300);
+  }, 5000);
+}
+
+async function refreshPageAnnotations() {
+  // Recharger les annotations de la page après synchronisation
+  try {
+    const data = await fetchJson(`/expert/api/get-annotations/${currentPageId}/`);
+    if (data.success && data.annotations) {
+      // Mettre à jour l'interface avec les nouvelles annotations
+      console.log(`Page actualisée: ${data.annotations.length} annotations`);
+      // Déclencher un événement pour mettre à jour l'UI
+      window.dispatchEvent(new CustomEvent('annotationsUpdated', {
+        detail: { annotations: data.annotations }
+      }));
+    }
+  } catch (e) {
+    console.error('Erreur rafraîchissement annotations:', e);
+  }
+}
+
+/* --------- Résumé ← Annotations --------- */
+async function triggerPageRegenerationAuto(reason) {
+  if (!pageAnnotationAutoSyncEnabled) return;
+  const el = document.getElementById('page-summary-editor');
+  if (!el) return;
+
+  updatePageSummaryStatus('Régénération automatique du résumé...', 'info');
+
+  try {
+    const data = await fetchJson(ENDPOINTS.generateSummary, {
+      method: 'POST',
+      headers: {'X-CSRFToken': getCookie('csrftoken')}
+    });
+
+    if (!(data.success && data.summary)) throw new Error(data.error || 'Erreur de régénération');
+
+    el.value = data.summary;
+    lastSavedPageSummary = data.summary;
+    el.classList.add('auto-updated');
+    setTimeout(() => el.classList.remove('auto-updated'), 3000);
+
+    updatePageSummaryStatus('Résumé régénéré automatiquement depuis les annotations', 'success');
+    showPageNotification('auto-regen', { title: 'Résumé mis à jour', message: 'Résumé régénéré : ' + reason, type: 'info' });
+
+  } catch (e) {
+    console.error('Erreur régénération résumé page:', e);
+    updatePageSummaryStatus('Erreur régénération: ' + e.message, 'error');
+  }
+}
+
+async function triggerSummaryUpdateFromAnnotations() {
+  if (!pageAnnotationAutoSyncEnabled) return;
+  const el = document.getElementById('page-summary-editor');
+  if (!el) return;
+
+  updatePageSummaryStatus('Mise à jour du résumé depuis les annotations...', 'info');
+
+  try {
+    const data = await fetchJson(ENDPOINTS.updateFromAnnotations, {
+      method: 'POST',
+      headers: {'X-CSRFToken': getCookie('csrftoken')}
+    });
+
+    if (!(data.success && data.summary)) throw new Error(data.error || 'Erreur de mise à jour');
+
+    el.value = data.summary;
+    lastSavedPageSummary = data.summary;
+    el.classList.add('auto-updated');
+    setTimeout(() => el.classList.remove('auto-updated'), 3000);
+
+    updatePageSummaryStatus(
+      `Résumé mis à jour depuis ${data.total_annotations} annotation(s) sur ${data.entities_count} type(s)`,
+      'success'
+    );
+    showPageNotification('summary-auto-update', {
+      title: 'Résumé synchronisé',
+      message: data.message || 'Résumé mis à jour automatiquement',
+      type: 'info'
+    });
+
+  } catch (e) {
+    console.error('Erreur mise à jour résumé depuis annotations:', e);
+    updatePageSummaryStatus('Erreur mise à jour: ' + e.message, 'error');
+  }
+}
+
+/* --------- UI: Contrôles & Indicateurs --------- */
+function setupPageSyncControls() {
+  const summaryToggle    = document.getElementById('summary-auto-sync');
+  const annotationToggle = document.getElementById('annotation-auto-sync');
+
+  if (summaryToggle) summaryToggle.onchange    = (e) => { pageSummaryAutoSyncEnabled = e.target.checked;    updatePageSyncStatus(); };
+  if (annotationToggle) annotationToggle.onchange = (e) => { pageAnnotationAutoSyncEnabled = e.target.checked; updatePageSyncStatus(); };
+}
+function setupPageSyncIndicators() { updatePageSyncStatus(); }
+function updatePageSyncStatus() {
+  const indicator = document.getElementById('sync-status-indicator');
+  if (!indicator) return;
+  const isActive = pageSummaryAutoSyncEnabled || pageAnnotationAutoSyncEnabled;
+  const icon = indicator.querySelector('i');
+  const text = indicator.querySelector('span');
+  if (isActive) { icon.className = 'fas fa-circle text-success'; text.textContent = 'Synchronisation active'; }
+  else          { icon.className = 'fas fa-circle text-muted';   text.textContent = 'Synchronisation désactivée'; }
+}
+
+/* --------- Popups & effets --------- */
+function showPageAnnotationDetails(annotationsDetails) {
+  if (!annotationsDetails || !Object.keys(annotationsDetails).length) return;
+  const details = Object.entries(annotationsDetails).map(([t, vals]) => t + ': ' + vals.join(', ')).join('\n');
+  const popup = document.createElement('div');
+  popup.className = 'ai-annotation-popup';
+  popup.innerHTML = `
+    <div class="popup-header"><i class="fas fa-robot"></i><strong>Annotations IA - Page ${currentPageNum}</strong></div>
+    <div class="popup-content"><pre>${details}</pre></div>`;
+  document.body.appendChild(popup);
+  setTimeout(() => popup.classList.add('show'), 100);
+  setTimeout(() => { popup.classList.remove('show'); setTimeout(() => popup.remove(), 300); }, 4000);
+}
+
+function setupInteractiveEffects() {
+  document.querySelectorAll('.action-btn-card').forEach(card => {
+    card.addEventListener('mouseenter', () => card.style.transform = 'translateY(-4px)');
+    card.addEventListener('mouseleave', () => card.style.transform = 'translateY(0)');
+  });
+}
+
+/* --------- Détection changements annotations --------- */
+function setupAnnotationChangeDetection() {
+  if (!window.MutationObserver) return;
+  const targetNode = document.body;
+  const config = { childList: true, subtree: true, attributes: true,
+                   attributeFilter: ['data-annotation-count','data-annotation-modified'] };
+
+  annotationChangeListener = new MutationObserver((mutations) => {
+    for (let m of mutations) {
+      if (m.type === 'attributes' && (m.attributeName === 'data-annotation-count' || m.attributeName === 'data-annotation-modified')) {
+        if (pageAnnotationAutoSyncEnabled) {
+          clearTimeout(pageSummaryChangeTimer);
+          pageSummaryChangeTimer = setTimeout(() => triggerSummaryUpdateFromAnnotations(), 2000);
+        }
       }
-      .expert-notification.success {
-        background: linear-gradient(135deg, rgba(16,185,129,.9), rgba(34,197,94,.9));
-        border: 1px solid rgba(16,185,129,.3);
-        color: #fff;
-      }
-      .expert-notification.error {
-        background: linear-gradient(135deg, rgba(239,68,68,.9), rgba(220,38,38,.9));
-        border: 1px solid rgba(239,68,68,.3);
-        color: #fff;
-      }
-      .notification-content {
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        font-weight: 500;
-        font-size: .9rem;
-      }
-      .notification-content i {
-        font-size: 1.1rem;
-        flex-shrink: 0;
-      }
-      @keyframes slideInRight {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-      }
-      @keyframes slideOutRight {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
-      }
-    `;
-    document.head.appendChild(style);
+    }
+  });
+  annotationChangeListener.observe(targetNode, config);
+
+  // Fallback polling toutes les 30s
+  setInterval(() => { if (pageAnnotationAutoSyncEnabled) checkAnnotationChanges(); }, 30000);
+}
+
+function setupAnnotationIntegration() {
+  window.addEventListener('annotationCreated',  (e) => notifyAnnotationChange('created',  e.detail));
+  window.addEventListener('annotationDeleted',  (e) => notifyAnnotationChange('deleted',  e.detail));
+  window.addEventListener('annotationModified', (e) => notifyAnnotationChange('modified', e.detail));
+}
+
+function notifyAnnotationChange(changeType = 'modified', details = {}) {
+  const newHash = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  document.body.setAttribute('data-annotation-modified', newHash);
+  document.body.setAttribute('data-annotation-count', (details.count || '0').toString());
+  console.log('Changement d\'annotation détecté:', changeType, details);
+}
+
+async function checkAnnotationChanges() {
+  try {
+    const data = await fetchJson(ENDPOINTS.getAnnotations(currentPageId));
+    if (data && (data.success || typeof data.total_annotations !== 'undefined')) {
+      const currentCount = data.total_annotations || (Array.isArray(data.annotations) ? data.annotations.length : 0) || 0;
+      const storedCount  = parseInt(document.body.getAttribute('data-annotation-count') || '0', 10);
+      if (currentCount !== storedCount) notifyAnnotationChange('count_changed', { count: currentCount });
+    }
+  } catch (e) {
+    // silencieux pour éviter le spam console si l’endpoint est temporairement indisponible
+    console.debug('Vérification annotations (silencieuse):', e.message);
+  }
+}
+
+/* --------- Actions publiques (boutons) --------- */
+async function triggerPageRegenerationManual() {
+  if (confirm('Régénérer le résumé basé sur les annotations actuelles de cette page ? Cela remplacera le résumé existant.')) {
+    await triggerPageRegenerationAuto('Régénération manuelle demandée');
+  }
+}
+function extractEntitiesFromPageSummary() {
+  const summaryEl = document.getElementById('page-summary-editor');
+  if (!summaryEl) return {};
+  const text = summaryEl.value;
+
+  const patterns = {
+    product: [/(\b[A-Z][\w\u00C0-\u017F\-\/ ]{3,40})(?=\s+(?:est|sera|contient))/gim],
+    dosage: [/([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|µg|%|UI))/gi],
+    substance_active: [/(?:substance active|principe actif)\s*:?\s*([A-Z][\w\u00C0-\u017F\s\-]{2,40})/gi],
+    form: [/(?:forme|presentation)\s*:?\s*(\b(?:comprimés?|gélules?|capsules?|sirop|solution|suspension)\b)/gi],
+    date: [/\b(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December|janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+\d{4})\b/gi] // ex: 5 June 2014
+  };
+
+  const found = {};
+  for (const [type, regs] of Object.entries(patterns)) {
+    const vals = new Set();
+    regs.forEach(re => { let m; while ((m = re.exec(text)) !== null) { const v = (m[1]||'').trim().replace(/[.,;:]$/,''); if (v.length>1) vals.add(v); }});
+    if (vals.size) found[type] = [...vals];
   }
 
-  document.body.appendChild(notification);
+  let box = document.querySelector('.entity-extraction-preview');
+  if (!box) { box = document.createElement('div'); box.className='entity-extraction-preview'; summaryEl.parentNode.appendChild(box); }
+  box.innerHTML = Object.keys(found).length
+    ? Object.entries(found).map(([k, arr]) => `<div><strong>${k}</strong> : ${arr.map(v=>`<span class="entity-tag new">${v}</span>`).join(' ')}</div>`).join('')
+    : '<small class="text-muted">Aucune entité détectée…</small>';
 
-  setTimeout(() => {
-    notification.style.animation = 'slideOutRight .3s ease-in';
-    setTimeout(() => notification.remove(), 300);
-  }, 4000);
+  updatePageSummaryStatus('Aperçu des entités mis à jour.', 'success');
+  return found;
 }
 
-// Example usage for validation actions
-function validatePage() {
-  showSuccessNotification('Page validée avec succès !');
+function forceSyncBidirectional() {
+  if (confirm('Forcer la synchronisation complète résumé ↔ annotations ?')) {
+    savePageSummaryChanges().then(() => setTimeout(() => triggerSummaryUpdateFromAnnotations(), 3000));
+  }
 }
 
-function validateDocument() {
-  showSuccessNotification('Document validé avec succès !');
-}
+console.log('Système de synchronisation page-level initialisé');
+console.log(`Page ${currentPageNum} sur ${totalPages} - Document ${documentId}`);
+
+
+
+
+
 </script>
+
 
 {% endblock %}

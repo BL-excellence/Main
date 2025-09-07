@@ -23,6 +23,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import views as auth_views
 from django.http import HttpResponse
 from django.views.decorators.http import require_POST
+from difflib import SequenceMatcher
 from .metadata_rlhf_learning import MetadataRLHFLearner
 from datetime import timezone as dt_timezone
 from django.conf import settings
@@ -1235,9 +1236,95 @@ def document_structured(request, document_id):
         messages.error(request, "Document non trouvé.")
         return redirect('rawdocs:document_list')
     except Exception as e:
+        # Ne pas rediriger vers la page d'édition de métadonnées.
+        # Rester sur la page de contenu structuré et afficher l'erreur.
         messages.error(request, f"Erreur lors de la génération du contenu structuré: {str(e)}")
-        return redirect('rawdocs:document_detail', document_id=document_id)
+        try:
+            document = RawDocument.objects.get(id=document_id)
+        except Exception:
+            document = None
+        context = {
+            'document': document,
+            'structured_html': '',
+            'structured_html_method': '',
+            'structured_html_confidence': None,
+            'error': str(e),
+        }
+        return render(request, 'rawdocs/document_structured.html', context)
 
+
+
+@login_required
+@csrf_exempt
+@require_POST
+def save_structured_edits(request, document_id):
+    """Sauvegarde des éditions du HTML structuré + score de confiance simple.
+    Payload attendu: { "edits": [ {type: 'text'|'cell', element_id/cell_id, original, modified}, ... ] }
+    """
+    try:
+        doc = get_object_or_404(RawDocument, id=document_id)
+        if not (request.user.is_staff or (doc.owner and doc.owner == request.user)):
+            return JsonResponse({'success': False, 'message': "Accès refusé"}, status=403)
+
+        try:
+            data = json.loads(request.body.decode('utf-8')) if request.body else {}
+        except Exception:
+            data = {}
+
+        edits = data.get('edits') or []
+        if not isinstance(edits, list) or not edits:
+            return JsonResponse({'success': False, 'message': 'Aucune modification fournie'}, status=400)
+
+        # Stockage côté RawDocument: structured_html_edits (JSONField à créer si besoin) -> fallback: enriched_annotations_json
+        # Pour ne pas casser le modèle, sauvegardons dans enriched_annotations_json sous une clé dédiée
+        store = doc.enriched_annotations_json or {}
+        if not isinstance(store, dict):
+            store = {}
+        store.setdefault('structured_edits', [])
+        store.setdefault('edited_texts', {})
+        store.setdefault('edited_cells', {})
+
+        def conf(o, m):
+            o = (o or '').strip(); m = (m or '').strip()
+            if not o and not m: return 1.0
+            if not o or not m: return 0.0
+            return float(SequenceMatcher(None, o, m).ratio())
+
+        details = []
+        saved_count = 0
+
+        for e in edits:
+            et = e.get('type')
+            orig = e.get('original', '')
+            mod = e.get('modified', '')
+            c = conf(orig, mod)
+            item = { 'type': et, 'original': orig, 'modified': mod, 'confidence': round(c, 4) }
+            if et == 'text':
+                eid = str(e.get('element_id') or '')
+                item['element_id'] = eid
+                if eid:
+                    store['edited_texts'][eid] = { 'original': orig, 'modified': mod, 'confidence': c }
+                    saved_count += 1
+            elif et == 'cell':
+                cid = str(e.get('cell_id') or '')
+                item['cell_id'] = cid
+                if cid:
+                    store['edited_cells'][cid] = { 'original': orig, 'modified': mod, 'confidence': c }
+                    saved_count += 1
+            else:
+                item['warning'] = 'Unknown edit type'
+            store['structured_edits'].append(item)
+            details.append(item)
+
+        doc.enriched_annotations_json = store
+        doc.save(update_fields=['enriched_annotations_json'])
+
+        avg = round(sum(d['confidence'] for d in details if 'confidence' in d) / max(1, len(details)), 4)
+
+        return JsonResponse({ 'success': True, 'saved_count': saved_count, 'avg_confidence': avg, 'details': details })
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
 
 @login_required

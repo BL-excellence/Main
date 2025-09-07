@@ -187,6 +187,11 @@ urlpatterns = [
         views.document_structured,
         name='document_structured'
     ),
+    path(
+        'documents/<int:document_id>/structured/save-edits/',
+        views.save_structured_edits,
+        name='save_structured_edits'
+    ),
     path('add-field/', views.add_field_ajax, name='add_field_ajax'),
     path('save-custom/', views.save_custom_field, name='save_custom_field'),
 

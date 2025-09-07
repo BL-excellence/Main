@@ -292,4 +292,28 @@
         </div>
     </div>
 </div>
+<style>
+  /* Ensure each action button is on top and not overlapped */
+  .table-actions { position: relative; }
+  .action-btn { position: relative; z-index: 1; }
+  .action-btn.extract { z-index: 2; }
+</style>
+<script>
+  // Force navigation to the correct URL and prevent any row-level handlers
+  (function(){
+    document.querySelectorAll('.table-actions .action-btn.extract').forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.stopPropagation();
+        e.preventDefault();
+        window.location.href = a.getAttribute('href');
+      }, true);
+    });
+    // Also guard the edit link from swallowing clicks meant for neighbors
+    document.querySelectorAll('.table-actions .action-btn.view').forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.stopPropagation();
+      }, true);
+    });
+  })();
+</script>
 {% endblock %}

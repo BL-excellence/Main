@@ -220,6 +220,18 @@
     /* Content card to display structured HTML below header */
     .content-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
     .empty { text-align: center; padding: 40px 10px; color: #6b7280; }
+
+    /* Ensure editable areas are actually editable and show caret */
+    #structured-host, .content-card { user-select: text; -webkit-user-select: text; }
+    [contenteditable="true"] {
+        outline: 1px dashed rgba(0,0,0,0.2);
+        cursor: text;
+        user-select: text;
+        -webkit-user-select: text;
+        caret-color: auto;
+    }
+    /* Avoid accidental blocking of pointer events */
+    #structured-host * { pointer-events: auto; }
 </style>
 {% endblock %}
 
@@ -294,7 +306,9 @@
 
     <div class="content-card">
         {% if structured_html %}
-        {{ structured_html|safe }}
+        <div id="structured-host">
+            {{ structured_html|safe }}
+        </div>
         {% else %}
         <div class="empty">
             <i class="far fa-file"></i>
@@ -303,4 +317,139 @@
         {% endif %}
     </div>
 </div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  // Activer l'édition inline pour le contenu structuré généré par UltraAdvancedPDFExtractor
+  function setEditable(on) {
+    const host = document.getElementById('structured-host') || document;
+
+    // If extractor didn't add markers, infer reasonable defaults
+    const hasMarkers = host.querySelector('.editable-content, .table-cell-editable');
+    if (!hasMarkers) {
+      // Make typical text elements editable
+      host.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, caption').forEach((el, idx) => {
+        el.classList.add('editable-content');
+        if (!el.getAttribute('data-element-id')) {
+          el.setAttribute('data-element-id', 'el-' + idx);
+        }
+        if (!el.getAttribute('data-original-text')) {
+          el.setAttribute('data-original-text', (el.innerText || el.textContent || '').trim());
+        }
+      });
+      // Make table cells editable
+      host.querySelectorAll('td, th').forEach((td, idx) => {
+        td.classList.add('table-cell-editable');
+        if (!td.getAttribute('data-cell-id')) {
+          td.setAttribute('data-cell-id', 'cell-' + idx);
+        }
+        if (!td.getAttribute('data-original-value')) {
+          td.setAttribute('data-original-value', (td.innerText || td.textContent || '').trim());
+        }
+      });
+    }
+
+    host.querySelectorAll('.editable-content, .table-cell-editable')
+      .forEach(el => el.setAttribute('contenteditable', on ? 'true' : 'false'));
+    const btn = document.getElementById('toggle-edit');
+    if (btn) btn.textContent = on ? 'Mode édition: ON' : 'Mode édition: OFF';
+  }
+
+  function getText(el){ return (el.innerText || el.textContent || '').trim(); }
+
+  function collectEdits(){
+    const edits = [];
+    // Text nodes
+    document.querySelectorAll('.editable-content').forEach(el => {
+      const elementId = el.getAttribute('data-element-id') || ''; // si le wrapper a l'attribut, remonte
+      const original = el.getAttribute('data-original-text') || '';
+      const modified = getText(el);
+      if (elementId && original !== modified) {
+        edits.push({ type: 'text', element_id: elementId, original, modified });
+      }
+    });
+    // Table cells
+    document.querySelectorAll('.table-cell-editable').forEach(td => {
+      const cellId = td.getAttribute('data-cell-id') || '';
+      const original = td.getAttribute('data-original-value') || '';
+      const modified = getText(td);
+      if (cellId && original !== modified) {
+        edits.push({ type: 'cell', cell_id: cellId, original, modified });
+      }
+    });
+    return edits;
+  }
+
+  async function saveEdits(){
+    const status = document.getElementById('save-status');
+    const edits = collectEdits();
+    if (!edits.length) { status.textContent = 'Aucun changement à sauvegarder.'; return; }
+    status.textContent = 'Sauvegarde en cours…';
+    try {
+      const resp = await fetch('{% url "rawdocs:save_structured_edits" document.id %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+        },
+        body: JSON.stringify({ edits })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw new Error(data.message || 'Erreur de sauvegarde');
+      // Mettre à jour les originaux
+      document.querySelectorAll('.editable-content').forEach(el => {
+        const elementId = el.getAttribute('data-element-id') || '';
+        if (elementId && data.details.some(d => d.type==='text' && d.element_id===elementId)) {
+          el.setAttribute('data-original-text', getText(el));
+        }
+      });
+      document.querySelectorAll('.table-cell-editable').forEach(td => {
+        const cellId = td.getAttribute('data-cell-id') || '';
+        if (cellId && data.details.some(d => d.type==='cell' && d.cell_id===cellId)) {
+          td.setAttribute('data-original-value', getText(td));
+        }
+      });
+      status.textContent = `Sauvegardé: ${data.saved_count} élément(s) • Score moyen: ${Math.round(data.avg_confidence*100)}%`;
+    } catch(e){ status.textContent = 'Erreur: ' + e.message; }
+  }
+
+  // Barre d’actions simple
+  const bar = document.createElement('div');
+  bar.style = 'position:sticky;top:8px;background:#fff;padding:8px;border:1px solid #eee;border-radius:8px;z-index:50;display:flex;gap:8px;';
+  bar.innerHTML = `
+    <button id="toggle-edit" type="button">Mode édition: ON</button>
+    <button id="save-edits" type="button">Sauvegarder</button>
+    <span id="save-status" style="margin-left:8px;color:#555;"></span>
+  `;
+  const host = document.querySelector('.content-card');
+  if (host) host.prepend(bar);
+
+  // Initial editable setup
+  setEditable(true);
+
+  // Fallback: if nothing is editable, make the whole structured area editable
+  setTimeout(() => {
+    const hasAnyEditable = document.querySelector('[contenteditable="true"]');
+    const structured = document.getElementById('structured-host');
+    if (!hasAnyEditable && structured) {
+      structured.setAttribute('contenteditable', 'true');
+      structured.classList.add('editable-content');
+    }
+  }, 0);
+
+  document.getElementById('toggle-edit').addEventListener('click', () => {
+    const on = document.querySelector('.editable-content[contenteditable="true"], .table-cell-editable[contenteditable="true"], #structured-host[contenteditable="true"]') !== null;
+    setEditable(!on);
+    // Toggle fallback container too
+    const structured = document.getElementById('structured-host');
+    if (structured && !structured.querySelector('[contenteditable="true"]')) {
+      structured.setAttribute('contenteditable', (!on) ? 'true' : 'false');
+    }
+  });
+  document.getElementById('save-edits').addEventListener('click', saveEdits);
+})();
+</script>
 {% endblock %}
