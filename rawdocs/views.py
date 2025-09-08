@@ -285,6 +285,17 @@ def upload_pdf(request):
 
         metadata = extract_metadonnees(rd.file.path, rd.url or "")
         text = extract_full_text(rd.file.path)
+
+        # Générer le HTML structuré pour l'affichage
+        structured_html = ""
+        try:
+            from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
+            ultra = UltraAdvancedPDFExtractor()
+            ultra_result = ultra.extract_ultra_structured_content(rd.file.path)
+            structured_html = (ultra_result or {}).get('html', '')
+        except Exception as e:
+            print(f"⚠️ Error generating structured HTML: {e}")
+            structured_html = ""
         
         initial_data = {
             'title': rd.title or '',
@@ -303,6 +314,7 @@ def upload_pdf(request):
             'doc': rd,
             'metadata': metadata,
             'extracted_text': text,
+            'structured_html': structured_html,
             'edit_form': edit_form,
             'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
         })
@@ -329,6 +341,17 @@ def upload_pdf(request):
             rd.save()
             metadata = extract_metadonnees(rd.file.path, rd.url or "") or {}
             text = extract_full_text(rd.file.path)
+
+            # Générer le HTML structuré pour l'affichage
+            structured_html = ""
+            try:
+                from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
+                ultra = UltraAdvancedPDFExtractor()
+                ultra_result = ultra.extract_ultra_structured_content(rd.file.path)
+                structured_html = (ultra_result or {}).get('html', '')
+            except Exception as e:
+                print(f"⚠️ Error generating structured HTML: {e}")
+                structured_html = ""
             
             # Save extracted metadata to the model
             if metadata:
@@ -364,6 +387,7 @@ def upload_pdf(request):
                 'doc': rd,
                 'metadata': metadata,
                 'extracted_text': text,
+                'structured_html': structured_html,
                 'edit_form': edit_form,
                 'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
             })
