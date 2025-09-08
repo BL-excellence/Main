@@ -30,13 +30,16 @@ ALLOWED_HOSTS = [
     'myprojectiablcoklabs.onrender.com',
     'iablocklabs-zh6i.onrender.com',
     '.replit.dev',
+    '.ngrok-free.app',
+    '.ngrok.io',
 ]
 
-# Si vous déployez sur HTTPS (Render l’est), ajoutez-le ici :
 CSRF_TRUSTED_ORIGINS = [
     'https://myprojectiablcoklabs.onrender.com',
     'https://iablocklabs-zh6i.onrender.com',
-    'https://*.replit.dev'
+    'https://*.replit.dev',
+    'https://*.ngrok-free.app',
+    'https://*.ngrok.io',
 ]
 
 
