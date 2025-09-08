@@ -61,6 +61,19 @@ Selon votre rôle (_Métadonneur_, _Annotateur_, _Expert_, ou _Client_), vous b�
 - Les métadonnées sont extraites automatiquement (_via LLM_)
 - ⚠️ Corrigez les éventuelles erreurs d'extraction lors de la validation
 
+### Visualisation du contenu structuré (Métadonneurs)
+
+Lors de l'upload d'un document dans la partie métadonneur, le système génère automatiquement une **vue structurée** avancée :
+
+- **Deux modes d'affichage** disponibles via des onglets :
+  - **Vue structurée** : Rendu HTML fidèle avec tableaux, images et mise en forme préservée
+  - **Texte brut** : Affichage textuel traditionnel pour comparaison
+- ⚠️ **Note importante** : L'annotation se fait actuellement sur le texte brut car le système de contenu structuré est encore en développement et nécessite des améliorations avant d'être utilisé pour l'annotation
+- Cette fonctionnalité permet une **prévisualisation avancée** du document pour une meilleure compréhension de sa structure
+
+---
+
+
 **b. Validation des métadonnées**
 - Accédez à la fenêtre de validation
 - Visualisez, modifiez, sauvegardez les métadonnées, consultez l'historique (logs)
@@ -314,7 +327,4 @@ Visualisation en temps réel des indicateurs de performance :
 
 Pour toute question, suggestion ou bug :  
 Contactez l'équipe PharmaLabs — _réponse rapide assurée_ !
-
----
-
 **Bon usage de la plateforme PharmaLabs**
