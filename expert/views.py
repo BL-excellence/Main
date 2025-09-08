@@ -38,30 +38,30 @@ mongo_collection = mongo_db[MONGO_COLLECTION]
 # --- Helpers Date FR/EN ---
 MONTH_MAP = {
     1: ["january", "jan", "jan.", "janvier", "janv", "janv.", "01"],
-    2: ["february", "feb", "feb.", "février", "fevrier", "févr", "fevr", "févr.", "02"],
+    2: ["february", "feb", "feb.", "fÃ©vrier", "fevrier", "fÃ©vr", "fevr", "fÃ©vr.", "02"],
     3: ["march", "mar", "mar.", "mars", "03"],
     4: ["april", "apr", "apr.", "avril", "avr", "avr.", "04"],
     5: ["may", "mai", "05"],
     6: ["june", "jun", "jun.", "juin", "06"],
     7: ["july", "jul", "jul.", "juillet", "juil", "juil.", "07"],
-    8: ["august", "aug", "aug.", "août", "aout", "08"],
+    8: ["august", "aug", "aug.", "aoÃ»t", "aout", "08"],
     9: ["september", "sep", "sept", "sept.", "septembre", "09"],
     10: ["october", "oct", "oct.", "octobre", "10"],
     11: ["november", "nov", "nov.", "novembre", "11"],
-    12: ["december", "dec", "dec.", "décembre", "decembre", "déc", "dec", "12"],
+    12: ["december", "dec", "dec.", "dÃ©cembre", "decembre", "dÃ©c", "dec", "12"],
 }
 
 def _is_date_like(s: str) -> tuple[bool, int|None, str|None]:
-    """Vrai si s contient 'mois + année' (FR/EN/abbr) ou formats 01/2013, 2013-01, 01-2013."""
+    """Vrai si s contient 'mois + annÃ©e' (FR/EN/abbr) ou formats 01/2013, 2013-01, 01-2013."""
     if not s: return (False, None, None)
     text = s.strip().lower()
-    # mois + année (FR/EN, abbr, ponctuation optionnelle)
+    # mois + annÃ©e (FR/EN, abbr, ponctuation optionnelle)
     for mnum, variants in MONTH_MAP.items():
         month_alt = "|".join([re.escape(v) for v in variants if not v.isdigit()])
         if re.search(rf"\b(?:{month_alt})\s*[,/-]?\s*\b(20\d{{2}}|19\d{{2}})\b", text, flags=re.IGNORECASE):
             year = re.search(r"(20\d{2}|19\d{2})", text).group(1)
             return (True, mnum, year)
-    # numériques (01/2013, 2013/01, 2013-01)
+    # numÃ©riques (01/2013, 2013/01, 2013-01)
     m = re.search(r"\b(0?[1-9]|1[0-2])\s*[/-]\s*(20\d{2}|19\d{2})\b", text)
     if m: return (True, int(m.group(1)), m.group(2))
     m = re.search(r"\b(20\d{2}|19\d{2})\s*[/-]\s*(0?[1-9]|1[0-2])\b", text)
@@ -121,7 +121,7 @@ class ExpertDashboardView(LoginRequiredMixin, TemplateView):
 
         from django.db.models import Count, Q, F
 
-        # Base queryset: documents prêts pour révision expert
+        # Base queryset: documents prÃªts pour rÃ©vision expert
         docs_qs = RawDocument.objects.filter(
             is_ready_for_expert=True
         ).select_related('owner').prefetch_related('pages__annotations') \
@@ -135,7 +135,7 @@ class ExpertDashboardView(LoginRequiredMixin, TemplateView):
 
         total_documents = docs_qs.count()
 
-        # Aggregates for annotations (limités aux docs prêts)
+        # Aggregates for annotations (limitÃ©s aux docs prÃªts)
         ann_qs = Annotation.objects.filter(
         page__document__in=docs_qs,
         validation_status__in=['pending', 'validated', 'expert_created']
@@ -145,16 +145,16 @@ class ExpertDashboardView(LoginRequiredMixin, TemplateView):
         pending_annotations = ann_qs.filter(validation_status='pending').count()
         rejected_annotations = ann_qs.filter(validation_status='rejected').count()
 
-        # Répartition des documents par statut de révision
+        # RÃ©partition des documents par statut de rÃ©vision
         completed_reviews = docs_qs.filter(total_ann__gt=0, validated_ann=F('total_ann')).count()
-        # Documents avec annotations mais non totalement validés (inclut potentiellement des rejetés)
+        # Documents avec annotations mais non totalement validÃ©s (inclut potentiellement des rejetÃ©s)
         in_progress_reviews = docs_qs.filter(total_ann__gt=0).exclude(validated_ann=F('total_ann')).count()
-        # Documents ayant au moins une annotation rejetée
+        # Documents ayant au moins une annotation rejetÃ©e
         rejected_documents = docs_qs.filter(rejected_ann__gt=0).count()
         # Documents sans aucune annotation encore
         to_review_count = docs_qs.filter(total_ann=0).count()
 
-        # KPI dérivés
+        # KPI dÃ©rivÃ©s
         total_reviews = total_documents
         validation_rate = round((validated_annotations / total_annotations) * 100) if total_annotations > 0 else 0
         validated_documents_count = completed_reviews
@@ -167,7 +167,7 @@ class ExpertDashboardView(LoginRequiredMixin, TemplateView):
         # Completer quelques champs attendus par le template
         for doc in recent_documents:
             doc.annotator = doc.owner
-            # updated_at basé sur la dernière annotation sinon fallback
+            # updated_at basÃ© sur la derniÃ¨re annotation sinon fallback
             if getattr(doc, 'latest_annotation', None):
                 doc.updated_at = doc.latest_annotation
             elif getattr(doc, 'expert_ready_at', None):
@@ -245,7 +245,7 @@ class DocumentReviewView(LoginRequiredMixin, TemplateView):
                 current_page.annotations_summary = page_summary
                 current_page.save(update_fields=['annotations_summary'])
             else:
-                page_summary = f"Page {current_page_num}: Aucune annotation disponible pour générer un résumé."
+                page_summary = f"Page {current_page_num}: Aucune annotation disponible pour gÃ©nÃ©rer un rÃ©sumÃ©."
 
         # Check if this is the last page
         is_last_page = current_page_num >= document.total_pages
@@ -298,7 +298,7 @@ class DocumentReviewListView(LoginRequiredMixin, TemplateView):
 @csrf_exempt
 def validate_annotation_ajax(request, annotation_id):
     """
-    Valide / rejette une annotation + régénère résumé page + déclenche régénération globale.
+    Valide / rejette une annotation + régénère résumé page + met à jour JSON global (fusion) + déclenche global.
     """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Method not allowed'})
@@ -319,11 +319,12 @@ def validate_annotation_ajax(request, annotation_id):
         annotation.validated_at = timezone.now()
         annotation.save()
 
-        # Recalcule résumé de la page
+        # Régénère résumé page & met à jour JSON global (fusion)
         try:
             new_page_summary, _ = build_page_summary_and_json(annotation.page, request.user)
+            update_document_global_json(annotation.page.document, request.user)
         except Exception as e:
-            print(f"⚠️ Erreur régénération résumé page après {action}: {e}")
+            print(f"⚠️ Erreur régénération résumé/JSON après {action}: {e}")
             new_page_summary = None
 
         # Régénération globale (async)
@@ -353,7 +354,7 @@ def validate_annotation_ajax(request, annotation_id):
 @csrf_exempt
 def create_annotation_ajax(request):
     """
-    Création d'une annotation (pré-validée) + MAJ JSON + régénération résumé page + retour résumé.
+    Création d'une annotation (pré-validée) + MAJ JSON fusionné + régénération résumé page/doc.
     """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Method not allowed'})
@@ -390,40 +391,13 @@ def create_annotation_ajax(request):
             source='expert'
         )
 
-        # MAJ JSON + résumé page + doc
+        # MAJ page + JSON global (fusion) + déclenchement résumé global
         try:
             build_page_summary_and_json(page, request.user)
-
-            all_annotations = Annotation.objects.filter(
-                page__document=page.document,
-                validation_status__in=['validated', 'expert_created']
-            ).select_related('annotation_type', 'page').order_by('page__page_number', 'start_pos')
-
-            from rawdocs.views import _build_entities_map
-            document_entities = _build_entities_map(all_annotations, use_display_name=True)
-
-            document_json = {
-                'document': {
-                    'id': str(page.document.id),
-                    'title': page.document.title,
-                    'doc_type': getattr(page.document, 'doc_type', None),
-                    'source': getattr(page.document, 'source', None),
-                    'total_pages': page.document.total_pages,
-                    'total_annotations': all_annotations.count(),
-                },
-                'entities': document_entities,
-                'generated_at': datetime.utcnow().isoformat() + 'Z',
-            }
-            page.document.global_annotations_json = document_json
-            page.document.save(update_fields=['global_annotations_json'])
-
-            try:
-                trigger_summary_regeneration_safe(page.document, request.user, 3)
-            except Exception as e:
-                print(f"⚠️ Erreur déclenchement régénération document: {e}")
-
+            update_document_global_json(page.document, request.user)
+            trigger_summary_regeneration_safe(page.document, request.user, 3)
         except Exception as e:
-            print(f"❌ Erreur MAJ JSON/summary (create): {e}")
+            print(f"✖️ Erreur MAJ JSON/summary (create): {e}")
 
         return JsonResponse({
             'success': True,
@@ -437,12 +411,12 @@ def create_annotation_ajax(request):
         return JsonResponse({'success': False, 'error': str(e)})
 
 
-
 @expert_required
 @csrf_exempt
 def modify_annotation_ajax(request, annotation_id):
     """
-    Modification d'une annotation (→ validée) + MAJ JSON + régénération résumé page + retour résumé.
+    Modification d'une annotation (→ validée) + MAJ JSON fusionné + régénération résumé page/doc.
+    Version améliorée avec fusion pour préserver les annotations existantes.
     """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Method not allowed'})
@@ -453,6 +427,12 @@ def modify_annotation_ajax(request, annotation_id):
 
         new_text = (data.get('text') or '').strip()
         new_entity_type_name = (data.get('entity_type') or '').strip()
+        if not new_entity_type_name:
+            return JsonResponse({'success': False, 'error': 'entity_type is required'})
+
+        # Sauvegarder les anciennes valeurs pour diagnostic
+        old_text = annotation.selected_text
+        old_type = annotation.annotation_type.display_name
 
         annotation_type, _ = AnnotationType.objects.get_or_create(
             name=new_entity_type_name,
@@ -472,47 +452,167 @@ def modify_annotation_ajax(request, annotation_id):
 
         page = annotation.page
 
-        # MAJ JSON + résumé page + doc
+        # MAJ page + JSON global avec FUSION (préserver annotations existantes)
+        new_page_summary = None
+        fusion_success = False
         try:
-            build_page_summary_and_json(page, request.user)
+            # Debug avant fusion
+            debug_json_fusion(page.document, f"modify_annotation by {request.user.username}")
+            print(f"🔄 Modification: '{old_text}' ({old_type}) → '{new_text}' ({new_entity_type_name})")
 
-            all_annotations = Annotation.objects.filter(
-                page__document=page.document,
-                validation_status__in=['validated', 'expert_created']
-            ).select_related('annotation_type', 'page').order_by('page__page_number', 'start_pos')
+            # Fusion page : mise à jour intelligente des entités
+            new_page_summary, merged_entities = build_page_summary_and_json(page, request.user)
 
-            from rawdocs.views import _build_entities_map
-            document_entities = _build_entities_map(all_annotations, use_display_name=True)
+            # Fusion document global : préserve toutes les autres annotations
+            update_document_global_json(page.document, request.user)
 
-            document_json = {
-                'document': {
-                    'id': str(page.document.id),
-                    'title': page.document.title,
-                    'doc_type': getattr(page.document, 'doc_type', None),
-                    'source': getattr(page.document, 'source', None),
-                    'total_pages': page.document.total_pages,
-                    'total_annotations': all_annotations.count(),
-                },
-                'entities': document_entities,
-                'generated_at': datetime.utcnow().isoformat() + 'Z',
-            }
-            page.document.global_annotations_json = document_json
-            page.document.save(update_fields=['global_annotations_json'])
+            fusion_success = True
+            print(f"✅ Fusion réussie - Annotation modifiée")
 
-            try:
-                trigger_summary_regeneration_safe(page.document, request.user, 3)
-            except Exception as e:
-                print(f"⚠️ Erreur déclenchement régénération document (modify): {e}")
+            # Debug après fusion
+            debug_json_fusion(page.document, f"modify_annotation_completed by {request.user.username}")
 
         except Exception as e:
-            print(f"❌ Erreur MAJ JSON/summary (modify): {e}")
+            print(f"⚠️ Erreur MAJ JSON/summary (modify): {e}")
+            # Fallback : essayer juste la page
+            try:
+                new_page_summary, _ = build_page_summary_and_json(page, request.user)
+                print(f"✅ Fallback page summary réussi")
+            except Exception as e2:
+                print(f"❌ Fallback page summary échoué: {e2}")
+
+        # Déclenchement régénération globale (async)
+        try:
+            trigger_summary_regeneration_safe(page.document, request.user, 3)
+        except Exception as e:
+            print(f"⚠️ Erreur déclenchement régénération (modify): {e}")
 
         return JsonResponse({
             'success': True,
-            'message': 'Annotation modifiée, validée et JSON mis à jour',
-            'page_summary': page.annotations_summary,
-            'auto_summary_triggered': True
+            'message': 'Annotation modifiée, validée et JSON mis à jour avec préservation',
+            'page_summary': new_page_summary,
+            'auto_summary_triggered': True,
+            'fusion_applied': fusion_success,
+            'preservation_mode': 'active',
+            'modification_details': {
+                'old_text': old_text,
+                'new_text': new_text,
+                'old_type': old_type,
+                'new_type': new_entity_type_name
+            }
         })
+
+    except Exception as e:
+        print(f"❌ Erreur modify_annotation_ajax: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+def debug_json_fusion(document, user_action="unknown"):
+    """
+    Fonction de diagnostic pour vérifier la fusion JSON
+    """
+    try:
+        from django.db.models import Count
+
+        # Compter les annotations par statut
+        status_counts = {}
+        for status in GLOBAL_JSON_STATUSES:
+            count = document.pages.aggregate(
+                total=Count('annotations', filter=Q(annotations__validation_status=status))
+            )['total'] or 0
+            status_counts[status] = count
+
+        total_annotations = sum(status_counts.values())
+
+        json_entities_count = 0
+        json_entities_types = []
+        if document.global_annotations_json:
+            entities = document.global_annotations_json.get('entities', {})
+            json_entities_count = sum(len(values) for values in entities.values())
+            json_entities_types = list(entities.keys())
+
+        print(f"🔍 DEBUG FUSION - Action: {user_action}")
+        print(f"   📊 Annotations par statut: {status_counts}")
+        print(f"   📊 Total annotations en DB: {total_annotations}")
+        print(f"   📋 Total entités en JSON: {json_entities_count}")
+        print(f"   📝 Types d'entités en JSON: {json_entities_types}")
+        if total_annotations > 0:
+            print(f"   ⚖️ Ratio JSON/DB: {json_entities_count / total_annotations:.2f}")
+        else:
+            print(f"   ⚖️ Pas d'annotations")
+
+        if total_annotations > 0 and json_entities_count == 0:
+            print("   ⚠️ PROBLÈME: JSON vide mais annotations présentes!")
+        elif json_entities_count > 0:
+            print("   ✅ JSON contient des entités")
+
+    except Exception as e:
+        print(f"   ❌ Erreur diagnostic: {e}")
+
+
+def update_document_global_json(document, user=None):
+    """
+    Reconstruit complètement les entités à partir des annotations actuelles.
+    CORRIGÉ: Ne fusionne plus avec l'existant pour refléter les suppressions.
+    """
+    from rawdocs.views import _build_entities_map
+
+    all_annotations = Annotation.objects.filter(
+        page__document=document,
+        validation_status__in=GLOBAL_JSON_STATUSES  # Inclut pending, validated, expert_created
+    ).select_related('annotation_type', 'page').order_by('page__page_number', 'start_pos')
+
+    # Reconstruire complètement les entités à partir des annotations actuelles
+    current_entities = _build_entities_map(all_annotations, use_display_name=True)
+
+    # CORRECTION: Utiliser directement current_entities au lieu de fusionner
+    # Cela permet de refléter les suppressions d'annotations
+    document_json = {
+        'document': {
+            'id': str(document.id),
+            'title': document.title,
+            'doc_type': getattr(document, 'doc_type', None),
+            'source': getattr(document, 'source', None),
+            'total_pages': document.total_pages,
+            'total_annotations': all_annotations.count(),
+        },
+        'entities': current_entities,  # Directement les entités actuelles
+        'generated_at': datetime.utcnow().isoformat() + 'Z',
+    }
+
+    document.global_annotations_json = document_json
+    document.save(update_fields=['global_annotations_json'])
+    return document_json
+
+@expert_required
+@csrf_exempt
+def delete_annotation_ajax(request, annotation_id):
+    """Delete an annotation + rebuild JSON fusion (préserve pending)."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'})
+
+    try:
+        annotation = get_object_or_404(Annotation, id=annotation_id)
+        doc = annotation.page.document
+
+        # LOG avant suppression
+        log_expert_action(
+            user=request.user,
+            action='annotation_deleted',
+            annotation=annotation,
+            reason=f"Manual deletion by expert. Annotation was: {annotation.validation_status}"
+        )
+
+        annotation.delete()
+
+        # Rebuild JSON global en fusion conservant les pending restants
+        try:
+            update_document_global_json(doc, request.user)
+            trigger_summary_regeneration_safe(doc, request.user, 3)
+        except Exception as e:
+            print(f"⚠️ Rebuild JSON after delete failed: {e}")
+
+        return JsonResponse({'success': True, 'message': 'Annotation supprimée'})
 
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
@@ -520,38 +620,9 @@ def modify_annotation_ajax(request, annotation_id):
 
 @expert_required
 @csrf_exempt
-def delete_annotation_ajax(request, annotation_id):
-    """Delete an annotation"""
-    if request.method == 'POST':
-        try:
-            annotation = get_object_or_404(Annotation, id=annotation_id)
-
-            # LOG ACTION BEFORE DELETION
-            log_expert_action(
-                user=request.user,
-                action='annotation_deleted',
-                annotation=annotation,
-                reason=f"Manual deletion by expert. Annotation was: {annotation.validation_status}"
-            )
-
-            annotation.delete()
-
-            return JsonResponse({
-                'success': True,
-                'message': 'Annotation supprimée'
-            })
-
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-
-    return JsonResponse({'success': False, 'error': 'Method not allowed'})
-
-
-@expert_required
-@csrf_exempt
 def undo_validation_ajax(request, annotation_id):
     """
-    Annuler la validation → met l'annotation en 'pending' et régénère le résumé de la page.
+    Annuler la validation → 'pending' + régénère résumé page + MAJ JSON global (fusion)
     """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Method not allowed'})
@@ -565,8 +636,9 @@ def undo_validation_ajax(request, annotation_id):
 
         try:
             new_page_summary, _ = build_page_summary_and_json(annotation.page, request.user)
+            update_document_global_json(annotation.page.document, request.user)
         except Exception as e:
-            print(f"⚠️ Erreur régénération résumé page (undo): {e}")
+            print(f"⚠️ Erreur régénération résumé/JSON (undo): {e}")
             new_page_summary = None
 
         try:
@@ -776,7 +848,7 @@ def create_product_from_annotations(document):
         'name': product_name,
         'dosage': annotations_by_type.get('dosage', [''])[0] or 'N/A',
         'active_ingredient': annotations_by_type.get('substance_active', ['N/A'])[0],
-        'form': 'Comprimé',
+        'form': 'ComprimÃ©',
         'therapeutic_area': 'N/A',
         'status': 'commercialise',
         'additional_annotations': additional_annotations
@@ -818,15 +890,15 @@ def debug_product_annotations():
     """Debug function to check if products have additional annotations"""
     from client.products.models import Product
 
-    print("🔍 DEBUGGING PRODUCT ADDITIONAL ANNOTATIONS")
+    print("ðŸ” DEBUGGING PRODUCT ADDITIONAL ANNOTATIONS")
     print("=" * 50)
 
     for product in Product.objects.all():
-        print(f"📦 Product: {product.name}")
+        print(f"ðŸ“¦ Product: {product.name}")
         if hasattr(product, 'additional_annotations'):
             print(f"   additional_annotations: {product.additional_annotations}")
         else:
-            print(f"   ❌ No additional_annotations field")
+            print(f"   âŒ No additional_annotations field")
         print()
 
 
@@ -849,9 +921,9 @@ def create_new_product(product_data, sites_data, document):
                 if 'additional_annotations' in product_data:
                     product.additional_annotations = product_data['additional_annotations']
                     product.save()
-                    print(f"✅ Saved additional annotations: {product_data['additional_annotations']}")
+                    print(f"âœ… Saved additional annotations: {product_data['additional_annotations']}")
             except Exception as e:
-                print(f"⚠️ Additional annotations field not ready yet: {e}")
+                print(f"âš ï¸ Additional annotations field not ready yet: {e}")
 
             # Create manufacturing sites
             for site_data in sites_data:
@@ -961,11 +1033,11 @@ def update_existing_product_with_variations(existing_product, new_sites_data, do
         try:
             existing_product.additional_annotations = additional_annotations
             existing_product.save()
-            print(f"✅ Updated additional annotations: {additional_annotations}")
+            print(f"âœ… Updated additional annotations: {additional_annotations}")
         except Exception as e:
-            print(f"⚠️ Could not update additional annotations: {e}")
+            print(f"âš ï¸ Could not update additional annotations: {e}")
 
-    print(f"🎯 Updated existing product '{existing_product.name}' with {len(variations_created)} variations")
+    print(f"ðŸŽ¯ Updated existing product '{existing_product.name}' with {len(variations_created)} variations")
 
     return existing_product
 
@@ -990,7 +1062,7 @@ def validate_document(request, document_id):
             # Create or update product from annotations
             product = create_product_from_annotations(document)
 
-            # Fonction helper pour gérer les dates
+            # Fonction helper pour gÃ©rer les dates
             def safe_isoformat(date_value):
                 if date_value is None:
                     return None
@@ -1000,10 +1072,10 @@ def validate_document(request, document_id):
                     return date_value.isoformat()
                 return str(date_value)
 
-            # Sauvegarder dans MongoDB avec toutes les métadonnées lors de la validation
+            # Sauvegarder dans MongoDB avec toutes les mÃ©tadonnÃ©es lors de la validation
             from rawdocs.models import CustomFieldValue
 
-            # Construire les métadonnées complètes
+            # Construire les mÃ©tadonnÃ©es complÃ¨tes
             metadata = {
                 'title': document.title,
                 'doc_type': document.doc_type,
@@ -1023,7 +1095,7 @@ def validate_document(request, document_id):
                 'file_name': os.path.basename(document.file.name) if document.file else None,
             }
 
-            # Ajouter les champs personnalisés
+            # Ajouter les champs personnalisÃ©s
             custom_fields = {}
             for custom_value in CustomFieldValue.objects.filter(document=document):
                 custom_fields[custom_value.field.name] = custom_value.value
@@ -1031,7 +1103,7 @@ def validate_document(request, document_id):
             if custom_fields:
                 metadata['custom_fields'] = custom_fields
 
-            # Récupérer les entités du JSON global si elles existent
+            # RÃ©cupÃ©rer les entitÃ©s du JSON global si elles existent
             entities = {}
             if hasattr(document, 'global_annotations_json') and document.global_annotations_json:
                 entities = document.global_annotations_json.get('entities', {})
@@ -1055,7 +1127,7 @@ def validate_document(request, document_id):
                 upsert=True
             )
 
-            # Préparer le message à renvoyer (et conserver messages Django pour fallback)
+            # PrÃ©parer le message Ã  renvoyer (et conserver messages Django pour fallback)
             response_message = ''
             if product:
                 debug_product_annotations()
@@ -1066,19 +1138,19 @@ def validate_document(request, document_id):
 
                 if variations_today > 0:
                     response_message = (
-                        f'🎉 Document validé avec succès! Le produit "{product.name}" a été mis à jour avec {variations_today} nouvelle(s) variation(s). '
+                        f'ðŸŽ‰ Document validÃ© avec succÃ¨s! Le produit "{product.name}" a Ã©tÃ© mis Ã  jour avec {variations_today} nouvelle(s) variation(s). '
                         f'Consultez l\'onglet "Variations" pour voir les changements.'
                     )
                     messages.success(request, response_message)
                 else:
                     response_message = (
-                        f'🎉 Document validé avec succès! Le produit "{product.name}" a été créé dans le module client.'
+                        f'ðŸŽ‰ Document validÃ© avec succÃ¨s! Le produit "{product.name}" a Ã©tÃ© crÃ©Ã© dans le module client.'
                     )
                     messages.success(request, response_message)
             else:
                 debug_info = debug_annotations_for_product(document)
                 response_message = (
-                    f'⚠️ Document validé mais aucun produit créé. Détails: {debug_info}'
+                    f'âš ï¸ Document validÃ© mais aucun produit crÃ©Ã©. DÃ©tails: {debug_info}'
                 )
                 messages.warning(request, response_message)
 
@@ -1091,7 +1163,7 @@ def validate_document(request, document_id):
         except Exception as e:
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({'success': False, 'error': str(e)}, status=500)
-            messages.error(request, f'❌ Erreur lors de la validation: {str(e)}')
+            messages.error(request, f'âŒ Erreur lors de la validation: {str(e)}')
             return redirect('expert:review_document', document_id=document_id)
 
     return redirect('expert:review_document', document_id=document_id)
@@ -1146,13 +1218,13 @@ def view_original_document(request, document_id):
             # If file doesn't exist, show error
             return HttpResponse(
                 "<html><body><h2>Erreur</h2>"
-                "<p>Le fichier PDF n'a pas pu être chargé.</p>"
+                "<p>Le fichier PDF n'a pas pu Ãªtre chargÃ©.</p>"
                 "<script>window.close();</script></body></html>"
             )
     else:
         return HttpResponse(
             "<html><body><h2>Aucun fichier disponible</h2>"
-            "<p>Ce document n'a pas de fichier PDF associé.</p>"
+            "<p>Ce document n'a pas de fichier PDF associÃ©.</p>"
             "<script>window.close();</script></body></html>"
         )
 
@@ -1160,7 +1232,7 @@ def view_original_document(request, document_id):
 @expert_required
 @csrf_exempt
 def save_page_json(request, page_id):
-    """Sauvegarde du JSON modifié d'une page"""
+    """Sauvegarde du JSON modifiÃ© d'une page"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -1172,7 +1244,7 @@ def save_page_json(request, page_id):
         if not json_content:
             return JsonResponse({'error': 'JSON content is required'}, status=400)
 
-        # Valider que le JSON est bien formaté
+        # Valider que le JSON est bien formatÃ©
         try:
             parsed_json = json.loads(json_content)
         except json.JSONDecodeError as e:
@@ -1183,7 +1255,7 @@ def save_page_json(request, page_id):
         page.annotations_summary_generated_at = timezone.now()
         page.save(update_fields=['annotations_json', 'annotations_summary_generated_at'])
 
-        # Mise à jour du JSON global du document
+        # Mise Ã  jour du JSON global du document
         document = page.document
         all_annotations = Annotation.objects.filter(
             page__document=document
@@ -1220,11 +1292,11 @@ def save_page_json(request, page_id):
 
         return JsonResponse({
             'success': True,
-            'message': 'JSON sauvegardé avec succès'
+            'message': 'JSON sauvegardÃ© avec succÃ¨s'
         })
 
     except Exception as e:
-        print(f"❌ Erreur lors de la sauvegarde du JSON de la page: {str(e)}")
+        print(f"âŒ Erreur lors de la sauvegarde du JSON de la page: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -1235,7 +1307,7 @@ def save_page_json(request, page_id):
 @expert_required
 @csrf_exempt
 #################
-# À ajouter dans expert/views.py
+# Ã€ ajouter dans expert/views.py
 
 # @expert_required
 # @csrf_exempt
@@ -1251,13 +1323,13 @@ def save_page_json(request, page_id):
 #
 #         old_summary = document.global_annotations_summary or ""
 #
-#         # 2) Préparer/initialiser le JSON global et les entités si manquants
+#         # 2) PrÃ©parer/initialiser le JSON global et les entitÃ©s si manquants
 #         current_json = document.global_annotations_json or {}
 #         current_json.setdefault('document', {})
 #         current_entities = current_json.get('entities', {}) or {}
 #
 #         if not current_entities:
-#             # Tenter de construire les entités depuis les annotations du document
+#             # Tenter de construire les entitÃ©s depuis les annotations du document
 #             try:
 #                 from rawdocs.views import _build_entities_map  # utilitaire existant
 #                 all_annotations = Annotation.objects.filter(page__document=document).select_related('annotation_type')
@@ -1276,7 +1348,7 @@ def save_page_json(request, page_id):
 #                         built[key].append(val)
 #                 current_entities = built
 #
-#             # Si toujours vide (ex: document sans annotations), initialiser des clés par défaut
+#             # Si toujours vide (ex: document sans annotations), initialiser des clÃ©s par dÃ©faut
 #             if not current_entities:
 #                 default_keys = [
 #                     'Invented Name',
@@ -1293,17 +1365,17 @@ def save_page_json(request, page_id):
 #
 #         allowed_keys = list(current_entities.keys())
 #
-#         # 1) Extraire les entités du nouveau résumé:
-#         #    a) via libellés existants (Clé: valeur)
+#         # 1) Extraire les entitÃ©s du nouveau rÃ©sumÃ©:
+#         #    a) via libellÃ©s existants (ClÃ©: valeur)
 #         extracted_by_keys = extract_by_allowed_keys(new_summary, allowed_keys)
-#         #    b) via texte libre (phrases), en détectant entité/valeur
+#         #    b) via texte libre (phrases), en dÃ©tectant entitÃ©/valeur
 #         free_extracted = extract_entities_from_text(new_summary) or {}
-#         #       b2) enrichissement par détections ciblées (route, packaging, pack size, forme)
+#         #       b2) enrichissement par dÃ©tections ciblÃ©es (route, packaging, pack size, forme)
 #         try:
 #             # Route of Administration
 #             route_vals = set()
 #             for m in re.finditer(
-#                     r"(?i)(?:par\s+voie\s+|voie\s+)(orale|intraveineuse|intramusculaire|sous\s*cutan[eé]e|subcutan[eé]e|nasale|topique|cutan[eé]e|rectale|inhalation)",
+#                     r"(?i)(?:par\s+voie\s+|voie\s+)(orale|intraveineuse|intramusculaire|sous\s*cutan[eÃ©]e|subcutan[eÃ©]e|nasale|topique|cutan[eÃ©]e|rectale|inhalation)",
 #                     new_summary):
 #                 route_vals.add(m.group(1))
 #             for m in re.finditer(
@@ -1316,16 +1388,16 @@ def save_page_json(request, page_id):
 #             # Immediate Packaging
 #             packaging_vals = set()
 #             for m in re.finditer(
-#                     r"(?i)\b(blisters?|blister|flacons?|bouteilles?|bottles?|sachets?|ampoules?|seringues?\s*pr[ée]remplies?)\b",
+#                     r"(?i)\b(blisters?|blister|flacons?|bouteilles?|bottles?|sachets?|ampoules?|seringues?\s*pr[Ã©e]remplies?)\b",
 #                     new_summary):
 #                 packaging_vals.add(m.group(0))
 #             if packaging_vals:
 #                 free_extracted.setdefault('Immediate Packaging', []).extend(sorted(packaging_vals))
 #
-#             # Pack Size (ex: 20 comprimés, 100 ml, 6 sachets)
+#             # Pack Size (ex: 20 comprimÃ©s, 100 ml, 6 sachets)
 #             pack_vals = set()
 #             for m in re.finditer(
-#                     r"(?i)\b([0-9]{1,4}\s*(?:comprim[ée]s?|g[ée]lules?|capsules?|sachets?|ml|ampoules?|unit[eé]s?))\b",
+#                     r"(?i)\b([0-9]{1,4}\s*(?:comprim[Ã©e]s?|g[Ã©e]lules?|capsules?|sachets?|ml|ampoules?|unit[eÃ©]s?))\b",
 #                     new_summary):
 #                 pack_vals.add(m.group(1))
 #             if pack_vals:
@@ -1334,7 +1406,7 @@ def save_page_json(request, page_id):
 #             # Pharmaceutical Form
 #             form_vals = set()
 #             for m in re.finditer(
-#                     r"(?i)\b(comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable|tablet[s]?)\b",
+#                     r"(?i)\b(comprim[Ã©e]s?|g[Ã©e]lules?|capsules?|sirop|solution|suspension|poudre|injectable|tablet[s]?)\b",
 #                     new_summary):
 #                 form_vals.add(m.group(0))
 #             if form_vals:
@@ -1342,7 +1414,7 @@ def save_page_json(request, page_id):
 #         except Exception:
 #             pass
 #
-#         #    c) Fusionner en ne gardant que les clés existantes (mapping canonique)
+#         #    c) Fusionner en ne gardant que les clÃ©s existantes (mapping canonique)
 #         extracted_entities: dict[str, list[str]] = {}
 #         for k, vals in (extracted_by_keys or {}).items():
 #             extracted_entities.setdefault(k, []).extend(vals or [])
@@ -1351,22 +1423,22 @@ def save_page_json(request, page_id):
 #             if not canon:
 #                 continue
 #             extracted_entities.setdefault(canon, []).extend(vals or [])
-#         # Déduplication + nettoyage par type
+#         # DÃ©duplication + nettoyage par type
 #         for k, vals in list(extracted_entities.items()):
 #             extracted_entities[k] = _clean_values_for_type(k, vals or [])
-#         print(f"Entités extraites (fusion): {extracted_entities}")
+#         print(f"EntitÃ©s extraites (fusion): {extracted_entities}")
 #
-#         # 3) Mise à jour fine par valeurs (ajouts/suppressions basées sur le résumé)
+#         # 3) Mise Ã  jour fine par valeurs (ajouts/suppressions basÃ©es sur le rÃ©sumÃ©)
 #         updated_entities = current_entities.copy()
 #         changes_made = []
 #         entities_added: dict[str, list[str]] = {}
 #         entities_removed: dict[str, list[str]] = {}
 #         changed_keys: list[str] = []
 #
-#         # Normaliser les clés permises (mapping insensible à la casse)
+#         # Normaliser les clÃ©s permises (mapping insensible Ã  la casse)
 #         key_map = {k.lower(): k for k in allowed_keys}
 #
-#         # Extraire entités de l'ancien résumé pour détecter suppressions (toutes clés)
+#         # Extraire entitÃ©s de l'ancien rÃ©sumÃ© pour dÃ©tecter suppressions (toutes clÃ©s)
 #         old_extracted = extract_by_allowed_keys(old_summary or "", allowed_keys)
 #
 #         def _norm_val(s: str) -> str:
@@ -1377,7 +1449,7 @@ def save_page_json(request, page_id):
 #             existing_vals = list(updated_entities.get(canon_k, []) or [])
 #             existing_norms = {_norm_val(v) for v in existing_vals}
 #
-#             # valeurs extraites anciennes et nouvelles pour cette clé
+#             # valeurs extraites anciennes et nouvelles pour cette clÃ©
 #             old_vals_ex = []
 #             for etype, vals in (old_extracted or {}).items():
 #                 if (etype or '').lower() == lower_k:
@@ -1395,9 +1467,9 @@ def save_page_json(request, page_id):
 #             old_norms = {_norm_val(v) for v in cleaned_old}
 #             new_norms = {_norm_val(v) for v in cleaned_new}
 #
-#             # suppressions: présentes avant, absentes maintenant
+#             # suppressions: prÃ©sentes avant, absentes maintenant
 #             to_remove = old_norms - new_norms
-#             # ajouts: présentes dans le nouveau résumé, pas déjà existantes
+#             # ajouts: prÃ©sentes dans le nouveau rÃ©sumÃ©, pas dÃ©jÃ  existantes
 #             to_add = [v for v in cleaned_new if _norm_val(v) not in existing_norms]
 #
 #             # appliquer suppressions
@@ -1423,14 +1495,14 @@ def save_page_json(request, page_id):
 #                 updated_entities[canon_k] = kept
 #                 changed_keys.append(canon_k)
 #
-#         # 4) Sauvegarder le résumé
+#         # 4) Sauvegarder le rÃ©sumÃ©
 #         document.global_annotations_summary = new_summary
 #         document.global_annotations_summary_generated_at = timezone.now()
 #
-#         # 5) Mettre à jour le JSON
+#         # 5) Mettre Ã  jour le JSON
 #         current_json['entities'] = updated_entities
 #
-#         # 6) Mettre à jour les métadonnées
+#         # 6) Mettre Ã  jour les mÃ©tadonnÃ©es
 #         current_json['last_updated'] = timezone.now().isoformat()
 #         current_json['last_updated_by'] = request.user.username
 #         current_json['document'].update({
@@ -1449,7 +1521,7 @@ def save_page_json(request, page_id):
 #         if changes_made:
 #             reason += " | Changes: " + " ; ".join(changes_made[:5])
 #         else:
-#             reason += " | Aucune entité changée"
+#             reason += " | Aucune entitÃ© changÃ©e"
 #         log_expert_action(
 #             user=request.user,
 #             action='summary_edited',
@@ -1463,7 +1535,7 @@ def save_page_json(request, page_id):
 #
 #         return JsonResponse({
 #             'success': True,
-#             'message': 'Résumé sauvegardé et entités synchronisées',
+#             'message': 'RÃ©sumÃ© sauvegardÃ© et entitÃ©s synchronisÃ©es',
 #             'updated_json': current_json,
 #             'changes_made': changes_made,
 #             'changed_keys': changed_keys,
@@ -1472,7 +1544,7 @@ def save_page_json(request, page_id):
 #             'entities_changes': changes_made,
 #         })
 #
-#         # métadonnées de mise à jour
+#         # mÃ©tadonnÃ©es de mise Ã  jour
 #         current_json['last_updated'] = timezone.now().isoformat()
 #         current_json['last_updated_by'] = request.user.username
 #         current_json['document'].update({
@@ -1484,7 +1556,7 @@ def save_page_json(request, page_id):
 #         document.global_annotations_json = current_json
 #         document.save(update_fields=['global_annotations_json'])
 #
-#         # (optionnel) push Mongo ici…
+#         # (optionnel) push Mongo iciâ€¦
 #
 #         # Log
 #         reason = "Summary edited; IA replace-only"
@@ -1503,13 +1575,13 @@ def save_page_json(request, page_id):
 #
 #         return JsonResponse({
 #             'success': True,
-#             'message': 'Résumé sauvegardé',
+#             'message': 'RÃ©sumÃ© sauvegardÃ©',
 #             'updated_json': current_json,
 #             'changed_keys': changed_keys,
 #             'entities_changes': human_diffs,
 #         })
 #     except Exception as e:
-#         print(f"❌ save_summary_changes error: {e}")
+#         print(f"âŒ save_summary_changes error: {e}")
 #         return JsonResponse({'error': str(e)}, status=500)
 
 # Modifier dans expert/views.py - Remplacer la fonction save_summary_changes existante
@@ -1525,7 +1597,7 @@ def save_summary_changes(request, doc_id):
         payload = json.loads(request.body)
         new_summary = (payload.get('summary_content') or '').strip()
         auto_annotate = payload.get('auto_annotate', True)
-        page_id = payload.get('page_id', None)  # NOUVEAU: récupérer l'ID de la page
+        page_id = payload.get('page_id', None)  # NOUVEAU: rÃ©cupÃ©rer l'ID de la page
 
 
 
@@ -1534,13 +1606,13 @@ def save_summary_changes(request, doc_id):
 
         old_summary = document.global_annotations_summary or ""
 
-        # 2) Préparer/initialiser le JSON global et les entités si manquants
+        # 2) PrÃ©parer/initialiser le JSON global et les entitÃ©s si manquants
         current_json = document.global_annotations_json or {}
         current_json.setdefault('document', {})
         current_entities = current_json.get('entities', {}) or {}
 
         if not current_entities:
-            # Construire les entités depuis les annotations du document
+            # Construire les entitÃ©s depuis les annotations du document
             try:
                 from rawdocs.views import _build_entities_map
                 all_annotations = Annotation.objects.filter(page__document=document).select_related('annotation_type')
@@ -1569,9 +1641,9 @@ def save_summary_changes(request, doc_id):
 
         allowed_keys = list(current_entities.keys())
 
-        # ===== NOUVELLE FONCTIONNALITÉ : ANNOTATION AUTOMATIQUE PAR IA =====
+        # ===== NOUVELLE FONCTIONNALITÃ‰ : ANNOTATION AUTOMATIQUE PAR IA =====
         new_annotations_created = []
-        # MODIFICATION: Passer page_id à la fonction
+        # MODIFICATION: Passer page_id Ã  la fonction
         if auto_annotate and old_summary != new_summary:
             try:
                 new_entities = await_ai_extract_and_annotate(
@@ -1580,23 +1652,23 @@ def save_summary_changes(request, doc_id):
                 )
                 if new_entities:
                     new_annotations_created = new_entities
-                    # Mettre à jour current_entities avec les nouvelles entités trouvées par IA
+                    # Mettre Ã  jour current_entities avec les nouvelles entitÃ©s trouvÃ©es par IA
                     for entity_type, values in new_entities.items():
                         if entity_type in allowed_keys:
                             current_entities[entity_type] = list(set(current_entities.get(entity_type, []) + values))
             except Exception as e:
-                print(f"⚠️ Erreur annotation IA automatique: {e}")
+                print(f"âš ï¸ Erreur annotation IA automatique: {e}")
 
-        # Extraction des entités du nouveau résumé (méthode existante)
+        # Extraction des entitÃ©s du nouveau rÃ©sumÃ© (mÃ©thode existante)
         extracted_by_keys = extract_by_allowed_keys(new_summary, allowed_keys)
         free_extracted = extract_entities_from_text(new_summary) or {}
 
-        # Enrichissement par détections ciblées (route, packaging, pack size, forme)
+        # Enrichissement par dÃ©tections ciblÃ©es (route, packaging, pack size, forme)
         try:
             # Route of Administration
             route_vals = set()
             for m in re.finditer(
-                    r"(?i)(?:par\s+voie\s+|voie\s+)(orale|intraveineuse|intramusculaire|sous\s*cutan[eé]e|subcutan[eé]e|nasale|topique|cutan[eé]e|rectale|inhalation)",
+                    r"(?i)(?:par\s+voie\s+|voie\s+)(orale|intraveineuse|intramusculaire|sous\s*cutan[eÃ©]e|subcutan[eÃ©]e|nasale|topique|cutan[eÃ©]e|rectale|inhalation)",
                     new_summary):
                 route_vals.add(m.group(1))
             for m in re.finditer(
@@ -1609,7 +1681,7 @@ def save_summary_changes(request, doc_id):
             # Immediate Packaging
             packaging_vals = set()
             for m in re.finditer(
-                    r"(?i)\b(blisters?|blister|flacons?|bouteilles?|bottles?|sachets?|ampoules?|seringues?\s*pré?remplies?)\b",
+                    r"(?i)\b(blisters?|blister|flacons?|bouteilles?|bottles?|sachets?|ampoules?|seringues?\s*prÃ©?remplies?)\b",
                     new_summary):
                 packaging_vals.add(m.group(0))
             if packaging_vals:
@@ -1618,7 +1690,7 @@ def save_summary_changes(request, doc_id):
             # Pack Size
             pack_vals = set()
             for m in re.finditer(
-                    r"(?i)\b([0-9]{1,4}\s*(?:comprim[ée]s?|gé?lules?|capsules?|sachets?|ml|ampoules?|unit[eé]s?))\b",
+                    r"(?i)\b([0-9]{1,4}\s*(?:comprim[Ã©e]s?|gÃ©?lules?|capsules?|sachets?|ml|ampoules?|unit[eÃ©]s?))\b",
                     new_summary):
                 pack_vals.add(m.group(1))
             if pack_vals:
@@ -1627,7 +1699,7 @@ def save_summary_changes(request, doc_id):
             # Pharmaceutical Form
             form_vals = set()
             for m in re.finditer(
-                    r"(?i)\b(comprim[ée]s?|gé?lules?|capsules?|sirop|solution|suspension|poudre|injectable|tablet[s]?)\b",
+                    r"(?i)\b(comprim[Ã©e]s?|gÃ©?lules?|capsules?|sirop|solution|suspension|poudre|injectable|tablet[s]?)\b",
                     new_summary):
                 form_vals.add(m.group(0))
             if form_vals:
@@ -1635,7 +1707,7 @@ def save_summary_changes(request, doc_id):
         except Exception:
             pass
 
-        # Fusionner les entités extraites
+        # Fusionner les entitÃ©s extraites
         extracted_entities: dict[str, list[str]] = {}
         for k, vals in (extracted_by_keys or {}).items():
             extracted_entities.setdefault(k, []).extend(vals or [])
@@ -1645,11 +1717,11 @@ def save_summary_changes(request, doc_id):
                 continue
             extracted_entities.setdefault(canon, []).extend(vals or [])
 
-        # Déduplication + nettoyage par type
+        # DÃ©duplication + nettoyage par type
         for k, vals in list(extracted_entities.items()):
             extracted_entities[k] = _clean_values_for_type(k, vals or [])
 
-        # Mise à jour fine par valeurs
+        # Mise Ã  jour fine par valeurs
         updated_entities = current_entities.copy()
         changes_made = []
         entities_added: dict[str, list[str]] = {}
@@ -1708,11 +1780,11 @@ def save_summary_changes(request, doc_id):
                 updated_entities[canon_k] = kept
                 changed_keys.append(canon_k)
 
-        # Sauvegarder le résumé
+        # Sauvegarder le rÃ©sumÃ©
         document.global_annotations_summary = new_summary
         document.global_annotations_summary_generated_at = timezone.now()
 
-        # Mettre à jour le JSON
+        # Mettre Ã  jour le JSON
         current_json['entities'] = updated_entities
         current_json['last_updated'] = timezone.now().isoformat()
         current_json['last_updated_by'] = request.user.username
@@ -1752,7 +1824,7 @@ def save_summary_changes(request, doc_id):
 
         return JsonResponse({
             'success': True,
-            'message': 'Résumé sauvegardé et entités synchronisées',
+            'message': 'RÃ©sumÃ© sauvegardÃ© et entitÃ©s synchronisÃ©es',
             'updated_json': current_json,
             'changes_made': changes_made,
             'changed_keys': changed_keys,
@@ -1763,63 +1835,63 @@ def save_summary_changes(request, doc_id):
         })
 
     except Exception as e:
-        print(f"⛔ save_summary_changes error: {e}")
+        print(f"â›” save_summary_changes error: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
 
 # Nouvelle fonction pour l'annotation automatique par IA
 # def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_keys, user):
 #     """
-#     Utilise l'IA pour identifier les nouvelles informations dans le résumé
-#     et créer automatiquement des annotations dans le document
+#     Utilise l'IA pour identifier les nouvelles informations dans le rÃ©sumÃ©
+#     et crÃ©er automatiquement des annotations dans le document
 #     """
 #     try:
 #         from rawdocs.groq_annotation_system import GroqAnnotator
 #
-#         # Calculer les différences entre ancien et nouveau résumé
+#         # Calculer les diffÃ©rences entre ancien et nouveau rÃ©sumÃ©
 #         diff_text = find_summary_differences(old_summary, new_summary)
 #         if not diff_text.strip():
 #             return {}
 #
-#         # Utiliser Groq pour identifier les entités dans les nouvelles informations
+#         # Utiliser Groq pour identifier les entitÃ©s dans les nouvelles informations
 #         groq_annotator = GroqAnnotator()
 #
 #         # Contexte pour l'IA
 #         context = f"""
 # Document: {document.title}
-# Ancien résumé: {old_summary[:500]}...
-# Nouveau résumé: {new_summary[:500]}...
-# Types d'entités autorisés: {', '.join(allowed_keys)}
+# Ancien rÃ©sumÃ©: {old_summary[:500]}...
+# Nouveau rÃ©sumÃ©: {new_summary[:500]}...
+# Types d'entitÃ©s autorisÃ©s: {', '.join(allowed_keys)}
 #
-# Nouvelles informations ajoutées:
+# Nouvelles informations ajoutÃ©es:
 # {diff_text}
 # """
 #
-#         # Prompt pour extraire et créer des annotations
+#         # Prompt pour extraire et crÃ©er des annotations
 #         prompt = f"""
-# Analyse les nouvelles informations ajoutées au résumé et identifie les entités à annoter automatiquement.
+# Analyse les nouvelles informations ajoutÃ©es au rÃ©sumÃ© et identifie les entitÃ©s Ã  annoter automatiquement.
 #
 # Contexte: {context}
 #
 # Instructions:
-# 1. Identifie UNIQUEMENT les nouvelles informations (qui n'étaient pas dans l'ancien résumé)
-# 2. Extrait les entités pharmaceutiques pertinentes selon les types autorisés
-# 3. Pour chaque entité trouvée, propose le texte exact à annoter dans le document
+# 1. Identifie UNIQUEMENT les nouvelles informations (qui n'Ã©taient pas dans l'ancien rÃ©sumÃ©)
+# 2. Extrait les entitÃ©s pharmaceutiques pertinentes selon les types autorisÃ©s
+# 3. Pour chaque entitÃ© trouvÃ©e, propose le texte exact Ã  annoter dans le document
 #
-# Réponds en JSON:
+# RÃ©ponds en JSON:
 # {{
 #     "entities_to_annotate": [
 #         {{
 #             "type": "entity_type",
 #             "value": "texte exact",
 #             "confidence": 0.0-1.0,
-#             "context": "contexte où ça apparaît"
+#             "context": "contexte oÃ¹ Ã§a apparaÃ®t"
 #         }}
 #     ]
 # }}
 # """
 #
-#         # Appel à Groq
+#         # Appel Ã  Groq
 #         response = groq_annotator.complete_text(prompt, max_tokens=1000)
 #
 #         if response:
@@ -1829,7 +1901,7 @@ def save_summary_changes(request, doc_id):
 #
 #                 created_annotations = {}
 #
-#                 # Créer automatiquement les annotations identifiées par l'IA
+#                 # CrÃ©er automatiquement les annotations identifiÃ©es par l'IA
 #                 for entity_data in entities_to_annotate:
 #                     entity_type = entity_data.get('type', '').strip()
 #                     entity_value = entity_data.get('value', '').strip()
@@ -1840,7 +1912,7 @@ def save_summary_changes(request, doc_id):
 #                         target_page = find_best_page_for_annotation(document, entity_value)
 #
 #                         if target_page:
-#                             # Créer l'annotation automatiquement
+#                             # CrÃ©er l'annotation automatiquement
 #                             annotation_created = create_ai_annotation(
 #                                 target_page, entity_value, entity_type, user, confidence
 #                             )
@@ -1851,18 +1923,18 @@ def save_summary_changes(request, doc_id):
 #                 return created_annotations
 #
 #             except json.JSONDecodeError:
-#                 print("⚠️ Erreur parsing réponse IA pour annotation automatique")
+#                 print("âš ï¸ Erreur parsing rÃ©ponse IA pour annotation automatique")
 #                 return {}
 #
 #         return {}
 #
 #     except Exception as e:
-#         print(f"⚠️ Erreur annotation IA automatique: {e}")
+#         print(f"âš ï¸ Erreur annotation IA automatique: {e}")
 #         return {}
 
 
 def find_summary_differences(old_summary, new_summary):
-    """Trouve les différences entre deux résumés"""
+    """Trouve les diffÃ©rences entre deux rÃ©sumÃ©s"""
     import difflib
 
     old_lines = old_summary.split('\n') if old_summary else []
@@ -1891,12 +1963,12 @@ def find_best_page_for_annotation(document, entity_value):
             text = page.cleaned_text.lower()
             entity_lower = entity_value.lower()
 
-            # Score basé sur la présence du texte exact ou similaire
+            # Score basÃ© sur la prÃ©sence du texte exact ou similaire
             score = 0
             if entity_lower in text:
                 score = 100
             else:
-                # Recherche de mots-clés similaires
+                # Recherche de mots-clÃ©s similaires
                 words = entity_lower.split()
                 for word in words:
                     if len(word) > 3 and word in text:
@@ -1910,7 +1982,7 @@ def find_best_page_for_annotation(document, entity_value):
 
 
 def create_ai_annotation(page, entity_value, entity_type, user, confidence):
-    """Crée une annotation automatiquement via IA"""
+    """CrÃ©e une annotation automatiquement via IA"""
     try:
         # Chercher le texte dans la page
         if hasattr(page, 'cleaned_text') and page.cleaned_text:
@@ -1918,19 +1990,19 @@ def create_ai_annotation(page, entity_value, entity_type, user, confidence):
             start_pos = text_content.lower().find(entity_value.lower())
 
             if start_pos == -1:
-                # Si pas trouvé exactement, chercher des mots-clés
+                # Si pas trouvÃ© exactement, chercher des mots-clÃ©s
                 words = entity_value.split()
                 for word in words:
                     if len(word) > 3:
                         start_pos = text_content.lower().find(word.lower())
                         if start_pos != -1:
-                            entity_value = word  # Utiliser le mot trouvé
+                            entity_value = word  # Utiliser le mot trouvÃ©
                             break
 
             if start_pos != -1:
                 end_pos = start_pos + len(entity_value)
 
-                # Créer ou récupérer le type d'annotation
+                # CrÃ©er ou rÃ©cupÃ©rer le type d'annotation
                 annotation_type, created = AnnotationType.objects.get_or_create(
                     name=entity_type,
                     defaults={
@@ -1940,14 +2012,14 @@ def create_ai_annotation(page, entity_value, entity_type, user, confidence):
                     }
                 )
 
-                # Créer l'annotation
+                # CrÃ©er l'annotation
                 annotation = Annotation.objects.create(
                     page=page,
                     selected_text=entity_value,
                     annotation_type=annotation_type,
                     start_pos=start_pos,
                     end_pos=end_pos,
-                    validation_status='expert_created',  # Pré-validée car créée par expert
+                    validation_status='expert_created',  # PrÃ©-validÃ©e car crÃ©Ã©e par expert
                     validated_by=user,
                     validated_at=timezone.now(),
                     created_by=user,
@@ -1955,13 +2027,13 @@ def create_ai_annotation(page, entity_value, entity_type, user, confidence):
                     confidence_score=confidence
                 )
 
-                print(f"✅ Annotation IA automatique créée: {entity_value} ({entity_type}) dans page {page.page_number}")
+                print(f"âœ… Annotation IA automatique crÃ©Ã©e: {entity_value} ({entity_type}) dans page {page.page_number}")
                 return True
 
         return False
 
     except Exception as e:
-        print(f"⚠️ Erreur création annotation automatique: {e}")
+        print(f"âš ï¸ Erreur crÃ©ation annotation automatique: {e}")
         return False
 
 # --- helpers backend : extraction stricte + nettoyage ---
@@ -1969,14 +2041,14 @@ def create_ai_annotation(page, entity_value, entity_type, user, confidence):
 import re
 
 
-# Ajouter à expert/views.py - Nouvelle fonction pour régénération automatique du résumé
+# Ajouter Ã  expert/views.py - Nouvelle fonction pour rÃ©gÃ©nÃ©ration automatique du rÃ©sumÃ©
 
 @expert_required
 @csrf_exempt
 def auto_regenerate_summary_from_annotations(request, doc_id):
     """
-    Régénère automatiquement le résumé basé sur les annotations actuelles
-    Appelé quand les annotations sont modifiées
+    RÃ©gÃ©nÃ¨re automatiquement le rÃ©sumÃ© basÃ© sur les annotations actuelles
+    AppelÃ© quand les annotations sont modifiÃ©es
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -1984,7 +2056,7 @@ def auto_regenerate_summary_from_annotations(request, doc_id):
     try:
         document = get_object_or_404(RawDocument, id=doc_id)
 
-        # Récupérer toutes les annotations validées du document
+        # RÃ©cupÃ©rer toutes les annotations validÃ©es du document
         all_annotations = Annotation.objects.filter(
             page__document=document,
             validation_status__in=['validated', 'expert_created']
@@ -1996,11 +2068,11 @@ def auto_regenerate_summary_from_annotations(request, doc_id):
                 'error': 'No validated annotations found'
             })
 
-        # Construire les entités depuis les annotations
+        # Construire les entitÃ©s depuis les annotations
         from rawdocs.views import _build_entities_map, generate_entities_based_document_summary
         entities = _build_entities_map(all_annotations, use_display_name=True)
 
-        # Générer un nouveau résumé basé sur les annotations actuelles
+        # GÃ©nÃ©rer un nouveau rÃ©sumÃ© basÃ© sur les annotations actuelles
         new_summary = generate_entities_based_document_summary(
             entities=entities,
             doc_title=document.title,
@@ -2008,20 +2080,20 @@ def auto_regenerate_summary_from_annotations(request, doc_id):
             total_annotations=all_annotations.count()
         )
 
-        # Enrichir le résumé avec l'IA si possible
+        # Enrichir le rÃ©sumÃ© avec l'IA si possible
         try:
             enhanced_summary = enhance_summary_with_ai(document, entities, new_summary)
             if enhanced_summary and len(enhanced_summary) > len(new_summary):
                 new_summary = enhanced_summary
         except Exception as e:
-            print(f"⚠️ Erreur enrichissement résumé IA: {e}")
+            print(f"âš ï¸ Erreur enrichissement rÃ©sumÃ© IA: {e}")
 
-        # Sauvegarder le nouveau résumé
+        # Sauvegarder le nouveau rÃ©sumÃ©
         old_summary = document.global_annotations_summary or ""
         document.global_annotations_summary = new_summary
         document.global_annotations_summary_generated_at = timezone.now()
 
-        # Mettre à jour le JSON global
+        # Mettre Ã  jour le JSON global
         current_json = document.global_annotations_json or {}
         current_json.setdefault('document', {})
         current_json['entities'] = entities
@@ -2054,20 +2126,20 @@ def auto_regenerate_summary_from_annotations(request, doc_id):
 
         return JsonResponse({
             'success': True,
-            'message': 'Résumé régénéré automatiquement depuis les annotations',
+            'message': 'RÃ©sumÃ© rÃ©gÃ©nÃ©rÃ© automatiquement depuis les annotations',
             'new_summary': new_summary,
             'updated_json': current_json,
             'annotations_count': all_annotations.count()
         })
 
     except Exception as e:
-        print(f"⛔ auto_regenerate_summary error: {e}")
+        print(f"â›” auto_regenerate_summary error: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
 
 def enhance_summary_with_ai(document, entities, basic_summary):
     """
-    Utilise l'IA pour enrichir le résumé généré automatiquement
+    Utilise l'IA pour enrichir le rÃ©sumÃ© gÃ©nÃ©rÃ© automatiquement
     """
     try:
         from rawdocs.groq_annotation_system import GroqAnnotator
@@ -2081,25 +2153,25 @@ def enhance_summary_with_ai(document, entities, basic_summary):
                 entities_text += f"- {entity_type}: {', '.join(values[:3])}\n"
 
         prompt = f"""
-Améliore ce résumé pharmaceutique en ajoutant du contexte et des détails pertinents basés sur les entités extraites.
+AmÃ©liore ce rÃ©sumÃ© pharmaceutique en ajoutant du contexte et des dÃ©tails pertinents basÃ©s sur les entitÃ©s extraites.
 
 Document: {document.title}
 Type: {getattr(document, 'doc_type', 'Pharmaceutique')}
 
-Résumé de base:
+RÃ©sumÃ© de base:
 {basic_summary}
 
-Entités identifiées:
+EntitÃ©s identifiÃ©es:
 {entities_text}
 
 Instructions:
-1. Garde toutes les informations du résumé original
-2. Ajoute des connexions logiques entre les entités
+1. Garde toutes les informations du rÃ©sumÃ© original
+2. Ajoute des connexions logiques entre les entitÃ©s
 3. Enrichis avec du contexte pharmaceutique pertinent
-4. Maintiens un ton professionnel et précis
+4. Maintiens un ton professionnel et prÃ©cis
 5. Maximum 300 mots
 
-Résumé enrichi:"""
+RÃ©sumÃ© enrichi:"""
 
         response = groq_annotator.complete_text(prompt, max_tokens=800)
 
@@ -2109,16 +2181,16 @@ Résumé enrichi:"""
         return basic_summary
 
     except Exception as e:
-        print(f"⚠️ Erreur enrichissement résumé: {e}")
+        print(f"âš ï¸ Erreur enrichissement rÃ©sumÃ©: {e}")
         return basic_summary
 
 
-# Modifier aussi les fonctions d'annotation existantes pour déclencher la régénération
+# Modifier aussi les fonctions d'annotation existantes pour dÃ©clencher la rÃ©gÃ©nÃ©ration
 # Par exemple, dans expert_save_manual_annotation, expert_delete_annotation, etc.
 
 def trigger_summary_regeneration(document, user):
     """
-    Déclenche la régénération automatique du résumé en arrière-plan
+    DÃ©clenche la rÃ©gÃ©nÃ©ration automatique du rÃ©sumÃ© en arriÃ¨re-plan
     """
     try:
         from django.test import RequestFactory
@@ -2126,59 +2198,59 @@ def trigger_summary_regeneration(document, user):
         fake_request = factory.post(f'/expert/document/{document.id}/auto-regenerate-summary/')
         fake_request.user = user
 
-        # Appeler la fonction de régénération
+        # Appeler la fonction de rÃ©gÃ©nÃ©ration
         result = auto_regenerate_summary_from_annotations(fake_request, document.id)
         return True
     except Exception as e:
-        print(f"⚠️ Erreur déclenchement régénération résumé: {e}")
+        print(f"âš ï¸ Erreur dÃ©clenchement rÃ©gÃ©nÃ©ration rÃ©sumÃ©: {e}")
         return False
 def extract_entities_from_text(text: str) -> dict:
     """
-    Extraction intelligente des entités du texte (FR/EN + abréviations).
-    Ajout: détection robuste des Date (mois + année, formats dd Month yyyy, mm/yyyy, yyyy-mm, etc.).
+    Extraction intelligente des entitÃ©s du texte (FR/EN + abrÃ©viations).
+    Ajout: dÃ©tection robuste des Date (mois + annÃ©e, formats dd Month yyyy, mm/yyyy, yyyy-mm, etc.).
     """
     base_patterns = {
         'Product': [
-            r'\b(?:produit|médicament|product)\b\s*:?\s*((?-i:[A-Z])[\wÀ-ÿ\s\-\/]{2,60})',
-            r'\b(?:produit|product)\b\s+(?:est|is)\s+((?-i:[A-Z])[\wÀ-ÿ\s\-\/]{2,60})',
-            r'^(?:le\s+|the\s+)?([A-Z][\wÀ-ÿ\s\-\/]{3,60})\s+(?:est|sera|contient|is|contains)\b',
-            r'(?:nom du produit|product name)\s*:?\s*([A-Z][\wÀ-ÿ\s\-\/]{2,60})'
+            r'\b(?:produit|mÃ©dicament|product)\b\s*:?\s*((?-i:[A-Z])[\wÃ€-Ã¿\s\-\/]{2,60})',
+            r'\b(?:produit|product)\b\s+(?:est|is)\s+((?-i:[A-Z])[\wÃ€-Ã¿\s\-\/]{2,60})',
+            r'^(?:le\s+|the\s+)?([A-Z][\wÃ€-Ã¿\s\-\/]{3,60})\s+(?:est|sera|contient|is|contains)\b',
+            r'(?:nom du produit|product name)\s*:?\s*([A-Z][\wÃ€-Ã¿\s\-\/]{2,60})'
         ],
         'Dosage': [
-            r'\b([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|iu|mg\/ml|g\/l))\b',
-            r'(?:dosage|posologie|concentration|strength)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|iu|mg\/ml|g\/l))',
+            r'\b([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|UI|iu|mg\/ml|g\/l))\b',
+            r'(?:dosage|posologie|concentration|strength)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|UI|iu|mg\/ml|g\/l))',
         ],
         'Substance_Active': [
-            r'(?:substance active|principe actif|active ingredient)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,60})',
-            r'(?:contient|à base de|contains)\s+([A-Z][\wÀ-ÿ\s\-]{2,60})'
+            r'(?:substance active|principe actif|active ingredient)\s*:?\s*([A-Z][\wÃ€-Ã¿\s\-]{2,60})',
+            r'(?:contient|Ã  base de|contains)\s+([A-Z][\wÃ€-Ã¿\s\-]{2,60})'
         ],
         'Site': [
-            r'(?:site|usine|fabricant|manufacturing site|manufacturer)\s*:?\s*([A-Z][\wÀ-ÿ\s\.\-]{2,80})',
-            r'(?:fabriqu[ée]|produit|manufactured|made)\s*(?:à|par|by|in)\s*([A-Z][\wÀ-ÿ\s\.\-]{2,80})'
+            r'(?:site|usine|fabricant|manufacturing site|manufacturer)\s*:?\s*([A-Z][\wÃ€-Ã¿\s\.\-]{2,80})',
+            r'(?:fabriqu[Ã©e]|produit|manufactured|made)\s*(?:Ã |par|by|in)\s*([A-Z][\wÃ€-Ã¿\s\.\-]{2,80})'
         ],
         'Pays': [
-            r'(?:pays|country)\s*:?\s*([A-Z][\wÀ-ÿ\s\-]{2,40})',
-            r'(?:en|au|aux|in)\s+([A-Z][\wÀ-ÿ\s\-]{2,40})(?=[\s,\.]|$)'
+            r'(?:pays|country)\s*:?\s*([A-Z][\wÃ€-Ã¿\s\-]{2,40})',
+            r'(?:en|au|aux|in)\s+([A-Z][\wÃ€-Ã¿\s\-]{2,40})(?=[\s,\.]|$)'
         ],
         'Strength': [
-            r'(?:strength|force|puissance|teneur)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|iu))',
-            r'(?:concentration)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|iu))',
-            r'(?:est\s+de|is)\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|UI|iu))',
+            r'(?:strength|force|puissance|teneur)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|UI|iu))',
+            r'(?:concentration)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|UI|iu))',
+            r'(?:est\s+de|is)\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|UI|iu))',
         ],
         'Form': [
-            r'(?:forme|form|presentation|pharmaceutical form)\s*:?\s*(\b(?:comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable|gel|cr[èe]me|onguent|suppositoire|tablet[s]?)\b)',
-            r'(?:sous\s+forme\s+de|as\s+a)\s*(\b(?:comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable|gel|cr[èe]me|onguent|suppositoire|tablet[s]?)\b)',
+            r'(?:forme|form|presentation|pharmaceutical form)\s*:?\s*(\b(?:comprim[Ã©e]s?|g[Ã©e]lules?|capsules?|sirop|solution|suspension|poudre|injectable|gel|cr[Ã¨e]me|onguent|suppositoire|tablet[s]?)\b)',
+            r'(?:sous\s+forme\s+de|as\s+a)\s*(\b(?:comprim[Ã©e]s?|g[Ã©e]lules?|capsules?|sirop|solution|suspension|poudre|injectable|gel|cr[Ã¨e]me|onguent|suppositoire|tablet[s]?)\b)',
         ],
         'Batch_Size': [
-            r'(?:taille de lot|batch size|lot)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:unités?|comprim[ée]s?|g[ée]lules?|capsules?|batches?))',
+            r'(?:taille de lot|batch size|lot)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:unitÃ©s?|comprim[Ã©e]s?|g[Ã©e]lules?|capsules?|batches?))',
         ],
         'Shelf_Life': [
-            r'(?:durée de conservation|shelf life|péremption|expiry)\s*:?\s*([0-9]+\s*(?:mois|ans?|months?|years?|m|y))',
+            r'(?:durÃ©e de conservation|shelf life|pÃ©remption|expiry)\s*:?\s*([0-9]+\s*(?:mois|ans?|months?|years?|m|y))',
         ],
-        # --- NOUVEAU : Dates (mois + année, d/m/Y, Y-m, etc.) ---
+        # --- NOUVEAU : Dates (mois + annÃ©e, d/m/Y, Y-m, etc.) ---
         'Date': [
-            r'\b(?:\d{1,2}\s+)?(?:janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre|jan|janv\.?|févr\.?|fevr\.?|avr\.?|juil\.?|sept\.?|oct\.?|nov\.?|déc\.?|dec\.?|january|february|march|april|may|june|july|august|september|october|november|december|jan\.?|feb\.?|mar\.?|apr\.?|jun\.?|jul\.?|aug\.?|sep\.?|oct\.?|nov\.?|dec\.?)\s*[,/-]?\s*(20\d{2}|19\d{2})\b',
-            r'\b(0?[1-9]|[12][0-9]|3[01])\s+(?:janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre|january|february|march|april|may|june|july|august|september|october|november|december)\s*(20\d{2}|19\d{2})\b',
+            r'\b(?:\d{1,2}\s+)?(?:janvier|fÃ©vrier|fevrier|mars|avril|mai|juin|juillet|aoÃ»t|aout|septembre|octobre|novembre|dÃ©cembre|decembre|jan|janv\.?|fÃ©vr\.?|fevr\.?|avr\.?|juil\.?|sept\.?|oct\.?|nov\.?|dÃ©c\.?|dec\.?|january|february|march|april|may|june|july|august|september|october|november|december|jan\.?|feb\.?|mar\.?|apr\.?|jun\.?|jul\.?|aug\.?|sep\.?|oct\.?|nov\.?|dec\.?)\s*[,/-]?\s*(20\d{2}|19\d{2})\b',
+            r'\b(0?[1-9]|[12][0-9]|3[01])\s+(?:janvier|fÃ©vrier|fevrier|mars|avril|mai|juin|juillet|aoÃ»t|aout|septembre|octobre|novembre|dÃ©cembre|decembre|january|february|march|april|may|june|july|august|september|october|november|december)\s*(20\d{2}|19\d{2})\b',
             r'\b(0?[1-9]|1[0-2])[/-](20\d{2}|19\d{2})\b',
             r'\b(20\d{2}|19\d{2})-(0?[1-9]|1[0-2])\b',
             r'\b(0?[1-9]|[12][0-9]|3[01])[/-](0?[1-9]|1[0-2])[/-](20\d{2}|19\d{2})\b',
@@ -2191,7 +2263,7 @@ def extract_entities_from_text(text: str) -> dict:
         for pattern in patterns:
             for m in re.finditer(pattern, text or "", re.IGNORECASE | re.MULTILINE):
                 v = (m.group(0) or '').strip().rstrip('.,;:')
-                # anti-bruit Date: refuser année seule
+                # anti-bruit Date: refuser annÃ©e seule
                 if entity_type == 'Date' and re.fullmatch(r'\d{4}', v):
                     continue
                 if v and len(v) <= 100:
@@ -2204,18 +2276,18 @@ def extract_entities_from_text(text: str) -> dict:
 
 def extract_by_allowed_keys(text: str, allowed_keys: list[str]) -> dict:
     """
-    Extraction basée sur les libellés des clés existantes (insensible à la casse).
-    Pour chaque clé existante, capture des valeurs sous les formes:
-    - "<Clé>: <valeur>"
-    - "<Clé> est/is/are <valeur>"
-    Les valeurs extraites sont ensuite nettoyées par _clean_values_for_type.
+    Extraction basÃ©e sur les libellÃ©s des clÃ©s existantes (insensible Ã  la casse).
+    Pour chaque clÃ© existante, capture des valeurs sous les formes:
+    - "<ClÃ©>: <valeur>"
+    - "<ClÃ©> est/is/are <valeur>"
+    Les valeurs extraites sont ensuite nettoyÃ©es par _clean_values_for_type.
     """
     results: dict[str, list[str]] = {}
 
     def norm_one(s: str) -> str:
         s = re.sub(r"\s+", " ", (s or "").strip())
-        # normaliser espace entre nombre et unité
-        s = re.sub(r"(?i)\b([0-9]+(?:[.,][0-9]+)?)(mg|g|ml|l|µg|mcg|%|ui)\b", r"\1 \2", s)
+        # normaliser espace entre nombre et unitÃ©
+        s = re.sub(r"(?i)\b([0-9]+(?:[.,][0-9]+)?)(mg|g|ml|l|Âµg|mcg|%|ui)\b", r"\1 \2", s)
         return s
 
     text = text or ""
@@ -2225,8 +2297,8 @@ def extract_by_allowed_keys(text: str, allowed_keys: list[str]) -> dict:
             continue
         label = re.escape(key)
         patterns = [
-            rf"(?i)\b{label}\b\s*[:\-]\s*([^\.;\n]+)",  # Clé: valeur
-            rf"(?i)\b{label}\b\s*(?:est|is|are)\s*([^\.;\n]+)",  # Clé est/is/are valeur
+            rf"(?i)\b{label}\b\s*[:\-]\s*([^\.;\n]+)",  # ClÃ©: valeur
+            rf"(?i)\b{label}\b\s*(?:est|is|are)\s*([^\.;\n]+)",  # ClÃ© est/is/are valeur
         ]
         found = set()
         for pat in patterns:
@@ -2256,7 +2328,7 @@ def extract_by_allowed_keys(text: str, allowed_keys: list[str]) -> dict:
 def _clean_values_for_type(key: str, values: list[str]) -> list[str]:
     def norm(s: str) -> str:
         s = re.sub(r'\s+', ' ', (s or '').strip())
-        s = re.sub(r'(?i)\b([0-9]+(?:[.,][0-9]+)?)(mg|g|ml|l|µg|mcg|%|ui)\b', r'\1 \2', s)
+        s = re.sub(r'(?i)\b([0-9]+(?:[.,][0-9]+)?)(mg|g|ml|l|Âµg|mcg|%|ui)\b', r'\1 \2', s)
         return s
 
     seen, keep = set(), []
@@ -2267,7 +2339,7 @@ def _clean_values_for_type(key: str, values: list[str]) -> list[str]:
         for v in values or []:
             vv = norm(v).rstrip('.,;:')
             ok, _, _ = _is_date_like(vv)
-            if not ok:  # éviter '2013' seule
+            if not ok:  # Ã©viter '2013' seule
                 continue
             slug = vv.lower()
             if slug not in seen:
@@ -2275,10 +2347,10 @@ def _clean_values_for_type(key: str, values: list[str]) -> list[str]:
         return keep
 
     if k in {'dosage', 'strength'}:
-        strict_rx = re.compile(r'(?i)^[0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|ui|iu)(?:\s*/\s*(?:ml|l|g))?$')
+        strict_rx = re.compile(r'(?i)^[0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|ui|iu)(?:\s*/\s*(?:ml|l|g))?$')
         for v in values or []:
             vv = norm(v)
-            m = re.search(r'(?i)([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|µg|mcg|%|ui|iu)(?:\s*/\s*(?:ml|l|g))?)', vv)
+            m = re.search(r'(?i)([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|ui|iu)(?:\s*/\s*(?:ml|l|g))?)', vv)
             if m: vv = norm(m.group(1))
             if strict_rx.match(vv):
                 slug = vv.lower()
@@ -2293,7 +2365,7 @@ def _clean_values_for_type(key: str, values: list[str]) -> list[str]:
             m = cut_rx.match(vv)
             if m: vv = m.group(1).strip()
             vv = re.sub(r'(?i)^(?:le\s+produit\s+est|the\s+product\s+is|est|est de|is|contains)\s+', '', vv).strip()
-            if not re.match(r'^(?-i:[A-Z]).*', vv):  # éviter 'produits de dégradation'
+            if not re.match(r'^(?-i:[A-Z]).*', vv):  # Ã©viter 'produits de dÃ©gradation'
                 continue
             if 1 < len(vv) <= 80:
                 slug = vv.lower()
@@ -2301,7 +2373,7 @@ def _clean_values_for_type(key: str, values: list[str]) -> list[str]:
                     seen.add(slug); keep.append(vv)
         return keep
 
-    stop = {'de','du','des','et','la','le','les','à','au','aux','pour','sur','dans','par','avec'}
+    stop = {'de','du','des','et','la','le','les','Ã ','au','aux','pour','sur','dans','par','avec'}
     for v in values or []:
         vv = norm(v)
         vv = re.split(r'[;\.]', vv)[0].strip()
@@ -2325,17 +2397,17 @@ def _fold_key(s: str) -> str:
 
 
 def _build_synonym_map(existing_keys: list[str]) -> dict:
-    """Construit une map foldée -> clé canonique, avec synonymes courants (FR/EN).
-    Note: on ne relie des synonymes qu’aux clés VRAIMENT présentes dans existing_keys.
+    """Construit une map foldÃ©e -> clÃ© canonique, avec synonymes courants (FR/EN).
+    Note: on ne relie des synonymes quâ€™aux clÃ©s VRAIMENT prÃ©sentes dans existing_keys.
     """
     syn: dict[str, str] = {}
     existing_keys = existing_keys or []
 
-    # Clés existantes -> elles-mêmes
+    # ClÃ©s existantes -> elles-mÃªmes
     for ek in existing_keys:
         syn[_fold_key(ek)] = ek
 
-    # Lier des synonymes SEULEMENT si la clé canonique est déjà présente
+    # Lier des synonymes SEULEMENT si la clÃ© canonique est dÃ©jÃ  prÃ©sente
     def bind(canon: str, variants: list[str]):
         if canon in existing_keys:
             syn[_fold_key(canon)] = canon
@@ -2352,30 +2424,30 @@ def _build_synonym_map(existing_keys: list[str]) -> dict:
     # Voie d'administration
     for variant in ['Route Of Administration', 'Route', 'Voie']:
         bind(variant, [
-            'route', 'voie', 'voie d administration', "voie d’administration",
+            'route', 'voie', 'voie d administration', "voie dâ€™administration",
             'route of administration', 'administration route'
         ])
-    # Dates (ne liera ces synonymes que si la clé canonique correspondante existe déjà)
+    # Dates (ne liera ces synonymes que si la clÃ© canonique correspondante existe dÃ©jÃ )
     for variant in ['Date', 'Effective Date', 'Publication Date', 'Update Date', 'Deadline', 'Start Date']:
         bind(variant, [
             'date', 'effective date', 'date effective', 'publication date', 'date de publication',
-            'update date', 'date de mise à jour', 'deadline', 'échéance', 'date limite',
-            'start date', 'date de début', "date d'entrée en vigueur", 'date d effet', 'date d’effet'
+            'update date', 'date de mise Ã  jour', 'deadline', 'Ã©chÃ©ance', 'date limite',
+            'start date', 'date de dÃ©but', "date d'entrÃ©e en vigueur", 'date d effet', 'date dâ€™effet'
         ])
 
 
-    # Conditionnement immédiat
+    # Conditionnement immÃ©diat
     for variant in ['Immediate Packaging', 'Packaging', 'Emballage']:
         bind(variant, ['packaging', 'emballage', 'immediate packaging', 'conditionnement'])
 
     # Taille de pack
     for variant in ['Pack Size', 'Packsize', 'Pack']:
-        bind(variant, ['pack size', 'taille du pack', 'taille de pack', 'taille de boîte', 'boîte'])
+        bind(variant, ['pack size', 'taille du pack', 'taille de pack', 'taille de boÃ®te', 'boÃ®te'])
 
-    # Numéro d'AMM
+    # NumÃ©ro d'AMM
     for variant in ['Ma Number', 'AMM Number', 'Authorization Number']:
         bind(variant, [
-            'ma number', 'numero amm', 'numéro amm',
+            'ma number', 'numero amm', 'numÃ©ro amm',
             'authorization number', 'marketing authorization number', 'amm'
         ])
 
@@ -2392,24 +2464,24 @@ def _build_synonym_map(existing_keys: list[str]) -> dict:
         bind(variant, ['substance active', 'principe actif', 'active ingredient'])
 
     # --- NOUVEAU : Dates (points temporels) ---
-    # Permet de canoniser vers la clé 'Date' (ou variantes) si elle existe déjà dans le JSON
+    # Permet de canoniser vers la clÃ© 'Date' (ou variantes) si elle existe dÃ©jÃ  dans le JSON
     for variant in ['Date', 'Publication Date', 'Effective Date', 'Deadline']:
         bind(variant, [
             'date', 'publication date', 'effective date', 'deadline',
-            'date de publication', "date d'effet", 'date d’effet',
-            "date d'entrée en vigueur", "date d'entree en vigueur",
-            'date effective', 'date limite', 'date de validité', 'date de validite'
+            'date de publication', "date d'effet", 'date dâ€™effet',
+            "date d'entrÃ©e en vigueur", "date d'entree en vigueur",
+            'date effective', 'date limite', 'date de validitÃ©', 'date de validite'
         ])
 
-    # Délai / Duration (durées, à distinguer des dates)
-    bind('Delay', ['délai', 'delai', 'durée', 'duree', 'duration', 'timeframe'])
+    # DÃ©lai / Duration (durÃ©es, Ã  distinguer des dates)
+    bind('Delay', ['dÃ©lai', 'delai', 'durÃ©e', 'duree', 'duration', 'timeframe'])
 
     return syn
 
 
 
 def _canonical_key(key: str, existing_keys: list[str]) -> str | None:
-    """Retourne la clé canonique parmi existing_keys en utilisant un matching accent/casse/synonymes."""
+    """Retourne la clÃ© canonique parmi existing_keys en utilisant un matching accent/casse/synonymes."""
     if not key:
         return None
     syn = _build_synonym_map(existing_keys)
@@ -2419,8 +2491,8 @@ def _canonical_key(key: str, existing_keys: list[str]) -> str | None:
 
 def update_document_json_with_entities_replace_only(document, new_entities: dict) -> tuple[dict, list[str]]:
     """
-    Remplace les valeurs des entités EXISTANTES uniquement, sans en créer.
-    Nettoie et déduplique. Retourne (json_mis_a_jour, liste_cles_modifiees).
+    Remplace les valeurs des entitÃ©s EXISTANTES uniquement, sans en crÃ©er.
+    Nettoie et dÃ©duplique. Retourne (json_mis_a_jour, liste_cles_modifiees).
     """
     current_json = document.global_annotations_json or {}
     entities = current_json.get('entities', {}) or {}
@@ -2428,13 +2500,13 @@ def update_document_json_with_entities_replace_only(document, new_entities: dict
 
     existing_keys = list(entities.keys())
     if not existing_keys:
-        # Rien à faire si pas d'entités existantes
+        # Rien Ã  faire si pas d'entitÃ©s existantes
         return current_json, changed
 
     for raw_key, values in (new_entities or {}).items():
         canon = _canonical_key(raw_key, existing_keys)
         if not canon:
-            continue  # on ignore les types non présents pour éviter d'en créer
+            continue  # on ignore les types non prÃ©sents pour Ã©viter d'en crÃ©er
         cleaned = _clean_values_for_type(canon, values or [])
         if cleaned and entities.get(canon) != cleaned:
             entities[canon] = cleaned
@@ -2465,7 +2537,7 @@ from rawdocs.groq_annotation_system import GroqAnnotator
 
 
 def _normalize_values(values: List[str]) -> List[str]:
-    """trim + dédup (insensible à la casse) + espaces normalisés"""
+    """trim + dÃ©dup (insensible Ã  la casse) + espaces normalisÃ©s"""
     seen, out = set(), []
     for v in values or []:
         vv = re.sub(r'\s+', ' ', (v or '').strip())
@@ -2479,8 +2551,8 @@ def _normalize_values(values: List[str]) -> List[str]:
 def _replace_only(existing_entities: Dict[str, List[str]],
                   proposed_changes: Dict[str, List[str]]) -> Tuple[Dict[str, List[str]], List[str], List[str]]:
     """
-    Applique des changements SEULEMENT sur les clés déjà existantes.
-    Retourne (entities_mises_a_jour, keys_modifiées, traces_humaines)
+    Applique des changements SEULEMENT sur les clÃ©s dÃ©jÃ  existantes.
+    Retourne (entities_mises_a_jour, keys_modifiÃ©es, traces_humaines)
     """
     if not existing_entities:
         return existing_entities, [], []
@@ -2489,7 +2561,7 @@ def _replace_only(existing_entities: Dict[str, List[str]],
     changed_keys, human_diffs = [], []
 
     for raw_k, vals in (proposed_changes or {}).items():
-        # ne pas créer de nouveaux types : on ne garde que les clés existantes (match insensible casse)
+        # ne pas crÃ©er de nouveaux types : on ne garde que les clÃ©s existantes (match insensible casse)
         canon = next((ek for ek in allowed if ek.lower() == (raw_k or '').lower()), None)
         if not canon:
             continue
@@ -2499,7 +2571,7 @@ def _replace_only(existing_entities: Dict[str, List[str]],
         if new_vals != old_vals:
             existing_entities[canon] = new_vals
             changed_keys.append(canon)
-            human_diffs.append(f"{canon}: {old_vals} → {new_vals}")
+            human_diffs.append(f"{canon}: {old_vals} â†’ {new_vals}")
 
     return existing_entities, changed_keys, human_diffs
 
@@ -2540,7 +2612,7 @@ Return EXACTLY:
 
     content = None
 
-    # A) SDK officiel Groq (recommandé)
+    # A) SDK officiel Groq (recommandÃ©)
     if Groq is not None:
         try:
             client = Groq(api_key=getattr(settings, "GROQ_API_KEY", os.getenv("GROQ_API_KEY")))
@@ -2554,13 +2626,13 @@ Return EXACTLY:
             )
             content = resp.choices[0].message.content
         except Exception as e:
-            print(f"⚠️ GROQ SDK path failed: {e}")
+            print(f"âš ï¸ GROQ SDK path failed: {e}")
 
-    # B) Fallback via votre GroqAnnotator s'il expose une méthode utilisable
+    # B) Fallback via votre GroqAnnotator s'il expose une mÃ©thode utilisable
     if not content:
         try:
             ga = GroqAnnotator()
-            # Essayez une méthode JSON si elle existe dans votre classe
+            # Essayez une mÃ©thode JSON si elle existe dans votre classe
             for m in ("chat_json", "complete_json", "ask_json"):
                 if hasattr(ga, m):
                     content = getattr(ga, m)(
@@ -2570,10 +2642,10 @@ Return EXACTLY:
                     )
                     break
         except Exception as e:
-            print(f"⚠️ GroqAnnotator fallback failed: {e}")
+            print(f"âš ï¸ GroqAnnotator fallback failed: {e}")
 
     if not content:
-        return {}  # IA indispo → pas de modif
+        return {}  # IA indispo â†’ pas de modif
 
     try:
         data = json.loads(content) if isinstance(content, str) else content
@@ -2581,7 +2653,7 @@ Return EXACTLY:
     except Exception:
         return {}
 
-    # Filtrer: uniquement les clés existantes
+    # Filtrer: uniquement les clÃ©s existantes
     filtered = {}
     for k, vals in (raw_changes or {}).items():
         if any(k.lower() == ak.lower() for ak in allowed_keys):
@@ -2590,7 +2662,7 @@ Return EXACTLY:
 
 
 def save_document_json(request, doc_id):
-    """Sauvegarde du JSON global modifié d'un document (et stockage MongoDB avec métadonnées complètes)"""
+    """Sauvegarde du JSON global modifiÃ© d'un document (et stockage MongoDB avec mÃ©tadonnÃ©es complÃ¨tes)"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -2602,13 +2674,13 @@ def save_document_json(request, doc_id):
         if not json_content:
             return JsonResponse({'error': 'JSON content is required'}, status=400)
 
-        # Valider que le JSON est bien formaté
+        # Valider que le JSON est bien formatÃ©
         try:
             parsed_json = json.loads(json_content)
         except json.JSONDecodeError as e:
             return JsonResponse({'error': f'Invalid JSON format: {str(e)}'}, status=400)
 
-        # Fonction helper pour gérer les dates
+        # Fonction helper pour gÃ©rer les dates
         def safe_isoformat(date_value):
             if date_value is None:
                 return None
@@ -2618,7 +2690,7 @@ def save_document_json(request, doc_id):
                 return date_value.isoformat()
             return str(date_value)
 
-        # Enrichir le JSON avec TOUTES les métadonnées du document
+        # Enrichir le JSON avec TOUTES les mÃ©tadonnÃ©es du document
         parsed_json['document']['metadata'] = {
             'title': document.title,
             'doc_type': document.doc_type,
@@ -2637,7 +2709,7 @@ def save_document_json(request, doc_id):
             'file_name': os.path.basename(document.file.name) if document.file else None,
         }
 
-        # Ajouter les champs personnalisés s'ils existent
+        # Ajouter les champs personnalisÃ©s s'ils existent
         from rawdocs.models import CustomFieldValue
         custom_fields = {}
         for custom_value in CustomFieldValue.objects.filter(document=document):
@@ -2651,14 +2723,14 @@ def save_document_json(request, doc_id):
         document.global_annotations_summary_generated_at = timezone.now()
         document.save(update_fields=['global_annotations_json', 'global_annotations_summary_generated_at'])
 
-        # Sauvegarder dans MongoDB avec toutes les métadonnées
+        # Sauvegarder dans MongoDB avec toutes les mÃ©tadonnÃ©es
         mongo_collection.update_one(
             {"document_id": str(document.id)},
             {
                 "$set": {
                     "document_id": str(document.id),
                     "title": document.title,
-                    "metadata": parsed_json['document']['metadata'],  # Toutes les métadonnées
+                    "metadata": parsed_json['document']['metadata'],  # Toutes les mÃ©tadonnÃ©es
                     "json": parsed_json,
                     "entities": parsed_json.get('entities', {}),
                     "updated_at": timezone.now().isoformat(),
@@ -2680,15 +2752,15 @@ def save_document_json(request, doc_id):
 
         return JsonResponse({
             'success': True,
-            'message': 'JSON sauvegardé avec succès (SQL + MongoDB avec métadonnées complètes)'
+            'message': 'JSON sauvegardÃ© avec succÃ¨s (SQL + MongoDB avec mÃ©tadonnÃ©es complÃ¨tes)'
         })
 
     except Exception as e:
-        print(f"❌ Erreur lors de la sauvegarde du JSON: {str(e)}")
+        print(f"âŒ Erreur lors de la sauvegarde du JSON: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
 
-# ——— NOUVELLES VUES ANNOTATION EXPERT (copiées et adaptées de rawdocs) —————————————————————————————————
+# â€”â€”â€” NOUVELLES VUES ANNOTATION EXPERT (copiÃ©es et adaptÃ©es de rawdocs) â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
 from django.contrib.auth.decorators import login_required
 from datetime import datetime
@@ -2698,7 +2770,7 @@ from rawdocs.groq_annotation_system import GroqAnnotator
 @expert_required
 def expert_annotation_dashboard(request):
     """Dashboard annotation pour Expert - copie de rawdocs.views.annotation_dashboard"""
-    # Récupérer tous les documents validés (prêts pour annotation)
+    # RÃ©cupÃ©rer tous les documents validÃ©s (prÃªts pour annotation)
     documents = RawDocument.objects.filter(is_validated=True).select_related('owner').order_by('-created_at')
 
     # Statistiques
@@ -2711,7 +2783,7 @@ def expert_annotation_dashboard(request):
         annotations__isnull=False
     ).distinct().count()
 
-    # Documents en cours d'annotation (au moins une page annotée mais pas toutes)
+    # Documents en cours d'annotation (au moins une page annotÃ©e mais pas toutes)
     in_progress_docs = []
     completed_docs = []
 
@@ -2748,7 +2820,7 @@ def expert_annotate_document(request, doc_id):
         validation_status__in=['pending', 'validated', 'expert_created', 'rejected']
     ).order_by('start_pos')
 
-    # Types d'annotations par défaut (mêmes que côté Annotateur) + types déjà utilisés
+    # Types d'annotations par dÃ©faut (mÃªmes que cÃ´tÃ© Annotateur) + types dÃ©jÃ  utilisÃ©s
     used_type_ids = Annotation.objects.filter(page__document=document).values_list('annotation_type_id', flat=True).distinct()
 
     whitelist = {
@@ -2781,17 +2853,17 @@ def expert_annotate_document(request, doc_id):
     return render(request, 'expert/annotate_document.html', context)
 
 
-# Ajouter ces fonctions utilitaires dans expert/views.py - À la fin du fichier
+# Ajouter ces fonctions utilitaires dans expert/views.py - Ã€ la fin du fichier
 
 # ===== FONCTIONS UTILITAIRES POUR LA SYNCHRONISATION AUTOMATIQUE =====
 
-# Variables globales pour la gestion des régénérations
+# Variables globales pour la gestion des rÃ©gÃ©nÃ©rations
 REGENERATION_CACHE = {}
-CACHE_DURATION = 30  # secondes entre régénérations pour un même document
+CACHE_DURATION = 30  # secondes entre rÃ©gÃ©nÃ©rations pour un mÃªme document
 
 
 def should_regenerate_summary(document_id):
-    """Vérifie si on doit régénérer le résumé (évite les appels trop fréquents)"""
+    """VÃ©rifie si on doit rÃ©gÃ©nÃ©rer le rÃ©sumÃ© (Ã©vite les appels trop frÃ©quents)"""
     import time
 
     last_regeneration = REGENERATION_CACHE.get(document_id, 0)
@@ -2805,9 +2877,9 @@ def should_regenerate_summary(document_id):
 
 
 def trigger_summary_regeneration(document, user):
-    """Version de base pour régénération du résumé"""
+    """Version de base pour rÃ©gÃ©nÃ©ration du rÃ©sumÃ©"""
     if not should_regenerate_summary(document.id):
-        print(f"⏰ Régénération résumé ignorée (trop récente) pour doc {document.id}")
+        print(f"â° RÃ©gÃ©nÃ©ration rÃ©sumÃ© ignorÃ©e (trop rÃ©cente) pour doc {document.id}")
         return False
 
     try:
@@ -2816,47 +2888,47 @@ def trigger_summary_regeneration(document, user):
         fake_request = factory.post(f'/expert/document/{document.id}/auto-regenerate-summary/')
         fake_request.user = user
 
-        # Appeler la fonction de régénération
+        # Appeler la fonction de rÃ©gÃ©nÃ©ration
         result = auto_regenerate_summary_from_annotations(fake_request, document.id)
 
         if hasattr(result, 'status_code') and result.status_code == 200:
-            print(f"✅ Régénération résumé réussie pour doc {document.id}")
+            print(f"âœ… RÃ©gÃ©nÃ©ration rÃ©sumÃ© rÃ©ussie pour doc {document.id}")
             return True
         else:
-            print(f"⚠️ Régénération résumé échouée pour doc {document.id}")
+            print(f"âš ï¸ RÃ©gÃ©nÃ©ration rÃ©sumÃ© Ã©chouÃ©e pour doc {document.id}")
             return False
 
     except Exception as e:
-        print(f"⚠️ Erreur déclenchement régénération résumé: {e}")
+        print(f"âš ï¸ Erreur dÃ©clenchement rÃ©gÃ©nÃ©ration rÃ©sumÃ©: {e}")
         return False
 
 
 def trigger_summary_regeneration_safe(document, user, delay_seconds=5):
     """
-    Version sécurisée avec délai pour éviter les régénérations trop fréquentes
+    Version sÃ©curisÃ©e avec dÃ©lai pour Ã©viter les rÃ©gÃ©nÃ©rations trop frÃ©quentes
     """
     import time
     import threading
 
     def delayed_regeneration():
         try:
-            time.sleep(delay_seconds)  # Attendre un peu pour éviter les appels multiples
+            time.sleep(delay_seconds)  # Attendre un peu pour Ã©viter les appels multiples
             trigger_summary_regeneration(document, user)
         except Exception as e:
-            print(f"⚠️ Erreur régénération différée: {e}")
+            print(f"âš ï¸ Erreur rÃ©gÃ©nÃ©ration diffÃ©rÃ©e: {e}")
 
-    # Exécuter la régénération dans un thread séparé
+    # ExÃ©cuter la rÃ©gÃ©nÃ©ration dans un thread sÃ©parÃ©
     thread = threading.Thread(target=delayed_regeneration)
     thread.daemon = True
     thread.start()
 
-    print(f"🔄 Régénération automatique programmée dans {delay_seconds}s pour doc {document.id}")
+    print(f"ðŸ”„ RÃ©gÃ©nÃ©ration automatique programmÃ©e dans {delay_seconds}s pour doc {document.id}")
 
 
 # ===== FONCTIONS POUR L'ANNOTATION AUTOMATIQUE PAR IA =====
 
 def find_summary_differences(old_summary, new_summary):
-    """Trouve les différences entre deux résumés"""
+    """Trouve les diffÃ©rences entre deux rÃ©sumÃ©s"""
     import difflib
 
     old_lines = old_summary.split('\n') if old_summary else []
@@ -2886,12 +2958,12 @@ def find_best_page_for_annotation(document, entity_value):
             text = text_content.lower()
             entity_lower = entity_value.lower()
 
-            # Score basé sur la présence du texte exact ou similaire
+            # Score basÃ© sur la prÃ©sence du texte exact ou similaire
             score = 0
             if entity_lower in text:
                 score = 100
             else:
-                # Recherche de mots-clés similaires
+                # Recherche de mots-clÃ©s similaires
                 words = entity_lower.split()
                 for word in words:
                     if len(word) > 3 and word in text:
@@ -2901,12 +2973,12 @@ def find_best_page_for_annotation(document, entity_value):
                 best_score = score
                 best_page = page
 
-    # Si aucune page pertinente, retourner la première page
+    # Si aucune page pertinente, retourner la premiÃ¨re page
     return best_page if best_score > 30 else pages.first()
 
 
 def create_ai_annotation(page, entity_value, entity_type, user, confidence=0.8):
-    """Crée une annotation automatiquement via IA"""
+    """CrÃ©e une annotation automatiquement via IA"""
     try:
         # Chercher le texte dans la page
         text_content = getattr(page, 'cleaned_text', '') or getattr(page, 'text_content', '')
@@ -2914,19 +2986,19 @@ def create_ai_annotation(page, entity_value, entity_type, user, confidence=0.8):
             start_pos = text_content.lower().find(entity_value.lower())
 
             if start_pos == -1:
-                # Si pas trouvé exactement, chercher des mots-clés
+                # Si pas trouvÃ© exactement, chercher des mots-clÃ©s
                 words = entity_value.split()
                 for word in words:
                     if len(word) > 3:
                         start_pos = text_content.lower().find(word.lower())
                         if start_pos != -1:
-                            entity_value = word  # Utiliser le mot trouvé
+                            entity_value = word  # Utiliser le mot trouvÃ©
                             break
 
             if start_pos != -1:
                 end_pos = start_pos + len(entity_value)
 
-                # Créer ou récupérer le type d'annotation
+                # CrÃ©er ou rÃ©cupÃ©rer le type d'annotation
                 annotation_type, created = AnnotationType.objects.get_or_create(
                     name=entity_type,
                     defaults={
@@ -2936,34 +3008,34 @@ def create_ai_annotation(page, entity_value, entity_type, user, confidence=0.8):
                     }
                 )
 
-                # Créer l'annotation
+                # CrÃ©er l'annotation
                 annotation = Annotation.objects.create(
                     page=page,
                     selected_text=entity_value,
                     annotation_type=annotation_type,
                     start_pos=start_pos,
                     end_pos=end_pos,
-                    validation_status='expert_created',  # Pré-validée car créée par expert
+                    validation_status='expert_created',  # PrÃ©-validÃ©e car crÃ©Ã©e par expert
                     validated_by=user,
                     validated_at=timezone.now(),
                     created_by=user,
                     source='expert_ai_auto'
                 )
 
-                print(f"✅ Annotation IA automatique créée: {entity_value} ({entity_type}) dans page {page.page_number}")
+                print(f"âœ… Annotation IA automatique crÃ©Ã©e: {entity_value} ({entity_type}) dans page {page.page_number}")
                 return annotation
 
         return None
 
     except Exception as e:
-        print(f"⚠️ Erreur création annotation automatique: {e}")
+        print(f"âš ï¸ Erreur crÃ©ation annotation automatique: {e}")
         return None
 
 
 def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_keys, user, page_id=None):
     """
-    Version améliorée qui limite les annotations à la page spécifique
-    et vérifie que le texte existe vraiment avant de créer l'annotation.
+    Version amÃ©liorÃ©e qui limite les annotations Ã  la page spÃ©cifique
+    et vÃ©rifie que le texte existe vraiment avant de crÃ©er l'annotation.
     """
     try:
         from rawdocs.groq_annotation_system import GroqAnnotator
@@ -2974,12 +3046,12 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
         if page_id:
             target_page = DocumentPage.objects.filter(id=page_id).first()
             if not target_page:
-                print(f"⚠️ Page {page_id} non trouvée")
+                print(f"âš ï¸ Page {page_id} non trouvÃ©e")
                 return {}
         else:
             target_page = None
 
-        # ---------- helpers dates (inchangé) ----------
+        # ---------- helpers dates (inchangÃ©) ----------
         MONTHS_EN = {
             "january": "01","jan": "01","february": "02","feb": "02","march": "03","mar": "03",
             "april": "04","apr": "04","may": "05","june": "06","jun": "06","july": "07","jul": "07",
@@ -2987,9 +3059,9 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
             "october": "10","oct": "10","november": "11","nov": "11","december": "12","dec": "12"
         }
         MONTHS_FR = {
-            "janvier":"01","février":"02","fevrier":"02","mars":"03","avril":"04","mai":"05","juin":"06",
-            "juillet":"07","août":"08","aout":"08","septembre":"09","octobre":"10","novembre":"11",
-            "décembre":"12","decembre":"12"
+            "janvier":"01","fÃ©vrier":"02","fevrier":"02","mars":"03","avril":"04","mai":"05","juin":"06",
+            "juillet":"07","aoÃ»t":"08","aout":"08","septembre":"09","octobre":"10","novembre":"11",
+            "dÃ©cembre":"12","decembre":"12"
         }
         MONTHS_ALL = {**MONTHS_EN, **MONTHS_FR}
 
@@ -2997,7 +3069,7 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
             return re.sub(r"\s+", " ", (s or "").strip())
 
         def _canonical_date_key():
-            # choisit une clé Date existante si possible
+            # choisit une clÃ© Date existante si possible
             for k in ["Date", "Effective Date", "Publication Date", "Update Date", "Deadline", "Start Date"]:
                 canon = _canonical_key(k, allowed_keys)
                 if canon:
@@ -3006,12 +3078,12 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
 
         DATE_KEY = _canonical_date_key()
 
-        # détecte toute forme de date (jour-mois-année, mois-année, numériques…)
+        # dÃ©tecte toute forme de date (jour-mois-annÃ©e, mois-annÃ©e, numÃ©riquesâ€¦)
         DAY = r"(0?[1-9]|[12]\d|3[01])"
         YEAR = r"(?:19|20)\d{2}"
-        MONTH_TXT = r"[A-Za-zéèêëàâîïôöùûü]{3,}"
+        MONTH_TXT = r"[A-Za-zÃ©Ã¨ÃªÃ«Ã Ã¢Ã®Ã¯Ã´Ã¶Ã¹Ã»Ã¼]{3,}"
         MONTH_NUM = r"(0?[1-9]|1[0-2])"
-        # formes texte et numériques
+        # formes texte et numÃ©riques
         RX_DATE_TEXT_1 = re.compile(rf"(?i)\b{DAY}\s+({MONTH_TXT})\s*,?\s*({YEAR})\b")
         RX_DATE_TEXT_2 = re.compile(rf"(?i)\b({MONTH_TXT})\s+{DAY}\s*,?\s*({YEAR})\b")
         RX_DATE_MY     = re.compile(rf"(?i)\b({MONTH_TXT})\s*,?\s*({YEAR})\b")
@@ -3029,9 +3101,9 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
 
         def _expand_date_variants(s: str) -> list[str]:
             """
-            À partir d'une forme '5 June 2014' ou '5 Jun 2014' ou '5 juin 2014', génère :
+            Ã€ partir d'une forme '5 June 2014' ou '5 Jun 2014' ou '5 juin 2014', gÃ©nÃ¨re :
             - '5 Jun 2014' / 'June 5, 2014' / '05/06/2014' / '2014-06-05'
-            - si mois-année seulement → 'Jun 2014' / '06/2014' / '2014-06'
+            - si mois-annÃ©e seulement â†’ 'Jun 2014' / '06/2014' / '2014-06'
             """
             s = _norm(s)
             out = {s}
@@ -3072,8 +3144,8 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
                     out.add(f"{mtxt[:3].title()} {y}")            # Jan 2013
                     out.add(f"{mm}/{y}")                          # 01/2013
                     out.add(f"{y}-{mm}")                          # 2013-01
-                    out.add(re.sub(r"(?i)\b([A-Za-zéèêëàâîïôöùûü]+)\s+(\d{{4}})\b", r"\1, \2", s))  # January, 2013
-            # numériques → générer quelques tournures inverses
+                    out.add(re.sub(r"(?i)\b([A-Za-zÃ©Ã¨ÃªÃ«Ã Ã¢Ã®Ã¯Ã´Ã¶Ã¹Ã»Ã¼]+)\s+(\d{{4}})\b", r"\1, \2", s))  # January, 2013
+            # numÃ©riques â†’ gÃ©nÃ©rer quelques tournures inverses
             m = RX_NUM_DMY.search(s)
             if m:
                 d, mm, y = m.group(1), m.group(2), re.search(YEAR, s).group(0)
@@ -3097,12 +3169,12 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
             return list(out)
 
         def _coerce_type_for_value(raw_type: str, value: str) -> str:
-            # force Date si le token ressemble à une date
+            # force Date si le token ressemble Ã  une date
             if DATE_KEY and _is_date_token(value):
                 return DATE_KEY
             return _canonical_key(raw_type, allowed_keys) or raw_type
 
-        # ---------- extraction locale des entités dans un résumé ----------
+        # ---------- extraction locale des entitÃ©s dans un rÃ©sumÃ© ----------
         def _extract_entities(summary: str) -> dict[str, list[str]]:
             summary = summary or ""
             by_text = extract_entities_from_text(summary) or {}
@@ -3116,7 +3188,7 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
             if DATE_KEY and dates:
                 out[DATE_KEY] = sorted(dates)
 
-            # 2) fusionner avec heuristique générique et recanoniser
+            # 2) fusionner avec heuristique gÃ©nÃ©rique et recanoniser
             for raw_k, vals in (by_text or {}).items():
                 for v in (vals or []):
                     v = _norm(v)
@@ -3125,14 +3197,14 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
                     if v and v not in out[k2]:
                         out[k2].append(v)
 
-            # dédup
+            # dÃ©dup
             for k, vals in list(out.items()):
                 out[k] = list({v.lower(): v for v in vals}.values())
                 if not out[k]:
                     del out[k]
             return out
 
-        # ---------- diff entités (ajouts / retraits) ----------
+        # ---------- diff entitÃ©s (ajouts / retraits) ----------
         def _diff_entities(old_sum: str, new_sum: str) -> tuple[dict, dict]:
             old_e = _extract_entities(old_sum)
             new_e = _extract_entities(new_sum)
@@ -3173,7 +3245,7 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
                     n += 1
                 return n
             except Exception as e:
-                print(f"⚠️ Deselect error {entity_type_canon}='{value}': {e}")
+                print(f"âš ï¸ Deselect error {entity_type_canon}='{value}': {e}")
                 return 0
 
         # ---------- pipeline principal ----------
@@ -3183,30 +3255,30 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
                 # Option IA : enrichissement (optionnel)
                 ai_added, ai_removed = {}, {}
                 if not added_local and not removed_local:
-                    # Si pas de changements détectés localement, demander à l'IA
+                    # Si pas de changements dÃ©tectÃ©s localement, demander Ã  l'IA
                     try:
                         diff_text = find_summary_differences(old_summary or "", new_summary or "")
                         if diff_text.strip():
                             ga = GroqAnnotator()
                             prompt = f"""
-        Analyse les changements dans ce résumé et identifie les entités à annoter.
-        IMPORTANT: Ne retourne QUE les entités qui sont NOUVELLES ou MODIFIÉES.
+        Analyse les changements dans ce rÃ©sumÃ© et identifie les entitÃ©s Ã  annoter.
+        IMPORTANT: Ne retourne QUE les entitÃ©s qui sont NOUVELLES ou MODIFIÃ‰ES.
 
-        Types autorisés: {', '.join(allowed_keys)}
+        Types autorisÃ©s: {', '.join(allowed_keys)}
 
-        Ancien résumé:
+        Ancien rÃ©sumÃ©:
         {old_summary[:500]}
 
-        Nouveau résumé:
+        Nouveau rÃ©sumÃ©:
         {new_summary[:500]}
 
-        Changements détectés:
+        Changements dÃ©tectÃ©s:
         {diff_text}
 
-        Réponds en JSON strict:
+        RÃ©ponds en JSON strict:
         {{
           "added": {{ "<Type>": ["valeur exacte dans le texte"] }},
-          "removed": {{ "<Type>": ["valeur supprimée"] }}
+          "removed": {{ "<Type>": ["valeur supprimÃ©e"] }}
         }}
         """
                             raw = ga.complete_text(prompt, max_tokens=700, temperature=0.0)
@@ -3218,28 +3290,28 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
                                 except Exception:
                                     pass
                     except Exception as e:
-                        print(f"⚠️ IA assist skipped: {e}")
+                        print(f"âš ï¸ IA assist skipped: {e}")
 
-                # Fusionner les résultats
+                # Fusionner les rÃ©sultats
                 added_all = _merge(added_local, ai_added)
                 removed_all = _merge(removed_local, ai_removed)
 
-                # 1) Désélection des valeurs retirées (inchangé)
+                # 1) DÃ©sÃ©lection des valeurs retirÃ©es (inchangÃ©)
                 for etype, values in (removed_all or {}).items():
                     for val in values:
                         if target_page:
-                            # Désélectionner uniquement sur la page cible
+                            # DÃ©sÃ©lectionner uniquement sur la page cible
                             _deselect_annotation_on_page(target_page, etype, val, user)
                         else:
                             _deselect_existing_annotation(document, etype, val, user)
 
-                # 2) Création des annotations UNIQUEMENT sur la page spécifiée
+                # 2) CrÃ©ation des annotations UNIQUEMENT sur la page spÃ©cifiÃ©e
                 created_map: dict[str, list[str]] = {}
 
                 for etype, values in (added_all or {}).items():
                     for val in values:
                         if target_page:
-                            # Créer l'annotation UNIQUEMENT si le texte existe dans la page
+                            # CrÃ©er l'annotation UNIQUEMENT si le texte existe dans la page
                             success = create_annotation_if_text_exists(
                                 target_page, val, etype, user, confidence=0.9
                             )
@@ -3256,27 +3328,27 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
                 return created_map
 
             except Exception as e:
-                print(f"⚠️ Erreur annotation IA automatique: {e}")
+                print(f"âš ï¸ Erreur annotation IA automatique: {e}")
                 return {}
 
     except Exception as e:
-        print(f"⚠️ Erreur annotation IA automatique: {e}")
+        print(f"âš ï¸ Erreur annotation IA automatique: {e}")
         return {}
 
 
 def create_annotation_if_text_exists(page, entity_value, entity_type, user, confidence=0.9):
     """
-    Crée une annotation SEULEMENT si le texte existe vraiment dans la page.
-    Utilise plusieurs stratégies de recherche pour être plus robuste.
+    CrÃ©e une annotation SEULEMENT si le texte existe vraiment dans la page.
+    Utilise plusieurs stratÃ©gies de recherche pour Ãªtre plus robuste.
     """
     try:
         # Obtenir le texte de la page
         page_text = _get_page_text(page)
         if not page_text:
-            print(f"⚠️ Page {page.page_number} sans texte")
+            print(f"âš ï¸ Page {page.page_number} sans texte")
             return False
 
-        # Stratégies de recherche dans l'ordre de préférence
+        # StratÃ©gies de recherche dans l'ordre de prÃ©fÃ©rence
         search_results = []
 
         # 1. Recherche exacte
@@ -3310,7 +3382,7 @@ def create_annotation_if_text_exists(page, entity_value, entity_type, user, conf
             if date_result and not search_results:
                 search_results.append(date_result)
 
-        # 4. Recherche par mots-clés significatifs
+        # 4. Recherche par mots-clÃ©s significatifs
         if not search_results:
             keywords = extract_significant_keywords(entity_value)
             if keywords:
@@ -3318,20 +3390,20 @@ def create_annotation_if_text_exists(page, entity_value, entity_type, user, conf
                 if keyword_result:
                     search_results.append(keyword_result)
 
-        # Si aucun résultat, on n'annote pas
+        # Si aucun rÃ©sultat, on n'annote pas
         if not search_results:
-            print(f"⚠️ Texte '{entity_value}' non trouvé dans page {page.page_number}")
+            print(f"âš ï¸ Texte '{entity_value}' non trouvÃ© dans page {page.page_number}")
             return False
 
-        # Utiliser le meilleur résultat
+        # Utiliser le meilleur rÃ©sultat
         best_result = max(search_results, key=lambda x: x['confidence'])
 
-        # Créer l'annotation uniquement si la confiance est suffisante
+        # CrÃ©er l'annotation uniquement si la confiance est suffisante
         if best_result['confidence'] < 0.5:
-            print(f"⚠️ Confiance trop faible ({best_result['confidence']}) pour '{entity_value}'")
+            print(f"âš ï¸ Confiance trop faible ({best_result['confidence']}) pour '{entity_value}'")
             return False
 
-        # Créer ou récupérer le type d'annotation
+        # CrÃ©er ou rÃ©cupÃ©rer le type d'annotation
         annotation_type, _ = AnnotationType.objects.get_or_create(
             name=entity_type,
             defaults={
@@ -3341,7 +3413,7 @@ def create_annotation_if_text_exists(page, entity_value, entity_type, user, conf
             }
         )
 
-        # Vérifier qu'une annotation similaire n'existe pas déjà
+        # VÃ©rifier qu'une annotation similaire n'existe pas dÃ©jÃ
         existing = Annotation.objects.filter(
             page=page,
             annotation_type=annotation_type,
@@ -3351,10 +3423,10 @@ def create_annotation_if_text_exists(page, entity_value, entity_type, user, conf
         ).first()
 
         if existing:
-            print(f"ℹ️ Annotation similaire déjà existante pour '{entity_value}'")
+            print(f"â„¹ï¸ Annotation similaire dÃ©jÃ  existante pour '{entity_value}'")
             return False
 
-        # Créer l'annotation
+        # CrÃ©er l'annotation
         annotation = Annotation.objects.create(
             page=page,
             selected_text=best_result['text'],
@@ -3369,21 +3441,21 @@ def create_annotation_if_text_exists(page, entity_value, entity_type, user, conf
             confidence_score=confidence * best_result['confidence']
         )
 
-        print(f"✅ Annotation créée: '{best_result['text']}' ({entity_type}) "
+        print(f"âœ… Annotation crÃ©Ã©e: '{best_result['text']}' ({entity_type}) "
               f"page {page.page_number} pos [{best_result['start']}:{best_result['end']}]")
         return True
 
     except Exception as e:
-        print(f"❌ Erreur création annotation: {e}")
+        print(f"âŒ Erreur crÃ©ation annotation: {e}")
         return False
 
 
 def find_real_position(original_text, normalized_text, norm_pos):
-    """Trouve la position réelle dans le texte original à partir de la position normalisée."""
+    """Trouve la position rÃ©elle dans le texte original Ã  partir de la position normalisÃ©e."""
     if norm_pos < 0:
         return -1
 
-    # Compter les caractères jusqu'à norm_pos dans le texte normalisé
+    # Compter les caractÃ¨res jusqu'Ã  norm_pos dans le texte normalisÃ©
     norm_count = 0
     real_pos = 0
 
@@ -3399,23 +3471,23 @@ def find_real_position(original_text, normalized_text, norm_pos):
 
 
 def extract_significant_keywords(text, min_length=4):
-    """Extrait les mots-clés significatifs d'un texte."""
-    # Mots vides à ignorer
+    """Extrait les mots-clÃ©s significatifs d'un texte."""
+    # Mots vides Ã  ignorer
     stopwords = {'le', 'la', 'les', 'de', 'du', 'des', 'un', 'une', 'et', 'ou',
-                 'à', 'au', 'aux', 'pour', 'par', 'sur', 'dans', 'avec', 'sans',
+                 'Ã ', 'au', 'aux', 'pour', 'par', 'sur', 'dans', 'avec', 'sans',
                  'the', 'a', 'an', 'and', 'or', 'for', 'by', 'on', 'in', 'with'}
 
     words = re.findall(r'\b\w+\b', text.lower())
     keywords = [w for w in words if len(w) >= min_length and w not in stopwords]
 
-    # Prioriser les mots commençant par une majuscule (noms propres)
+    # Prioriser les mots commenÃ§ant par une majuscule (noms propres)
     capitalized = re.findall(r'\b[A-Z]\w+\b', text)
 
     return capitalized + keywords
 
 
 def find_by_keywords_in_page(keywords, page_text, original_value):
-    """Cherche une séquence de mots-clés dans le texte."""
+    """Cherche une sÃ©quence de mots-clÃ©s dans le texte."""
     if not keywords:
         return None
 
@@ -3423,18 +3495,18 @@ def find_by_keywords_in_page(keywords, page_text, original_value):
     best_match = None
     best_score = 0
 
-    # Chercher chaque mot-clé
-    for keyword in keywords[:3]:  # Limiter aux 3 premiers mots-clés
+    # Chercher chaque mot-clÃ©
+    for keyword in keywords[:3]:  # Limiter aux 3 premiers mots-clÃ©s
         keyword_lower = keyword.lower()
         pos = page_lower.find(keyword_lower)
 
         if pos >= 0:
-            # Étendre la recherche autour du mot-clé
+            # Ã‰tendre la recherche autour du mot-clÃ©
             context_start = max(0, pos - 50)
             context_end = min(len(page_text), pos + len(keyword) + 50)
             context = page_text[context_start:context_end]
 
-            # Calculer un score basé sur le nombre de mots-clés trouvés
+            # Calculer un score basÃ© sur le nombre de mots-clÃ©s trouvÃ©s
             score = sum(1 for kw in keywords if kw.lower() in context.lower())
 
             if score > best_score:
@@ -3450,8 +3522,8 @@ def find_by_keywords_in_page(keywords, page_text, original_value):
 
 
 def find_date_in_page_text(date_value, page_text):
-    """Recherche spécialisée pour les dates avec formats multiples."""
-    # Utiliser la fonction existante mais adaptée pour retourner le bon format
+    """Recherche spÃ©cialisÃ©e pour les dates avec formats multiples."""
+    # Utiliser la fonction existante mais adaptÃ©e pour retourner le bon format
     start, end, text = find_date_span_in_text(page_text, date_value)
 
     if start is not None:
@@ -3463,13 +3535,13 @@ def find_date_in_page_text(date_value, page_text):
         }
 
     # Essayer d'autres formats de date
-    # ... (logique additionnelle si nécessaire)
+    # ... (logique additionnelle si nÃ©cessaire)
 
     return None
 
 
 def _deselect_annotation_on_page(page, entity_type_canon, value, user):
-    """Désélectionne les annotations uniquement sur une page spécifique."""
+    """DÃ©sÃ©lectionne les annotations uniquement sur une page spÃ©cifique."""
     try:
         from django.db.models import Q
 
@@ -3481,7 +3553,7 @@ def _deselect_annotation_on_page(page, entity_type_canon, value, user):
             return 0
 
         qs = Annotation.objects.filter(
-            page=page,  # Limiter à la page spécifique
+            page=page,  # Limiter Ã  la page spÃ©cifique
             annotation_type__in=list(qs_type),
             selected_text__iexact=value,
             validation_status__in=['pending', 'validated', 'expert_created']
@@ -3496,16 +3568,16 @@ def _deselect_annotation_on_page(page, entity_type_canon, value, user):
             count += 1
 
         if count > 0:
-            print(f"ℹ️ {count} annotation(s) désélectionnée(s) pour '{value}' sur page {page.page_number}")
+            print(f"â„¹ï¸ {count} annotation(s) dÃ©sÃ©lectionnÃ©e(s) pour '{value}' sur page {page.page_number}")
 
         return count
 
     except Exception as e:
-        print(f"⚠️ Erreur désélection: {e}")
+        print(f"âš ï¸ Erreur dÃ©sÃ©lection: {e}")
         return 0
 def enhance_summary_with_ai(document, entities, basic_summary):
     """
-    Utilise l'IA pour enrichir le résumé généré automatiquement
+    Utilise l'IA pour enrichir le rÃ©sumÃ© gÃ©nÃ©rÃ© automatiquement
     """
     try:
         from rawdocs.groq_annotation_system import GroqAnnotator
@@ -3519,25 +3591,25 @@ def enhance_summary_with_ai(document, entities, basic_summary):
                 entities_text += f"- {entity_type}: {', '.join(values[:3])}\n"
 
         prompt = f"""
-Améliore ce résumé pharmaceutique en ajoutant du contexte et des détails pertinents basés sur les entités extraites.
+AmÃ©liore ce rÃ©sumÃ© pharmaceutique en ajoutant du contexte et des dÃ©tails pertinents basÃ©s sur les entitÃ©s extraites.
 
 Document: {document.title}
 Type: {getattr(document, 'doc_type', 'Pharmaceutique')}
 
-Résumé de base:
+RÃ©sumÃ© de base:
 {basic_summary}
 
-Entités identifiées:
+EntitÃ©s identifiÃ©es:
 {entities_text}
 
 Instructions:
-1. Garde toutes les informations du résumé original
-2. Ajoute des connexions logiques entre les entités
+1. Garde toutes les informations du rÃ©sumÃ© original
+2. Ajoute des connexions logiques entre les entitÃ©s
 3. Enrichis avec du contexte pharmaceutique pertinent
-4. Maintiens un ton professionnel et précis
+4. Maintiens un ton professionnel et prÃ©cis
 5. Maximum 300 mots
 
-Résumé enrichi:"""
+RÃ©sumÃ© enrichi:"""
 
         response = groq_annotator.complete_text(prompt, max_tokens=800)
 
@@ -3547,18 +3619,18 @@ Résumé enrichi:"""
         return basic_summary
 
     except Exception as e:
-        print(f"⚠️ Erreur enrichissement résumé: {e}")
+        print(f"âš ï¸ Erreur enrichissement rÃ©sumÃ©: {e}")
         return basic_summary
 
 
 # ===== FONCTION DE NETTOYAGE POUR LA MAINTENANCE =====
 
 def cleanup_regeneration_cache():
-    """Nettoie le cache des régénérations (à appeler périodiquement)"""
+    """Nettoie le cache des rÃ©gÃ©nÃ©rations (Ã  appeler pÃ©riodiquement)"""
     import time
     current_time = time.time()
 
-    # Supprimer les entrées anciennes
+    # Supprimer les entrÃ©es anciennes
     expired_keys = [
         doc_id for doc_id, timestamp in REGENERATION_CACHE.items()
         if current_time - timestamp > CACHE_DURATION * 2
@@ -3568,13 +3640,13 @@ def cleanup_regeneration_cache():
         del REGENERATION_CACHE[key]
 
     if expired_keys:
-        print(f"🧹 Cache régénération nettoyé: {len(expired_keys)} entrées supprimées")
+        print(f"ðŸ§¹ Cache rÃ©gÃ©nÃ©ration nettoyÃ©: {len(expired_keys)} entrÃ©es supprimÃ©es")
 
 
-# ===== DÉCORATEUR POUR EVITER LES APPELS TROP FREQUENTS =====
+# ===== DÃ‰CORATEUR POUR EVITER LES APPELS TROP FREQUENTS =====
 
 def with_regeneration_throttle(delay_seconds=5):
-    """Décorateur pour limiter la fréquence des régénérations"""
+    """DÃ©corateur pour limiter la frÃ©quence des rÃ©gÃ©nÃ©rations"""
 
     def decorator(func):
         def wrapper(document, user, *args, **kwargs):
@@ -3592,7 +3664,7 @@ def with_regeneration_throttle(delay_seconds=5):
 
                 return True
             else:
-                print(f"⏰ Fonction {func.__name__} throttlée pour doc {document.id}")
+                print(f"â° Fonction {func.__name__} throttlÃ©e pour doc {document.id}")
                 return False
 
         return wrapper
@@ -3600,7 +3672,7 @@ def with_regeneration_throttle(delay_seconds=5):
     return decorator
 
 
-# Usage avec le décorateur:
+# Usage avec le dÃ©corateur:
 # @with_regeneration_throttle(delay_seconds=3)
 # def my_regeneration_function(document, user):
 #     # votre code ici
@@ -3610,7 +3682,7 @@ def with_regeneration_throttle(delay_seconds=5):
 @csrf_exempt
 def expert_ai_annotate_page_groq(request, page_id):
     """
-    Version corrigée qui gère les erreurs API et le nouveau format de retour GROQ
+    Version corrigÃ©e qui gÃ¨re les erreurs API et le nouveau format de retour GROQ
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -3625,17 +3697,17 @@ def expert_ai_annotate_page_groq(request, page_id):
                 'error': "Aucun texte exploitable sur la page."
             }, status=400)
 
-        # Vérification de l'API GROQ
+        # VÃ©rification de l'API GROQ
         try:
             from rawdocs.groq_annotation_system import GroqAnnotator
             groq_annotator = GroqAnnotator()
 
-            # Vérifier si GROQ est disponible
+            # VÃ©rifier si GROQ est disponible
             if not groq_annotator.enabled:
                 return JsonResponse({
                     'success': False,
-                    'error': "API GROQ non configurée ou clé invalide (erreur 401)",
-                    'message': "Veuillez vérifier votre clé API GROQ dans les paramètres.",
+                    'error': "API GROQ non configurÃ©e ou clÃ© invalide (erreur 401)",
+                    'message': "Veuillez vÃ©rifier votre clÃ© API GROQ dans les paramÃ¨tres.",
                     'fallback_available': True
                 })
 
@@ -3657,23 +3729,23 @@ def expert_ai_annotate_page_groq(request, page_id):
             # CORRECTION : La nouvelle version retourne seulement une liste
             raw_annotations = groq_annotator.annotate_page_with_groq(page_data)
 
-            # Récupérer le schéma depuis l'attribut last_schema
+            # RÃ©cupÃ©rer le schÃ©ma depuis l'attribut last_schema
             annotation_schema = getattr(groq_annotator, 'last_schema', [])
 
             if not isinstance(raw_annotations, list):
                 raise Exception(f"Format de retour GROQ inattendu: {type(raw_annotations)}")
 
-            print(f"✅ GROQ retour: {len(raw_annotations)} annotations, {len(annotation_schema)} types")
+            print(f"âœ… GROQ retour: {len(raw_annotations)} annotations, {len(annotation_schema)} types")
 
         except Exception as e:
             error_msg = str(e)
-            print(f"❌ Erreur appel GROQ: {error_msg}")
+            print(f"âŒ Erreur appel GROQ: {error_msg}")
 
             if "401" in error_msg or "invalide" in error_msg:
                 return JsonResponse({
                     'success': False,
-                    'error': "Clé API GROQ invalide ou expirée",
-                    'message': "Veuillez renouveler votre clé API GROQ.",
+                    'error': "ClÃ© API GROQ invalide ou expirÃ©e",
+                    'message': "Veuillez renouveler votre clÃ© API GROQ.",
                     'groq_status': 'unauthorized'
                 })
             else:
@@ -3698,11 +3770,11 @@ def expert_ai_annotate_page_groq(request, page_id):
             return JsonResponse({
                 'success': True,
                 'annotations': [],
-                'message': "GROQ connecté mais aucune entité détectée.",
+                'message': "GROQ connectÃ© mais aucune entitÃ© dÃ©tectÃ©e.",
                 'page_summary': getattr(page, 'annotations_summary', None)
             })
 
-        # Création des annotations
+        # CrÃ©ation des annotations
         saved = []
         for item in entities:
             try:
@@ -3712,7 +3784,7 @@ def expert_ai_annotate_page_groq(request, page_id):
                 if not etype or not etext:
                     continue
 
-                # Créer le type d'annotation
+                # CrÃ©er le type d'annotation
                 annotation_type, created = AnnotationType.objects.get_or_create(
                     name=etype,
                     defaults={
@@ -3722,11 +3794,11 @@ def expert_ai_annotate_page_groq(request, page_id):
                     }
                 )
 
-                # Positions sécurisées
+                # Positions sÃ©curisÃ©es
                 sp = max(0, int(item.get('start_pos', 0)))
                 ep = max(sp + 1, min(int(item.get('end_pos', sp + len(etext))), len(page_text)))
 
-                # Créer l'annotation
+                # CrÃ©er l'annotation
                 annotation = Annotation.objects.create(
                     page=page,
                     selected_text=etext,
@@ -3749,10 +3821,10 @@ def expert_ai_annotate_page_groq(request, page_id):
                 })
 
             except Exception as e:
-                print(f"⚠️ Erreur création annotation '{etext}': {e}")
+                print(f"âš ï¸ Erreur crÃ©ation annotation '{etext}': {e}")
                 continue
 
-        # Mise à jour JSON
+        # Mise Ã  jour JSON
         try:
             new_page_summary, _ = build_page_summary_and_json(page, request.user)
 
@@ -3780,21 +3852,21 @@ def expert_ai_annotate_page_groq(request, page_id):
             page.document.save(update_fields=['global_annotations_json'])
 
         except Exception as e:
-            print(f"⚠️ Erreur mise à jour JSON: {e}")
+            print(f"âš ï¸ Erreur mise Ã  jour JSON: {e}")
 
         return JsonResponse({
             'success': True,
             'annotations': saved,
-            'message': f"{len(saved)} annotation(s) créée(s) par GROQ",
+            'message': f"{len(saved)} annotation(s) crÃ©Ã©e(s) par GROQ",
             'page_summary': getattr(page, 'annotations_summary', ''),
             'groq_status': 'success'
         })
 
     except Exception as e:
-        print(f"❌ Erreur critique: {e}")
+        print(f"âŒ Erreur critique: {e}")
         return JsonResponse({
             'success': False,
-            'error': f"Erreur système: {str(e)}",
+            'error': f"Erreur systÃ¨me: {str(e)}",
             'fallback_available': True
         }, status=500)
 
@@ -3802,8 +3874,8 @@ def expert_ai_annotate_page_groq(request, page_id):
 @csrf_exempt
 def expert_save_manual_annotation(request):
     """
-    Création d'une annotation manuelle (pré-validée) + MAJ JSON page/doc + régénération automatique
-    du résumé de la page + retour du nouveau résumé.
+    CrÃ©ation d'une annotation manuelle (prÃ©-validÃ©e) + MAJ JSON page/doc + rÃ©gÃ©nÃ©ration automatique
+    du rÃ©sumÃ© de la page + retour du nouveau rÃ©sumÃ©.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -3875,19 +3947,19 @@ def expert_save_manual_annotation(request):
             page.document.global_annotations_json = document_json
             page.document.save(update_fields=['global_annotations_json'])
 
-            # résumé global (asynchrone / throttlé)
+            # rÃ©sumÃ© global (asynchrone / throttlÃ©)
             try:
                 trigger_summary_regeneration_safe(page.document, request.user, 3)
             except Exception as e:
-                print(f"⚠️ Erreur déclenchement régénération document (manual): {e}")
+                print(f"âš ï¸ Erreur dÃ©clenchement rÃ©gÃ©nÃ©ration document (manual): {e}")
 
         except Exception as e:
-            print(f"❌ Erreur MAJ JSON/summary (manual): {e}")
+            print(f"âŒ Erreur MAJ JSON/summary (manual): {e}")
 
         return JsonResponse({
             'success': True,
             'annotation_id': annotation.id,
-            'message': 'Annotation sauvegardée avec succès et JSON mis à jour',
+            'message': 'Annotation sauvegardÃ©e avec succÃ¨s et JSON mis Ã  jour',
             'page_summary': page.annotations_summary,
             'auto_summary_triggered': True
         })
@@ -3898,43 +3970,89 @@ def expert_save_manual_annotation(request):
 
 @expert_required
 def expert_get_page_annotations(request, page_id):
-    """Récupération des annotations d'une page pour Expert - copie de rawdocs.views.get_page_annotations"""
+    """Récupération des annotations d'une page pour Expert - version robuste"""
     try:
-        page = get_object_or_404(DocumentPage, id=page_id)
+        # CORRECTION: Ne pas utiliser get_object_or_404 qui cause une exception
+        # Utiliser get() avec gestion manuelle du DoesNotExist
+        try:
+            page = DocumentPage.objects.get(id=page_id)
+        except DocumentPage.DoesNotExist:
+            print(f"⚠️ Page {page_id} introuvable")
+            return JsonResponse({
+                'success': False,
+                'error': f'Page {page_id} not found',
+                'annotations': []  # Retourner une liste vide pour éviter les erreurs frontend
+            }, status=404)
+
         annotations = page.annotations.filter(
             validation_status__in=['pending', 'validated', 'expert_created', 'rejected']
-        ).select_related('annotation_type').order_by('start_pos')
+        ).select_related('annotation_type', 'validated_by').order_by('start_pos')
 
         annotations_data = []
         for annotation in annotations:
-            annotations_data.append({
-                'id': annotation.id,
-                'selected_text': annotation.selected_text,  # Match the JavaScript expectation
-                'type_display': annotation.annotation_type.display_name,  # Match the JavaScript expectation
-                'type': annotation.annotation_type.name,
-                'color': annotation.annotation_type.color,  # Add the color
-                'start_pos': annotation.start_pos,
-                'end_pos': annotation.end_pos,
-                'validation_status': annotation.validation_status,
-                'created_at': annotation.created_at.isoformat() if annotation.created_at else None,
-                'validated_at': annotation.validated_at.isoformat() if annotation.validated_at else None,
-                'validated_by': annotation.validated_by.username if annotation.validated_by else None,
-            })
+            try:
+                # Gestion robuste des relations qui peuvent être None
+                annotation_type = annotation.annotation_type
+                if not annotation_type:
+                    print(f"⚠️ Annotation {annotation.id} sans annotation_type")
+                    continue
+
+                validated_by = annotation.validated_by
+                validated_by_username = validated_by.username if validated_by else None
+
+                # Gestion robuste des dates
+                created_at = None
+                if annotation.created_at:
+                    try:
+                        created_at = annotation.created_at.isoformat()
+                    except Exception as e:
+                        print(f"⚠️ Erreur sérialisation created_at pour annotation {annotation.id}: {e}")
+
+                validated_at = None
+                if annotation.validated_at:
+                    try:
+                        validated_at = annotation.validated_at.isoformat()
+                    except Exception as e:
+                        print(f"⚠️ Erreur sérialisation validated_at pour annotation {annotation.id}: {e}")
+
+                annotations_data.append({
+                    'id': annotation.id,
+                    'selected_text': annotation.selected_text or '',
+                    'type_display': annotation_type.display_name or annotation_type.name or 'Unknown',
+                    'type': annotation_type.name or 'unknown',
+                    'color': getattr(annotation_type, 'color', '#666666'),
+                    'start_pos': annotation.start_pos or 0,
+                    'end_pos': annotation.end_pos or 0,
+                    'validation_status': annotation.validation_status or 'pending',
+                    'created_at': created_at,
+                    'validated_at': validated_at,
+                    'validated_by': validated_by_username,
+                })
+
+            except Exception as e:
+                print(f"⚠️ Erreur traitement annotation {annotation.id}: {e}")
+                # Continuer avec les autres annotations au lieu de faire planter la requête
+                continue
 
         return JsonResponse({
             'success': True,
-            'annotations': annotations_data
+            'annotations': annotations_data,
+            'total_count': len(annotations_data)
         })
 
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
+        print(f"❌ Erreur critique expert_get_page_annotations page {page_id}: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Erreur serveur: {str(e)}',
+            'annotations': []  # Toujours retourner une structure cohérente
+        }, status=500)
 
 @expert_required
 @csrf_exempt
 def expert_delete_annotation(request, annotation_id):
     """
-    Suppression d'annotation + MAJ JSON page/doc + régénération résumé page + retour résumé.
+    Suppression d'annotation + MAJ JSON page/doc + rÃ©gÃ©nÃ©ration rÃ©sumÃ© page + retour rÃ©sumÃ©.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -3976,13 +4094,13 @@ def expert_delete_annotation(request, annotation_id):
             try:
                 trigger_summary_regeneration_safe(document, request.user, 3)
             except Exception as e:
-                print(f"⚠️ Erreur déclenchement régénération après suppression: {e}")
+                print(f"âš ï¸ Erreur dÃ©clenchement rÃ©gÃ©nÃ©ration aprÃ¨s suppression: {e}")
 
         except Exception as e:
-            print(f"❌ Erreur MAJ JSON/summary (delete): {e}")
+            print(f"âŒ Erreur MAJ JSON/summary (delete): {e}")
             new_page_summary = None
 
-        return JsonResponse({'success': True, 'message': 'Annotation supprimée', 'page_summary': new_page_summary})
+        return JsonResponse({'success': True, 'message': 'Annotation supprimÃ©e', 'page_summary': new_page_summary})
 
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
@@ -4020,7 +4138,7 @@ def expert_validate_page_annotations(request, page_id):
         return JsonResponse({
             'success': True,
             'validated_count': validated_count,
-            'message': f'{validated_count} annotations validées'
+            'message': f'{validated_count} annotations validÃ©es'
         })
 
     except Exception as e:
@@ -4037,7 +4155,7 @@ def expert_generate_page_annotation_summary(request, page_id):
         page = get_object_or_404(DocumentPage, id=page_id)
         summary, entities_map = build_page_summary_and_json(page, request.user)
 
-        # (optionnel) mettre aussi à jour le JSON global du document pour rester cohérent
+        # (optionnel) mettre aussi Ã  jour le JSON global du document pour rester cohÃ©rent
         from rawdocs.views import _build_entities_map
         all_doc_anns = (
             Annotation.objects
@@ -4072,14 +4190,14 @@ def expert_generate_page_annotation_summary(request, page_id):
 @expert_required
 @csrf_exempt
 def expert_generate_document_annotation_summary(request, doc_id):
-    """Génération du JSON et résumé global pour un document - Expert - copie de rawdocs.views.generate_document_annotation_summary"""
+    """GÃ©nÃ©ration du JSON et rÃ©sumÃ© global pour un document - Expert - copie de rawdocs.views.generate_document_annotation_summary"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
     try:
         document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
 
-        # Récupérer toutes les annotations du document
+        # RÃ©cupÃ©rer toutes les annotations du document
         all_annotations = Annotation.objects.filter(
             page__document=document
         ).select_related('annotation_type', 'page').order_by('page__page_number', 'start_pos')
@@ -4102,7 +4220,7 @@ def expert_generate_document_annotation_summary(request, doc_id):
             'generated_at': datetime.utcnow().isoformat() + 'Z',
         }
 
-        # Résumé à partir des seules entités/valeurs
+        # RÃ©sumÃ© Ã  partir des seules entitÃ©s/valeurs
         summary = generate_entities_based_document_summary(
             entities=entities,
             doc_title=document.title,
@@ -4121,21 +4239,21 @@ def expert_generate_document_annotation_summary(request, doc_id):
             'success': True,
             'document_json': document_json,
             'summary': summary,
-            'message': f'JSON et résumé globaux générés pour le document'
+            'message': f'JSON et rÃ©sumÃ© globaux gÃ©nÃ©rÃ©s pour le document'
         })
     except Exception as e:
-        print(f"❌ Erreur génération résumé document {doc_id}: {e}")
-        return JsonResponse({'error': f'Erreur lors de la génération: {str(e)}'}, status=500)
+        print(f"âŒ Erreur gÃ©nÃ©ration rÃ©sumÃ© document {doc_id}: {e}")
+        return JsonResponse({'error': f'Erreur lors de la gÃ©nÃ©ration: {str(e)}'}, status=500)
 
 
 @expert_required
 def expert_view_page_annotation_json(request, page_id):
-    """Visualisation du JSON et résumé d'une page - Expert avec navigation"""
+    """Visualisation du JSON et rÃ©sumÃ© d'une page - Expert avec navigation"""
     try:
         page = get_object_or_404(DocumentPage, id=page_id)
         document = page.document
 
-        # Si pas encore généré, le générer
+        # Si pas encore gÃ©nÃ©rÃ©, le gÃ©nÃ©rer
         if not hasattr(page, 'annotations_json') or not page.annotations_json:
             from django.test import RequestFactory
             factory = RequestFactory()
@@ -4169,21 +4287,21 @@ def expert_view_page_annotation_json(request, page_id):
 
 @expert_required
 def expert_view_document_annotation_json(request, doc_id):
-    """Visualisation et édition du JSON et résumé global d'un document - Expert avec analyse réglementaire"""
+    """Visualisation et Ã©dition du JSON et rÃ©sumÃ© global d'un document - Expert avec analyse rÃ©glementaire"""
     try:
         document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
 
         if request.method == 'POST' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            # Mode édition AJAX
+            # Mode Ã©dition AJAX
             try:
                 data = json.loads(request.body)
                 action = data.get('action', '')
 
                 if action == 'save_summary':
-                    # Déléguer à la fonction existante
+                    # DÃ©lÃ©guer Ã  la fonction existante
                     return save_summary_changes(request, doc_id)
                 elif action == 'save_json':
-                    # Déléguer à la fonction existante
+                    # DÃ©lÃ©guer Ã  la fonction existante
                     return save_document_json(request, doc_id)
                 else:
                     return JsonResponse({'error': 'Action non reconnue'}, status=400)
@@ -4191,9 +4309,9 @@ def expert_view_document_annotation_json(request, doc_id):
                 return JsonResponse({'error': str(e)}, status=500)
 
         # Mode affichage GET
-        # Si pas encore généré, le générer
+        # Si pas encore gÃ©nÃ©rÃ©, le gÃ©nÃ©rer
         if not hasattr(document, 'global_annotations_json') or not document.global_annotations_json:
-            # Déclencher la génération
+            # DÃ©clencher la gÃ©nÃ©ration
             from django.test import RequestFactory
             factory = RequestFactory()
             fake_request = factory.post(f'/expert/annotation/document/{doc_id}/generate-summary/')
@@ -4201,7 +4319,7 @@ def expert_view_document_annotation_json(request, doc_id):
             expert_generate_document_annotation_summary(fake_request, doc_id)
             document.refresh_from_db()
 
-        # Enrichir le contexte pour l'édition
+        # Enrichir le contexte pour l'Ã©dition
         document_json = document.global_annotations_json if hasattr(document, 'global_annotations_json') else {}
         allowed_entity_types = list(document_json.get('entities', {}).keys())
         document_summary = document.global_annotations_summary if hasattr(document, 'global_annotations_summary') else ""
@@ -4240,7 +4358,7 @@ def expert_view_document_annotation_json(request, doc_id):
             'annotated_pages': annotated_pages,
             'total_pages': document.total_pages,
             'allowed_entity_types': allowed_entity_types,
-            'can_edit': True,  # Activer l'interface d'édition
+            'can_edit': True,  # Activer l'interface d'Ã©dition
             'last_updated': document_json.get('last_updated'),
             'last_updated_by': document_json.get('last_updated_by'),
             # Regulatory analysis data
@@ -4441,11 +4559,11 @@ def generate_regulatory_analysis(request, doc_id):
         }, status=500)
 
 
-# Fonctions pour la gestion des résumés de page
+# Fonctions pour la gestion des rÃ©sumÃ©s de page
 # @expert_required
 # @csrf_exempt
 # def save_page_summary(request, page_id):
-#     """Sauvegarde du résumé d'une page"""
+#     """Sauvegarde du rÃ©sumÃ© d'une page"""
 #     if request.method != 'POST':
 #         return JsonResponse({'error': 'POST required'}, status=405)
 #     try:
@@ -4454,12 +4572,12 @@ def generate_regulatory_analysis(request, doc_id):
 #         summary_text = data.get('summary_text', '').strip()
 #
 #         page.page_summary = summary_text
-#         page.summary_validated = False  # Réinitialiser la validation
+#         page.summary_validated = False  # RÃ©initialiser la validation
 #         page.summary_validated_at = None
 #         page.summary_validated_by = None
 #         page.save(update_fields=['page_summary', 'summary_validated', 'summary_validated_at', 'summary_validated_by'])
 #
-#         return JsonResponse({'success': True, 'message': 'Résumé sauvegardé'})
+#         return JsonResponse({'success': True, 'message': 'RÃ©sumÃ© sauvegardÃ©'})
 #     except Exception as e:
 #         return JsonResponse({'error': str(e)}, status=500)
 
@@ -4472,7 +4590,7 @@ def generate_regulatory_analysis(request, doc_id):
 @csrf_exempt
 def save_page_summary(request, page_id):
     """
-    Version améliorée qui utilise le JSON de page existant pour une synchronisation intelligente.
+    Version amÃ©liorÃ©e qui utilise le JSON de page existant pour une synchronisation intelligente.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -4486,9 +4604,9 @@ def save_page_summary(request, page_id):
         auto_delete = data.get('auto_delete', True)
 
         if not new_summary:
-            return JsonResponse({'error': 'Résumé vide'}, status=400)
+            return JsonResponse({'error': 'RÃ©sumÃ© vide'}, status=400)
 
-        # Sauvegarder l'ancien résumé pour comparaison
+        # Sauvegarder l'ancien rÃ©sumÃ© pour comparaison
         old_summary = page.annotations_summary or ""
 
         # UTILISER LA NOUVELLE FONCTION DE SYNCHRONISATION INTELLIGENTE
@@ -4508,7 +4626,7 @@ def save_page_summary(request, page_id):
                 'details': {}
             }
 
-        # Sauvegarder le nouveau résumé
+        # Sauvegarder le nouveau rÃ©sumÃ©
         page.annotations_summary = new_summary
         page.annotations_summary_generated_at = timezone.now()
         page.save(update_fields=['annotations_summary', 'annotations_summary_generated_at'])
@@ -4518,7 +4636,7 @@ def save_page_summary(request, page_id):
 
         response_data = {
             'success': True,
-            'message': f'Synchronisation intelligente réussie : {sync_result["annotations_created"]} créées, {sync_result["annotations_deleted"] + sync_result["annotations_rejected"]} supprimées',
+            'message': f'Synchronisation intelligente rÃ©ussie : {sync_result["annotations_created"]} crÃ©Ã©es, {sync_result["annotations_deleted"] + sync_result["annotations_rejected"]} supprimÃ©es',
             'summary': new_summary,
             'sync_result': sync_result
         }
@@ -4534,10 +4652,10 @@ def save_page_summary(request, page_id):
 from typing import Dict, List, Iterable
 
 def _normalize(s: str) -> str:
-    return (s or "").strip().strip('.,;:·').lower()
+    return (s or "").strip().strip('.,;:Â·').lower()
 
 def _normalize_entities(entities: Dict[str, Iterable[str]]) -> Dict[str, List[str]]:
-    """Nettoie, déduplique et retire les valeurs vides."""
+    """Nettoie, dÃ©duplique et retire les valeurs vides."""
     cleaned: Dict[str, List[str]] = {}
     for etype, vals in (entities or {}).items():
         seen = set()
@@ -4562,16 +4680,16 @@ def enhance_entities_with_ai(
     groq_annotator=None,
 ) -> Dict[str, List[str]]:
     """
-    Enrichit/valide les entités détectées.
-    - Si un GroqAnnotator est fourni et expose une méthode utile, on l’utilise.
-    - Sinon, fallback : normalisation + dédoublonnage + filtrage trivial par présence dans le texte.
-    Retourne le même schéma {entity_type: [values...]}.
+    Enrichit/valide les entitÃ©s dÃ©tectÃ©es.
+    - Si un GroqAnnotator est fourni et expose une mÃ©thode utile, on lâ€™utilise.
+    - Sinon, fallback : normalisation + dÃ©doublonnage + filtrage trivial par prÃ©sence dans le texte.
+    Retourne le mÃªme schÃ©ma {entity_type: [values...]}.
     """
-    # Fallback immédiat si rien à faire
+    # Fallback immÃ©diat si rien Ã  faire
     if not entities:
         return {}
 
-    # Tentatives d’utilisation de l’annotateur si présent
+    # Tentatives dâ€™utilisation de lâ€™annotateur si prÃ©sent
     try:
         if groq_annotator:
             # On accepte plusieurs conventions possibles pour rester robuste
@@ -4592,13 +4710,13 @@ def enhance_entities_with_ai(
         # On ignore proprement et on passe au fallback
         pass
 
-    # Fallback simple : on garde les valeurs présentes dans le texte (quand possible)
+    # Fallback simple : on garde les valeurs prÃ©sentes dans le texte (quand possible)
     text_lc = (page_text or "").lower()
     filtered: Dict[str, List[str]] = {}
     for etype, vals in _normalize_entities(entities).items():
         keep: List[str] = []
         for v in vals:
-            # très permissif : gardé si valeur ou version normalisée est dans le texte
+            # trÃ¨s permissif : gardÃ© si valeur ou version normalisÃ©e est dans le texte
             vn = _normalize(v)
             if not text_lc or (vn and vn in text_lc) or (v and v.lower() in text_lc):
                 keep.append(v)
@@ -4607,7 +4725,7 @@ def enhance_entities_with_ai(
     return filtered
 
 
-# 2) Création d’annotation -------------------------------------------
+# 2) CrÃ©ation dâ€™annotation -------------------------------------------
 
 def create_page_annotation_from_entity(
     page,
@@ -4616,21 +4734,21 @@ def create_page_annotation_from_entity(
     user,
 ):
     """
-    Crée l’annotation (si elle n’existe pas déjà, insensible à la casse).
-    Retourne l’instance créée, ou None si un doublon existait déjà.
+    CrÃ©e lâ€™annotation (si elle nâ€™existe pas dÃ©jÃ , insensible Ã  la casse).
+    Retourne lâ€™instance crÃ©Ã©e, ou None si un doublon existait dÃ©jÃ .
 
-    Hypothèses Django courantes :
-    - Modèle PageAnnotation avec champs : page, entity_type, entity_value, created_by
+    HypothÃ¨ses Django courantes :
+    - ModÃ¨le PageAnnotation avec champs : page, entity_type, entity_value, created_by
     - Adapte les noms de champs au besoin.
     """
-    # Normalisation pour éviter les doublons
+    # Normalisation pour Ã©viter les doublons
     norm_value = _normalize(entity_value)
 
-    # --- Variante modèle Django (recommandée) ---
+    # --- Variante modÃ¨le Django (recommandÃ©e) ---
     try:
         from rawdocs.models import PageAnnotation  # adapte le chemin si besoin
 
-        # Existence (insensible à la casse)
+        # Existence (insensible Ã  la casse)
         exists = PageAnnotation.objects.filter(
             page=page,
             entity_type=entity_type,
@@ -4647,8 +4765,8 @@ def create_page_annotation_from_entity(
         )
         return ann
     except Exception:
-        # --- Fallback très simple si tu n’utilises pas Django ---
-        # On essaie d'utiliser un conteneur en mémoire sur l'objet page.
+        # --- Fallback trÃ¨s simple si tu nâ€™utilises pas Django ---
+        # On essaie d'utiliser un conteneur en mÃ©moire sur l'objet page.
         # Remplace ceci par ta logique de persistance maison.
         if not hasattr(page, "_tmp_annotations"):
             page._tmp_annotations = []  # type: ignore[attr-defined]
@@ -4668,7 +4786,7 @@ def create_page_annotation_from_entity(
 
 def validate_ai_analysis(analysis, existing_entities, page_text):
     """
-    Valide et filtre les résultats de l'analyse IA pour éviter les erreurs.
+    Valide et filtre les rÃ©sultats de l'analyse IA pour Ã©viter les erreurs.
     """
     validated = {
         'entities_to_add': {},
@@ -4691,10 +4809,10 @@ def validate_ai_analysis(analysis, existing_entities, page_text):
                 value = str(value_data)
                 confidence = 0.7
 
-            # Vérifier que l'entité n'existe pas déjà
+            # VÃ©rifier que l'entitÃ© n'existe pas dÃ©jÃ
             existing_values = existing_entities.get(entity_type, [])
             if value.lower() not in [v.lower() for v in existing_values]:
-                # Vérifier présence dans le texte (pour les entités non-date)
+                # VÃ©rifier prÃ©sence dans le texte (pour les entitÃ©s non-date)
                 if 'date' not in entity_type.lower() or value.lower() in page_text_lower or confidence > 0.9:
                     validated_values.append(value_data)
 
@@ -4704,7 +4822,7 @@ def validate_ai_analysis(analysis, existing_entities, page_text):
     # Valider les suppressions
     for entity_type, values in analysis.get('entities_to_remove', {}).items():
         if entity_type in existing_entities:
-            # Ne supprimer que les entités qui existent réellement
+            # Ne supprimer que les entitÃ©s qui existent rÃ©ellement
             validated_values = []
             existing_values = [v.lower() for v in existing_entities[entity_type]]
             for value in values:
@@ -4721,7 +4839,7 @@ def validate_ai_analysis(analysis, existing_entities, page_text):
             old_value = mod.get('old_value', '')
             new_value = mod.get('new_value', '')
 
-            # Vérifier que l'ancienne valeur existe
+            # VÃ©rifier que l'ancienne valeur existe
             if entity_type in existing_entities:
                 existing_values = [v.lower() for v in existing_entities[entity_type]]
                 if old_value.lower() in existing_values and old_value != new_value:
@@ -4774,7 +4892,7 @@ def _fallback_analysis(old_summary, new_summary, existing_entities):
         }
 
     except Exception as e:
-        print(f"⚠️ Erreur analyse fallback: {e}")
+        print(f"âš ï¸ Erreur analyse fallback: {e}")
         return {
             'entities_to_add': {},
             'entities_to_remove': {},
@@ -4786,7 +4904,7 @@ def _fallback_analysis(old_summary, new_summary, existing_entities):
 
 def analyze_summary_changes_with_ai(page, old_summary, new_summary, existing_entities, page_text):
     """
-    Utilise l'IA pour analyser intelligemment les changements dans le résumé
+    Utilise l'IA pour analyser intelligemment les changements dans le rÃ©sumÃ©
     en prenant en compte le contexte du JSON existant et du texte de la page.
     """
     try:
@@ -4805,32 +4923,32 @@ def analyze_summary_changes_with_ai(page, old_summary, new_summary, existing_ent
             'page_text_preview': page_text[:1000] if page_text else ''  # Limiter pour le prompt
         }
 
-        prompt = f"""Tu es un expert en analyse documentaire pharmaceutique. Analyse les changements dans le résumé d'une page en tenant compte du contexte existant.
+        prompt = f"""Tu es un expert en analyse documentaire pharmaceutique. Analyse les changements dans le rÃ©sumÃ© d'une page en tenant compte du contexte existant.
 
 CONTEXTE:
 - Document: {context_data['document_title']}
 - Page: {context_data['page_number']}
 
-ENTITÉS EXISTANTES (JSON actuel):
+ENTITÃ‰S EXISTANTES (JSON actuel):
 {json.dumps(existing_entities, ensure_ascii=False, indent=2)}
 
-ANCIEN RÉSUMÉ:
+ANCIEN RÃ‰SUMÃ‰:
 {context_data['old_summary']}
 
-NOUVEAU RÉSUMÉ:
+NOUVEAU RÃ‰SUMÃ‰:
 {context_data['new_summary']}
 
-EXTRAIT DU TEXTE DE PAGE (pour référence):
+EXTRAIT DU TEXTE DE PAGE (pour rÃ©fÃ©rence):
 {context_data['page_text_preview']}
 
 INSTRUCTIONS:
-1. Identifie les entités qui doivent être AJOUTÉES (nouvelles dans le résumé)
-2. Identifie les entités qui doivent être SUPPRIMÉES (retirées du résumé)
-3. Identifie les entités MODIFIÉES (changement de valeur)
-4. Pour chaque entité, évalue si elle existe réellement dans le texte de la page
+1. Identifie les entitÃ©s qui doivent Ãªtre AJOUTÃ‰ES (nouvelles dans le rÃ©sumÃ©)
+2. Identifie les entitÃ©s qui doivent Ãªtre SUPPRIMÃ‰ES (retirÃ©es du rÃ©sumÃ©)
+3. Identifie les entitÃ©s MODIFIÃ‰ES (changement de valeur)
+4. Pour chaque entitÃ©, Ã©value si elle existe rÃ©ellement dans le texte de la page
 5. Donne un niveau de confiance (0.0-1.0) pour chaque action
 
-TYPES D'ENTITÉS PHARMACEUTIQUES À CONSIDÉRER:
+TYPES D'ENTITÃ‰S PHARMACEUTIQUES Ã€ CONSIDÃ‰RER:
 - Product/Invented Name
 - Strength/Dosage  
 - Pharmaceutical Form
@@ -4840,15 +4958,15 @@ TYPES D'ENTITÉS PHARMACEUTIQUES À CONSIDÉRER:
 - Manufacturing Site
 - Active Ingredient
 
-Réponds UNIQUEMENT en JSON strict:
+RÃ©ponds UNIQUEMENT en JSON strict:
 {{
   "entities_to_add": {{
     "<EntityType>": [
       {{
-        "value": "texte exact à annoter",
+        "value": "texte exact Ã  annoter",
         "confidence": 0.9,
-        "context": "contexte où apparaît l'entité",
-        "reasoning": "pourquoi cette entité doit être ajoutée"
+        "context": "contexte oÃ¹ apparaÃ®t l'entitÃ©",
+        "reasoning": "pourquoi cette entitÃ© doit Ãªtre ajoutÃ©e"
       }}
     ]
   }},
@@ -4866,10 +4984,10 @@ Réponds UNIQUEMENT en JSON strict:
     ]
   }},
   "removal_confidence": 0.8,
-  "analysis_summary": "Résumé de l'analyse des changements"
+  "analysis_summary": "RÃ©sumÃ© de l'analyse des changements"
 }}"""
 
-        # Appel à l'IA
+        # Appel Ã  l'IA
         raw_response = groq_annotator.complete_text(
             prompt=prompt,
             max_tokens=1500,
@@ -4878,7 +4996,7 @@ Réponds UNIQUEMENT en JSON strict:
 
         if raw_response:
             try:
-                # Nettoyer la réponse
+                # Nettoyer la rÃ©ponse
                 clean_response = raw_response.strip()
                 if clean_response.startswith('```'):
                     clean_response = clean_response.split('\n', 1)[1]
@@ -4887,32 +5005,32 @@ Réponds UNIQUEMENT en JSON strict:
 
                 analysis = json.loads(clean_response)
 
-                # Validation et nettoyage des résultats
+                # Validation et nettoyage des rÃ©sultats
                 validated_analysis = validate_ai_analysis(analysis, existing_entities, page_text)
 
                 return validated_analysis
 
             except json.JSONDecodeError as e:
-                print(f"⚠️ Erreur parsing réponse IA: {e}")
+                print(f"âš ï¸ Erreur parsing rÃ©ponse IA: {e}")
                 return _fallback_analysis(old_summary, new_summary, existing_entities)
         else:
             return _fallback_analysis(old_summary, new_summary, existing_entities)
 
     except Exception as e:
-        print(f"⚠️ Erreur analyse IA: {e}")
+        print(f"âš ï¸ Erreur analyse IA: {e}")
         return _fallback_analysis(old_summary, new_summary, existing_entities)
 
 
 def create_page_annotation_with_smart_positioning(page, entity_type, entity_value, user, confidence=0.8, context='',
                                                   existing_json=None):
     """
-    Crée une annotation avec positionnement intelligent basé sur le contexte existant
-    et recherche optimisée dans le texte.
+    CrÃ©e une annotation avec positionnement intelligent basÃ© sur le contexte existant
+    et recherche optimisÃ©e dans le texte.
     """
     try:
         page_text = _get_page_text(page)
         if not page_text:
-            print(f"⚠️ Pas de texte disponible pour la page {page.page_number}")
+            print(f"âš ï¸ Pas de texte disponible pour la page {page.page_number}")
             return False
 
         # Recherche intelligente de position
@@ -4925,10 +5043,10 @@ def create_page_annotation_with_smart_positioning(page, entity_type, entity_valu
         )
 
         if start_pos == -1:
-            print(f"⚠️ Entité '{entity_value}' non trouvée dans le texte de la page {page.page_number}")
+            print(f"âš ï¸ EntitÃ© '{entity_value}' non trouvÃ©e dans le texte de la page {page.page_number}")
             return False
 
-        # Créer le type d'annotation
+        # CrÃ©er le type d'annotation
         annotation_type, _ = AnnotationType.objects.get_or_create(
             name=entity_type,
             defaults={
@@ -4938,7 +5056,7 @@ def create_page_annotation_with_smart_positioning(page, entity_type, entity_valu
             }
         )
 
-        # Vérifier les doublons
+        # VÃ©rifier les doublons
         existing = Annotation.objects.filter(
             page=page,
             annotation_type=annotation_type,
@@ -4948,10 +5066,10 @@ def create_page_annotation_with_smart_positioning(page, entity_type, entity_valu
         ).first()
 
         if existing:
-            print(f"ℹ️ Annotation similaire déjà existante: {existing.selected_text}")
+            print(f"â„¹ï¸ Annotation similaire dÃ©jÃ  existante: {existing.selected_text}")
             return False
 
-        # Créer l'annotation
+        # CrÃ©er l'annotation
         annotation = Annotation.objects.create(
             page=page,
             selected_text=actual_text,
@@ -4966,17 +5084,17 @@ def create_page_annotation_with_smart_positioning(page, entity_type, entity_valu
             confidence_score=confidence
         )
 
-        print(f"✅ Annotation intelligente créée: '{actual_text}' ({entity_type}) page {page.page_number}")
+        print(f"âœ… Annotation intelligente crÃ©Ã©e: '{actual_text}' ({entity_type}) page {page.page_number}")
         return True
 
     except Exception as e:
-        print(f"⚠️ Erreur création annotation intelligente: {e}")
+        print(f"âš ï¸ Erreur crÃ©ation annotation intelligente: {e}")
         return False
 
 
 def find_entity_in_text_enhanced(entity_text, page_text, entity_type='', existing_annotations=None, context_hint=''):
     """
-    Version améliorée de la recherche d'entité qui utilise le contexte du JSON existant.
+    Version amÃ©liorÃ©e de la recherche d'entitÃ© qui utilise le contexte du JSON existant.
     """
     if not entity_text or not page_text:
         return -1, -1, entity_text
@@ -5003,19 +5121,19 @@ def find_entity_in_text_enhanced(entity_text, page_text, entity_type='', existin
 
 def _find_entity_using_annotation_context(entity_text, page_text, existing_annotations):
     """
-    Utilise le contexte des annotations existantes pour améliorer la recherche.
+    Utilise le contexte des annotations existantes pour amÃ©liorer la recherche.
     """
     try:
         existing_entities = existing_annotations.get('entities', {})
         page_text_lower = page_text.lower()
         entity_lower = entity_text.lower()
 
-        # Chercher des entités similaires ou liées
+        # Chercher des entitÃ©s similaires ou liÃ©es
         for entity_type, values in existing_entities.items():
             for value in values:
                 value_pos = page_text_lower.find(value.lower())
                 if value_pos != -1:
-                    # Chercher l'entité cible dans un rayon autour de cette annotation
+                    # Chercher l'entitÃ© cible dans un rayon autour de cette annotation
                     search_start = max(0, value_pos - 200)
                     search_end = min(len(page_text), value_pos + len(value) + 200)
                     context_text = page_text[search_start:search_end]
@@ -5030,13 +5148,13 @@ def _find_entity_using_annotation_context(entity_text, page_text, existing_annot
         return -1, -1, entity_text
 
     except Exception as e:
-        print(f"⚠️ Erreur recherche avec contexte annotations: {e}")
+        print(f"âš ï¸ Erreur recherche avec contexte annotations: {e}")
         return -1, -1, entity_text
 
 
 def _find_entity_using_context_hint(entity_text, page_text, context_hint):
     """
-    Utilise l'indice de contexte fourni par l'IA pour localiser l'entité.
+    Utilise l'indice de contexte fourni par l'IA pour localiser l'entitÃ©.
     """
     try:
         page_text_lower = page_text.lower()
@@ -5046,7 +5164,7 @@ def _find_entity_using_context_hint(entity_text, page_text, context_hint):
         # Chercher le contexte d'abord
         context_pos = page_text_lower.find(context_lower)
         if context_pos != -1:
-            # Chercher l'entité près du contexte
+            # Chercher l'entitÃ© prÃ¨s du contexte
             search_start = max(0, context_pos - 100)
             search_end = min(len(page_text), context_pos + len(context_hint) + 100)
             search_area = page_text[search_start:search_end]
@@ -5061,17 +5179,17 @@ def _find_entity_using_context_hint(entity_text, page_text, context_hint):
         return -1, -1, entity_text
 
     except Exception as e:
-        print(f"⚠️ Erreur recherche avec contexte hint: {e}")
+        print(f"âš ï¸ Erreur recherche avec contexte hint: {e}")
         return -1, -1, entity_text
 
 
 def remove_page_annotations_for_entity_enhanced(page, entity_type, entity_value, user, existing_json=None,
                                                 confidence_threshold=0.8, hard_delete=False):
     """
-    Version améliorée de suppression qui prend en compte le contexte du JSON existant.
+    Version amÃ©liorÃ©e de suppression qui prend en compte le contexte du JSON existant.
     """
     try:
-        # Utiliser la fonction existante mais avec une validation supplémentaire
+        # Utiliser la fonction existante mais avec une validation supplÃ©mentaire
         result = remove_page_annotations_for_entity(
             page=page,
             entity_type=entity_type,
@@ -5080,32 +5198,32 @@ def remove_page_annotations_for_entity_enhanced(page, entity_type, entity_value,
             hard_delete=hard_delete
         )
 
-        # Validation supplémentaire basée sur le JSON existant
+        # Validation supplÃ©mentaire basÃ©e sur le JSON existant
         if existing_json and confidence_threshold > 0.7:
             existing_entities = existing_json.get('entities', {})
             if entity_type in existing_entities:
                 existing_values = [v.lower() for v in existing_entities[entity_type]]
                 if entity_value.lower() not in existing_values:
-                    print(f"ℹ️ Entité '{entity_value}' pas dans le JSON existant, suppression annulée")
-                    return {'count': 0, 'message': 'Entité non trouvée dans le JSON existant'}
+                    print(f"â„¹ï¸ EntitÃ© '{entity_value}' pas dans le JSON existant, suppression annulÃ©e")
+                    return {'count': 0, 'message': 'EntitÃ© non trouvÃ©e dans le JSON existant'}
 
         return result
 
     except Exception as e:
-        print(f"⚠️ Erreur suppression annotations améliorée: {e}")
+        print(f"âš ï¸ Erreur suppression annotations amÃ©liorÃ©e: {e}")
         return {'count': 0, 'error': str(e)}
 
 
 def synchronize_page_annotations_with_summary(page, old_summary, new_summary, user, auto_delete=True):
     """
     Synchronisation intelligente qui prend en compte le JSON de page existant
-    pour une analyse précise des modifications et une annotation automatique optimisée.
+    pour une analyse prÃ©cise des modifications et une annotation automatique optimisÃ©e.
     """
     try:
         from rawdocs.groq_annotation_system import GroqAnnotator
         from django.utils import timezone
 
-        # 1. RÉCUPÉRER LE CONTEXTE EXISTANT
+        # 1. RÃ‰CUPÃ‰RER LE CONTEXTE EXISTANT
         existing_json = getattr(page, 'annotations_json', {}) or {}
         existing_entities = existing_json.get('entities', {})
         page_text = _get_page_text(page)
@@ -5131,7 +5249,7 @@ def synchronize_page_annotations_with_summary(page, old_summary, new_summary, us
             }
         }
 
-        # 3. TRAITEMENT DES SUPPRESSIONS (basé sur l'analyse IA)
+        # 3. TRAITEMENT DES SUPPRESSIONS (basÃ© sur l'analyse IA)
         entities_to_remove = ai_analysis.get('entities_to_remove', {})
         if entities_to_remove and auto_delete:
             for entity_type, values in entities_to_remove.items():
@@ -5146,7 +5264,7 @@ def synchronize_page_annotations_with_summary(page, old_summary, new_summary, us
                     )
                     sync_result['annotations_rejected'] += result['count']
 
-        # 4. TRAITEMENT DES AJOUTS (basé sur l'analyse IA + recherche dans le texte)
+        # 4. TRAITEMENT DES AJOUTS (basÃ© sur l'analyse IA + recherche dans le texte)
         entities_to_add = ai_analysis.get('entities_to_add', {})
         if entities_to_add:
             for entity_type, values in entities_to_add.items():
@@ -5160,7 +5278,7 @@ def synchronize_page_annotations_with_summary(page, old_summary, new_summary, us
                         confidence = 0.7
                         context = ''
 
-                    # Créer l'annotation avec recherche intelligente dans le texte
+                    # CrÃ©er l'annotation avec recherche intelligente dans le texte
                     annotation_created = create_page_annotation_with_smart_positioning(
                         page=page,
                         entity_type=entity_type,
@@ -5211,25 +5329,25 @@ def synchronize_page_annotations_with_summary(page, old_summary, new_summary, us
         return sync_result
 
     except Exception as e:
-        print(f"⚠️ Erreur synchronisation intelligente: {e}")
-        # Fallback vers la méthode originale
+        print(f"âš ï¸ Erreur synchronisation intelligente: {e}")
+        # Fallback vers la mÃ©thode originale
         return synchronize_page_annotations_with_summary(page, old_summary, new_summary, user, auto_delete)
 
 
 
 def remove_page_annotations_for_entity(page, entity_type, entity_value, user, hard_delete=False):
     """
-    Supprime ou rejette les annotations d'une page qui correspondent à une entité
+    Supprime ou rejette les annotations d'une page qui correspondent Ã  une entitÃ©
 
     Args:
-        page: La page concernée
-        entity_type: Type d'entité (ex: "Product", "Date")
-        entity_value: Valeur de l'entité à rechercher
+        page: La page concernÃ©e
+        entity_type: Type d'entitÃ© (ex: "Product", "Date")
+        entity_value: Valeur de l'entitÃ© Ã  rechercher
         user: Utilisateur effectuant l'action
-        hard_delete: Si True, supprime définitivement. Si False, met en status 'rejected'
+        hard_delete: Si True, supprime dÃ©finitivement. Si False, met en status 'rejected'
 
     Returns:
-        dict avec le nombre d'annotations affectées
+        dict avec le nombre d'annotations affectÃ©es
     """
     try:
         from django.db.models import Q
@@ -5242,7 +5360,7 @@ def remove_page_annotations_for_entity(page, entity_type, entity_value, user, ha
         )
 
         if not annotation_types.exists():
-            return {'count': 0, 'message': f'Type {entity_type} non trouvé'}
+            return {'count': 0, 'message': f'Type {entity_type} non trouvÃ©'}
 
         # Rechercher les annotations sur cette page uniquement
         annotations = Annotation.objects.filter(
@@ -5265,7 +5383,7 @@ def remove_page_annotations_for_entity(page, entity_type, entity_value, user, ha
                 matching_annotations.append(ann)
                 continue
 
-            # Pour les dates, vérifier les variantes
+            # Pour les dates, vÃ©rifier les variantes
             if 'date' in entity_type.lower():
                 if are_dates_equivalent(ann.selected_text, entity_value):
                     matching_annotations.append(ann)
@@ -5273,34 +5391,34 @@ def remove_page_annotations_for_entity(page, entity_type, entity_value, user, ha
         count = 0
         for ann in matching_annotations:
             if hard_delete:
-                # Suppression définitive
+                # Suppression dÃ©finitive
                 ann_id = ann.id
                 ann.delete()
-                print(f"❌ Annotation {ann_id} supprimée (page {page.page_number})")
+                print(f"âŒ Annotation {ann_id} supprimÃ©e (page {page.page_number})")
             else:
-                # Marquer comme rejetée
+                # Marquer comme rejetÃ©e
                 ann.validation_status = 'rejected'
                 ann.validated_by = user
                 ann.validated_at = timezone.now()
                 ann.save(update_fields=['validation_status', 'validated_by', 'validated_at'])
-                print(f"⛔ Annotation {ann.id} rejetée (page {page.page_number})")
+                print(f"â›” Annotation {ann.id} rejetÃ©e (page {page.page_number})")
 
             count += 1
 
         return {
             'count': count,
-            'message': f'{count} annotation(s) {"supprimée(s)" if hard_delete else "rejetée(s)"} pour "{entity_value}"'
+            'message': f'{count} annotation(s) {"supprimÃ©e(s)" if hard_delete else "rejetÃ©e(s)"} pour "{entity_value}"'
         }
 
     except Exception as e:
-        print(f"❌ Erreur suppression annotations: {e}")
+        print(f"âŒ Erreur suppression annotations: {e}")
         return {'count': 0, 'error': str(e)}
 
 
 def extract_entities_from_summary(summary_text):
     """
-    Extrait toutes les entités d'un résumé
-    Utilise les patterns existants + détection intelligente
+    Extrait toutes les entitÃ©s d'un rÃ©sumÃ©
+    Utilise les patterns existants + dÃ©tection intelligente
     """
     if not summary_text:
         return {}
@@ -5308,7 +5426,7 @@ def extract_entities_from_summary(summary_text):
     # Utiliser la fonction existante
     entities = extract_entities_from_text(summary_text)
 
-    # Ajouter une détection par structure "Type: valeur"
+    # Ajouter une dÃ©tection par structure "Type: valeur"
     import re
     pattern = r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*:\s*([^,\n]+)'
     for match in re.finditer(pattern, summary_text):
@@ -5325,7 +5443,7 @@ def extract_entities_from_summary(summary_text):
 
 def are_dates_equivalent(date1, date2):
     """
-    Vérifie si deux dates sont équivalentes malgré des formats différents
+    VÃ©rifie si deux dates sont Ã©quivalentes malgrÃ© des formats diffÃ©rents
     Ex: "January 2013" == "Jan 2013" == "01/2013"
     """
     # Normaliser les dates
@@ -5343,7 +5461,7 @@ def normalize_date_format(date_str):
 
     # Dictionnaire mois
     months = {
-        'january': '01', 'jan': '01', 'février': '02', 'february': '02',
+        'january': '01', 'jan': '01', 'fÃ©vrier': '02', 'february': '02',
         'march': '03', 'mar': '03', 'april': '04', 'apr': '04',
         'may': '05', 'june': '06', 'jun': '06', 'july': '07', 'jul': '07',
         'august': '08', 'aug': '08', 'september': '09', 'sep': '09',
@@ -5353,14 +5471,14 @@ def normalize_date_format(date_str):
 
     date_lower = date_str.lower().strip()
 
-    # Extraire mois et année
+    # Extraire mois et annÃ©e
     for month_name, month_num in months.items():
         if month_name in date_lower:
             year_match = re.search(r'(\d{4})', date_lower)
             if year_match:
                 return f"{month_num}/{year_match.group(1)}"
 
-    # Format numérique
+    # Format numÃ©rique
     numeric_match = re.search(r'(\d{1,2})[/-](\d{4})', date_lower)
     if numeric_match:
         month = numeric_match.group(1).zfill(2)
@@ -5374,8 +5492,8 @@ def normalize_date_format(date_str):
 @csrf_exempt
 def update_summary_from_annotations(request, page_id):
     """
-    Régénère automatiquement le résumé de page basé sur les annotations actuelles
-    Appelé quand l'expert modifie/ajoute/supprime des annotations
+    RÃ©gÃ©nÃ¨re automatiquement le rÃ©sumÃ© de page basÃ© sur les annotations actuelles
+    AppelÃ© quand l'expert modifie/ajoute/supprime des annotations
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -5383,11 +5501,11 @@ def update_summary_from_annotations(request, page_id):
     try:
         page = get_object_or_404(DocumentPage, id=page_id)
 
-        # Récupérer toutes les annotations de la page
+        # RÃ©cupÃ©rer toutes les annotations de la page
         annotations = page.annotations.all().select_related('annotation_type').order_by('start_pos')
 
         if not annotations.exists():
-            # Pas d'annotations = résumé vide ou générique
+            # Pas d'annotations = rÃ©sumÃ© vide ou gÃ©nÃ©rique
             new_summary = f"Page {page.page_number}: Aucune annotation disponible."
             page.annotations_summary = new_summary
             page.annotations_summary_generated_at = timezone.now()
@@ -5396,10 +5514,10 @@ def update_summary_from_annotations(request, page_id):
             return JsonResponse({
                 'success': True,
                 'summary': new_summary,
-                'message': 'Résumé mis à jour (aucune annotation)'
+                'message': 'RÃ©sumÃ© mis Ã  jour (aucune annotation)'
             })
 
-        # Construire les entités depuis les annotations
+        # Construire les entitÃ©s depuis les annotations
         from collections import OrderedDict
         entities = OrderedDict()
         seen_per_key = {}
@@ -5418,38 +5536,38 @@ def update_summary_from_annotations(request, page_id):
                 entities[key].append(val)
                 seen_per_key[key].add(val)
 
-        # Générer le résumé avec IA si possible
+        # GÃ©nÃ©rer le rÃ©sumÃ© avec IA si possible
         try:
             from rawdocs.groq_annotation_system import GroqAnnotator
             groq_annotator = GroqAnnotator()
 
             if groq_annotator.enabled and entities:
-                # Préparer les données structurées pour le prompt
+                # PrÃ©parer les donnÃ©es structurÃ©es pour le prompt
                 lines = []
                 total_pairs = 0
                 for ent, vals in entities.items():
                     total_pairs += len(vals)
-                    preview = "; ".join(vals[:4]) + ("…" if len(vals) > 4 else "")
+                    preview = "; ".join(vals[:4]) + ("â€¦" if len(vals) > 4 else "")
                     lines.append(f"- {ent}: {preview}")
 
                 structured_view = "\n".join(lines)
 
-                prompt = f"""Tu es un expert en analyse documentaire réglementaire.
-Génère un résumé court (3-4 phrases) et fluide basé UNIQUEMENT sur les entités annotées.
+                prompt = f"""Tu es un expert en analyse documentaire rÃ©glementaire.
+GÃ©nÃ¨re un rÃ©sumÃ© court (3-4 phrases) et fluide basÃ© UNIQUEMENT sur les entitÃ©s annotÃ©es.
 
 DOCUMENT: {page.document.title}
 PAGE: {page.page_number}
 
-ENTITÉS ANNOTÉES:
+ENTITÃ‰S ANNOTÃ‰ES:
 {structured_view}
 
 Contraintes:
-- Ne liste pas tout; synthétise les thèmes/infos clés
+- Ne liste pas tout; synthÃ©tise les thÃ¨mes/infos clÃ©s
 - Utilise un ton professionnel et clair
-- Termine par le nombre total de paires entité-valeur entre parenthèses
-- Focus sur les aspects réglementaires et pharmaceutiques
+- Termine par le nombre total de paires entitÃ©-valeur entre parenthÃ¨ses
+- Focus sur les aspects rÃ©glementaires et pharmaceutiques
 
-Réponds UNIQUEMENT par le paragraphe de résumé."""
+RÃ©ponds UNIQUEMENT par le paragraphe de rÃ©sumÃ©."""
 
                 ai_summary = groq_annotator.complete_text(prompt, max_tokens=280, temperature=0.1)
 
@@ -5457,19 +5575,19 @@ Réponds UNIQUEMENT par le paragraphe de résumé."""
                     new_summary = ai_summary.strip()
                 else:
                     # Fallback manuel
-                    new_summary = f"Page {page.page_number}: synthèse de {total_pairs} élément(s) annoté(s) sur les entités « {', '.join(list(entities.keys())[:5])}{'…' if len(entities) > 5 else ''} »."
+                    new_summary = f"Page {page.page_number}: synthÃ¨se de {total_pairs} Ã©lÃ©ment(s) annotÃ©(s) sur les entitÃ©s Â« {', '.join(list(entities.keys())[:5])}{'â€¦' if len(entities) > 5 else ''} Â»."
             else:
                 # Fallback sans IA
                 flat_count = sum(len(v) for v in entities.values())
-                new_summary = f"Page {page.page_number}: {flat_count} valeur(s) annotée(s) sur {len(entities)} entité(s)."
+                new_summary = f"Page {page.page_number}: {flat_count} valeur(s) annotÃ©e(s) sur {len(entities)} entitÃ©(s)."
 
         except Exception as e:
-            print(f"Erreur génération résumé IA: {e}")
+            print(f"Erreur gÃ©nÃ©ration rÃ©sumÃ© IA: {e}")
             # Fallback simple
             flat_count = sum(len(v) for v in entities.values())
-            new_summary = f"Page {page.page_number}: {flat_count} annotation(s) sur {len(entities)} type(s) d'entité."
+            new_summary = f"Page {page.page_number}: {flat_count} annotation(s) sur {len(entities)} type(s) d'entitÃ©."
 
-        # Sauvegarder le nouveau résumé
+        # Sauvegarder le nouveau rÃ©sumÃ©
         page.annotations_summary = new_summary
         page.annotations_summary_generated_at = timezone.now()
         page.save(update_fields=['annotations_summary', 'annotations_summary_generated_at'])
@@ -5479,16 +5597,16 @@ Réponds UNIQUEMENT par le paragraphe de résumé."""
             'summary': new_summary,
             'entities_count': len(entities),
             'total_annotations': annotations.count(),
-            'message': 'Résumé régénéré depuis les annotations'
+            'message': 'RÃ©sumÃ© rÃ©gÃ©nÃ©rÃ© depuis les annotations'
         })
 
     except Exception as e:
-        print(f"Erreur mise à jour résumé page {page_id}: {e}")
+        print(f"Erreur mise Ã  jour rÃ©sumÃ© page {page_id}: {e}")
         return JsonResponse({'error': f'Erreur: {str(e)}'}, status=500)
 @expert_required
 @csrf_exempt
 def validate_page_summary(request, page_id):
-    """Validation du résumé d'une page"""
+    """Validation du rÃ©sumÃ© d'une page"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     try:
@@ -5497,7 +5615,7 @@ def validate_page_summary(request, page_id):
         summary_text = data.get('summary_text', '').strip()
 
         if not summary_text:
-            return JsonResponse({'error': 'Résumé vide'}, status=400)
+            return JsonResponse({'error': 'RÃ©sumÃ© vide'}, status=400)
 
         page.page_summary = summary_text
         page.summary_validated = True
@@ -5505,17 +5623,17 @@ def validate_page_summary(request, page_id):
         page.summary_validated_by = request.user
         page.save(update_fields=['page_summary', 'summary_validated', 'summary_validated_at', 'summary_validated_by'])
 
-        return JsonResponse({'success': True, 'message': 'Résumé validé'})
+        return JsonResponse({'success': True, 'message': 'RÃ©sumÃ© validÃ©'})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
 
 
-# Fonctions pour l'enrichissement sémantique du JSON
+# Fonctions pour l'enrichissement sÃ©mantique du JSON
 @expert_required
 @csrf_exempt
 def enrich_document_json(request, doc_id):
-    """Enrichit le JSON d'un document avec du contexte sémantique"""
+    """Enrichit le JSON d'un document avec du contexte sÃ©mantique"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -5525,7 +5643,7 @@ def enrich_document_json(request, doc_id):
 
         if not basic_json.get('entities'):
             return JsonResponse({
-                'error': 'Aucune entité trouvée dans le document. Veuillez d\'abord générer le JSON de base.'
+                'error': 'Aucune entitÃ© trouvÃ©e dans le document. Veuillez d\'abord gÃ©nÃ©rer le JSON de base.'
             }, status=400)
 
         # Utiliser votre fonction d'enrichissement existante
@@ -5543,12 +5661,12 @@ def enrich_document_json(request, doc_id):
             annotation=None,
             document_id=document.id,
             document_title=document.title,
-            reason="JSON enrichi automatiquement avec contexte sémantique"
+            reason="JSON enrichi automatiquement avec contexte sÃ©mantique"
         )
 
         return JsonResponse({
             'success': True,
-            'message': 'JSON enrichi avec succès',
+            'message': 'JSON enrichi avec succÃ¨s',
             'enriched_json': enriched_json
         })
 
@@ -5559,7 +5677,7 @@ def enrich_document_json(request, doc_id):
 
 @expert_required
 def expert_view_document_annotation_json_enriched(request, doc_id):
-    """Vue pour le JSON enrichi sémantique"""
+    """Vue pour le JSON enrichi sÃ©mantique"""
     document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
 
     if not getattr(document, 'global_annotations_json', None):
@@ -5610,7 +5728,7 @@ def qa_feedback(request, doc_id):
         source = data.get('source', 'enriched').lower()
 
         if not question or not corrected_answer:
-            return JsonResponse({'error': 'Question ou réponse manquante'}, status=400)
+            return JsonResponse({'error': 'Question ou rÃ©ponse manquante'}, status=400)
 
         enriched_json = document.enriched_annotations_json or {}
         qa_list = enriched_json.setdefault('questions_answers', [])
@@ -5633,7 +5751,7 @@ def qa_feedback(request, doc_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-# Place ça en haut du fichier (près des autres helpers)
+# Place Ã§a en haut du fichier (prÃ¨s des autres helpers)
 def _get_page_text(page: DocumentPage) -> str:
     """
     Retourne le meilleur texte exploitable pour une page, avec fallback.
@@ -5654,14 +5772,14 @@ import json, re
 
 def _coerce_groq_entities(raw, page_text: str) -> list[dict]:
     """
-    Accepte différentes formes de sortie Groq et normalise en:
+    Accepte diffÃ©rentes formes de sortie Groq et normalise en:
     [{"type": str, "text": str, "start_pos": int, "end_pos": int}, ...]
     """
-    # 1) déjà une liste dict
+    # 1) dÃ©jÃ  une liste dict
     if isinstance(raw, list):
         items = raw
     else:
-        # 2) dict avec clés usuelles
+        # 2) dict avec clÃ©s usuelles
         if isinstance(raw, dict):
             for key in ("entities", "annotations", "items", "data"):
                 if key in raw and isinstance(raw[key], list):
@@ -5670,10 +5788,10 @@ def _coerce_groq_entities(raw, page_text: str) -> list[dict]:
             else:
                 items = []
         else:
-            # 3) string → tenter JSON
+            # 3) string â†’ tenter JSON
             if isinstance(raw, str):
                 s = raw.strip()
-                # retirer fences éventuels
+                # retirer fences Ã©ventuels
                 s = re.sub(r"^```(?:json)?\s*|\s*```$", "", s, flags=re.IGNORECASE)
                 try:
                     parsed = json.loads(s)
@@ -5703,13 +5821,13 @@ def _coerce_groq_entities(raw, page_text: str) -> list[dict]:
         needle = txt.lower().strip()
         start = base.find(needle)
         if start == -1:
-            # fallback mot-clé
+            # fallback mot-clÃ©
             for w in needle.split():
                 if len(w) > 3:
                     start = base.find(w)
                     if start != -1:
                         end = start + len(w)
-                        # vérifier chevauchement
+                        # vÃ©rifier chevauchement
                         for a, b in used_spans:
                             if not (end <= a or start >= b):
                                 start = -1
@@ -5719,7 +5837,7 @@ def _coerce_groq_entities(raw, page_text: str) -> list[dict]:
             return -1, -1
 
         end = start + len(needle)
-        # éviter chevauchements
+        # Ã©viter chevauchements
         for a, b in used_spans:
             if not (end <= a or start >= b):
                 return -1, -1
@@ -5745,7 +5863,7 @@ def _coerce_groq_entities(raw, page_text: str) -> list[dict]:
         if sp is None or ep is None or sp < 0 or ep <= sp or ep > len(page_text):
             sp, ep = _safe_find(etext)
             if sp == -1:
-                # si aucune position possible, on garde quand même l'entité (positions 0..len)
+                # si aucune position possible, on garde quand mÃªme l'entitÃ© (positions 0..len)
                 sp = 0
                 ep = min(len(etext), len(page_text)) if page_text else len(etext)
 
@@ -5763,34 +5881,39 @@ def _coerce_groq_entities(raw, page_text: str) -> list[dict]:
 # expert/views.py
 from django.utils import timezone
 
+
 def build_page_summary_and_json(page: DocumentPage, user) -> tuple[str, dict]:
     """
-    Recalcule ENTITIES + SUMMARY pour UNE page à partir des annotations validées/expert_created,
-    met à jour page.annotations_summary et page.annotations_json, puis sauvegarde.
-    Retourne (summary, entities_map)
+    Recalcule ENTITIES + SUMMARY pour UNE page à partir des annotations actuelles.
+    CORRIGÉ: Reconstruit complètement au lieu de fusionner pour refléter les suppressions.
     """
+    # Récupérer les annotations actuelles avec les mêmes statuts que le JSON global
     anns = (
         page.annotations
-        .filter(validation_status__in=['validated', 'expert_created'])
+        .filter(validation_status__in=GLOBAL_JSON_STATUSES)  # Inclut pending, validated, expert_created
         .select_related('annotation_type')
         .order_by('start_pos')
     )
 
     from rawdocs.views import _build_entities_map, generate_entities_based_page_summary
 
-    entities_map = _build_entities_map(anns, use_display_name=True)
+    # Construire les entités à partir des annotations actuelles
+    current_entities = _build_entities_map(anns, use_display_name=True)
 
-    # Génère un résumé lisible (si pas d’annotations, message court)
-    if entities_map:
+    # CORRECTION: Utiliser directement current_entities au lieu de fusionner
+    # Cela permet de refléter les suppressions d'annotations
+
+    # Générer un résumé lisible
+    if current_entities:
         summary = generate_entities_based_page_summary(
-            entities=entities_map,
+            entities=current_entities,
             page_number=page.page_number,
             document_title=page.document.title
         )
     else:
-        summary = f"Page {page.page_number}: aucune annotation validée."
+        summary = f"Page {page.page_number}: aucune annotation."
 
-    # JSON page
+    # JSON page avec entités actuelles (pas de fusion)
     page_json = {
         "document": {
             "id": str(page.document.id),
@@ -5801,11 +5924,12 @@ def build_page_summary_and_json(page: DocumentPage, user) -> tuple[str, dict]:
         "page": {
             "number": page.page_number,
             "annotations_count": anns.count(),
-            "validated_count": anns.count(),
+            "total_annotations_on_page": page.annotations.count(),  # Total incluant tous statuts
         },
-        "entities": entities_map,
+        "entities": current_entities,  # Directement les entités actuelles
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "updated_by": getattr(user, "username", None),
+        "rebuild_applied": True,  # Indicateur de reconstruction complète
     }
 
     page.annotations_summary = summary
@@ -5813,21 +5937,21 @@ def build_page_summary_and_json(page: DocumentPage, user) -> tuple[str, dict]:
     page.annotations_json = page_json
     page.save(update_fields=['annotations_summary', 'annotations_summary_generated_at', 'annotations_json'])
 
-    return summary, entities_map
+    return summary, current_entities
 
 ################
 def find_entity_in_text(entity_text, page_text, entity_type=""):
     """
-    Recherche intelligente d'entité dans le texte avec support spécialisé pour les dates
+    Recherche intelligente d'entitÃ© dans le texte avec support spÃ©cialisÃ© pour les dates
     et autres formats variables.
 
     Args:
-        entity_text (str): Texte de l'entité à chercher (ex: "January 2013")
-        page_text (str): Texte de la page où chercher
-        entity_type (str): Type d'entité pour optimiser la recherche
+        entity_text (str): Texte de l'entitÃ© Ã  chercher (ex: "January 2013")
+        page_text (str): Texte de la page oÃ¹ chercher
+        entity_type (str): Type d'entitÃ© pour optimiser la recherche
 
     Returns:
-        tuple: (start_pos, end_pos, actual_text) ou (-1, -1, entity_text) si non trouvé
+        tuple: (start_pos, end_pos, actual_text) ou (-1, -1, entity_text) si non trouvÃ©
     """
     if not entity_text or not page_text:
         return -1, -1, entity_text
@@ -5842,8 +5966,8 @@ def find_entity_in_text(entity_text, page_text, entity_type=""):
         actual_text = page_text[start_pos:end_pos]
         return start_pos, end_pos, actual_text
 
-    # 2. Recherche spécialisée par type d'entité
-    if any(keyword in entity_type.lower() for keyword in ['date', 'time', 'délai', 'deadline']):
+    # 2. Recherche spÃ©cialisÃ©e par type d'entitÃ©
+    if any(keyword in entity_type.lower() for keyword in ['date', 'time', 'dÃ©lai', 'deadline']):
         return _find_date_entity(entity_text, page_text)
 
     # 3. Recherche flexible avec variations
@@ -5851,18 +5975,18 @@ def find_entity_in_text(entity_text, page_text, entity_type=""):
     if result[0] >= 0:
         return result
 
-    # 4. Recherche par mots-clés (version améliorée)
+    # 4. Recherche par mots-clÃ©s (version amÃ©liorÃ©e)
     result = _find_keyword_match(entity_text, page_text)
     if result[0] >= 0:
         return result
 
-    # 5. Pas trouvé
+    # 5. Pas trouvÃ©
     return -1, -1, entity_text
 
 
 def _find_date_entity(entity_text, page_text):
     """
-    Recherche spécialisée pour les dates avec formats multiples
+    Recherche spÃ©cialisÃ©e pour les dates avec formats multiples
     """
     import re
     from datetime import datetime
@@ -5870,7 +5994,7 @@ def _find_date_entity(entity_text, page_text):
     page_lower = page_text.lower()
     entity_lower = entity_text.lower()
 
-    # Extraire les composants de date de l'entité
+    # Extraire les composants de date de l'entitÃ©
     date_patterns = [
         r'(\w+)\s+(\d{4})',  # "January 2013"
         r'(\d{1,2})/(\d{4})',  # "01/2013"
@@ -5879,7 +6003,7 @@ def _find_date_entity(entity_text, page_text):
         r'(\d{1,2})\s+(\w+)\s+(\d{4})',  # "15 January 2013"
     ]
 
-    # Tenter de parser l'entité comme date
+    # Tenter de parser l'entitÃ© comme date
     entity_components = set()
     for pattern in date_patterns:
         match = re.search(pattern, entity_lower)
@@ -5890,7 +6014,7 @@ def _find_date_entity(entity_text, page_text):
         # Si pas de format date reconnu, recherche normale
         return -1, -1, entity_text
 
-    # Chercher ces composants dans différents formats dans le texte
+    # Chercher ces composants dans diffÃ©rents formats dans le texte
     search_patterns = [
         # Format exact
         re.escape(entity_lower),
@@ -5906,11 +6030,11 @@ def _find_date_entity(entity_text, page_text):
         # etc.
     ]
 
-    # Ajouter des variantes spécialisées
+    # Ajouter des variantes spÃ©cialisÃ©es
     if len(entity_components) >= 2:
         components = list(entity_components)
 
-        # Mois + année
+        # Mois + annÃ©e
         month_abbrevs = {
             'january': 'jan', 'february': 'feb', 'march': 'mar',
             'april': 'apr', 'may': 'may', 'june': 'jun',
@@ -5920,7 +6044,7 @@ def _find_date_entity(entity_text, page_text):
 
         for comp in components:
             if comp in month_abbrevs:
-                # Chercher version abrégée
+                # Chercher version abrÃ©gÃ©e
                 abbrev_version = entity_lower.replace(comp, month_abbrevs[comp])
                 search_patterns.append(re.escape(abbrev_version))
 
@@ -5937,7 +6061,7 @@ def _find_date_entity(entity_text, page_text):
             actual_text = page_text[start_pos:end_pos]
             return start_pos, end_pos, actual_text
 
-    # Recherche plus permissive : composants séparés mais proches
+    # Recherche plus permissive : composants sÃ©parÃ©s mais proches
     return _find_date_components_nearby(entity_components, page_text)
 
 
@@ -5985,7 +6109,7 @@ def _find_flexible_match(entity_text, page_text):
     page_lower = page_text.lower()
     entity_lower = entity_text.lower()
 
-    # Variations à tester
+    # Variations Ã  tester
     variations = [
         entity_lower,
         entity_lower.replace(',', ''),
@@ -5997,7 +6121,7 @@ def _find_flexible_match(entity_text, page_text):
     ]
 
     for variation in variations:
-        if variation != entity_lower:  # Déjà testé avant
+        if variation != entity_lower:  # DÃ©jÃ  testÃ© avant
             # Recherche normale
             start_pos = page_lower.find(variation)
             if start_pos >= 0:
@@ -6022,24 +6146,24 @@ def _find_flexible_match(entity_text, page_text):
 
 def _find_keyword_match(entity_text, page_text):
     """
-    Recherche par mots-clés améliorée qui garde plus de contexte
+    Recherche par mots-clÃ©s amÃ©liorÃ©e qui garde plus de contexte
     """
     page_lower = page_text.lower()
     words = entity_text.lower().split()
 
-    # Trier par longueur décroissante pour privilégier les mots plus spécifiques
+    # Trier par longueur dÃ©croissante pour privilÃ©gier les mots plus spÃ©cifiques
     words.sort(key=len, reverse=True)
 
     for word in words:
-        if len(word) >= 3:  # Réduire le seuil de 4 à 3 caractères
+        if len(word) >= 3:  # RÃ©duire le seuil de 4 Ã  3 caractÃ¨res
             start_pos = page_lower.find(word)
             if start_pos >= 0:
-                # Essayer de prendre plus de contexte autour du mot trouvé
+                # Essayer de prendre plus de contexte autour du mot trouvÃ©
                 context_start = max(0, start_pos - 20)
                 context_end = min(len(page_text), start_pos + len(word) + 20)
                 context = page_text[context_start:context_end]
 
-                # Chercher si d'autres mots de l'entité sont dans ce contexte
+                # Chercher si d'autres mots de l'entitÃ© sont dans ce contexte
                 context_lower = context.lower()
                 other_words_found = sum(1 for w in words if w != word and w in context_lower)
 
@@ -6047,10 +6171,281 @@ def _find_keyword_match(entity_text, page_text):
                     # Prendre tout le contexte contenant plusieurs mots
                     return context_start, context_end, context.strip()
                 else:
-                    # Juste le mot trouvé
+                    # Juste le mot trouvÃ©
                     end_pos = start_pos + len(word)
                     actual_text = page_text[start_pos:end_pos]
                     return start_pos, end_pos, actual_text
 
     return -1, -1, entity_text
+
+
+
+# --- Conserver les annotations annotateur (pending) dans le JSON global ---
+GLOBAL_JSON_STATUSES = ['pending', 'validated', 'expert_created']
+
+def _normalize_values(values):
+    """trim + dédup (insensible à la casse) + espaces normalisés"""
+    seen, out = set(), []
+    for v in values or []:
+        vv = re.sub(r'\s+', ' ', (v or '').strip())
+        key = vv.lower()
+        if vv and key not in seen:
+            seen.add(key)
+            out.append(vv)
+    return out
+
+
+def _merge_entities_preserve(old_entities: dict | None, new_entities: dict | None) -> dict:
+    """
+    Fusionne les entités en conservant l'existant (dédupe insensible à la casse/espaces).
+    Version améliorée qui préserve l'ordre et évite les doublons.
+    """
+    merged = {}
+
+    # D'abord, copier toutes les entités existantes
+    for k, v in (old_entities or {}).items():
+        merged[k] = _normalize_values(v)
+
+    # Ensuite, ajouter/fusionner les nouvelles entités
+    for k, vals in (new_entities or {}).items():
+        if k in merged:
+            # Fusionner avec existant (éviter doublons)
+            existing_normalized = {val.lower().strip() for val in merged[k]}
+            for val in (vals or []):
+                normalized_val = val.lower().strip()
+                if normalized_val and normalized_val not in existing_normalized:
+                    merged[k].append(val)
+                    existing_normalized.add(normalized_val)
+        else:
+            # Nouvelle entité
+            merged[k] = _normalize_values(vals or [])
+
+    # Nettoyer les entités vides
+    return {k: v for k, v in merged.items() if v}
+
+
+@expert_required
+@csrf_exempt
+def create_annotation_ajax(request):
+    """
+    Création d'une annotation (pré-validée) + MAJ JSON fusionné + régénération résumé page/doc.
+    Version améliorée avec fusion pour préserver les annotations existantes.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'})
+
+    try:
+        data = json.loads(request.body)
+        page_id = data.get('page_id')
+        text = (data.get('text') or '').strip()
+        entity_type_name = (data.get('entity_type') or '').strip()
+        if not entity_type_name:
+            return JsonResponse({'success': False, 'error': 'entity_type is required'})
+
+        page = get_object_or_404(DocumentPage, id=page_id)
+
+        annotation_type, _ = AnnotationType.objects.get_or_create(
+            name=entity_type_name,
+            defaults={
+                'display_name': entity_type_name.replace('_', ' ').title(),
+                'color': '#3b82f6',
+                'description': f"Expert created type: {entity_type_name}"
+            }
+        )
+
+        annotation = Annotation.objects.create(
+            page=page,
+            selected_text=text,
+            annotation_type=annotation_type,
+            start_pos=int(data.get('start_pos', 0) or 0),
+            end_pos=int(data.get('end_pos', len(text) or 0) or 0),
+            validation_status='expert_created',
+            validated_by=request.user,
+            validated_at=timezone.now(),
+            created_by=request.user,
+            source='expert'
+        )
+
+        # MAJ page + JSON global avec FUSION (préserver annotations existantes)
+        new_page_summary = None
+        fusion_success = False
+        try:
+            # Debug avant fusion
+            debug_json_fusion(page.document, f"create_annotation by {request.user.username}")
+
+            # Fusion page : conserve + ajoute nouvelles entités
+            new_page_summary, merged_entities = build_page_summary_and_json(page, request.user)
+
+            # Fusion document global : conserve + ajoute
+            update_document_global_json(page.document, request.user)
+
+            fusion_success = True
+            print(f"✅ Fusion réussie - Annotation ajoutée: '{text}' ({entity_type_name})")
+
+            # Debug après fusion
+            debug_json_fusion(page.document, f"create_annotation_completed by {request.user.username}")
+
+        except Exception as e:
+            print(f"⚠️ Erreur MAJ JSON/summary (create): {e}")
+            # Fallback : essayer juste la page
+            try:
+                new_page_summary, _ = build_page_summary_and_json(page, request.user)
+                print(f"✅ Fallback page summary réussi")
+            except Exception as e2:
+                print(f"❌ Fallback page summary échoué: {e2}")
+
+        # Déclenchement régénération globale (async)
+        try:
+            trigger_summary_regeneration_safe(page.document, request.user, 3)
+        except Exception as e:
+            print(f"⚠️ Erreur déclenchement régénération (create): {e}")
+
+        return JsonResponse({
+            'success': True,
+            'annotation_id': annotation.id,
+            'message': 'Annotation créée avec succès',
+            'page_summary': new_page_summary,
+            'auto_summary_triggered': True,
+            'fusion_applied': fusion_success,
+            'preservation_mode': 'active'  # Indique que les annotations existantes sont préservées
+        })
+
+    except Exception as e:
+        print(f"❌ Erreur create_annotation_ajax: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+# --- UPSERT SANS SUPPRESSION POUR LES ANNOTATIONS D'UNE PAGE ---
+
+from typing import Iterable, Tuple
+
+def _overlap(a: Tuple[int,int], b: Tuple[int,int]) -> bool:
+    """True si deux intervalles [start,end) se chevauchent un minimum."""
+    (a0, a1), (b0, b1) = a, b
+    return max(a0, b0) < min(a1, b1)
+
+def _same_text(a: str, b: str) -> bool:
+    return (a or '').strip().lower() == (b or '').strip().lower()
+
+def upsert_annotations_for_page(
+    page: DocumentPage,
+    items: Iterable[dict],
+    source: str = "groq_llama3.3_70b",
+    default_status: str = "pending",
+    min_overlap_chars: int = 2
+) -> list[Annotation]:
+    """
+    Insère ou met à jour des annotations IA SANS toucher aux autres (pas de delete).
+    On matche sur (type, texte ~, chevauchement positions) pour décider update vs insert.
+    """
+    created_or_updated = []
+    existing = list(
+        Annotation.objects.filter(page=page)
+        .select_related("annotation_type")
+        .order_by("start_pos")
+    )
+
+    # cache types par nom
+    type_cache: dict[str, AnnotationType] = {}
+
+    for it in items or []:
+        raw_type = (it.get("type") or "").strip()
+        raw_text = (it.get("text") or "").strip()
+        if not raw_type or not raw_text:
+            continue
+
+        start_pos = int(it.get("start_pos") or 0)
+        end_pos   = int(it.get("end_pos") or max(start_pos + len(raw_text), start_pos + 1))
+        conf      = it.get("confidence", 0.8)
+
+        # type (get_or_create)
+        if raw_type not in type_cache:
+            at, _ = AnnotationType.objects.get_or_create(
+                name=raw_type,
+                defaults={
+                    "display_name": raw_type.replace("_", " ").title(),
+                    "color": "#54a0ff",
+                    "description": f"Auto ({source})"
+                }
+            )
+            type_cache[raw_type] = at
+        atype = type_cache[raw_type]
+
+        # tentative de match sur existant de la même page
+        matched = None
+        for ann in existing:
+            if ann.annotation_type_id != atype.id:
+                continue
+            if not _same_text(ann.selected_text, raw_text):
+                continue
+            if _overlap((ann.start_pos or 0, ann.end_pos or 0), (start_pos, end_pos)):
+                # assez de chevauchement ?
+                if min(ann.end_pos, end_pos) - max(ann.start_pos, start_pos) >= min_overlap_chars:
+                    matched = ann
+                    break
+
+        if matched:
+            # mise à jour légère: positions/confiance/source, ne touche pas status expert/annotateur
+            changed = False
+            if matched.start_pos != start_pos or matched.end_pos != end_pos:
+                matched.start_pos, matched.end_pos = start_pos, end_pos
+                changed = True
+            if getattr(matched, "confidence_score", None) != conf:
+                try:
+                    matched.confidence_score = conf
+                    changed = True
+                except Exception:
+                    pass
+            if matched.source != source:
+                matched.source = source
+                changed = True
+            if changed:
+                matched.save(update_fields=["start_pos", "end_pos", "source"] + (["confidence_score"] if hasattr(matched, "confidence_score") else []))
+            created_or_updated.append(matched)
+        else:
+            # INSERT: on ne supprime rien d'autre
+            ann = Annotation.objects.create(
+                page=page,
+                selected_text=raw_text,
+                annotation_type=atype,
+                start_pos=start_pos,
+                end_pos=end_pos,
+                validation_status=default_status,  # ex: 'pending' si annotateur, ou 'expert_created' côté expert
+                source=source
+            )
+            created_or_updated.append(ann)
+
+    return created_or_updated
+@csrf_exempt
+@login_required
+def annotate_page_with_groq_view(request, page_id):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "POST required"}, status=405)
+
+    page = get_object_or_404(DocumentPage, id=page_id)
+    data = json.loads(request.body or "{}")
+
+    # 1) appeler ton annotateur pour obtenir 'items' (liste de dicts)
+    from rawdocs.groq_annotation_system import GroqAnnotator
+    annotator = GroqAnnotator()
+    anns, _schema = annotator.annotate_page_with_groq({
+        "page_num": page.page_number,
+        "text": getattr(page, "cleaned_text", "") or getattr(page, "text_content", "") or ""
+    })
+
+    # 2) UPSERT — aucune suppression
+    upsert_annotations_for_page(
+        page,
+        anns,
+        source="groq_llama3.3_70b",
+        default_status="pending"  # garder comme 'pending' côté annotateur
+    )
+
+    # 3) Mettre à jour résumé/JSON (fusion, pas d’écrasement)
+    try:
+        build_page_summary_and_json(page, request.user)  # doit être non destructif côté DB
+        update_document_global_json(page.document, request.user)
+    except Exception as e:
+        print(f"⚠️ post-groq update failed: {e}")
+
+    return JsonResponse({"success": True, "count": len(anns)})
 
