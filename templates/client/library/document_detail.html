@@ -592,6 +592,10 @@
                     <i class="material-icons">picture_as_pdf</i>
                     <span class="text">Voir PDF original</span>
                 </a>
+                <a href="{% url 'client:library:convertio_preview' document.pk %}?fmt=html" class="btn btn-primary" title="Convertir avec Convertio" target="_blank" rel="noopener">
+                    <i class="material-icons">transform</i>
+                    <span class="text">Convertio</span>
+                </a>
             </div>
         </div>
 
