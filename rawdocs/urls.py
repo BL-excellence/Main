@@ -321,5 +321,5 @@ urlpatterns = [
     
     # API pour l'analyse directe de texte avec Mistral (pour la page de test)
     path('api/mistral/direct_analysis/', views.mistral_direct_analysis, name='mistral_direct_analysis'),
-
+    path('save-edited-text/', views.save_edited_text, name='save_edited_text'),
 ]

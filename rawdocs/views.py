@@ -3330,3 +3330,39 @@ def mistral_analyze_document(request, document_id):
             'success': False, 
             'error': f"Une erreur est survenue: {str(e)}"
         }, status=500)
+
+        # Dans views.py
+from django.views.decorators.csrf import csrf_protect
+
+@csrf_protect
+@login_required
+@require_POST
+def save_edited_text(request):
+    try:
+        data = json.loads(request.body)
+        doc_id = data.get('document_id')
+        element_id = data.get('element_id')
+        new_text = data.get('new_text')
+
+        document = get_object_or_404(RawDocument, id=doc_id, owner=request.user)  # Vérifier les permissions
+
+        # Logique de mise à jour : par exemple, régénérez le HTML avec le nouveau texte
+        # Pour simplicité, on suppose que vous stockez le HTML édité entier
+        # Ici, une implémentation basique : remplacez dans structured_html
+        updated_html = document.structured_html.replace('OLD_TEXT_PLACEHOLDER', new_text)  # Adaptez à votre logique réelle
+
+        document.structured_html = updated_html  # Ou un nouveau champ edited_structured_html
+        document.save()
+
+        # Optionnel : Loggez la modification
+        MetadataLog.objects.create(
+            document=document,
+            field_name='edited_text',
+            old_value='Ancien texte',  # Récupérez l'ancien si possible
+            new_value=new_text,
+            modified_by=request.user
+        )
+
+        return JsonResponse({'success': True, 'message': 'Texte mis à jour'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

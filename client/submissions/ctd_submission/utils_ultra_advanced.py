@@ -2222,11 +2222,13 @@ class UltraAdvancedPDFExtractor:
         parts.append('</div>')
         return '\n'.join(parts)
 
+    # Dans utils_ultra_advanced.py, modifiez _generate_text_element_html
     def _generate_text_element_html(self, el: Dict, style: str) -> str:
         raw = el.get('text', '')
         text = self._normalize_whitespace(raw)
         cls = 'ultra-element ultra-text'
-        return f'<div class="{cls}" style="{style}"><div class="editable-content">{text}</div></div>'
+        # Ajout de contenteditable="true" pour édition en ligne
+        return f'<div class="{cls}" style="{style}"><div class="editable-content" contenteditable="true">{text}</div></div>'
 
     def _generate_image_element_html(self, el: Dict, style: str) -> str:
         src = el.get('image_data') or ''
