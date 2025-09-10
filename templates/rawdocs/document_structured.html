@@ -242,7 +242,6 @@
         border-color: #007bff;
         outline: none;
     }
-
 </style>
 {% endblock %}
 
@@ -316,10 +315,12 @@
     </div>
 
     <div class="content-card">
+        <div id="save-status" style="margin-bottom: 10px; color: #555;"></div>
         {% if structured_html %}
         <div id="structured-host">
             {{ structured_html|safe }}
         </div>
+        <button id="save-edits" class="btn btn-primary" style="margin-top: 10px;">Sauvegarder</button>
         {% else %}
         <div class="empty">
             <i class="far fa-file"></i>
@@ -328,10 +329,54 @@
         {% endif %}
     </div>
 </div>
-
 {% endblock %}
+
 {% block extra_js %}
 <script>
+document.getElementById('save-edits').addEventListener('click', function() {
+    const edits = collectEdits();
+    console.log('Modifications collectées :', edits); // Ajout pour débogage
+    const status = document.getElementById('save-status');
+    if (!edits.length) {
+        status.textContent = 'Aucun changement à sauvegarder.';
+        return;
+    }
+    status.textContent = 'Sauvegarde en cours…';
+
+    fetch('{% url "rawdocs:save_structured_edits" document.id %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : ''
+        },
+        body: JSON.stringify({ edits })
+    })
+    .then(response => {
+        console.log('Réponse serveur :', response); // Ajout pour débogage
+        if (!response.ok) throw new Error('Erreur serveur : ' + response.statusText);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Données reçues :', data); // Ajout pour débogage
+        if (data.success) {
+            status.textContent = `Sauvegardé: ${data.saved_count} élément(s)`;
+            edits.forEach(edit => {
+                const el = document.querySelector(`.editable-content[data-element-id="${edit.element_id}"]`);
+                if (el) el.setAttribute('data-original-text', edit.modified);
+            });
+            alert(data.message || 'Modifications enregistrées !');
+        } else {
+            status.textContent = 'Erreur: ' + data.message;
+            alert('Erreur : ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur AJAX :', error); // Ajout pour débogage
+        status.textContent = 'Erreur réseau : ' + error.message;
+        alert('Erreur réseau : ' + error.message);
+    });
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     // Sélectionner tous les éléments éditables
     const editables = document.querySelectorAll('.editable-content');
@@ -342,16 +387,41 @@ document.addEventListener('DOMContentLoaded', function() {
             editable.closest('.ultra-element').setAttribute('data-element-id', 'text-block-' + index);
         }
 
-        // Sauvegarder après édition
-        editable.addEventListener('blur', function() {
+        // Mettre à jour data-original-text en temps réel
+        editable.addEventListener('input', function() {
             const newText = this.innerHTML.trim();
-            const container = this.closest('.ultra-element');
-            const elementId = container.getAttribute('data-element-id');
+            const originalText = this.getAttribute('data-original-text') || '';
+            if (newText !== originalText) {
+                this.setAttribute('data-original-text', newText);
+            }
+        });
+    });
 
-            if (!newText || !elementId) {
-                console.warn('Texte vide ou ID manquant, annulation de la sauvegarde.');
+    // Fonction pour collecter les modifications
+    function collectEdits() {
+        const edits = [];
+        document.querySelectorAll('.editable-content').forEach(el => {
+            const elementId = el.getAttribute('data-element-id') || '';
+            const original = el.getAttribute('data-original-text') || '';
+            const modified = (el.innerText || el.textContent || '').trim();
+            if (elementId && original !== modified) {
+                edits.push({ type: 'text', element_id: elementId, original, modified });
+            }
+        });
+        return edits;
+    }
+
+    // Sauvegarde manuelle via le bouton
+    const saveButton = document.getElementById('save-edits');
+    if (saveButton) {
+        saveButton.addEventListener('click', function() {
+            const edits = collectEdits();
+            const status = document.getElementById('save-status');
+            if (!edits.length) {
+                status.textContent = 'Aucun changement à sauvegarder.';
                 return;
             }
+            status.textContent = 'Sauvegarde en cours…';
 
             fetch('{% url "rawdocs:save_structured_edits" document.id %}', {
                 method: 'POST',
@@ -359,134 +429,74 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : ''
                 },
-                body: JSON.stringify({
-                    edits: [{
-                        type: 'text',
-                        element_id: elementId,
-                        original: editable.getAttribute('data-original-text') || '',
-                        modified: newText
-                    }]
-                })
+                body: JSON.stringify({ edits })
             })
             .then(response => {
-                if (!response.ok) {
-                    throw new Error('Réponse serveur invalide : ' + response.statusText);
-                }
+                if (!response.ok) throw new Error('Erreur serveur : ' + response.statusText);
                 return response.json();
             })
             .then(data => {
                 if (data.success) {
-                    console.log('Texte sauvegardé :', elementId);
-                    editable.setAttribute('data-original-text', newText); // Mettre à jour l'original
-                    alert('Modifications enregistrées !');
+                    status.textContent = `Sauvegardé: ${data.saved_count} élément(s)`;
+                    // Mettre à jour les originaux après sauvegarde
+                    edits.forEach(edit => {
+                        const el = document.querySelector(`.editable-content[data-element-id="${edit.element_id}"]`);
+                        if (el) el.setAttribute('data-original-text', edit.modified);
+                    });
+                    alert(data.message || 'Modifications enregistrées !');
                 } else {
-                    console.error('Erreur :', data.error);
-                    alert('Erreur lors de la sauvegarde : ' + data.error);
+                    status.textContent = 'Erreur: ' + data.message;
+                    alert('Erreur : ' + data.message);
                 }
             })
             .catch(error => {
-                console.error('Erreur AJAX :', error);
-                alert('Erreur réseau lors de la sauvegarde : ' + error.message);
+                status.textContent = 'Erreur réseau : ' + error.message;
+                alert('Erreur réseau : ' + error.message);
             });
         });
-    });
+    }
+
+    // Fonctionnalités supplémentaires
+    (function() {
+        function setEditable(on) {
+            const host = document.getElementById('structured-host') || document;
+            host.querySelectorAll('.editable-content, .table-cell-editable')
+                .forEach(el => el.setAttribute('contenteditable', on ? 'true' : 'false'));
+            const btn = document.getElementById('toggle-edit');
+            if (btn) btn.textContent = on ? 'Mode édition: ON' : 'Mode édition: OFF';
+        }
+
+        const bar = document.createElement('div');
+        bar.style = 'position:sticky;top:8px;background:#fff;padding:8px;border:1px solid #eee;border-radius:8px;z-index:50;display:flex;gap:8px;';
+        bar.innerHTML = `
+            <button id="toggle-edit" type="button">Mode édition: ON</button>
+        `;
+        const host = document.querySelector('.content-card');
+        if (host) host.prepend(bar);
+
+        setEditable(true);
+
+        setTimeout(() => {
+            const hasAnyEditable = document.querySelector('[contenteditable="true"]');
+            const structured = document.getElementById('structured-host');
+            if (!hasAnyEditable && structured) {
+                structured.setAttribute('contenteditable', 'true');
+                structured.classList.add('editable-content');
+            }
+        }, 0);
+
+        document.getElementById('toggle-edit').addEventListener('click', () => {
+            const on = document.querySelector('.editable-content[contenteditable="true"], .table-cell-editable[contenteditable="true"], #structured-host[contenteditable="true"]') !== null;
+            setEditable(!on);
+            const structured = document.getElementById('structured-host');
+            if (structured && !structured.querySelector('[contenteditable="true"]')) {
+                structured.setAttribute('contenteditable', (!on) ? 'true' : 'false');
+            }
+        });
+    })();
 });
 
-// Fonctionnalités supplémentaires du second script
-(function() {
-    function setEditable(on) {
-        const host = document.getElementById('structured-host') || document;
-        host.querySelectorAll('.editable-content, .table-cell-editable')
-            .forEach(el => el.setAttribute('contenteditable', on ? 'true' : 'false'));
-        const btn = document.getElementById('toggle-edit');
-        if (btn) btn.textContent = on ? 'Mode édition: ON' : 'Mode édition: OFF';
-    }
 
-    function getText(el) { return (el.innerText || el.textContent || '').trim(); }
 
-    function collectEdits() {
-        const edits = [];
-        document.querySelectorAll('.editable-content').forEach(el => {
-            const elementId = el.getAttribute('data-element-id') || '';
-            const original = el.getAttribute('data-original-text') || '';
-            const modified = getText(el);
-            if (elementId && original !== modified) {
-                edits.push({ type: 'text', element_id: elementId, original, modified });
-            }
-        });
-        document.querySelectorAll('.table-cell-editable').forEach(td => {
-            const cellId = td.getAttribute('data-cell-id') || '';
-            const original = td.getAttribute('data-original-value') || '';
-            const modified = getText(td);
-            if (cellId && original !== modified) {
-                edits.push({ type: 'cell', cell_id: cellId, original, modified });
-            }
-        });
-        return edits;
-    }
-
-    async function saveEdits() {
-        const status = document.getElementById('save-status');
-        const edits = collectEdits();
-        if (!edits.length) { status.textContent = 'Aucun changement à sauvegarder.'; return; }
-        status.textContent = 'Sauvegarde en cours…';
-        try {
-            const resp = await fetch('{% url "rawdocs:save_structured_edits" document.id %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : ''
-                },
-                body: JSON.stringify({ edits })
-            });
-            const data = await resp.json();
-            if (!resp.ok || !data.success) throw new Error(data.message || 'Erreur de sauvegarde');
-            document.querySelectorAll('.editable-content').forEach(el => {
-                const elementId = el.getAttribute('data-element-id') || '';
-                if (elementId && data.details.some(d => d.type === 'text' && d.element_id === elementId)) {
-                    el.setAttribute('data-original-text', getText(el));
-                }
-            });
-            document.querySelectorAll('.table-cell-editable').forEach(td => {
-                const cellId = td.getAttribute('data-cell-id') || '';
-                if (cellId && data.details.some(d => d.type === 'cell' && d.cell_id === cellId)) {
-                    td.setAttribute('data-original-value', getText(td));
-                }
-            });
-            status.textContent = `Sauvegardé: ${data.saved_count} élément(s) • Score moyen: ${Math.round(data.avg_confidence * 100)}%`;
-        } catch (e) { status.textContent = 'Erreur: ' + e.message; }
-    }
-
-    const bar = document.createElement('div');
-    bar.style = 'position:sticky;top:8px;background:#fff;padding:8px;border:1px solid #eee;border-radius:8px;z-index:50;display:flex;gap:8px;';
-    bar.innerHTML = `
-        <button id="toggle-edit" type="button">Mode édition: ON</button>
-        <button id="save-edits" type="button">Sauvegarder</button>
-        <span id="save-status" style="margin-left:8px;color:#555;"></span>
-    `;
-    const host = document.querySelector('.content-card');
-    if (host) host.prepend(bar);
-
-    setEditable(true);
-
-    setTimeout(() => {
-        const hasAnyEditable = document.querySelector('[contenteditable="true"]');
-        const structured = document.getElementById('structured-host');
-        if (!hasAnyEditable && structured) {
-            structured.setAttribute('contenteditable', 'true');
-            structured.classList.add('editable-content');
-        }
-    }, 0);
-
-    document.getElementById('toggle-edit').addEventListener('click', () => {
-        const on = document.querySelector('.editable-content[contenteditable="true"], .table-cell-editable[contenteditable="true"], #structured-host[contenteditable="true"]') !== null;
-        setEditable(!on);
-        const structured = document.getElementById('structured-host');
-        if (structured && !structured.querySelector('[contenteditable="true"]')) {
-            structured.setAttribute('contenteditable', (!on) ? 'true' : 'false');
-        }
-    });
-    document.getElementById('save-edits').addEventListener('click', saveEdits);
-})();
 </script>
 {% endblock %}
