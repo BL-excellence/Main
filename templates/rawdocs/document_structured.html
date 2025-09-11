@@ -242,6 +242,16 @@
         border-color: #007bff;
         outline: none;
     }
+.pharma-save {
+    background: linear-gradient(135deg, #16a34a 0%, #0891b2 100%);
+    border: none;
+    color: #fff;
+}
+.pharma-save:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+}
 </style>
 {% endblock %}
 
@@ -320,7 +330,7 @@
         <div id="structured-host">
             {{ structured_html|safe }}
         </div>
-        <button id="save-edits" class="btn btn-primary" style="margin-top: 10px;">Sauvegarder</button>
+        <button id="save-edits" class="btn btn-primary pharma-save" style="margin-top: 10px;">Sauvegarder</button>
         {% else %}
         <div class="empty">
             <i class="far fa-file"></i>
@@ -343,11 +353,18 @@ document.getElementById('save-edits').addEventListener('click', function() {
     }
     status.textContent = 'Sauvegarde en cours…';
 
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+
     fetch('{% url "rawdocs:save_structured_edits" document.id %}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : ''
+            'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') && document.querySelector('[name=csrfmiddlewaretoken]').value) || getCookie('csrftoken') || ''
         },
         body: JSON.stringify({ edits })
     })
@@ -387,14 +404,11 @@ document.addEventListener('DOMContentLoaded', function() {
             editable.closest('.ultra-element').setAttribute('data-element-id', 'text-block-' + index);
         }
 
-        // Mettre à jour data-original-text en temps réel
-        editable.addEventListener('input', function() {
-            const newText = this.innerHTML.trim();
-            const originalText = this.getAttribute('data-original-text') || '';
-            if (newText !== originalText) {
-                this.setAttribute('data-original-text', newText);
-            }
-        });
+        // Initialiser le texte initial une seule fois et ne pas le modifier ensuite
+        if (!editable.hasAttribute('data-initial-text')) {
+            const initial = (editable.innerText || editable.textContent || '').trim();
+            editable.setAttribute('data-initial-text', initial);
+        }
     });
 
     // Fonction pour collecter les modifications
@@ -402,10 +416,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const edits = [];
         document.querySelectorAll('.editable-content').forEach(el => {
             const elementId = el.getAttribute('data-element-id') || '';
-            const original = el.getAttribute('data-original-text') || '';
+            const original = el.getAttribute('data-initial-text') || '';
             const modified = (el.innerText || el.textContent || '').trim();
             if (elementId && original !== modified) {
-                edits.push({ type: 'text', element_id: elementId, original, modified });
+                edits.push({ type: 'text', element_id: elementId, original, new_text: modified, modified });
             }
         });
         return edits;
@@ -437,11 +451,11 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(data => {
                 if (data.success) {
-                    status.textContent = `Sauvegardé: ${data.saved_count} élément(s)`;
+                    status.textContent = `Sauvegardé: ${data.updated_count || data.saved_count || 0} élément(s)`;
                     // Mettre à jour les originaux après sauvegarde
                     edits.forEach(edit => {
                         const el = document.querySelector(`.editable-content[data-element-id="${edit.element_id}"]`);
-                        if (el) el.setAttribute('data-original-text', edit.modified);
+                        if (el) el.setAttribute('data-original-text', edit.modified || edit.new_text);
                     });
                     alert(data.message || 'Modifications enregistrées !');
                 } else {
