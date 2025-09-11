@@ -351,6 +351,7 @@ def upload_pdf(request):
                 ultra = UltraAdvancedPDFExtractor()
                 ultra_result = ultra.extract_ultra_structured_content(rd.file.path)
                 structured_html = (ultra_result or {}).get('html', '')
+                structured_html = ultra.add_ids_to_html(structured_html)
             except Exception as e:
                 print(f"⚠️ Error generating structured HTML: {e}")
                 structured_html = ""
@@ -1285,15 +1286,21 @@ def document_structured(request, document_id):
 @require_POST
 def save_structured_edits(request, document_id):
     try:
+        print("📥 Requête brute:", request.body)
         data = json.loads(request.body)
+        print("📥 JSON décodé:", data)
+        edits = data.get('edits', [])
+        print("📥 Edits reçus:", edits)
+
+        data = json.loads(request.body)
+        doc_id = data.get('document_id')
         edits = data.get('edits', [])
         extraction_score = data.get('extraction_score', None)
 
-        if not edits:
-            return JsonResponse({'success': False, 'error': 'No edits provided'}, status=400)
+        if not doc_id or not edits:
+            return JsonResponse({'success': False, 'error': 'Missing required fields'}, status=400)
 
-        # Use document_id from the URL
-        document = get_object_or_404(RawDocument, id=document_id, owner=request.user)
+        document = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
         if not document.structured_html:
             return JsonResponse({'success': False, 'error': 'No structured HTML to edit'}, status=400)
 
@@ -1302,25 +1309,39 @@ def save_structured_edits(request, document_id):
         total_elements = len(soup.find_all(class_='editable-content'))
 
         for edit in edits:
-            element_id = edit.get('element_id')
-            # Accept both 'new_text' and 'modified'
-            new_text = (edit.get('new_text') or edit.get('modified') or '').strip()
-            if not element_id or new_text == '':
-                continue
-            # Prefer data-element-id, then fallback to id
-            element = soup.find(attrs={'data-element-id': element_id}) or soup.find(id=element_id)
+            print(f"🔎 Traitement edit pour id={element_id}, new_text='{new_text}'")
+            element = soup.find(id=element_id)
+            print("   → Élément trouvé:", element is not None)
             if element:
-                old_text = element.get_text(strip=True)
-                element.clear()
-                element.append(new_text)
-                updated_count += 1
-                MetadataLog.objects.create(
-                    document=document,
-                    field_name='edited_text_' + element_id,
-                    old_value=old_text,
-                    new_value=new_text,
-                    modified_by=request.user
-                )
+                target = element if 'editable-content' in element.get('class', []) else element.find(class_='editable-content')
+                print("   → Target trouvé:", target is not None, "| Texte actuel:", target.text.strip() if target else "None")
+
+            element_id = edit.get('element_id')
+            new_text = (edit.get('new_text') or '').strip()
+            if not element_id:
+                continue
+
+            element = soup.find(id=element_id)
+            if element:
+                # Si l'élément trouvé est directement éditable
+                if 'editable-content' in element.get('class', []):
+                    target = element
+                else:
+                    # Sinon chercher un enfant editable
+                    target = element.find(class_='editable-content')
+
+                if target:
+                    old_text = (target.text or '').strip()
+                    if old_text != new_text:
+                        target.string = new_text
+                        updated_count += 1
+                        MetadataLog.objects.create(
+                            document=document,
+                            field_name='edited_text_' + element_id,
+                            old_value=old_text,
+                            new_value=new_text,
+                            modified_by=request.user
+                        )
 
         if updated_count > 0:
             document.structured_html = str(soup)
@@ -1329,20 +1350,21 @@ def save_structured_edits(request, document_id):
             document.structured_html_generated_at = timezone.now()
             document.save()
 
-        msg_score = f" | Score d'extraction : {extraction_score:.2f}%" if isinstance(extraction_score, (int, float)) else ""
         return JsonResponse({
             'success': True,
-            'message': f"{updated_count} élément(s) mis à jour avec succès{msg_score}",
+            'message': f'{updated_count} élément(s) mis à jour avec succès.'
+                       + (f" Score d'extraction : {extraction_score:.2f}%" if extraction_score else ""),
             'updated_count': updated_count,
-            'saved_count': updated_count,
             'total_elements': total_elements,
             'extraction_score': extraction_score
         })
+
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
     except Exception as e:
         print(f"Error in save_structured_edits: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
 
 @login_required
 def document_detail(request, document_id):
@@ -3259,7 +3281,7 @@ def mistral_analyze_document(request, document_id):
         entity_types = context_analysis.get("entity_types", [])
         print(f"✅ Mistral a proposé {len(entity_types)} types d'entités")
         
-         # Créer ou mettre à jour les types d'annotation dans la base de données
+        # Créer ou mettre à jour les types d'annotation dans la base de données
         created_types = []
         for entity_type in entity_types:
             name = entity_type.get("name", "").lower().strip()
@@ -3324,8 +3346,16 @@ def mistral_analyze_document(request, document_id):
             'error': f"Une erreur est survenue: {str(e)}"
         }, status=500)
 
-        # Dans views.py
+        
+from bs4 import BeautifulSoup
 from django.views.decorators.csrf import csrf_protect
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from django.views.decorators.http import require_POST
+import json
+
+from .models import RawDocument, MetadataLog
 
 @csrf_protect
 @login_required
@@ -3334,28 +3364,62 @@ def save_edited_text(request):
     try:
         data = json.loads(request.body)
         doc_id = data.get('document_id')
-        element_id = data.get('element_id')
-        new_text = data.get('new_text')
+        edits = data.get('edits', [])
+        print(f"Received data: document_id={doc_id}, edits={edits}")  # Debug log
 
-        document = get_object_or_404(RawDocument, id=doc_id, owner=request.user)  # Vérifier les permissions
+        if not doc_id or not edits:
+            print("Missing required fields")
+            return JsonResponse({'success': False, 'error': 'Missing required fields'}, status=400)
 
-        # Logique de mise à jour : par exemple, régénérez le HTML avec le nouveau texte
-        # Pour simplicité, on suppose que vous stockez le HTML édité entier
-        # Ici, une implémentation basique : remplacez dans structured_html
-        updated_html = document.structured_html.replace('OLD_TEXT_PLACEHOLDER', new_text)  # Adaptez à votre logique réelle
+        document = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
+        print(f"Document found: {document.id}, structured_html exists: {bool(document.structured_html)}")
 
-        document.structured_html = updated_html  # Ou un nouveau champ edited_structured_html
-        document.save()
+        if not document.structured_html:
+            print("No structured HTML")
+            return JsonResponse({'success': False, 'error': 'No structured HTML to edit'}, status=400)
 
-        # Optionnel : Loggez la modification
-        MetadataLog.objects.create(
-            document=document,
-            field_name='edited_text',
-            old_value='Ancien texte',  # Récupérez l'ancien si possible
-            new_value=new_text,
-            modified_by=request.user
-        )
+        soup = BeautifulSoup(document.structured_html, 'html.parser')
+        updated_count = 0
 
-        return JsonResponse({'success': True, 'message': 'Texte mis à jour'})
+        for edit in edits:
+            element_id = edit.get('element_id')
+            new_text = edit.get('new_text', '').strip()
+            print(f"Processing edit: element_id={element_id}, new_text={new_text}")  # Debug log
+
+            if not element_id or not new_text:
+                print("Skipping edit: missing element_id or new_text")
+                continue
+
+            element = soup.find(id=element_id)
+            if element:
+                old_text = element.text.strip()
+                print(f"Found element: id={element_id}, old_text={old_text}")  # Debug log
+                element.string = new_text
+                updated_count += 1
+
+                MetadataLog.objects.create(
+                    document=document,
+                    field_name='edited_text_' + element_id,
+                    old_value=old_text,
+                    new_value=new_text,
+                    modified_by=request.user
+                )
+            else:
+                print(f"Element not found: id={element_id}")  # Debug log
+
+        if updated_count > 0:
+            document.structured_html = str(soup)
+            document.save()
+            print(f"Updated {updated_count} elements, saved document")  # Debug log
+
+        return JsonResponse({
+            'success': True,
+            'message': f'{updated_count} élément(s) mis à jour avec succès',
+            'updated_count': updated_count
+        })
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {str(e)}")  # Debug log
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
     except Exception as e:
+        print(f"Error in save_edited_text: {str(e)}")  # Debug log
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

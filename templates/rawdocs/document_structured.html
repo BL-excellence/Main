@@ -6,14 +6,14 @@
 {% block extra_css %}
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <style>
-    /* ===== Header style imported from document_structured_ex (scoped) ===== */
+    /* ===== Modern Pharmaceutical Header Style ===== */
     .structured-header {
         position: relative;
         overflow: hidden;
         border-radius: 24px;
         padding: 32px;
         color: #fff;
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 40%, var(--secondary) 100%);
+        background: linear-gradient(135deg, var(--primary, #3b82f6) 0%, var(--primary-light, #60a5fa) 40%, var(--secondary, #8b5cf6) 100%);
         box-shadow: 0 25px 50px -12px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.05) inset;
         margin-bottom: 24px;
         border: none;
@@ -44,16 +44,19 @@
         content: '';
         position: absolute;
         top: -2px; left: -2px; right: -2px; bottom: -2px;
-        background: linear-gradient(135deg, var(--primary), var(--primary-light), var(--secondary));
+        background: linear-gradient(135deg, var(--primary, #3b82f6), var(--primary-light, #60a5fa), var(--secondary, #8b5cf6));
         border-radius: 26px;
         z-index: -1;
         opacity: 0.3;
         filter: blur(8px);
     }
 
-    .sh-content { position: relative; z-index: 2; }
+    .sh-content { 
+        position: relative; 
+        z-index: 2; 
+    }
 
-    .sh-top {
+    .header {
         display: grid;
         grid-template-columns: 1fr auto;
         gap: 24px;
@@ -61,14 +64,17 @@
         margin-bottom: 24px;
     }
 
-    .sh-main-info {
+    .main-info {
         display: flex;
         align-items: flex-start;
         gap: 20px;
         min-width: 0;
     }
 
-    .icon-container { position: relative; flex-shrink: 0; }
+    .icon-container { 
+        position: relative; 
+        flex-shrink: 0; 
+    }
 
     .icon-chip {
         width: 72px;
@@ -94,18 +100,28 @@
         transition: transform 0.6s;
     }
 
-    .icon-chip:hover::before { transform: translateX(100%); }
+    .icon-chip:hover::before { 
+        transform: translateX(100%); 
+    }
 
     .icon-chip:hover {
         transform: translateY(-2px);
         box-shadow: 0 12px 24px rgba(0,0,0,0.15);
     }
 
-    .icon-chip i { font-size: 28px; color: #fff; z-index: 1; position: relative; }
+    .icon-chip i { 
+        font-size: 28px; 
+        color: #fff; 
+        z-index: 1; 
+        position: relative; 
+    }
 
-    .title-section { min-width: 0; flex: 1; }
+    .title-section { 
+        min-width: 0; 
+        flex: 1; 
+    }
 
-    .document-title {
+    .header h1 {
         margin: 0;
         font-size: 2rem;
         line-height: 1.2;
@@ -116,10 +132,10 @@
         background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.9) 100%);
         -webkit-background-clip: text;
         background-clip: text;
-        color: #fff; /* ensure visible on gradient */
+        color: #fff;
     }
 
-    .document-subtitle {
+    .metadata {
         display: flex;
         flex-wrap: wrap;
         gap: 16px;
@@ -128,10 +144,33 @@
         opacity: 0.95;
     }
 
-    .subtitle-item { display: flex; align-items: center; gap: 6px; font-weight: 500; }
-    .subtitle-item i { opacity: 0.8; font-size: 0.9rem; }
+    .metadata p { 
+        display: flex; 
+        align-items: center; 
+        gap: 6px; 
+        font-weight: 500; 
+        margin: 0;
+    }
 
-    .sh-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start; }
+    .metadata p::before {
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+        opacity: 0.8;
+        font-size: 0.9rem;
+    }
+
+    .metadata p:first-child::before { content: '\f292'; } /* hashtag */
+    .metadata p:nth-child(2)::before { content: '\f15c'; } /* file-lines */
+    .metadata p:nth-child(3)::before { content: '\f0ac'; } /* globe */
+    .metadata p:nth-child(4)::before { content: '\f1ab'; } /* language */
+
+    .actions { 
+        display: flex; 
+        gap: 12px; 
+        flex-wrap: wrap; 
+        justify-content: flex-end; 
+        align-items: flex-start; 
+    }
 
     .btn {
         display: inline-flex;
@@ -148,6 +187,7 @@
         backdrop-filter: blur(12px);
         transition: all 0.3s ease;
         white-space: nowrap;
+        cursor: pointer;
     }
 
     .btn:hover {
@@ -155,9 +195,16 @@
         transform: translateY(-1px);
         box-shadow: 0 8px 16px rgba(0,0,0,0.15);
         border-color: rgba(255,255,255,0.4);
+        color: #fff;
+        text-decoration: none;
     }
 
-    .btn-primary { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); position: relative; overflow: hidden; }
+    .btn-primary { 
+        background: rgba(255,255,255,0.2); 
+        border-color: rgba(255,255,255,0.3); 
+        position: relative; 
+        overflow: hidden; 
+    }
 
     .btn-primary::before {
         content: '';
@@ -168,10 +215,20 @@
         transition: transform 0.6s;
     }
 
-    .btn-primary:hover::before { transform: translateX(100%); }
-    .btn-primary:hover { background: rgba(255,255,255,0.25); transform: translateY(-2px); }
+    .btn-primary:hover::before { 
+        transform: translateX(100%); 
+    }
 
-    .sh-metadata { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn-primary:hover { 
+        background: rgba(255,255,255,0.25); 
+        transform: translateY(-2px); 
+    }
+
+    .details {
+        display: flex; 
+        flex-wrap: wrap; 
+        gap: 12px; 
+    }
 
     .meta-badge {
         display: inline-flex;
@@ -188,70 +245,321 @@
         transition: all 0.3s ease;
     }
 
-    .meta-badge:hover { background: rgba(255,255,255,0.18); transform: translateY(-1px); }
-    .meta-badge i { opacity: 0.9; font-size: 0.8rem; }
-
-    .meta-badge.success { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.3); color: #fff; }
-    .meta-badge.warning { background: rgba(251,191,36,0.15); border-color: rgba(251,191,36,0.3); color: #fff; }
-    .meta-badge.info { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.3); color: #fff; }
-
-    /* Responsive design from example */
-    @media (max-width: 768px) {
-        .structured-header { padding: 24px; border-radius: 20px; }
-        .sh-top { grid-template-columns: 1fr; gap: 20px; }
-        .sh-main-info { gap: 16px; }
-        .icon-chip { width: 60px; height: 60px; border-radius: 16px; }
-        .icon-chip i { font-size: 24px; }
-        .document-title { font-size: 1.5rem; }
-        .document-subtitle { flex-direction: column; gap: 8px; }
-        .sh-actions { justify-content: flex-start; gap: 8px; }
-        .btn { padding: 10px 14px; font-size: 0.85rem; }
-        .sh-metadata { gap: 8px; }
-        .meta-badge { padding: 8px 12px; font-size: 0.8rem; }
+    .meta-badge:hover { 
+        background: rgba(255,255,255,0.18); 
+        transform: translateY(-1px); 
     }
 
-    @media (max-width: 480px) {
-        .sh-main-info { flex-direction: column; align-items: flex-start; gap: 16px; }
-        .document-subtitle { gap: 12px; }
-        .sh-actions { width: 100%; }
-        .btn { flex: 1; justify-content: center; }
+    .meta-badge i { 
+        opacity: 0.9; 
+        font-size: 0.8rem; 
     }
 
-    /* Content card to display structured HTML below header */
-    .content-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
-    .empty { text-align: center; padding: 40px 10px; color: #6b7280; }
+    .meta-badge.success { 
+        background: rgba(34,197,94,0.15); 
+        border-color: rgba(34,197,94,0.3); 
+        color: #fff; 
+    }
 
-    /* Ensure editable areas are actually editable and show caret */
-    #structured-host, .content-card { user-select: text; -webkit-user-select: text; }
+    .meta-badge.warning { 
+        background: rgba(251,191,36,0.15); 
+        border-color: rgba(251,191,36,0.3); 
+        color: #fff; 
+    }
+
+    .meta-badge.info { 
+        background: rgba(59,130,246,0.15); 
+        border-color: rgba(59,130,246,0.3); 
+        color: #fff; 
+    }
+
+    /* Content Card */
+    .content-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .content-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary, #3b82f6), var(--secondary, #8b5cf6));
+        border-radius: 16px 16px 0 0;
+    }
+
+    .content-card:hover {
+        box-shadow: 0 10px 25px -3px rgba(0,0,0,0.1);
+        transform: translateY(-1px);
+    }
+
+    /* Toolbar */
+    .toolbar {
+        position: sticky;
+        top: 8px;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        padding: 12px 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        z-index: 50;
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        backdrop-filter: blur(20px);
+        align-items: center;
+    }
+
+    .toolbar button {
+        background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+        color: #fff;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+    }
+
+    .toolbar button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Save Button */
+    #save-edits-btn {
+        background: linear-gradient(135deg, #16a34a 0%, #0891b2 100%);
+        color: #fff;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.3);
+    }
+
+    #save-edits-btn:hover {
+        filter: brightness(1.05);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(22, 163, 74, 0.4);
+    }
+
+    #save-edits-btn:active {
+        transform: translateY(0);
+    }
+
+    #save-edits-btn::before {
+        content: '\f0c7';
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+    }
+
+    /* Save Status */
+    #save-status {
+        margin-top: 12px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        min-height: 20px;
+    }
+
+    #save-status:not(:empty) {
+        background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+        border: 1px solid #bbf7d0;
+        color: #15803d;
+    }
+
+    /* Editable Content */
+    .editable-content {
+        border: 2px dashed transparent;
+        padding: 8px;
+        min-height: 24px;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    .editable-content:hover {
+        border-color: rgba(59, 130, 246, 0.3);
+        background: rgba(59, 130, 246, 0.02);
+    }
+
+    .editable-content:focus,
+    .editable-content[contenteditable="true"]:focus {
+        border-color: #3b82f6;
+        outline: none;
+        background: rgba(59, 130, 246, 0.05);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
     [contenteditable="true"] {
-        outline: 1px dashed rgba(0,0,0,0.2);
+        outline: none;
         cursor: text;
         user-select: text;
         -webkit-user-select: text;
-        caret-color: auto;
+        caret-color: #3b82f6;
     }
-    /* Avoid accidental blocking of pointer events */
-    #structured-host * { pointer-events: auto; }
 
-    .editable-content {
-        border: 1px dashed #ccc;
-        padding: 5px;
-        min-height: 20px;
+    #structured-host {
+        user-select: text;
+        -webkit-user-select: text;
+        line-height: 1.6;
     }
-    .editable-content:focus {
-        border-color: #007bff;
-        outline: none;
+
+    #structured-host * {
+        pointer-events: auto;
     }
-.pharma-save {
-    background: linear-gradient(135deg, #16a34a 0%, #0891b2 100%);
-    border: none;
-    color: #fff;
-}
-.pharma-save:hover {
-    filter: brightness(1.05);
-    transform: translateY(-1px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-}
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #64748b;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+
+    .empty-state p {
+        font-size: 1.1rem;
+        margin: 0;
+    }
+
+    /* Loading animation */
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .loading {
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .structured-header { 
+            padding: 24px; 
+            border-radius: 20px; 
+        }
+        
+        .header { 
+            grid-template-columns: 1fr; 
+            gap: 20px; 
+        }
+        
+        .main-info { 
+            gap: 16px; 
+        }
+        
+        .icon-chip { 
+            width: 60px; 
+            height: 60px; 
+            border-radius: 16px; 
+        }
+        
+        .icon-chip i { 
+            font-size: 24px; 
+        }
+        
+        .header h1 { 
+            font-size: 1.5rem; 
+        }
+        
+        .metadata { 
+            flex-direction: column; 
+            gap: 8px; 
+        }
+        
+        .actions { 
+            justify-content: flex-start; 
+            gap: 8px; 
+        }
+        
+        .btn { 
+            padding: 10px 14px; 
+            font-size: 0.85rem; 
+        }
+        
+        .details { 
+            gap: 8px; 
+        }
+        
+        .meta-badge { 
+            padding: 8px 12px; 
+            font-size: 0.8rem; 
+        }
+
+        .content-card {
+            padding: 16px;
+            border-radius: 12px;
+        }
+
+        .toolbar {
+            flex-direction: column;
+            gap: 8px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .main-info { 
+            flex-direction: column; 
+            align-items: flex-start; 
+            gap: 16px; 
+        }
+        
+        .metadata { 
+            gap: 12px; 
+        }
+        
+        .actions { 
+            width: 100%; 
+        }
+        
+        .btn { 
+            flex: 1; 
+            justify-content: center; 
+        }
+    }
+
+    /* Micro animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .content-card {
+        animation: fadeInUp 0.6s ease-out;
+    }
+
+    .structured-header {
+        animation: fadeInUp 0.4s ease-out;
+    }
 </style>
 {% endblock %}
 
@@ -259,49 +567,43 @@
 <div class="container-fluid py-4">
     <div class="structured-header">
         <div class="sh-content">
-            <div class="sh-top">
-                <div class="sh-main-info">
+            <div class="header">
+                <div class="main-info">
                     <div class="icon-container">
                         <div class="icon-chip">
                             <i class="fas fa-layer-group"></i>
                         </div>
                     </div>
                     <div class="title-section">
-                        <h1 class="document-title">{{ document.title|default:"Document" }}</h1>
-                        <div class="document-subtitle">
-                            <div class="subtitle-item">
-                                <i class="fas fa-hashtag"></i>
-                                <span>Doc #{{ document.id }}</span>
-                            </div>
+                        <h1>{{ document.title|default:"Document" }}</h1>
+                        <div class="metadata">
+                            <p>Doc #{{ document.id }}</p>
                             {% if document.doc_type %}
-                            <div class="subtitle-item">
-                                <i class="far fa-file-lines"></i>
-                                <span>{{ document.doc_type }}</span>
-                            </div>
+                                <p>{{ document.doc_type }}</p>
                             {% endif %}
                             {% if document.country %}
-                            <div class="subtitle-item">
-                                <i class="fas fa-globe"></i>
-                                <span>{{ document.country }}</span>
-                            </div>
+                                <p>{{ document.country }}</p>
                             {% endif %}
                             {% if document.language %}
-                            <div class="subtitle-item">
-                                <i class="fas fa-language"></i>
-                                <span>{{ document.language }}</span>
-                            </div>
+                                <p>{{ document.language }}</p>
                             {% endif %}
                         </div>
                     </div>
                 </div>
-                <div class="sh-actions">
-                    <a class="btn" href="{% url 'rawdocs:document_list' %}"><i class="fas fa-arrow-left"></i> Retour</a>
-                    <a class="btn" href="{% url 'rawdocs:view_original_document' document.id %}" target="_blank"><i class="fas fa-file-pdf"></i> PDF original</a>
-                    <a class="btn btn-primary" href="?regen=1"><i class="fas fa-rotate"></i> Régénérer</a>
+                <div class="actions">
+                    <a class="btn" href="{% url 'rawdocs:document_list' %}">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </a>
+                    <a class="btn" href="{% url 'rawdocs:view_original_document' document.id %}" target="_blank">
+                        <i class="fas fa-file-pdf"></i> PDF original
+                    </a>
+                    <a class="btn btn-primary" href="?regen=1">
+                        <i class="fas fa-rotate"></i> Régénérer
+                    </a>
                 </div>
             </div>
 
-            <div class="sh-metadata">
+            <div class="details">
                 {% if structured_html_method %}
                 <span class="meta-badge info">
                     <i class="fas fa-cogs"></i>
@@ -325,192 +627,215 @@
     </div>
 
     <div class="content-card">
-        <div id="save-status" style="margin-bottom: 10px; color: #555;"></div>
-        {% if structured_html %}
+        <div class="toolbar">
+            <button id="toggle-edit" type="button">Mode édition: ON</button>
+        </div>
+
         <div id="structured-host">
-            {{ structured_html|safe }}
+            {% if structured_html %}
+                {{ structured_html|safe }}
+            {% else %}
+                <div class="empty-state">
+                    <i class="far fa-file"></i>
+                    <p>Aucun contenu structuré disponible pour l'instant. Cliquez sur "Régénérer".</p>
+                </div>
+            {% endif %}
         </div>
-        <button id="save-edits" class="btn btn-primary pharma-save" style="margin-top: 10px;">Sauvegarder</button>
-        {% else %}
-        <div class="empty">
-            <i class="far fa-file"></i>
-            <p>Aucun contenu structuré disponible pour l'instant. Cliquez sur "Régénérer".</p>
-        </div>
-        {% endif %}
+
+        <!-- Bouton Sauvegarder et statut -->
+        <button id="save-edits-btn"></button>
+        <div id="save-status"></div>
+
+        <!-- Conteneur caché pour le token CSRF -->
+        <form id="csrf-placeholder" style="display:none;">
+            {% csrf_token %}
+        </form>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.getElementById('save-edits').addEventListener('click', function() {
-    const edits = collectEdits();
-    console.log('Modifications collectées :', edits); // Ajout pour débogage
-    const status = document.getElementById('save-status');
-    if (!edits.length) {
-        status.textContent = 'Aucun changement à sauvegarder.';
-        return;
-    }
-    status.textContent = 'Sauvegarde en cours…';
+    console.log('Script chargé immédiatement');
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM chargé, ajout des écouteurs...');
 
-    function getCookie(name) {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-        return '';
-    }
+        // Sélectionner tous les éléments éditables
+        const editables = document.querySelectorAll('.editable-content');
+        console.log('Éléments éditables trouvés :', editables.length);
 
-    fetch('{% url "rawdocs:save_structured_edits" document.id %}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') && document.querySelector('[name=csrfmiddlewaretoken]').value) || getCookie('csrftoken') || ''
-        },
-        body: JSON.stringify({ edits })
-    })
-    .then(response => {
-        console.log('Réponse serveur :', response); // Ajout pour débogage
-        if (!response.ok) throw new Error('Erreur serveur : ' + response.statusText);
-        return response.json();
-    })
-    .then(data => {
-        console.log('Données reçues :', data); // Ajout pour débogage
-        if (data.success) {
-            status.textContent = `Sauvegardé: ${data.saved_count} élément(s)`;
-            edits.forEach(edit => {
-                const el = document.querySelector(`.editable-content[data-element-id="${edit.element_id}"]`);
-                if (el) el.setAttribute('data-original-text', edit.modified);
-            });
-            alert(data.message || 'Modifications enregistrées !');
-        } else {
-            status.textContent = 'Erreur: ' + data.message;
-            alert('Erreur : ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Erreur AJAX :', error); // Ajout pour débogage
-        status.textContent = 'Erreur réseau : ' + error.message;
-        alert('Erreur réseau : ' + error.message);
-    });
-});
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Sélectionner tous les éléments éditables
-    const editables = document.querySelectorAll('.editable-content');
-
-    editables.forEach(function(editable, index) {
-        // Ajouter un identifiant unique si absent
-        if (!editable.closest('.ultra-element').hasAttribute('data-element-id')) {
-            editable.closest('.ultra-element').setAttribute('data-element-id', 'text-block-' + index);
-        }
-
-        // Initialiser le texte initial une seule fois et ne pas le modifier ensuite
-        if (!editable.hasAttribute('data-initial-text')) {
-            const initial = (editable.innerText || editable.textContent || '').trim();
-            editable.setAttribute('data-initial-text', initial);
-        }
-    });
-
-    // Fonction pour collecter les modifications
-    function collectEdits() {
-        const edits = [];
-        document.querySelectorAll('.editable-content').forEach(el => {
-            const elementId = el.getAttribute('data-element-id') || '';
-            const original = el.getAttribute('data-initial-text') || '';
-            const modified = (el.innerText || el.textContent || '').trim();
-            if (elementId && original !== modified) {
-                edits.push({ type: 'text', element_id: elementId, original, new_text: modified, modified });
+        // Ajouter des identifiants uniques et stocker le texte original
+        editables.forEach(function(editable, index) {
+            const parent = editable.closest('.ultra-element');
+            if (parent && !parent.hasAttribute('id')) {
+                parent.setAttribute('id', 'text-block-' + index);
             }
+            editable.setAttribute('data-original-text', editable.innerHTML.trim());
         });
-        return edits;
-    }
 
-    // Sauvegarde manuelle via le bouton
-    const saveButton = document.getElementById('save-edits');
-    if (saveButton) {
-        saveButton.addEventListener('click', function() {
-            const edits = collectEdits();
-            const status = document.getElementById('save-status');
-            if (!edits.length) {
-                status.textContent = 'Aucun changement à sauvegarder.';
-                return;
-            }
-            status.textContent = 'Sauvegarde en cours…';
+        // Fonction pour collecter les modifications
+        function collectEdits() {
+            const edits = [];
+            document.querySelectorAll('.editable-content').forEach(function(el) {
+                const parent = el.closest('.ultra-element');
+                const elementId = parent ? parent.getAttribute('id') : null;
+                const original = el.getAttribute('data-original-text') || '';
+                const modified = el.innerHTML.trim();
 
-            fetch('{% url "rawdocs:save_structured_edits" document.id %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : ''
-                },
-                body: JSON.stringify({ edits })
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('Erreur serveur : ' + response.statusText);
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    status.textContent = `Sauvegardé: ${data.updated_count || data.saved_count || 0} élément(s)`;
-                    // Mettre à jour les originaux après sauvegarde
-                    edits.forEach(edit => {
-                        const el = document.querySelector(`.editable-content[data-element-id="${edit.element_id}"]`);
-                        if (el) el.setAttribute('data-original-text', edit.modified || edit.new_text);
+                if (elementId && original !== modified) {
+                    edits.push({
+                        element_id: elementId,
+                        new_text: modified
                     });
-                    alert(data.message || 'Modifications enregistrées !');
-                } else {
-                    status.textContent = 'Erreur: ' + data.message;
-                    alert('Erreur : ' + data.message);
                 }
-            })
-            .catch(error => {
-                status.textContent = 'Erreur réseau : ' + error.message;
-                alert('Erreur réseau : ' + error.message);
             });
-        });
-    }
+            console.log('Modifications collectées :', edits);
+            return edits;
+        }
 
-    // Fonctionnalités supplémentaires
-    (function() {
+        // Gestionnaire pour le bouton Sauvegarder
+        const saveButton = document.getElementById('save-edits-btn');
+        console.log('Bouton trouvé :', saveButton);
+        const status = document.getElementById('save-status');
+
+        if (saveButton) {
+            saveButton.addEventListener('click', function() {
+                console.log('Clic sur Sauvegarder détecté');
+                
+                // Animation du bouton
+                saveButton.classList.add('loading');
+                saveButton.style.transform = 'scale(0.95)';
+                
+                const edits = collectEdits();
+                if (edits.length === 0) {
+                    status.textContent = 'Aucun changement à sauvegarder.';
+                    status.style.background = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
+                    status.style.borderColor = '#f59e0b';
+                    status.style.color = '#92400e';
+                    saveButton.classList.remove('loading');
+                    saveButton.style.transform = '';
+                    return;
+                }
+                
+                status.textContent = 'Sauvegarde en cours…';
+                status.style.background = 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)';
+                status.style.borderColor = '#3b82f6';
+                status.style.color = '#1d4ed8';
+                
+                const csrfToken = document.querySelector('[name="csrfmiddlewaretoken"]')?.value;
+                console.log('CSRF Token :', csrfToken);
+
+                fetch("{% url 'rawdocs:save_edited_text' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken || ''
+                    },
+                    body: JSON.stringify({
+                        document_id: {{ document.id }},
+                        edits: edits
+                    })
+                })
+                .then(function(response) {
+                    console.log('Réponse serveur :', response);
+                    if (!response.ok) {
+                        throw new Error('Erreur serveur : ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(function(data) {
+                    console.log('Données reçues :', data);
+                    saveButton.classList.remove('loading');
+                    saveButton.style.transform = '';
+                    
+                    if (data.success) {
+                        status.textContent = 'Sauvegardé : ' + data.updated_count + ' élément(s)';
+                        status.style.background = 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)';
+                        status.style.borderColor = '#bbf7d0';
+                        status.style.color = '#15803d';
+                        
+                        edits.forEach(function(edit) {
+                            const el = document.querySelector('.editable-content[id="' + edit.element_id + '"]') ||
+                                      document.querySelector('.ultra-element[id="' + edit.element_id + '"] .editable-content');
+                            if (el) {
+                                el.setAttribute('data-original-text', edit.new_text);
+                            }
+                        });
+                        
+                        // Animation de succès
+                        saveButton.style.transform = 'scale(1.05)';
+                        setTimeout(() => {
+                            saveButton.style.transform = '';
+                        }, 200);
+                        
+                        if (data.extraction_score) {
+                            status.textContent += ' | Score d\'extraction : ' + data.extraction_score.toFixed(2) + '%';
+                        }
+                    } else {
+                        status.textContent = 'Erreur : ' + data.error;
+                        status.style.background = 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)';
+                        status.style.borderColor = '#fca5a5';
+                        status.style.color = '#dc2626';
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Erreur AJAX :', error);
+                    saveButton.classList.remove('loading');
+                    saveButton.style.transform = '';
+                    status.textContent = 'Erreur réseau : ' + error.message;
+                    status.style.background = 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)';
+                    status.style.borderColor = '#fca5a5';
+                    status.style.color = '#dc2626';
+                });
+            });
+        } else {
+            console.error('Bouton save-edits-btn non trouvé dans le DOM');
+        }
+
+        // Fonction pour activer/désactiver le mode édition
         function setEditable(on) {
             const host = document.getElementById('structured-host') || document;
-            host.querySelectorAll('.editable-content, .table-cell-editable')
-                .forEach(el => el.setAttribute('contenteditable', on ? 'true' : 'false'));
-            const btn = document.getElementById('toggle-edit');
-            if (btn) btn.textContent = on ? 'Mode édition: ON' : 'Mode édition: OFF';
+            host.querySelectorAll('.editable-content, .table-cell-editable').forEach(function(el) {
+                el.setAttribute('contenteditable', on ? 'true' : 'false');
+            });
+            const toggleButton = document.getElementById('toggle-edit');
+            if (toggleButton) {
+                toggleButton.textContent = on ? 'Mode édition: ON' : 'Mode édition: OFF';
+                toggleButton.style.background = on ? 
+                    'linear-gradient(135deg, #16a34a 0%, #059669 100%)' : 
+                    'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+            }
         }
 
-        const bar = document.createElement('div');
-        bar.style = 'position:sticky;top:8px;background:#fff;padding:8px;border:1px solid #eee;border-radius:8px;z-index:50;display:flex;gap:8px;';
-        bar.innerHTML = `
-            <button id="toggle-edit" type="button">Mode édition: ON</button>
-        `;
-        const host = document.querySelector('.content-card');
-        if (host) host.prepend(bar);
-
+        // Initialiser le mode édition
         setEditable(true);
 
-        setTimeout(() => {
-            const hasAnyEditable = document.querySelector('[contenteditable="true"]');
-            const structured = document.getElementById('structured-host');
-            if (!hasAnyEditable && structured) {
-                structured.setAttribute('contenteditable', 'true');
-                structured.classList.add('editable-content');
-            }
-        }, 0);
+        // Gestionnaire pour basculer le mode édition
+        const toggleButton = document.getElementById('toggle-edit');
+        if (toggleButton) {
+            toggleButton.addEventListener('click', function() {
+                const isEditable = document.querySelector('.editable-content[contenteditable="true"], .table-cell-editable[contenteditable="true"], #structured-host[contenteditable="true"]') !== null;
+                setEditable(!isEditable);
+                const structured = document.getElementById('structured-host');
+                if (structured && !structured.querySelector('[contenteditable="true"]')) {
+                    structured.setAttribute('contenteditable', !isEditable ? 'true' : 'false');
+                }
+            });
+        }
 
-        document.getElementById('toggle-edit').addEventListener('click', () => {
-            const on = document.querySelector('.editable-content[contenteditable="true"], .table-cell-editable[contenteditable="true"], #structured-host[contenteditable="true"]') !== null;
-            setEditable(!on);
-            const structured = document.getElementById('structured-host');
-            if (structured && !structured.querySelector('[contenteditable="true"]')) {
-                structured.setAttribute('contenteditable', (!on) ? 'true' : 'false');
+        // Ajouter des effets visuels lors de l'édition
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('editable-content') || e.target.closest('.editable-content')) {
+                const element = e.target.classList.contains('editable-content') ? e.target : e.target.closest('.editable-content');
+                element.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.2)';
+                element.style.transform = 'scale(1.01)';
+                
+                setTimeout(() => {
+                    element.style.boxShadow = '';
+                    element.style.transform = '';
+                }, 1000);
             }
         });
-    })();
-});
-
-
-
+    });
 </script>
 {% endblock %}
