@@ -14,6 +14,7 @@ from collections import defaultdict, Counter
 import pickle
 import tempfile
 from io import BytesIO
+from bs4 import BeautifulSoup
 
 # Imports pour extraction PDF
 try:
@@ -2562,3 +2563,10 @@ class UltraAdvancedPDFExtractor:
         
         # Joindre les lignes avec des espaces (seront normalisés après)
         return '\n'.join(text_parts)
+
+    def add_ids_to_html(html_content):
+        soup = BeautifulSoup(html_content, 'html.parser')
+        for i, element in enumerate(soup.find_all(['div', 'p', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])):
+            if not element.get('id'):
+                element['id'] = f'element-{i+1}'
+        return str(soup)    
