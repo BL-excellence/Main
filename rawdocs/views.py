@@ -3379,44 +3379,92 @@ def save_edited_text(request):
             return JsonResponse({'success': False, 'error': 'No structured HTML to edit'}, status=400)
 
         soup = BeautifulSoup(document.structured_html, 'html.parser')
+        
+        # Debug temporaire - à supprimer après résolution
+        print("=== DEBUG HTML Structure ===")
+        print(f"HTML length: {len(document.structured_html)} characters")
+        print(f"First 500 chars of HTML:\n{document.structured_html[:500]}")
+        
+        all_elements_with_ids = soup.find_all(lambda tag: tag.get('id') or tag.get('data-id') or tag.get('data-element-id'))
+        print(f"Total elements with IDs found: {len(all_elements_with_ids)}")
+        
+        # Montrer tous les éléments avec du texte (même sans ID)
+        all_text_elements = soup.find_all(['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+        print(f"Total text elements found: {len(all_text_elements)}")
+        for i, elem in enumerate(all_text_elements[:5]):  # Limiter à 5 pour éviter trop de logs
+            elem_text = elem.get_text(strip=True)[:50]
+            elem_id = elem.get('id') or elem.get('data-id') or elem.get('data-element-id') or 'NO_ID'
+            print(f"Element {i}: tag={elem.name}, id='{elem_id}', text='{elem_text}...'")
+        
+        print("=== END DEBUG ===")
+        
         updated_count = 0
+        not_found_elements = []
 
+        # Remplace la boucle actuelle par ceci
         for edit in edits:
             element_id = edit.get('element_id')
-            new_text = edit.get('new_text', '').strip()
+            # Ne pas filtrer les chaînes vides: l'utilisateur peut vouloir effacer le texte
+            new_text = edit.get('new_text')
+            if isinstance(new_text, str):
+                new_text = new_text.strip()
             print(f"Processing edit: element_id={element_id}, new_text={new_text}")  # Debug log
-
-            if not element_id or not new_text:
-                print("Skipping edit: missing element_id or new_text")
+            
+            if not element_id:
+                print("Skipping edit: missing element_id")
                 continue
-
+                
+            # Stratégies de lookup
             element = soup.find(id=element_id)
-            if element:
-                old_text = element.text.strip()
-                print(f"Found element: id={element_id}, old_text={old_text}")  # Debug log
-                element.string = new_text
+            if not element:
+                element = soup.find(attrs={'data-id': element_id}) or soup.find(attrs={'data-element-id': element_id})
+            if not element:
+                # Essais avec préfixes/suffixes courants
+                candidates = soup.select(
+                    f"[id$='-{element_id}'], [id^='{element_id}-'], "
+                    f"[data-id$='-{element_id}'], [data-id^='{element_id}-']"
+                )
+                element = candidates[0] if candidates else None
+                
+            if element is not None:
+                old_text = element.get_text(strip=True)
+                found_identifier = element.get('id') or element.get('data-id') or element.get('data-element-id')
+                print(f"Found element: id={found_identifier}, old_text={old_text}")  # Debug log
+                
+                # Remplacer le contenu proprement (préserve la structure)
+                from bs4 import NavigableString
+                element.clear()
+                element.append(NavigableString(new_text if new_text is not None else ''))
                 updated_count += 1
-
+                
                 MetadataLog.objects.create(
                     document=document,
-                    field_name='edited_text_' + element_id,
+                    field_name='edited_text_' + str(element_id),
                     old_value=old_text,
                     new_value=new_text,
                     modified_by=request.user
                 )
             else:
                 print(f"Element not found: id={element_id}")  # Debug log
+                not_found_elements.append(element_id)
 
         if updated_count > 0:
             document.structured_html = str(soup)
             document.save()
             print(f"Updated {updated_count} elements, saved document")  # Debug log
 
+        # Amélioration du message de retour
+        message = f'{updated_count} élément(s) mis à jour avec succès'
+        if not_found_elements:
+            message += f'. {len(not_found_elements)} élément(s) non trouvé(s): {", ".join(not_found_elements)}'
+
         return JsonResponse({
             'success': True,
-            'message': f'{updated_count} élément(s) mis à jour avec succès',
-            'updated_count': updated_count
+            'message': message,
+            'updated_count': updated_count,
+            'not_found_elements': not_found_elements
         })
+        
     except json.JSONDecodeError as e:
         print(f"JSON decode error: {str(e)}")  # Debug log
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
