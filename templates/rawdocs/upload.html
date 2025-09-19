@@ -539,6 +539,29 @@
     overflow: auto;
     box-shadow: inset 0 2px 8px rgba(14,165,233,0.08);
   }
+  /* Actions éditeur structuré (upload) */
+  .upload-structured-actions {
+    display: flex; gap: .5rem; justify-content: flex-end; align-items: center; margin-bottom: .5rem;
+  }
+  .upload-structured-actions .btn {
+    border: 1px solid var(--card-border);
+    background: #fff;
+  }
+  /* Ne pas écraser le style primaire dans la barre d'actions */
+  .upload-structured-actions .btn.btn-primary {
+    border: none;
+    background: linear-gradient(135deg, var(--accent), var(--primary-light));
+    color: #fff;
+    box-shadow: 0 8px 25px rgba(14,165,233,0.16);
+  }
+  /* Toast upload */
+  #ul-toast { position: fixed; top: 16px; right: 16px; z-index: 2000; display: none; }
+  #ul-toast .toast-box {
+    background: rgba(17,24,39,0.95); color: #fff; padding: 10px 14px; border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2); font-weight: 600; min-width: 220px;
+  }
+  #ul-toast.success .toast-box { background: rgba(16,185,129,0.95); }
+  #ul-toast.error .toast-box { background: rgba(239,68,68,0.95); }
 
   /* Styles pour le contenu ultra-faithful (hérités de document_structured) */
   .structured-display .ultra-faithful-pdf-document {
@@ -901,11 +924,22 @@
 
     <!-- Contenu structuré (par défaut) -->
     <div id="structured-content" class="content-panel active">
-      {% if structured_html %}
-        <div class="structured-display">
-          {{ structured_html|safe }}
-        </div>
-      {% else %}
+    {% if structured_html %}
+    <div class="upload-structured-actions">
+    {% if doc and doc.id %}
+    <button class="btn btn-outline" id="ulToggleEdit" type="button" title="Mode édition">
+    <i class="fas fa-pen"></i> Éditer
+    </button>
+    <button class="btn btn-primary" id="ulSaveEdits" type="button" title="Enregistrer">
+    <i class="fas fa-save"></i> Enregistrer
+    </button>
+    {% endif %}
+    </div>
+    <div id="uploadStructuredContainer" class="structured-display">
+    {{ structured_html|safe }}
+    </div>
+    <div id="ul-toast"><div class="toast-box"></div></div>
+    {% else %}
         <div class="fallback-message">
           <i class="fas fa-exclamation-triangle"></i>
           Le contenu structuré n'a pas pu être généré. Affichage du texte brut ci-dessous.
@@ -1170,5 +1204,64 @@ document.addEventListener('DOMContentLoaded', function() {
     // S'assurer que l'onglet structuré est affiché par défaut
     showTab('structured');
 });
+</script>
+
+<script>
+// Edition et sauvegarde du contenu structuré (UPLOAD)
+(function() {
+  const ulToggle = document.getElementById('ulToggleEdit');
+  const ulSave = document.getElementById('ulSaveEdits');
+  const ulContainer = document.getElementById('uploadStructuredContainer');
+  const ulToast = document.getElementById('ul-toast');
+  const ulSaveUrl = '{% if doc and doc.id %}{% url "rawdocs:save_structured_edits" doc.id %}{% endif %}';
+  let ulEditMode = false;
+
+  function ulShowToast(type, message) {
+    if (!ulToast) return; ulToast.className = ''; ulToast.classList.add(type); ulToast.style.display = 'block';
+    const box = ulToast.querySelector('.toast-box'); if (box) box.textContent = message || '';
+    setTimeout(() => { ulToast.style.display = 'none'; }, 1800);
+  }
+
+  function setUlEditMode(on) {
+    ulEditMode = !!on; if (!ulContainer) return;
+    const sels = ['.pdf-text-element', '.pdf-cell'];
+    sels.forEach(sel => {
+      ulContainer.querySelectorAll(sel).forEach(el => {
+        el.setAttribute('contenteditable', ulEditMode ? 'true' : 'false');
+        el.spellcheck = false;
+      });
+    });
+    if (ulToggle) {
+      if (ulEditMode) { ulToggle.style.borderColor = '#0ea5e9'; ulToggle.style.color = '#0ea5e9'; }
+      else { ulToggle.style.borderColor = ''; ulToggle.style.color = ''; }
+    }
+  }
+
+  if (ulToggle) {
+    ulToggle.addEventListener('click', () => setUlEditMode(!ulEditMode));
+  }
+
+  async function doUlSave() {
+    if (!ulContainer || !ulSaveUrl) return;
+    const formatted_content = ulContainer.innerHTML;
+    const payload = { formatted_content, extracted_content: '' };
+    try {
+      const resp = await fetch(ulSaveUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      if (data && data.success) {
+        ulShowToast('success', data.message || 'Modifications sauvegardées');
+      } else {
+        ulShowToast('error', (data && data.error) ? data.error : 'Erreur lors de la sauvegarde');
+      }
+    } catch (e) {
+      ulShowToast('error', 'Erreur réseau lors de la sauvegarde');
+    }
+  }
+  if (ulSave) ulSave.addEventListener('click', doUlSave);
+})();
 </script>
 {% endblock %}

@@ -85,54 +85,80 @@
   .edit-mode .pdf-text-element[contenteditable="true"], .edit-mode .pdf-cell[contenteditable="true"] {
     background: rgba(14,165,233,0.06);
   }
+  /* Toast */
+  #ds-toast { position: fixed; top: 16px; right: 16px; z-index: 2000; display: none; }
+  #ds-toast .toast-box {
+    background: rgba(17,24,39,0.95); color: #fff; padding: 10px 14px; border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2); font-weight: 600; min-width: 220px;
+  }
+  #ds-toast.success .toast-box { background: rgba(16,185,129,0.95); }
+  #ds-toast.error .toast-box { background: rgba(239,68,68,0.95); }
+/* Structured header (from rawdocs) */
+  .structured-header { position: relative; overflow: hidden; border-radius: 24px; padding: 24px; color: #fff; background: linear-gradient(135deg, var(--primary, #3b82f6) 0%, var(--primary-light, #60a5fa) 40%, var(--secondary, #8b5cf6) 100%); box-shadow: 0 25px 50px -12px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.05) inset; margin-bottom: 16px; border: none; backdrop-filter: blur(20px); }
+  .structured-header::before { content:''; position:absolute; inset:0; background: radial-gradient(circle at 20% 50%, rgba(255,255,255,.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,.08) 0%, transparent 50%), radial-gradient(circle at 40% 80%, rgba(255,255,255,.06) 0%, transparent 50%); animation: float 20s ease-in-out infinite; pointer-events: none; }
+  @keyframes float { 0%,100%{transform:translateY(0) rotate(0)} 33%{transform:translateY(-10px) rotate(1deg)} 66%{transform:translateY(5px) rotate(-1deg)} }
+  .sh-content{ position:relative; z-index:2 }
+  .sh-grid{ display:grid; grid-template-columns:1fr auto; gap:16px; align-items:flex-start; margin-bottom:12px; }
+  .sh-main{ display:flex; align-items:flex-start; gap:16px; min-width:0 }
+  .icon-chip{ width:56px; height:56px; border-radius:16px; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.15); backdrop-filter: blur(12px); border:2px solid rgba(255,255,255,0.25) }
+  .sh-title{ margin:0; font-size:1.6rem; line-height:1.2; font-weight:900; letter-spacing:-0.02em; color:#fff }
+  .sh-meta{ display:flex; flex-wrap:wrap; gap:12px; opacity:.95 }
+  .sh-actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end }
+  .sh-actions .btn{ border-color: rgba(255,255,255,0.35) }
+  .meta-badge{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background: rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); font-weight:600; font-size:.85rem }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="doc-structured-header">
-  <div>
-    <h2 class="mb-1" style="display:flex;align-items:center;gap:.5rem;">
-      <i class="fas fa-file-lines" aria-hidden="true"></i>
-      {% if document.title %}{{ document.title }}{% elif document.file %}{{ document.file.name }}{% else %}Document{% endif %}
-    </h2>
-    <div class="doc-structured-meta">
+<div class="structured-header">
+  <div class="sh-content">
+    <div class="sh-grid">
+      <div class="sh-main">
+        <div class="icon-chip"><i class="fas fa-layer-group"></i></div>
+        <div>
+          <h1 class="sh-title">{% if document.title %}{{ document.title }}{% elif document.file %}{{ document.file.name }}{% else %}Document{% endif %}</h1>
+          <div class="sh-meta">
+            <span>Doc #{{ document.id }}</span>
+            {% if document.doc_type %}<span>{{ document.doc_type }}</span>{% endif %}
+            {% if document.country %}<span>{{ document.country }}</span>{% endif %}
+            {% if document.language %}<span>{{ document.language }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="sh-actions">
+        {% if document %}
+          <a class="btn" href="{% url 'rawdocs:view_original_document' document.id %}" target="_blank" title="PDF original">
+            <i class="fas fa-file-pdf" aria-hidden="true"></i>
+          </a>
+          <a class="btn" href="?regen=1" title="Régénérer">
+            <i class="fas fa-rotate-right" aria-hidden="true"></i>
+          </a>
+        {% endif %}
+        <button id="toggleEditBtn" class="btn" type="button" title="Mode édition">
+          <i class="fas fa-pen" aria-hidden="true"></i>
+        </button>
+        <button id="saveEditsBtn" class="btn" type="button" title="Enregistrer les modifications">
+          <i class="fas fa-floppy-disk" aria-hidden="true"></i>
+        </button>
+        <button id="copyHtmlBtn" class="btn" type="button" title="Copier le HTML">
+          <i class="fas fa-copy" aria-hidden="true"></i>
+        </button>
+        <button id="downloadHtmlBtn" class="btn" type="button" title="Télécharger le HTML">
+          <i class="fas fa-download" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <div class="details" style="display:flex;gap:8px;flex-wrap:wrap;">
       {% if structured_html_method %}
-        Méthode: {{ structured_html_method }}
-      {% else %}
-        Méthode: DocumentProcessor
+        <span class="meta-badge"><i class="fas fa-cogs"></i> Méthode: {{ structured_html_method }}</span>
       {% endif %}
       {% if structured_html_confidence %}
-        • Confiance: {{ structured_html_confidence }}
+        <span class="meta-badge"><i class="fas fa-gauge-high"></i> Confiance: {{ structured_html_confidence }}</span>
       {% endif %}
-      {% if document and document.total_pages %}
-        • Pages: {{ document.total_pages }}
-      {% endif %}
-      {% if document and document.created_at %}
-        • Ajouté: {{ document.created_at|date:'Y-m-d H:i' }}
+      {% if document.structured_html_generated_at %}
+        <span class="meta-badge"><i class="far fa-clock"></i> Généré le {{ document.structured_html_generated_at|date:'d/m/Y H:i' }}</span>
       {% endif %}
     </div>
-  </div>
-  <div class="toolbar-actions" style="display:flex;align-items:center;gap:.5rem;">
-    {% if document %}
-      <a class="btn" href="{% url 'rawdocs:view_original_document' document.id %}" target="_blank" title="PDF original">
-        <i class="fas fa-file-pdf" aria-hidden="true"></i>
-      </a>
-      <a class="btn" href="?regen=1" title="Régénérer">
-        <i class="fas fa-rotate-right" aria-hidden="true"></i>
-      </a>
-    {% endif %}
-    <button id="toggleEditBtn" class="btn" type="button" title="Mode édition">
-      <i class="fas fa-pen" aria-hidden="true"></i>
-    </button>
-    <button id="saveEditsBtn" class="btn" type="button" title="Enregistrer les modifications">
-      <i class="fas fa-floppy-disk" aria-hidden="true"></i>
-    </button>
-    <button id="copyHtmlBtn" class="btn" type="button" title="Copier le HTML">
-      <i class="fas fa-copy" aria-hidden="true"></i>
-    </button>
-    <button id="downloadHtmlBtn" class="btn" type="button" title="Télécharger le HTML">
-      <i class="fas fa-download" aria-hidden="true"></i>
-    </button>
   </div>
 </div>
 
@@ -165,6 +191,7 @@
     </div>
   </div>
 </div>
+<div id="ds-toast"><div class="toast-box"></div></div>
 {% endblock %}
 
 {% block extra_js %}
@@ -196,6 +223,13 @@
     return cookieValue;
   }
   const csrfToken = getCookie('csrftoken');
+
+  function showToast(type, message) {
+    const t = document.getElementById('ds-toast');
+    if (!t) return; t.className = ''; t.classList.add(type); t.style.display = 'block';
+    const box = t.querySelector('.toast-box'); if (box) box.textContent = message || '';
+    setTimeout(() => { t.style.display = 'none'; }, 1800);
+  }
 
   let zoom = 1.0;
   const Z_MIN = 0.25;
@@ -286,16 +320,17 @@
         saveEditsBtn.style.borderColor = '#10b981'; // green-500
         saveEditsBtn.style.color = '#10b981';
         saveEditsBtn.title = data.message || 'Modifications enregistrées';
+        showToast('success', data.message || 'Modifications sauvegardées');
         setTimeout(() => {
           saveEditsBtn.style.borderColor = '#e5e7eb';
           saveEditsBtn.style.color = 'inherit';
           saveEditsBtn.title = 'Enregistrer les modifications';
         }, 1400);
       } else {
-        alert((data && data.error) ? ('Erreur: ' + data.error) : 'Erreur lors de la sauvegarde');
+        showToast('error', (data && data.error) ? data.error : 'Erreur lors de la sauvegarde');
       }
     } catch (e) {
-      alert('Erreur réseau lors de la sauvegarde');
+      showToast('error', 'Erreur réseau lors de la sauvegarde');
     }
   }
   if (saveEditsBtn) saveEditsBtn.addEventListener('click', saveEdits);

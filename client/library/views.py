@@ -491,11 +491,12 @@ def document_detail(request, pk):
         is_validated=True
     ).exclude(pk=document.pk)[:5]
 
+    display_html = structured_html if regen else (document.structured_html or structured_html or '')
     context = {
         'document': document,
         'metadata': metadata,
         'related_documents': related_documents,
-        'structured_html': document.structured_html or structured_html or '',
+        'structured_html': display_html,
         'structured_html_method': method,
         'structured_html_confidence': confidence,
     }
