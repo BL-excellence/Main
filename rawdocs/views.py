@@ -288,15 +288,32 @@ def upload_pdf(request):
         metadata = extract_metadonnees(rd.file.path, rd.url or "")
         text = extract_full_text(rd.file.path)
 
-        # Générer le HTML structuré pour l'affichage
+        # Générer le HTML structuré pour l'affichage (DocumentProcessor)
         structured_html = ""
+        method = 'document_processor'
+        confidence = None
         try:
-            from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
-            ultra = UltraAdvancedPDFExtractor()
-            ultra_result = ultra.extract_ultra_structured_content(rd.file.path)
-            structured_html = (ultra_result or {}).get('html', '')
+            from documents.models import Document as DocModel
+            from documents.utils.document_processor import DocumentProcessor
+            # Créer ou récupérer un Document associé
+            ext = os.path.splitext(rd.file.name)[1].lower().lstrip('.')
+            allowed = {'pdf', 'docx', 'doc', 'txt', 'html', 'xlsx', 'xls', 'rtf'}
+            file_type = ext if ext in allowed else 'pdf'
+            doc = DocModel.objects.filter(original_file=rd.file.name, uploaded_by=rd.owner or request.user).first()
+            if not doc:
+                doc = DocModel(
+                    title=rd.title or os.path.basename(rd.file.name),
+                    original_file=rd.file,
+                    file_type=file_type,
+                    file_size=getattr(rd.file, 'size', 0),
+                    uploaded_by=rd.owner or request.user,
+                )
+                doc.save()
+            processor = DocumentProcessor(doc)
+            processor.process_document()
+            structured_html = doc.formatted_content or ''
         except Exception as e:
-            print(f"⚠️ Error generating structured HTML: {e}")
+            print(f"⚠️ Error generating structured HTML via DocumentProcessor: {e}")
             structured_html = ""
         
         initial_data = {
@@ -344,15 +361,31 @@ def upload_pdf(request):
             metadata = extract_metadonnees(rd.file.path, rd.url or "") or {}
             text = extract_full_text(rd.file.path)
 
-            # Générer le HTML structuré pour l'affichage
+            # Générer le HTML structuré (DocumentProcessor)
             structured_html = ""
+            method = 'document_processor'
+            confidence = None
             try:
-                from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
-                ultra = UltraAdvancedPDFExtractor()
-                ultra_result = ultra.extract_ultra_structured_content(rd.file.path)
-                structured_html = (ultra_result or {}).get('html', '')
+                from documents.models import Document as DocModel
+                from documents.utils.document_processor import DocumentProcessor
+                ext = os.path.splitext(rd.file.name)[1].lower().lstrip('.')
+                allowed = {'pdf', 'docx', 'doc', 'txt', 'html', 'xlsx', 'xls', 'rtf'}
+                file_type = ext if ext in allowed else 'pdf'
+                doc = DocModel.objects.filter(original_file=rd.file.name, uploaded_by=rd.owner or request.user).first()
+                if not doc:
+                    doc = DocModel(
+                        title=rd.title or os.path.basename(rd.file.name),
+                        original_file=rd.file,
+                        file_type=file_type,
+                        file_size=getattr(rd.file, 'size', 0),
+                        uploaded_by=rd.owner or request.user,
+                    )
+                    doc.save()
+                processor = DocumentProcessor(doc)
+                processor.process_document()
+                structured_html = doc.formatted_content or ''
             except Exception as e:
-                print(f"⚠️ Error generating structured HTML: {e}")
+                print(f"⚠️ Error generating structured HTML via DocumentProcessor: {e}")
                 structured_html = ""
             
             # Save extracted metadata to the model
@@ -1218,6 +1251,7 @@ def document_structured(request, document_id):
     """
     try:
         document = RawDocument.objects.get(id=document_id)
+        doc = None
         
         # Permissions identiques à tables/images
         if not request.user.is_staff and document.owner != request.user:
@@ -1231,16 +1265,32 @@ def document_structured(request, document_id):
         regen = request.GET.get('regen') in ['1', 'true', 'True']
         
         if (regen or not structured_html) and getattr(document, 'file', None):
-            # UltraAdvancedPDFExtractor uniquement
             try:
-                from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
-                ultra = UltraAdvancedPDFExtractor()
-                ultra_result = ultra.extract_ultra_structured_content(document.file.path)
-                structured_html = (ultra_result or {}).get('html') or ''
-                method = (ultra_result or {}).get('extraction_method', 'ultra_advanced_combined')
-                confidence = (ultra_result or {}).get('confidence_score')
-            except Exception:
+                from documents.models import Document as DocModel
+                from documents.utils.document_processor import DocumentProcessor
+                ext = os.path.splitext(document.file.name)[1].lower().lstrip('.')
+                allowed = {'pdf', 'docx', 'doc', 'txt', 'html', 'xlsx', 'xls', 'rtf'}
+                file_type = ext if ext in allowed else 'pdf'
+                doc = DocModel.objects.filter(original_file=document.file.name, uploaded_by=document.owner or request.user).first()
+                if not doc:
+                    doc = DocModel(
+                        title=document.title or os.path.basename(document.file.name),
+                        original_file=document.file,
+                        file_type=file_type,
+                        file_size=getattr(document.file, 'size', 0),
+                        uploaded_by=document.owner or request.user,
+                    )
+                    doc.save()
+                processor = DocumentProcessor(doc)
+                processor.process_document()
+                structured_html = doc.formatted_content or ''
+                method = 'document_processor'
+                confidence = None
+            except Exception as e:
+                print(f"⚠️ DocumentProcessor failed: {e}")
                 structured_html = ''
+                method = 'document_processor'
+                confidence = None
         
         # Sauvegarde cache si on a du contenu
         if structured_html:
@@ -1255,8 +1305,9 @@ def document_structured(request, document_id):
             'structured_html': structured_html or '',
             'structured_html_method': method,
             'structured_html_confidence': confidence,
+            'doc_model_id': getattr(doc, 'id', None),
         }
-        return render(request, 'rawdocs/document_structured.html', context)
+        return render(request, 'documents/document_structured.html', context)
         
     except RawDocument.DoesNotExist:
         messages.error(request, "Document non trouvé.")
@@ -1275,8 +1326,9 @@ def document_structured(request, document_id):
             'structured_html_method': '',
             'structured_html_confidence': None,
             'error': str(e),
+            'doc_model_id': None,
         }
-        return render(request, 'rawdocs/document_structured.html', context)
+        return render(request, 'documents/document_structured.html', context)
 
 
 
@@ -1288,6 +1340,40 @@ def save_structured_edits(request, document_id):
         data = json.loads(request.body)
         edits = data.get('edits', [])
         extraction_score = data.get('extraction_score', None)
+        formatted_content = data.get('formatted_content')
+
+        # Nouveau: sauvegarde du HTML complet si fourni (comme documents.save_document_edits)
+        if (not edits) and formatted_content:
+            document = get_object_or_404(RawDocument, id=document_id, owner=request.user)
+            document.structured_html = formatted_content
+            document.structured_html_generated_at = timezone.now()
+            try:
+                document.structured_html_method = 'manual_edit'
+            except Exception:
+                pass
+            if extraction_score is not None:
+                try:
+                    document.extraction_score = extraction_score
+                except Exception:
+                    pass
+            # Sauvegarder
+            try:
+                update_fields = ['structured_html', 'structured_html_generated_at']
+                if hasattr(document, 'structured_html_method'):
+                    update_fields.append('structured_html_method')
+                if extraction_score is not None and hasattr(document, 'extraction_score'):
+                    update_fields.append('extraction_score')
+                document.save(update_fields=update_fields)
+            except Exception:
+                document.save()
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Modifications sauvegardées avec succès',
+                'updated_count': 0,
+                'total_elements': 0,
+                'extraction_score': extraction_score
+            })
 
         if not edits:
             return JsonResponse({'success': False, 'error': 'No edits provided'}, status=400)

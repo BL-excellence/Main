@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Contenu structuré - {{ document.title|default:'Document' }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .doc-structured-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .doc-structured-meta {
+    font-size: .9rem;
+    color: #6b7280; /* Tailwind slate-500 */
+  }
+  .doc-structured-wrapper {
+    position: relative;
+    background: #f8fafc; /* slate-50 */
+    border: 1px solid #e5e7eb; /* slate-200 */
+    border-radius: .5rem;
+    padding: .75rem;
+  }
+  .doc-structured-canvas {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: .25rem;
+    overflow: auto;
+    min-height: 400px;
+  }
+  .toolbar-actions button {
+    border: 1px solid #e5e7eb;
+    background: white;
+    padding: .4rem .65rem;
+    border-radius: .5rem;
+    font-size: .9rem;
+    cursor: pointer;
+  }
+  .toolbar-actions button:hover {
+    background: #f9fafb;
+  }
+  /* Floating zoom controls */
+  .floating-zoom-controls {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    z-index: 1030;
+  }
+  .floating-zoom-controls .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: white;
+    cursor: pointer;
+  }
+  .floating-zoom-controls .btn:hover { background: #f9fafb; }
+  .floating-zoom-controls .divider { width: 1px; height: 22px; background: #e5e7eb; margin: 0 4px; }
+  .floating-zoom-controls .zoom-label { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; color: #374151; }
+
+  /* Zoom container */
+  #zoomContainer {
+    transform-origin: top center;
+  }
+
+  /* Edit mode */
+  .edit-mode .pdf-text-element, .edit-mode .pdf-cell {
+    outline: 1px dashed rgba(14,165,233,0.5) !important; /* cyan-500 */
+    outline-offset: 0;
+  }
+  .edit-mode .pdf-text-element[contenteditable="true"], .edit-mode .pdf-cell[contenteditable="true"] {
+    background: rgba(14,165,233,0.06);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="doc-structured-header">
+  <div>
+    <h2 class="mb-1" style="display:flex;align-items:center;gap:.5rem;">
+      <i class="fas fa-file-lines" aria-hidden="true"></i>
+      {% if document.title %}{{ document.title }}{% elif document.file %}{{ document.file.name }}{% else %}Document{% endif %}
+    </h2>
+    <div class="doc-structured-meta">
+      {% if structured_html_method %}
+        Méthode: {{ structured_html_method }}
+      {% else %}
+        Méthode: DocumentProcessor
+      {% endif %}
+      {% if structured_html_confidence %}
+        • Confiance: {{ structured_html_confidence }}
+      {% endif %}
+      {% if document and document.total_pages %}
+        • Pages: {{ document.total_pages }}
+      {% endif %}
+      {% if document and document.created_at %}
+        • Ajouté: {{ document.created_at|date:'Y-m-d H:i' }}
+      {% endif %}
+    </div>
+  </div>
+  <div class="toolbar-actions" style="display:flex;align-items:center;gap:.5rem;">
+    {% if document %}
+      <a class="btn" href="{% url 'rawdocs:view_original_document' document.id %}" target="_blank" title="PDF original">
+        <i class="fas fa-file-pdf" aria-hidden="true"></i>
+      </a>
+      <a class="btn" href="?regen=1" title="Régénérer">
+        <i class="fas fa-rotate-right" aria-hidden="true"></i>
+      </a>
+    {% endif %}
+    <button id="toggleEditBtn" class="btn" type="button" title="Mode édition">
+      <i class="fas fa-pen" aria-hidden="true"></i>
+    </button>
+    <button id="saveEditsBtn" class="btn" type="button" title="Enregistrer les modifications">
+      <i class="fas fa-floppy-disk" aria-hidden="true"></i>
+    </button>
+    <button id="copyHtmlBtn" class="btn" type="button" title="Copier le HTML">
+      <i class="fas fa-copy" aria-hidden="true"></i>
+    </button>
+    <button id="downloadHtmlBtn" class="btn" type="button" title="Télécharger le HTML">
+      <i class="fas fa-download" aria-hidden="true"></i>
+    </button>
+  </div>
+</div>
+
+<div class="doc-structured-wrapper">
+  <div class="doc-structured-canvas">
+    {% if structured_html %}
+      <div id="zoomContainer">
+        {{ structured_html|safe }}
+      </div>
+    {% else %}
+      <div class="p-4 text-center" style="color:#6b7280;">
+        <i class="fas fa-info-circle" aria-hidden="true"></i>
+        Aucun contenu structuré disponible pour l’instant.
+      </div>
+    {% endif %}
+
+    <!-- Floating Zoom Controls -->
+    <div class="floating-zoom-controls">
+      <button class="btn" type="button" id="zoomOutBtn" title="Zoom -">
+        <i class="fas fa-search-minus" aria-hidden="true"></i>
+      </button>
+      <span class="zoom-label" id="zoomLabel">100%</span>
+      <button class="btn" type="button" id="zoomInBtn" title="Zoom +">
+        <i class="fas fa-search-plus" aria-hidden="true"></i>
+      </button>
+      <div class="divider"></div>
+      <button class="btn" type="button" id="zoomResetBtn" title="Réinitialiser">
+        <i class="fas fa-compress" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  const zoomContainer = document.getElementById('zoomContainer');
+  const zoomInBtn = document.getElementById('zoomInBtn');
+  const zoomOutBtn = document.getElementById('zoomOutBtn');
+  const zoomResetBtn = document.getElementById('zoomResetBtn');
+  const zoomLabel = document.getElementById('zoomLabel');
+  const toggleEditBtn = document.getElementById('toggleEditBtn');
+  const copyHtmlBtn = document.getElementById('copyHtmlBtn');
+  const downloadHtmlBtn = document.getElementById('downloadHtmlBtn');
+  const saveEditsBtn = document.getElementById('saveEditsBtn');
+  const docModelId = {{ doc_model_id|default:'null' }};
+  const saveUrl = docModelId ? "{% url 'documents:save_edits' 0 %}".replace('/0/', '/' + docModelId + '/') : null;
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrfToken = getCookie('csrftoken');
+
+  let zoom = 1.0;
+  const Z_MIN = 0.25;
+  const Z_MAX = 3.0;
+  const Z_STEP = 0.1;
+  let editMode = false;
+
+  function applyZoom() {
+    if (!zoomContainer) return;
+    zoomContainer.style.transform = `scale(${zoom})`;
+    zoomLabel.textContent = Math.round(zoom * 100) + '%';
+  }
+
+  function setZoom(val) {
+    zoom = Math.min(Z_MAX, Math.max(Z_MIN, val));
+    applyZoom();
+  }
+
+  if (zoomInBtn) zoomInBtn.addEventListener('click', () => setZoom(zoom + Z_STEP));
+  if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => setZoom(zoom - Z_STEP));
+  if (zoomResetBtn) zoomResetBtn.addEventListener('click', () => setZoom(1.0));
+
+  // Keyboard shortcuts (Ctrl/Cmd + +/-, Ctrl/Cmd + 0)
+  document.addEventListener('keydown', (e) => {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
+    const accel = isMac ? e.metaKey : e.ctrlKey;
+    if (!accel) return;
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom(zoom + Z_STEP); }
+    if (e.key === '-') { e.preventDefault(); setZoom(zoom - Z_STEP); }
+    if (e.key === '0') { e.preventDefault(); setZoom(1.0); }
+  });
+
+  // Mouse wheel + Ctrl => zoom
+  document.addEventListener('wheel', (e) => {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
+    const accelKey = isMac ? e.metaKey : e.ctrlKey;
+    if (accelKey) {
+      e.preventDefault();
+      const delta = Math.sign(e.deltaY);
+      if (delta > 0) setZoom(zoom - Z_STEP); else setZoom(zoom + Z_STEP);
+    }
+  }, { passive: false });
+
+  // Edit mode toggle: make structural text elements editable
+  function setEditMode(on) {
+    editMode = !!on;
+    document.body.classList.toggle('edit-mode', editMode);
+    if (!zoomContainer) return;
+    const editableSelectors = ['.pdf-text-element', '.pdf-cell'];
+    editableSelectors.forEach(sel => {
+      zoomContainer.querySelectorAll(sel).forEach(el => {
+        el.setAttribute('contenteditable', editMode ? 'true' : 'false');
+        el.spellcheck = false;
+      });
+    });
+    // Change button style
+    if (toggleEditBtn) {
+      if (editMode) {
+        toggleEditBtn.style.borderColor = '#0ea5e9';
+        toggleEditBtn.style.color = '#0ea5e9';
+      } else {
+        toggleEditBtn.style.borderColor = '#e5e7eb';
+        toggleEditBtn.style.color = 'inherit';
+      }
+    }
+  }
+
+  if (toggleEditBtn) toggleEditBtn.addEventListener('click', () => setEditMode(!editMode));
+
+  async function saveEdits() {
+    if (!zoomContainer || !saveUrl) return;
+    const formatted_content = zoomContainer.innerHTML;
+    const extracted_content = '';
+    const payload = { formatted_content, extracted_content };
+
+    try {
+      const resp = await fetch(saveUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      if (data && data.success) {
+        // Visual feedback
+        saveEditsBtn.style.borderColor = '#10b981'; // green-500
+        saveEditsBtn.style.color = '#10b981';
+        saveEditsBtn.title = data.message || 'Modifications enregistrées';
+        setTimeout(() => {
+          saveEditsBtn.style.borderColor = '#e5e7eb';
+          saveEditsBtn.style.color = 'inherit';
+          saveEditsBtn.title = 'Enregistrer les modifications';
+        }, 1400);
+      } else {
+        alert((data && data.error) ? ('Erreur: ' + data.error) : 'Erreur lors de la sauvegarde');
+      }
+    } catch (e) {
+      alert('Erreur réseau lors de la sauvegarde');
+    }
+  }
+  if (saveEditsBtn) saveEditsBtn.addEventListener('click', saveEdits);
+
+  // Copy current HTML to clipboard (content only)
+  async function copyHtml() {
+    if (!zoomContainer) return;
+    const html = zoomContainer.innerHTML;
+    try {
+      await navigator.clipboard.writeText(html);
+      toggleEditBtn && (toggleEditBtn.title = 'Copié!');
+      setTimeout(() => { toggleEditBtn && (toggleEditBtn.title = 'Mode édition'); }, 1200);
+    } catch (e) {
+      console.log('Clipboard not available, creating a fallback textarea');
+      const ta = document.createElement('textarea');
+      ta.value = html; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch(_){}
+      document.body.removeChild(ta);
+    }
+  }
+  if (copyHtmlBtn) copyHtmlBtn.addEventListener('click', copyHtml);
+
+  // Download current HTML (content only)
+  function downloadHtml() {
+    if (!zoomContainer) return;
+    const html = zoomContainer.innerHTML;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const filename = ({{ document.id|default:'0' }}).toString() + '_structured.html';
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+  if (downloadHtmlBtn) downloadHtmlBtn.addEventListener('click', downloadHtml);
+
+  // Initial zoom
+  applyZoom();
+})();
+</script>
+{% endblock %}

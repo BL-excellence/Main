@@ -176,19 +176,26 @@ def client_document_detail(request, pk):
 
     if regen or not structured_html:
         try:
-            # 1) Essayer l'extracteur ultra-avancé
-            try:
-                from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
-                ultra = UltraAdvancedPDFExtractor()
-                ultra_result = ultra.extract_ultra_structured_content(document.file.path)
-                structured_html = (ultra_result or {}).get('html') or ''
-                method = (ultra_result or {}).get('extraction_method', 'ultra_advanced_combined')
-                confidence = (ultra_result or {}).get('confidence_score')
-            except Exception as e:
-                print(f"⚠️ UltraAdvancedPDFExtractor KO: {e}")
-                structured_html = ''
-
-            # Pas de fallback: UltraAdvanced uniquement
+            from documents.models import Document as DocModel
+            from documents.utils.document_processor import DocumentProcessor
+            ext = os.path.splitext(document.file.name)[1].lower().lstrip('.')
+            allowed = {'pdf', 'docx', 'doc', 'txt', 'html', 'xlsx', 'xls', 'rtf'}
+            file_type = ext if ext in allowed else 'pdf'
+            ddoc = DocModel.objects.filter(original_file=document.file.name, uploaded_by=document.owner or request.user).first()
+            if not ddoc:
+                ddoc = DocModel(
+                    title=document.title or os.path.basename(document.file.name),
+                    original_file=document.file,
+                    file_type=file_type,
+                    file_size=getattr(document.file, 'size', 0),
+                    uploaded_by=document.owner or request.user,
+                )
+                ddoc.save()
+            processor = DocumentProcessor(ddoc)
+            processor.process_document()
+            structured_html = ddoc.formatted_content or ''
+            method = 'document_processor'
+            confidence = None
 
             # Sauvegarde cache (éviter de modifier les docs d'autrui)
             if structured_html:
