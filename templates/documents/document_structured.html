@@ -179,8 +179,7 @@
   const copyHtmlBtn = document.getElementById('copyHtmlBtn');
   const downloadHtmlBtn = document.getElementById('downloadHtmlBtn');
   const saveEditsBtn = document.getElementById('saveEditsBtn');
-  const docModelId = {{ doc_model_id|default:'null' }};
-  const saveUrl = docModelId ? "{% url 'documents:save_edits' 0 %}".replace('/0/', '/' + docModelId + '/') : null;
+  const saveUrl = "{% url 'rawdocs:save_structured_edits' document.id %}";
 
   function getCookie(name) {
     let cookieValue = null;
@@ -267,7 +266,7 @@
   if (toggleEditBtn) toggleEditBtn.addEventListener('click', () => setEditMode(!editMode));
 
   async function saveEdits() {
-    if (!zoomContainer || !saveUrl) return;
+    if (!zoomContainer) return;
     const formatted_content = zoomContainer.innerHTML;
     const extracted_content = '';
     const payload = { formatted_content, extracted_content };
