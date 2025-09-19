@@ -573,14 +573,44 @@ def extract_images_from_pdf(file_path):
 
 def extract_full_text(file_path):
     """
-    Extraction de texte sans dépendre d'UltraAdvanced.
-    Utilise un fallback robuste via pdfplumber pour obtenir un texte lisible et structuré.
+    Extraction de texte utilisant UltraAdvancedPDFExtractor pour obtenir
+    le contenu structuré au lieu du texte brut pdfplumber
     """
     try:
-        return _extract_full_text_fallback(file_path)
+        # Utiliser UltraAdvancedPDFExtractor pour obtenir le contenu structuré
+        from client.submissions.ctd_submission.utils_ultra_advanced import UltraAdvancedPDFExtractor
+
+        extractor = UltraAdvancedPDFExtractor()
+        result = extractor.extract_ultra_structured_content(file_path)
+
+        if result and result.get('extracted', False):
+            # Retourner le texte structuré qui préserve la mise en forme
+            structured_text = result.get('text', '')
+
+            # Enrichir avec des informations sur la structure détectée
+            structure = result.get('structure', {})
+            if structure:
+                structure_info = []
+                if structure.get('tables'):
+                    structure_info.append(f"📊 {len(structure['tables'])} tableau(x)")
+                if structure.get('images'):
+                    structure_info.append(f"🖼️ {len(structure['images'])} image(s)")
+                if structure.get('text_blocks'):
+                    structure_info.append(f"📝 {len(structure['text_blocks'])} bloc(s) de texte")
+
+                if structure_info:
+                    structured_text = f"[STRUCTURE DÉTECTÉE: {', '.join(structure_info)}]\n\n{structured_text}"
+
+            return structured_text
+        else:
+            # Fallback vers pdfplumber en cas d'échec
+            print(f"⚠️ UltraAdvancedPDFExtractor failed, falling back to pdfplumber for {file_path}")
+            return _extract_full_text_fallback(file_path)
+
     except Exception as e:
-        print(f"⚠️ Error extracting text with fallback: {e}")
-        return ""
+        # En cas d'erreur, utiliser le fallback pdfplumber
+        print(f"⚠️ Error with UltraAdvancedPDFExtractor: {e}, falling back to pdfplumber")
+        return _extract_full_text_fallback(file_path)
 
 
 def _extract_full_text_fallback(file_path):
