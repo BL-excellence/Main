@@ -164,7 +164,7 @@ def call_mistral_annotation(page_text: str, page_number: int) -> List[Dict]:
                     # Validate positions with DEBUG
                     validated = validate_annotation_positions(page_text, valid_annotations)
                     # DEBUG: Show what was filtered out
-                    filtered_count = len(annotations) - len(validated)
+                    filtered_count = len(valid_annotations) - len(validated)
                     if filtered_count > 0:
                         print(f"⚠️  {filtered_count} annotations were filtered out during position validation")
                     print(f"📍 {len(validated)} annotations after position validation")
