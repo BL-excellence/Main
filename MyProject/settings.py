@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'client.submissions.ctd_submission',  # new client submissions app
     'chatbot',
     'rest_framework',
+    'documents',
 ]
 
 MIDDLEWARE = [
@@ -133,11 +134,26 @@ STATICFILES_DIRS   = [ BASE_DIR / "static" ]
 MEDIA_URL  = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Paramètres pour le traitement des documents
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
+
+ALLOWED_DOCUMENT_TYPES = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain',
+    'text/html',
+    'application/rtf'
+]
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Auth redirects
-LOGIN_URL           = '/'
-LOGIN_REDIRECT_URL  = '/upload/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL           = '/rawdocs/'
+LOGIN_REDIRECT_URL  = '/rawdocs/upload/'
+LOGOUT_REDIRECT_URL = '/rawdocs/'
 
 
 # Default primary key field type
@@ -176,8 +192,12 @@ BOX_CLIENT_SECRET = 'votre_box_client_secret'
 OAUTH_REDIRECT_URI = 'http://127.0.0.1:8000/client/products/api/oauth/callback/'
 
 # Sécurité
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+else:
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
 
 CONVERTIO_API_KEY = "c14c6e0d62a6a7a98acb9bc629bbd273"
 

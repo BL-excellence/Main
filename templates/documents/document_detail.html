@@ -1,0 +1,778 @@
+<!-- Enhanced document_detail.html with editing capability and floating zoom controls -->
+{% extends 'documents/base.html' %}
+
+{% block title %}{{ document.title }} - Doc Format{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Existing styles... */
+.fullscreen-preview {
+    height: calc(100vh - 220px);
+    overflow: auto;
+    background: #f5f5f5;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    position: relative;
+}
+
+.pdf-document-container {
+    width: max-content;
+    min-width: 100%;
+    transform-origin: top left;
+    transition: transform 0.2s ease;
+    will-change: transform;
+}
+
+/* EDITING STYLES */
+.edit-mode .pdf-text-element,
+.edit-mode .pdf-footnote,
+.edit-mode .pdf-cell > div {
+    cursor: text !important;
+    border: 1px dashed transparent !important;
+    transition: all 0.2s ease;
+}
+
+.edit-mode .pdf-text-element:hover,
+.edit-mode .pdf-footnote:hover,
+.edit-mode .pdf-cell > div:hover {
+    border-color: #007bff !important;
+    background: rgba(0, 123, 255, 0.1) !important;
+}
+
+.editable-text {
+    min-height: 20px;
+    outline: none;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.editable-text:focus {
+    background: rgba(255, 255, 0, 0.2) !important;
+    border: 2px solid #007bff !important;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+}
+
+.editing-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border: 1px solid #dee2e6;
+}
+
+.edit-indicator {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background: #28a745;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.edit-mode .edit-indicator {
+    opacity: 1;
+}
+
+.save-status {
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+/* FLOATING ZOOM CONTROLS */
+.floating-zoom-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    opacity: 0.8;
+}
+
+.floating-zoom-controls:hover {
+    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+}
+
+.floating-zoom-controls .btn {
+    border: none;
+    background: rgba(108, 117, 125, 0.1);
+    color: #495057;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.floating-zoom-controls .btn:hover {
+    background: #007bff;
+    color: white;
+    transform: scale(1.1);
+}
+
+.floating-zoom-controls .btn:active {
+    transform: scale(0.95);
+}
+
+.zoom-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #495057;
+    min-width: 40px;
+    text-align: center;
+    padding: 0 4px;
+}
+
+/* Hide original zoom controls if they exist */
+.pdf-controls {
+    display: none !important;
+}
+
+/* Table editing */
+.edit-mode .pdf-table-smart td {
+    cursor: text !important;
+}
+
+.edit-mode .pdf-table-smart td:hover {
+    background: rgba(0, 123, 255, 0.1) !important;
+}
+
+/* Smooth transitions for zoom */
+.pdf-document-container {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mobile responsive zoom controls */
+@media (max-width: 768px) {
+    .floating-zoom-controls {
+        bottom: 10px;
+        right: 10px;
+        padding: 6px;
+        gap: 6px;
+    }
+    
+    .floating-zoom-controls .btn {
+        width: 32px;
+        height: 32px;
+        font-size: 12px;
+    }
+    
+    .zoom-label {
+        font-size: 12px;
+        min-width: 35px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Ensure CSRF token is available -->
+{% csrf_token %}
+<div class="row">
+  <div class="col-12">
+    <!-- Header with edit controls -->
+    <div class="d-flex justify-content-between align-items-start mb-3">
+      <div>
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'documents:home' %}" class="text-decoration-none"><i class="bi bi-house"></i> Accueil</a>
+            </li>
+            <li class="breadcrumb-item">
+              <a href="{% url 'documents:list' %}" class="text-decoration-none">Documents</a>
+            </li>
+            <li class="breadcrumb-item active">{{ document.title|truncatechars:30 }}</li>
+          </ol>
+        </nav>
+        <h1 class="h4 mb-2">
+          {% if document.file_type == 'pdf' %}
+            <i class="bi bi-file-earmark-pdf text-danger me-2"></i>
+          {% elif document.file_type == 'docx' or document.file_type == 'doc' %}
+            <i class="bi bi-file-earmark-word text-primary me-2"></i>
+          {% elif document.file_type == 'xlsx' or document.file_type == 'xls' %}
+            <i class="bi bi-file-earmark-excel text-success me-2"></i>
+          {% else %}
+            <i class="bi bi-file-earmark text-secondary me-2"></i>
+          {% endif %}
+          {{ document.title }}
+        </h1>
+        <div class="mb-2">
+          {% if document.status == 'completed' %}
+            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Traité avec succès</span>
+          {% elif document.status == 'processing' %}
+            <span class="badge bg-warning" id="statusBadge"><i class="bi bi-hourglass-split me-1"></i>En cours</span>
+          {% elif document.status == 'error' %}
+            <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Erreur</span>
+          {% else %}
+            <span class="badge bg-secondary"><i class="bi bi-clock me-1"></i>En attente</span>
+          {% endif %}
+        </div>
+      </div>
+      
+      <!-- Action buttons with edit toggle -->
+      <div class="d-flex gap-2">
+        {% if document.status == 'completed' %}
+          <button class="btn btn-outline-primary" id="toggleEditBtn" onclick="toggleEditMode()">
+            <i class="bi bi-pencil me-1"></i>Modifier
+          </button>
+          <button class="btn btn-success d-none" id="saveBtn" onclick="saveDocument()">
+            <i class="bi bi-check-lg me-1"></i>Sauvegarder
+          </button>
+          <button class="btn btn-secondary d-none" id="cancelBtn" onclick="cancelEdit()">
+            <i class="bi bi-x-lg me-1"></i>Annuler
+          </button>
+        {% endif %}
+        
+        {% if document.status == 'completed' %}
+          <a href="{% url 'documents:export_html' document.pk %}" class="btn btn-success">
+            <i class="bi bi-download me-1"></i>Exporter HTML
+          </a>
+        {% endif %}
+        <a href="{% url 'documents:download' document.pk %}" class="btn btn-outline-secondary">
+          <i class="bi bi-file-arrow-down me-1"></i>Original
+        </a>
+        <button class="btn btn-outline-danger" onclick="deleteDocument()">
+          <i class="bi bi-trash me-1"></i>Supprimer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="col-12">
+    {% if document.status == 'completed' %}
+      <div class="card">
+        <div class="card-header p-0">
+          <ul class="nav nav-tabs" id="contentTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="formatted-tab" data-bs-toggle="tab" data-bs-target="#formatted" type="button" role="tab">
+                <i class="bi bi-eye me-1"></i>Aperçu formaté
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="text-tab" data-bs-toggle="tab" data-bs-target="#text" type="button" role="tab">
+                <i class="bi bi-file-text me-1"></i>Texte brut
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <div class="tab-content">
+          <!-- Formatted preview -->
+          <div class="tab-pane fade show active" id="formatted" role="tabpanel">
+            <div class="fullscreen-preview" id="documentViewer">
+              <!-- Edit indicator -->
+              <div class="edit-indicator">Mode édition activé</div>
+              
+              <!-- Editing controls -->
+              <div class="editing-controls d-none" id="editingControls">
+                <div class="d-flex gap-2 align-items-center">
+                  <small class="text-muted">Mode édition:</small>
+                  <button class="btn btn-sm btn-outline-primary" onclick="undoEdit()" title="Annuler (Ctrl+Z)">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-primary" onclick="redoEdit()" title="Refaire (Ctrl+Y)">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </div>
+                <div class="save-status" id="saveStatus"></div>
+              </div>
+
+              <!-- Floating Zoom Controls -->
+              {% if document.file_type == 'pdf' %}
+                <div class="floating-zoom-controls" id="floatingZoomControls">
+                  <button type="button" class="btn" onclick="stepZoom(-0.1)" title="Zoom - (Ctrl -)">
+                    <i class="bi bi-zoom-out"></i>
+                  </button>
+                  <span id="zoomLabel" class="zoom-label">100%</span>
+                  <button type="button" class="btn" onclick="stepZoom(0.1)" title="Zoom + (Ctrl +)">
+                    <i class="bi bi-zoom-in"></i>
+                  </button>
+                  <div style="width: 1px; height: 20px; background: rgba(108, 117, 125, 0.3); margin: 0 4px;"></div>
+                  <button type="button" class="btn" onclick="zoomDocument(1)" title="Réinitialiser (Ctrl 0)">
+                    <i class="bi bi-aspect-ratio"></i>
+                  </button>
+                </div>
+              {% endif %}
+
+              {% if format_info.generated_css %}<style>{{ format_info.generated_css|safe }}</style>{% endif %}
+              <div class="pdf-document-container" id="pdfContainer">
+                {{ document.formatted_content|safe }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Raw text tab -->
+          <div class="tab-pane fade" id="text" role="tabpanel">
+            <div class="fullscreen-preview" style="background:#fff">
+              <textarea class="form-control h-100 border-0" id="rawTextEditor" style="font-family: monospace; resize: none;">{{ document.extracted_content }}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const documentId = {{ document.pk }};
+let isEditMode = false;
+let originalContent = '';
+let editHistory = [];
+let historyIndex = -1;
+
+let statusCheckInterval;
+
+function startStatusCheck(){ 
+  console.log('Starting status checks every 3 seconds...');
+  statusCheckInterval = setInterval(checkStatus, 3000); 
+}
+
+function stopStatusCheck(){ 
+  if(statusCheckInterval) {
+    clearInterval(statusCheckInterval);
+    console.log('Status checking stopped');
+  }
+}
+
+function checkStatus(){
+  fetch(`/documents/api/${documentId}/status/`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
+    .then(data=>{
+      console.log('Status check result:', data);
+      const bar=document.getElementById('progressBar');
+      const statusBadge=document.getElementById('statusBadge');
+      
+      if(data.status==='completed' || data.status==='error'){ 
+        stopStatusCheck(); 
+        console.log('Processing finished! Reloading page...');
+        location.reload(); 
+      }
+      else if(data.status==='processing') { 
+        if(bar) bar.style.width=data.progress+'%';
+        if(statusBadge) statusBadge.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>En cours (' + data.progress + '%)';
+        console.log(`Still processing... ${data.progress}%`);
+      }
+    })
+    .catch(err=>{
+      console.error('Status check error:', err);
+    });
+}
+
+function deleteDocument() {
+  if (confirm('Êtes-vous sûr de vouloir supprimer ce document ?')) {
+    fetch(`/documents/api/${documentId}/delete/`, {
+      method: 'DELETE',
+      headers: {
+        'X-CSRFToken': getCSRFToken(),
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showAlert('success', data.message);
+        setTimeout(() => {
+          window.location.href = '/documents/list/';
+        }, 1200);
+      } else {
+        showAlert('danger', data.error || 'Erreur lors de la suppression');
+      }
+    })
+    .catch(() => {
+      showAlert('danger', 'Erreur de connexion');
+    });
+  }
+}
+
+function getCSRFToken() {
+  // Try different selectors for CSRF token
+  let token = null;
+  
+  // Method 1: Look for csrf token input
+  const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+  if (csrfInput) {
+    token = csrfInput.value;
+  }
+  
+  // Method 2: Look for csrf token in cookies
+  if (!token) {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'csrftoken') {
+        token = value;
+        break;
+      }
+    }
+  }
+  
+  return token;
+}
+
+// Edit mode functionality
+function toggleEditMode() {
+  isEditMode = !isEditMode;
+  const viewer = document.getElementById('documentViewer');
+  const toggleBtn = document.getElementById('toggleEditBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const editingControls = document.getElementById('editingControls');
+  
+  if (isEditMode) {
+    // Enter edit mode
+    viewer.classList.add('edit-mode');
+    toggleBtn.classList.add('d-none');
+    saveBtn.classList.remove('d-none');
+    cancelBtn.classList.remove('d-none');
+    editingControls.classList.remove('d-none');
+    
+    // Store original content
+    originalContent = document.getElementById('pdfContainer').innerHTML;
+    
+    // Make elements editable
+    makeElementsEditable();
+    
+    // Save initial state to history
+    saveToHistory();
+    
+    showAlert('info', 'Mode édition activé - Cliquez sur le texte pour le modifier');
+  } else {
+    exitEditMode();
+  }
+}
+
+function exitEditMode() {
+  isEditMode = false;
+  const viewer = document.getElementById('documentViewer');
+  const toggleBtn = document.getElementById('toggleEditBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const editingControls = document.getElementById('editingControls');
+  
+  viewer.classList.remove('edit-mode');
+  toggleBtn.classList.remove('d-none');
+  saveBtn.classList.add('d-none');
+  cancelBtn.classList.add('d-none');
+  editingControls.classList.add('d-none');
+  
+  // Remove editing capabilities
+  makeElementsReadonly();
+}
+
+function makeElementsEditable() {
+  // Make text elements editable
+  const textElements = document.querySelectorAll('.pdf-text-element, .pdf-footnote');
+  textElements.forEach(element => {
+    element.contentEditable = true;
+    element.classList.add('editable-text');
+    element.addEventListener('input', onTextChange);
+    element.addEventListener('blur', saveToHistory);
+  });
+  
+  // Make table cells editable
+  const tableCells = document.querySelectorAll('.pdf-table-smart td, .pdf-table-reconstructed td');
+  tableCells.forEach(cell => {
+    cell.contentEditable = true;
+    cell.classList.add('editable-text');
+    cell.addEventListener('input', onTextChange);
+    cell.addEventListener('blur', saveToHistory);
+  });
+  
+  // Make cell divs editable
+  const cellDivs = document.querySelectorAll('.pdf-cell > div');
+  cellDivs.forEach(div => {
+    div.contentEditable = true;
+    div.classList.add('editable-text');
+    div.addEventListener('input', onTextChange);
+    div.addEventListener('blur', saveToHistory);
+  });
+}
+
+function makeElementsReadonly() {
+  const editableElements = document.querySelectorAll('.editable-text');
+  editableElements.forEach(element => {
+    element.contentEditable = false;
+    element.classList.remove('editable-text');
+    element.removeEventListener('input', onTextChange);
+    element.removeEventListener('blur', saveToHistory);
+  });
+}
+
+function onTextChange() {
+  updateSaveStatus('Modifications non sauvegardées...', 'text-warning');
+}
+
+function saveToHistory() {
+  const currentContent = document.getElementById('pdfContainer').innerHTML;
+  
+  // Remove future history if we're not at the end
+  if (historyIndex < editHistory.length - 1) {
+    editHistory = editHistory.slice(0, historyIndex + 1);
+  }
+  
+  editHistory.push(currentContent);
+  historyIndex = editHistory.length - 1;
+  
+  // Limit history size
+  if (editHistory.length > 50) {
+    editHistory = editHistory.slice(-50);
+    historyIndex = editHistory.length - 1;
+  }
+}
+
+function undoEdit() {
+  if (historyIndex > 0) {
+    historyIndex--;
+    document.getElementById('pdfContainer').innerHTML = editHistory[historyIndex];
+    makeElementsEditable(); // Re-attach event listeners
+    updateSaveStatus('Modifications annulées', 'text-info');
+  }
+}
+
+function redoEdit() {
+  if (historyIndex < editHistory.length - 1) {
+    historyIndex++;
+    document.getElementById('pdfContainer').innerHTML = editHistory[historyIndex];
+    makeElementsEditable(); // Re-attach event listeners
+    updateSaveStatus('Modifications refaites', 'text-info');
+  }
+}
+
+function updateSaveStatus(message, className) {
+  const status = document.getElementById('saveStatus');
+  status.textContent = message;
+  status.className = `save-status ${className}`;
+}
+
+function saveDocument() {
+  updateSaveStatus('Sauvegarde en cours...', 'text-info');
+  
+  const editedContent = document.getElementById('pdfContainer').innerHTML;
+  
+  // Extract plain text for the extracted_content field
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = editedContent;
+  const plainText = tempDiv.textContent || tempDiv.innerText || '';
+  
+  // Get CSRF token from multiple possible sources
+  function getCSRFToken() {
+    // Try different selectors for CSRF token
+    let token = null;
+    
+    // Method 1: Look for csrf token input
+    const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfInput) {
+      token = csrfInput.value;
+    }
+    
+    // Method 2: Look for csrf token in meta tag
+    if (!token) {
+      const csrfMeta = document.querySelector('meta[name=csrf-token]');
+      if (csrfMeta) {
+        token = csrfMeta.getAttribute('content');
+      }
+    }
+    
+    // Method 3: Look for csrf token in cookies
+    if (!token) {
+      const cookies = document.cookie.split(';');
+      for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'csrftoken') {
+          token = value;
+          break;
+        }
+      }
+    }
+    
+    return token;
+  }
+  
+  const csrfToken = getCSRFToken();
+  
+  if (!csrfToken) {
+    updateSaveStatus('Erreur: Token CSRF introuvable', 'text-danger');
+    console.error('CSRF token not found');
+    return;
+  }
+  
+  // Save via API
+  fetch(`/documents/api/${documentId}/save-edits/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken
+    },
+    body: JSON.stringify({
+      formatted_content: editedContent,
+      extracted_content: plainText
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      updateSaveStatus('✓ Sauvegardé avec succès', 'text-success');
+      originalContent = editedContent; // Update original content
+      setTimeout(() => updateSaveStatus('', ''), 3000);
+    } else {
+      updateSaveStatus('Erreur de sauvegarde: ' + (data.error || 'Erreur inconnue'), 'text-danger');
+    }
+  })
+  .catch(error => {
+    console.error('Save error:', error);
+    updateSaveStatus('Erreur de connexion', 'text-danger');
+  });
+}
+
+function cancelEdit() {
+  if (confirm('Annuler toutes les modifications ?')) {
+    document.getElementById('pdfContainer').innerHTML = originalContent;
+    exitEditMode();
+    updateSaveStatus('Modifications annulées', 'text-info');
+    setTimeout(() => updateSaveStatus('', ''), 3000);
+  }
+}
+
+// Enhanced zoom functionality with floating controls
+let currentZoom = 1.0;
+const MIN_ZOOM = 0.3, MAX_ZOOM = 3.0, ZOOM_STEP = 0.1;
+
+function updateZoomLabel(){ 
+  const z = document.getElementById('zoomLabel'); 
+  if(z) z.textContent = Math.round(currentZoom * 100) + '%'; 
+}
+
+function applyZoom(scale){
+  const c = document.getElementById('pdfContainer'); 
+  if(!c) return;
+  
+  currentZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
+  c.style.transform = `scale(${currentZoom})`;
+  c.style.transformOrigin = 'top left';
+  
+  // Add smooth animation
+  c.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+  
+  localStorage.setItem('pdf_zoom', String(currentZoom));
+  updateZoomLabel();
+  
+  // Show visual feedback
+  const controls = document.getElementById('floatingZoomControls');
+  if (controls) {
+    controls.style.transform = 'scale(1.05)';
+    setTimeout(() => {
+      controls.style.transform = 'scale(1)';
+    }, 150);
+  }
+}
+
+function zoomDocument(scale){ 
+  applyZoom(scale); 
+}
+
+function stepZoom(delta){ 
+  applyZoom(currentZoom + delta); 
+}
+
+// Zoom keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === '0') {
+      e.preventDefault();
+      zoomDocument(1);
+    } else if (e.key === '=' || e.key === '+') {
+      e.preventDefault();
+      stepZoom(ZOOM_STEP);
+    } else if (e.key === '-') {
+      e.preventDefault();
+      stepZoom(-ZOOM_STEP);
+    }
+  }
+  
+  // Edit mode shortcuts
+  if (!isEditMode) return;
+  
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 's') {
+      e.preventDefault();
+      saveDocument();
+    } else if (e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      undoEdit();
+    } else if ((e.key === 'y') || (e.key === 'z' && e.shiftKey)) {
+      e.preventDefault();
+      redoEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEdit();
+    }
+  }
+});
+
+// Wheel zoom functionality
+document.addEventListener('DOMContentLoaded', function() {
+  const viewer = document.getElementById('documentViewer');
+  if (viewer) {
+    viewer.addEventListener('wheel', function(e) {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+        stepZoom(delta);
+      }
+    });
+  }
+});
+
+function showAlert(type, message){
+  const el=document.createElement('div');
+  el.className=`alert alert-${type} alert-dismissible fade show`;
+  el.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+  const container=document.querySelector('.container'); 
+  container.insertBefore(el, container.firstChild);
+  setTimeout(()=>el.remove(), 5000);
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const savedZoom = parseFloat(localStorage.getItem('pdf_zoom') || '1');
+  applyZoom(isNaN(savedZoom) ? 1 : savedZoom);
+  
+  // Start status checking if document is processing
+  {% if document.status == 'processing' %}
+    console.log('Document is processing, starting status checks...');
+    startStatusCheck();
+  {% endif %}
+});
+
+window.addEventListener('beforeunload', stopStatusCheck);
+</script>
+{% endblock %}
