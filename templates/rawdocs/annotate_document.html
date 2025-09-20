@@ -1496,6 +1496,40 @@ body {
   -moz-user-select: text;
   -ms-user-select: text;
 }
+
+.content-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.tab-btn {
+    background: var(--pharma-glass);
+    border: 1.5px solid var(--pharma-primary);
+    color: var(--pharma-primary-dark);
+    border-radius: var(--pharma-radius-sm);
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    transition: var(--pharma-transition);
+    cursor: pointer;
+}
+
+.tab-btn.active,
+.tab-btn:hover {
+    background: var(--pharma-primary);
+    color: #fff;
+    border-color: var(--pharma-primary-dark);
+}
+
+.content-panel {
+    animation: fadeInUp 0.3s ease;
+}
+
+.content-panel.active {
+    display: block;
+}
+
 </style>
 
 <!-- Annotation Header -->
@@ -1889,11 +1923,43 @@ body {
 </section>
 {% endif %}
 
-<!-- Main Text Content avec espacement -->
+<!-- NOUVELLE SECTION: Contenu Structuré pour Annotateur -->
+<!-- À placer après la section "page-regulatory-analysis" et avant la section "text-content-card main-content" -->
+
+{% if document.structured_html or show_structured_content %}
+<section class="structured-content-section">
+    <div class="structured-content-header">
+        <h3><i class="fas fa-layer-group"></i> Contenu Structuré (Non-éditable)</h3>
+        <button class="toggle-content-btn" onclick="toggleStructuredContent()" title="Masquer/Afficher">
+            <i class="fas fa-eye-slash"></i>
+        </button>
+    </div>
+    
+    <!-- Zone d'annotation structurée -->
+    <div class="structured-content-card" id="structured-content-container">
+        <div class="structured-content-body" id="structured-annotation-area" data-page-id="{{ current_page.id }}">
+            {% if document.structured_html %}
+                <div class="non-editable-content">
+                    {{ document.structured_html|safe }}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="far fa-file"></i>
+                    <p>Contenu structuré en cours de génération...</p>
+                    <button class="btn btn-primary" onclick="generateStructuredContent()">
+                        <i class="fas fa-play"></i> Générer maintenant
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Main Text Content avec l'élément page-text OBLIGATOIRE -->
 <section class="text-content-card main-content" style="margin-top: 3rem;">
   <h3>
     <i class="fas fa-file-text"></i>
-    Page {{ current_page.page_number }}
+    Page {{ current_page.page_number }} - Zone d'Annotation Principale
     {% if current_page.is_validated_by_human %}
       <span class="page-status validated-human">Validée par humain</span>
     {% elif current_page.is_annotated %}
@@ -1906,139 +1972,723 @@ body {
     {% endif %}
   </h3>
 
-  <div id="page-text" class="text-content doc-text" data-page-id="{{ current_page.id }}">
-    <!-- This will be populated by JavaScript with annotated text -->
-</div>
+  <!-- ÉLÉMENT MANQUANT CRITIQUE POUR L'ANNOTATION -->
+  <div class="text-content" id="page-text" data-page-id="{{ current_page.id }}">{{ current_page.cleaned_text }}</div>
+
+  <!-- Extracted Text Section (votre code existant) -->
+  {% if extracted_text %}
+  <div class="text-card">
+    <h3 class="card-title">
+      <i class="fas fa-file-alt"></i> Contenu structuré extrait
+    </h3>
+
+    <!-- Onglets pour choisir l'affichage -->
+    <div class="content-tabs" style="margin-bottom: 1rem;">
+      <button class="tab-btn active" onclick="showTab('structured')" id="structured-tab">
+        <i class="fas fa-layer-group"></i> Vue structurée
+      </button>
+      <button class="tab-btn" onclick="showTab('text')" id="text-tab">
+        <i class="fas fa-align-left"></i> Texte brut
+      </button>
+    </div>
+
+    <!-- Contenu structuré (par défaut) -->
+    <div id="structured-content" class="content-panel active">
+      {% if structured_html %}
+        <div class="structured-display">
+          {{ structured_html|safe }}
+        </div>
+      {% else %}
+        <div class="fallback-message">
+          <i class="fas fa-exclamation-triangle"></i>
+          Le contenu structuré n'a pas pu être généré. Affichage du texte brut ci-dessous.
+        </div>
+        <div class="text-content">
+          <pre>{{ extracted_text }}</pre>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Contenu texte brut (caché par défaut) -->
+    <div id="text-content" class="content-panel" style="display: none;">
+      <pre>{{ extracted_text }}</pre>
+    </div>
+  </div>
+  {% endif %}
 </section>
 
-<!-- Modal pour ajouter des types d'annotation (identique) -->
-<div class="modal fade" id="addAnnotationTypeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Annotation Type</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="new-annotation-display-name" class="form-label">Display Name</label>
-                    <input type="text" class="form-control" id="new-annotation-display-name"
-                           placeholder="e.g., Product, Dosage, Method">
-                </div>
-                <div class="mb-3">
-                    <label for="new-annotation-name" class="form-label">Technical Name (auto-generated)</label>
-                    <input type="text" class="form-control" id="new-annotation-name" readonly>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="createAnnotationType()">
-                    Create Type
-                </button>
+{% endif %}
+
+<style>
+
+/* Styles pour la section structurée avec annotation */
+.structured-content-section {
+    margin-bottom: 2rem;
+}
+
+.structured-content-header {
+    background: linear-gradient(120deg, #f0f9ff 70%, #e0f2fe 100%);
+    border: 1.5px solid var(--pharma-info);
+    border-radius: var(--pharma-radius) var(--pharma-radius) 0 0;
+    padding: 1rem 1.5rem;
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.structured-content-header.hidden + .structured-content-card {
+    display: none;
+}
+
+.toggle-content-btn {
+    background: var(--pharma-primary);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.toggle-content-btn:hover {
+    background: var(--pharma-primary-dark);
+    transform: scale(1.1);
+}
+
+.structured-content-card {
+    background: var(--pharma-bg-card);
+    border: 1.5px solid var(--pharma-info);
+    border-top: none;
+    border-radius: 0 0 var(--pharma-radius) var(--pharma-radius);
+    box-shadow: var(--pharma-shadow);
+}
+
+.structured-content-body {
+    padding: 2rem;
+    line-height: 1.8;
+    font-size: 1.05rem;
+    color: var(--pharma-text);
+    cursor: text;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    position: relative;
+}
+
+/* Rendre le contenu non-éditable mais sélectionnable */
+.non-editable-content {
+    pointer-events: auto;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+}
+
+.non-editable-content * {
+    pointer-events: auto !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
+/* Indicateur visuel pour le contenu non-éditable */
+.structured-content-body::before {
+    content: "🔒 Zone d'annotation (contenu non-éditable)";
+    display: block;
+    background: #e0f2fe;
+    color: var(--pharma-info);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-left: 4px solid var(--pharma-info);
+}
+
+/* Styles pour la section de contenu structuré dans l'annotateur */
+.structured-content-section {
+    margin-bottom: 3rem;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.structured-content-header {
+    position: relative;
+    overflow: hidden;
+    border-radius: 20px;
+    padding: 24px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--pharma-accent, #16a34a) 0%, var(--pharma-info, #38bdf8) 40%, var(--pharma-primary, #3b82f6) 100%);
+    box-shadow: var(--pharma-shadow);
+    margin-bottom: 20px;
+    border: none;
+    backdrop-filter: blur(20px);
+}
+
+.structured-content-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 20% 50%, rgba(255,255,255,.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(255,255,255,.08) 0%, transparent 50%),
+        radial-gradient(circle at 40% 80%, rgba(255,255,255,.06) 0%, transparent 50%);
+    animation: float 20s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    33% { transform: translateY(-10px) rotate(1deg); }
+    66% { transform: translateY(5px) rotate(-1deg); }
+}
+
+.structured-content-header::after {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px; right: -2px; bottom: -2px;
+    background: linear-gradient(135deg, var(--pharma-accent, #16a34a), var(--pharma-info, #38bdf8), var(--pharma-primary, #3b82f6));
+    border-radius: 22px;
+    z-index: -1;
+    opacity: 0.3;
+    filter: blur(8px);
+}
+
+.sh-content { 
+    position: relative; 
+    z-index: 2; 
+}
+
+.header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.main-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    min-width: 0;
+}
+
+.icon-container { 
+    position: relative; 
+    flex-shrink: 0; 
+}
+
+.icon-chip {
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(12px);
+    border: 2px solid rgba(255,255,255,0.25);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.icon-chip::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s;
+}
+
+.icon-chip:hover::before { 
+    transform: translateX(100%); 
+}
+
+.icon-chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+}
+
+.icon-chip i { 
+    font-size: 24px; 
+    color: #fff; 
+    z-index: 1; 
+    position: relative; 
+}
+
+.title-section { 
+    min-width: 0; 
+    flex: 1; 
+}
+
+.header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 6px;
+    color: #fff;
+}
+
+.metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    opacity: 0.95;
+}
+
+.metadata p { 
+    display: flex; 
+    align-items: center; 
+    gap: 6px; 
+    font-weight: 500; 
+    margin: 0;
+}
+
+.metadata p::before {
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    opacity: 0.8;
+    font-size: 0.8rem;
+}
+
+.metadata p:first-child::before { content: '\f085'; } /* cogs */
+.metadata p:nth-child(2)::before { content: '\f017'; } /* clock */
+.metadata p:nth-child(3)::before { content: '\f0ad'; } /* wrench */
+
+.actions { 
+    display: flex; 
+    gap: 10px; 
+    flex-wrap: wrap; 
+    justify-content: flex-end; 
+    align-items: flex-start; 
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    text-decoration: none;
+    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    backdrop-filter: blur(12px);
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background: rgba(255,255,255,0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    border-color: rgba(255,255,255,0.4);
+    color: #fff;
+    text-decoration: none;
+}
+
+.btn-primary { 
+    background: rgba(255,255,255,0.2); 
+    border-color: rgba(255,255,255,0.3); 
+    position: relative; 
+    overflow: hidden; 
+}
+
+.btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s;
+}
+
+.btn-primary:hover::before { 
+    transform: translateX(100%); 
+}
+
+.btn-primary:hover { 
+    background: rgba(255,255,255,0.25); 
+    transform: translateY(-2px); 
+}
+
+.details {
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 8px; 
+}
+
+.meta-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 50px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.3px;
+    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+}
+
+.meta-badge:hover { 
+    background: rgba(255,255,255,0.18); 
+    transform: translateY(-1px); 
+}
+
+.meta-badge i { 
+    opacity: 0.9; 
+    font-size: 0.75rem; 
+}
+
+.meta-badge.success { 
+    background: rgba(34,197,94,0.15); 
+    border-color: rgba(34,197,94,0.3); 
+    color: #fff; 
+}
+
+.meta-badge.warning { 
+    background: rgba(251,191,36,0.15); 
+    border-color: rgba(251,191,36,0.3); 
+    color: #fff; 
+}
+
+.meta-badge.info { 
+    background: rgba(59,130,246,0.15); 
+    border-color: rgba(59,130,246,0.3); 
+    color: #fff; 
+}
+
+.structured-content-card {
+    background: var(--pharma-bg-card);
+    border: 1.5px solid var(--pharma-border);
+    border-radius: var(--pharma-radius);
+    box-shadow: var(--pharma-shadow);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.structured-content-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--pharma-accent), var(--pharma-info), var(--pharma-primary));
+    border-radius: var(--pharma-radius) var(--pharma-radius) 0 0;
+}
+
+.structured-content-card:hover {
+    box-shadow: 0 10px 25px -3px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+.structured-content-body {
+    padding: 2rem;
+    user-select: text;
+    -webkit-user-select: text;
+    line-height: 1.6;
+}
+
+.structured-content-body * {
+    pointer-events: auto;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #64748b;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+}
+
+.empty-state .btn {
+    background: linear-gradient(135deg, var(--pharma-primary) 0%, var(--pharma-accent) 100%);
+    border: none;
+    color: #fff;
+    padding: 12px 24px;
+}
+
+.empty-state .btn:hover {
+    background: linear-gradient(135deg, var(--pharma-accent) 0%, var(--pharma-primary) 100%);
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+/* Animation de collapse/expand */
+.structured-content-card.collapsed .structured-content-body {
+    display: none;
+}
+
+.structured-content-card.collapsed {
+    margin-bottom: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .structured-content-header { 
+        padding: 16px; 
+        border-radius: 16px; 
+    }
+    
+    .header { 
+        grid-template-columns: 1fr; 
+        gap: 16px; 
+    }
+    
+    .main-info { 
+        gap: 12px; 
+    }
+    
+    .icon-chip { 
+        width: 50px; 
+        height: 50px; 
+        border-radius: 12px; 
+    }
+    
+    .icon-chip i { 
+        font-size: 20px; 
+    }
+    
+    .header h3 { 
+        font-size: 1.25rem; 
+    }
+    
+    .metadata { 
+        flex-direction: column; 
+        gap: 6px; 
+    }
+    
+    .actions { 
+        justify-content: flex-start; 
+        gap: 6px; 
+    }
+    
+    .btn { 
+        padding: 8px 12px; 
+        font-size: 0.8rem; 
+    }
+    
+    .details { 
+        gap: 6px; 
+    }
+    
+    .meta-badge { 
+        padding: 6px 10px; 
+        font-size: 0.75rem; 
+    }
+
+    .structured-content-body {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-info { 
+        flex-direction: column; 
+        align-items: flex-start; 
+        gap: 12px; 
+    }
+    
+    .actions { 
+        width: 100%; 
+    }
+    
+    .btn { 
+        flex: 1; 
+        justify-content: center; 
+    }
+}
+
+/* Animation de fadeIn */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+
+<script>
+// JavaScript pour la gestion du contenu structuré dans l'annotateur
+
+function toggleStructuredContent() {
+    const container = document.getElementById('structured-content-container');
+    const toggleText = document.getElementById('toggle-text');
+    const icon = document.querySelector('.toggle-structured-btn i');
+    
+    if (container.classList.contains('collapsed')) {
+        container.classList.remove('collapsed');
+        toggleText.textContent = 'Masquer';
+        icon.className = 'fas fa-eye';
+    } else {
+        container.classList.add('collapsed');
+        toggleText.textContent = 'Afficher';
+        icon.className = 'fas fa-eye-slash';
+    }
+}
+
+function regenerateStructuredContent() {
+    if (!confirm('Régénérer le contenu structuré ? Cette opération peut prendre quelques minutes.')) {
+        return;
+    }
+
+    const documentId = {{ document.id }};
+    const loading = showStructuredLoadingIndicator('Régénération en cours...');
+
+    fetch(`/structured/regenerate/${documentId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideStructuredLoadingIndicator(loading);
+        if (data.success) {
+            showStructuredSuccess('Contenu structuré régénéré avec succès');
+            // Recharger la section structured content
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    })
+    .catch(error => {
+        hideStructuredLoadingIndicator(loading);
+        console.error('Erreur régénération:', error);
+        alert('Erreur lors de la régénération du contenu structuré');
+    });
+}
+
+function generateStructuredContent() {
+    if (!confirm('Générer le contenu structuré ? Cette opération peut prendre quelques minutes.')) {
+        return;
+    }
+
+    const documentId = {{ document.id }};
+    const loading = showStructuredLoadingIndicator('Génération en cours...');
+
+    fetch(`/structured/generate/${documentId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideStructuredLoadingIndicator(loading);
+        if (data.success) {
+            showStructuredSuccess('Contenu structuré généré avec succès');
+            // Remplacer le contenu de l'empty state
+            const host = document.getElementById('structured-host');
+            if (host && data.structured_html) {
+                host.innerHTML = data.structured_html;
+            }
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    })
+    .catch(error => {
+        hideStructuredLoadingIndicator(loading);
+        console.error('Erreur génération:', error);
+        alert('Erreur lors de la génération du contenu structuré');
+    });
+}
+
+function showStructuredLoadingIndicator(message) {
+    const loading = document.createElement('div');
+    loading.className = 'validation-success';
+    loading.innerHTML = `
+        <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem;"></i>
+        <div>
+            <strong>${message}</strong>
+            <div style="font-size: 0.9rem; opacity: 0.9;">
+                Veuillez patienter...
             </div>
         </div>
-    </div>
-</div>
-<!-- Modal pour éditer une annotation -->
-<div class="modal fade" id="editAnnotationModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-edit"></i> Modifier l'Annotation
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <!-- Texte sélectionné -->
-                <div class="mb-3">
-                    <label for="edit-selected-text" class="form-label">
-                        <i class="fas fa-quote-right"></i> Texte Sélectionné
-                    </label>
-                    <textarea class="form-control" id="edit-selected-text" rows="3"
-                             placeholder="Texte à annoter..."></textarea>
-                    <div class="form-text">
-                        Vous pouvez modifier le texte sélectionné pour corriger l'IA
-                    </div>
-                </div>
+    `;
+    loading.id = 'structured-loading-indicator';
 
-                <!-- Type d'annotation -->
-                <div class="mb-3">
-                    <label for="edit-annotation-type" class="form-label">
-                        <i class="fas fa-tags"></i> Type d'Annotation
-                    </label>
-                    <select class="form-control" id="edit-annotation-type">
-                        <option value="">Sélectionner un type...</option>
-                        {% for ann_type in annotation_types %}
-                        <option value="{{ ann_type.id }}" data-color="{{ ann_type.color }}">
-                            {{ ann_type.display_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
+    const section = document.querySelector('.structured-content-section');
+    if (section) {
+        section.parentNode.insertBefore(loading, section);
+    }
 
-                <!-- Positions (pour les utilisateurs avancés) -->
-                <div class="mb-3">
-                    <label class="form-label">
-                        <i class="fas fa-crosshairs"></i> Positions dans le texte
-                    </label>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <input type="number" class="form-control" id="edit-start-pos"
-                                   placeholder="Position début" readonly>
-                        </div>
-                        <div class="col-md-6">
-                            <input type="number" class="form-control" id="edit-end-pos"
-                                   placeholder="Position fin" readonly>
-                        </div>
-                    </div>
-                    <div class="form-text">
-                        Les positions sont automatiquement calculées
-                    </div>
-                </div>
+    return loading;
+}
 
-                <!-- Informations sur l'annotation -->
-                <div class="mb-3">
-                    <div class="annotation-info-panel" style="
-                        background: #f8f9fa;
-                        border: 1px solid #dee2e6;
-                        border-radius: 8px;
-                        padding: 1rem;
-                    ">
-                        <div class="annotation-meta">
-                            <div><strong>Créée par:</strong> <span id="edit-created-by">-</span></div>
-                            <div><strong>Confiance IA:</strong> <span id="edit-confidence">-</span>%</div>
-                            <div><strong>Raisonnement IA:</strong></div>
-                            <div id="edit-ai-reasoning" style="
-                                font-style: italic;
-                                color: #6c757d;
-                                margin-top: 0.5rem;
-                                padding: 0.5rem;
-                                background: #e9ecef;
-                                border-radius: 4px;
-                            ">-</div>
-                        </div>
-                    </div>
-                </div>
+function hideStructuredLoadingIndicator(loading) {
+    if (loading && loading.parentNode) {
+        loading.parentNode.removeChild(loading);
+    }
+}
 
-                <!-- Message d'aide -->
-                <div class="alert alert-info" role="alert">
-                    <i class="fas fa-info-circle"></i>
-                    <strong>Conseil:</strong> Modifiez le texte et/ou le type pour corriger les erreurs de l'IA.
-                    Vos corrections aident l'IA à s'améliorer!
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times"></i> Annuler
-                </button>
-                <button type="button" class="btn btn-primary" onclick="saveAnnotationChanges()">
-                    <i class="fas fa-save"></i> Sauvegarder les Modifications
-                </button>
+function showStructuredSuccess(message) {
+    const success = document.createElement('div');
+    success.className = 'validation-success';
+    success.innerHTML = `
+        <i class="fas fa-layer-group" style="font-size: 1.5rem;"></i>
+        <div>
+            <strong>✅ ${message}</strong>
+            <div style="font-size: 0.9rem; opacity: 0.9;">
+                Le contenu structuré a été mis à jour
             </div>
         </div>
-    </div>
-</div>
+    `;
+
+    const section = document.querySelector('.structured-content-section');
+    if (section) {
+        section.parentNode.insertBefore(success, section);
+        setTimeout(() => success.remove(), 5000);
+    }
+}
+
+// Initialiser l'état collapsed par défaut si souhaité
+document.addEventListener('DOMContentLoaded', function() {
+    // Optionnel: commencer avec la section repliée
+    // const container = document.getElementById('structured-content-container');
+    // if (container) {
+    //     container.classList.add('collapsed');
+    //     document.getElementById('toggle-text').textContent = 'Afficher';
+    //     document.querySelector('.toggle-structured-btn i').className = 'fas fa-eye-slash';
+    // }
+});
+</script>
 
 <script src="{% static 'rawdocs/js/rlhf_annotation.js' %}"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -2075,11 +2725,29 @@ document.addEventListener('DOMContentLoaded', function() {
     loadMistralAnnotationTypes();
 });
 
+function showTab(tabName) {
+    // Hide all tab contents
+    const contents = document.getElementsByClassName('content-panel');
+    for (let content of contents) {
+        content.style.display = 'none';
+    }
+
+    // Show the selected tab content
+    document.getElementById(tabName + '-content').style.display = 'block';
+
+    // Update active tab button
+    const tabs = document.getElementsByClassName('tab-btn');
+    for (let tab of tabs) {
+        tab.classList.remove('active');
+    }
+    document.getElementById(tabName + '-tab').classList.add('active');
+}
+
 function initializeProdigyToolbar() {
     const pageEl = document.getElementById("page-text");
-    const pageId = pageEl.dataset.pageId;
+    const structuredArea = document.getElementById("structured-annotation-area");
 
-    // Activate label buttons
+    // Gérer les boutons de type d'annotation (code existant)
     document.querySelectorAll(".label-btn").forEach(btn => {
         btn.addEventListener("click", () => {
             // Remove active from all
@@ -2109,10 +2777,29 @@ function initializeProdigyToolbar() {
         }
     });
 
-    // Text selection for annotation
-    pageEl.addEventListener("mouseup", handleTextSelection);
+    // Ajouter les événements de sélection pour les deux zones
+    if (pageEl) {
+        pageEl.addEventListener("mouseup", handleTextSelection);
+    }
     
-    // Clear button
+    if (structuredArea) {
+        structuredArea.addEventListener("mouseup", handleTextSelection);
+        
+        // Empêcher l'édition mais permettre la sélection
+        structuredArea.addEventListener("keydown", function(e) {
+            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && 
+                e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' &&
+                !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+            }
+        });
+        
+        structuredArea.addEventListener("paste", function(e) {
+            e.preventDefault();
+        });
+    }
+    
+    // Clear button (code existant)
     document.getElementById("clear-annotations-btn").addEventListener("click", () => {
         if (confirm('Effacer toutes les annotations de cette page ?')) {
             clearPageAnnotations();
@@ -2228,64 +2915,58 @@ function renderInlineAnnotations(originalText, annotations) {
 function handleTextSelection() {
     const selection = window.getSelection();
     
-    // Don't process if no selection or empty selection
     if (!selection.rangeCount || !selection.toString().trim()) {
         return;
     }
 
-    // Check if selection is within an annotation - if so, ignore
+    // Vérifier si on est dans une annotation existante
     const range = selection.getRangeAt(0);
-    const startContainer = range.startContainer;
-    const endContainer = range.endContainer;
-    
-    // Check if either start or end of selection is within an inline-annotation
-    let withinAnnotation = false;
-    
-    [startContainer, endContainer].forEach(container => {
-        let node = container;
-        while (node && node !== document.getElementById("page-text")) {
-            if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('inline-annotation')) {
-                withinAnnotation = true;
-                break;
-            }
-            node = node.parentNode;
-        }
-    });
-    
-    if (withinAnnotation) {
+    if (isWithinAnnotation(range)) {
         selection.removeAllRanges();
         return;
     }
 
     if (!currentLabel) {
-        alert('Veuillez d\'abord sélectionner un type d\'annotation');
+        showSelectionAlert('Veuillez d\'abord sélectionner un type d\'annotation');
         return;
     }
 
     const selectedText = selection.toString().trim();
-    const pageEl = document.getElementById("page-text");
     
-    // Get clean text without HTML for position calculation
-    const cleanText = pageEl.textContent || pageEl.innerText;
+    // Déterminer quelle zone utiliser (page-text ou structured-annotation-area)
+    let targetArea = null;
+    let pageId = null;
     
-    // Calculate position using clean text
+    // Vérifier d'abord la zone de texte principal
+    const pageTextElement = document.getElementById("page-text");
+    if (pageTextElement && pageTextElement.contains(range.commonAncestorContainer)) {
+        targetArea = pageTextElement;
+        pageId = targetArea.dataset.pageId;
+    } 
+    // Puis vérifier la zone structurée
+    else if (document.getElementById("structured-annotation-area") && 
+             document.getElementById("structured-annotation-area").contains(range.commonAncestorContainer)) {
+        targetArea = document.getElementById("structured-annotation-area");
+        pageId = targetArea.dataset.pageId;
+    }
+    
+    if (!targetArea || !pageId) {
+        showSelectionAlert('Veuillez sélectionner du texte dans une zone d\'annotation valide');
+        return;
+    }
+
+    // Reste du code existant...
+    const cleanText = targetArea.textContent || targetArea.innerText;
     let startPos = cleanText.toLowerCase().indexOf(selectedText.toLowerCase());
     
     if (startPos === -1) {
-        alert('Impossible de localiser le texte sélectionné.');
+        showSelectionAlert('Impossible de localiser le texte sélectionné.');
         return;
     }
     
     const endPos = startPos + selectedText.length;
 
-    console.log('Selection positions:', {
-        text: selectedText,
-        start: startPos,
-        end: endPos,
-        cleanTextLength: cleanText.length
-    });
-
-    // Create visual annotation immediately
+    // Créer l'annotation visuelle (code existant)
     const span = document.createElement("span");
     span.classList.add("inline-annotation");
     span.setAttribute("data-annotation-id", "temp-" + Date.now());
@@ -2294,9 +2975,7 @@ function handleTextSelection() {
     span.style.margin = "0 1px";
     span.style.borderRadius = "3px";
     span.style.cursor = "pointer";
-    span.style.position = "relative";  // Pour les indicateurs visuels d'état
-    span.innerHTML = selectedText + `<span class="ann-label" style="font-size: 0.7rem; font-weight: bold; margin-left: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.6); color: #fff; white-space: nowrap;">${currentLabel.name}</span>` +
-                     `<span class="saving-indicator" style="position: absolute; right: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: #FFC107; display: inline-block;"></span>`;
+    span.innerHTML = selectedText + `<span class="ann-label" style="font-size: 0.7rem; font-weight: bold; margin-left: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.6); color: #fff; white-space: nowrap;">${currentLabel.name}</span>`;
 
     addClickHandlerToTempAnnotation(span);
 
@@ -2307,18 +2986,100 @@ function handleTextSelection() {
         console.error('Error inserting annotation:', e);
     }
 
-    // Save to database
+    // Sauvegarder en base
     saveManualAnnotation({
-        page_id: pageEl.dataset.pageId,
+        page_id: pageId,
         type_id: currentLabel.id,
         selected_text: selectedText,
         start_pos: startPos,
         end_pos: endPos
     });
 
-    // Clear selection
     selection.removeAllRanges();
 }
+
+function isWithinAnnotation(range) {
+    const startContainer = range.startContainer;
+    const endContainer = range.endContainer;
+    
+    // Vérifier si la sélection est dans une annotation existante
+    let withinAnnotation = false;
+    
+    [startContainer, endContainer].forEach(container => {
+        let node = container;
+        while (node && node !== document.body) {
+            if (node.nodeType === Node.ELEMENT_NODE && 
+                node.classList && node.classList.contains('inline-annotation')) {
+                withinAnnotation = true;
+                break;
+            }
+            node = node.parentNode;
+        }
+    });
+    
+    return withinAnnotation;
+}
+
+function showSelectionAlert(message) {
+    const alert = document.createElement('div');
+    alert.className = 'validation-success';
+    alert.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+    alert.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+    document.body.appendChild(alert);
+    
+    setTimeout(() => alert.remove(), 3000);
+}
+
+function toggleStructuredContent() {
+    const header = document.querySelector('.structured-content-header');
+    const btn = header.querySelector('.toggle-content-btn i');
+    
+    if (header.classList.contains('hidden')) {
+        header.classList.remove('hidden');
+        btn.className = 'fas fa-eye-slash';
+    } else {
+        header.classList.add('hidden');
+        btn.className = 'fas fa-eye';
+    }
+}
+
+function makeContentNonEditable() {
+    const structuredArea = document.getElementById("structured-annotation-area");
+    if (!structuredArea) return;
+    
+    // Désactiver tous les éléments éditables
+    const editableElements = structuredArea.querySelectorAll('input, textarea, select, button, [contenteditable]');
+    editableElements.forEach(element => {
+        element.disabled = true;
+        element.style.pointerEvents = 'none';
+        element.style.background = '#e9ecef';
+        element.style.cursor = 'not-allowed';
+        if (element.hasAttribute('contenteditable')) {
+            element.removeAttribute('contenteditable');
+        }
+    });
+    
+    // Empêcher la modification directe du texte
+    structuredArea.addEventListener('input', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    });
+    
+    structuredArea.addEventListener('beforeinput', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    });
+}
+
+// Appeler cette fonction après le chargement
+document.addEventListener('DOMContentLoaded', function() {
+    // Votre code existant...
+    
+    // Rendre le contenu non-éditable
+    setTimeout(makeContentNonEditable, 100);
+});
 
 function deleteAnnotationFromDB(annotationId) {
     // Supprimer l'annotation de la base de données sans recharger la page
