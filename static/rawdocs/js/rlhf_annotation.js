@@ -35,7 +35,19 @@ function annotateWithGroq() {
                 validateBtn.innerHTML = '<i class="fas fa-graduation-cap"></i> Valider la Page';
             }
 
-            setTimeout(() => location.reload(), 1500);
+            // Au lieu de recharger la page, on va afficher les annotations dans le contenu structuré
+            if (data.annotations && data.annotations.length > 0) {
+                const structuredContent = document.querySelector('.structured-content-body');
+                if (structuredContent) {
+                    // Pour chaque annotation, on l'ajoute au contenu structuré
+                    data.annotations.forEach(annotation => {
+                        addAnnotationToStructuredContent(annotation);
+                    });
+                }
+            }
+
+            // En parallèle, on met à jour aussi les annotations dans la zone principale
+            loadAndRenderAnnotations();
         } else {
             throw new Error(data.error || 'Erreur inconnue lors de l\'annotation');
         }

@@ -13,6 +13,79 @@
   // Variable globale pour l'ID du document
   var DOCUMENT_ID = {{ document.id }};
 
+  // Fonction pour ajouter une annotation au contenu structuré
+  function addAnnotationToStructuredContent(annotation) {
+    const structuredContent = document.querySelector('.structured-content-body');
+    if (!structuredContent) return;
+
+    const text = annotation.text || annotation.selected_text;
+    const type = annotation.type || annotation.entity_type;
+    const color = annotation.color || '#ffeb3b'; // couleur par défaut
+    
+    // Convertir la couleur hex en RGB pour le gradient
+    const rgb = hexToRgb(color || '#ffeb3b');
+    const rgbValues = rgb ? `${rgb.r},${rgb.g},${rgb.b}` : '255,235,59';
+
+    // Convertir le texte en format HTML safe pour la recherche
+    const textAsHtml = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+            
+    // Créer un regex qui prend en compte le format HTML
+    const regexEscaped = textAsHtml.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(regexEscaped, 'g');
+    
+    // Créer le span d'annotation
+    const annotationSpan = `<span class="inline-annotation" 
+                               style="--highlight-color: ${rgbValues}; 
+                                      cursor: pointer;">
+                            ${textAsHtml}
+                            <span class="ann-label" 
+                                  style="font-size: 0.7rem; 
+                                         font-weight: bold; 
+                                         margin-left: 4px; 
+                                         padding: 2px 6px; 
+                                         border-radius: 4px; 
+                                         background: rgba(0,0,0,0.6); 
+                                         color: #fff; 
+                                         white-space: nowrap;">
+                                ${type}
+                            </span>
+                         </span>`;
+    
+    // Remplacer uniquement si le texte existe et n'est pas déjà dans un span d'annotation
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = structuredContent.innerHTML;
+    const textNodes = [];
+    
+    function findTextNodes(node) {
+        if (node.nodeType === 3) { // Text node
+            textNodes.push(node);
+        } else if (node.nodeType === 1 && !node.classList.contains('inline-annotation')) {
+            for (const child of node.childNodes) {
+                findTextNodes(child);
+            }
+        }
+    }
+    
+    findTextNodes(tempDiv);
+    
+    textNodes.forEach(node => {
+        const nodeContent = node.textContent;
+        if (nodeContent.includes(text)) {
+            const newContent = nodeContent.replace(regex, annotationSpan);
+            const span = document.createElement('span');
+            span.innerHTML = newContent;
+            node.parentNode.replaceChild(span, node);
+        }
+    });
+    
+    structuredContent.innerHTML = tempDiv.innerHTML;
+  }
+
   // Définition de la fonction ici pour s'assurer qu'elle est disponible globalement
   function annotateWithGroqAll() {
     const btn = document.getElementById('groq-annotate-all-btn');
@@ -144,6 +217,16 @@
         loading.style.display = 'none';
         loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> IA en cours...';
     });
+  }
+
+  // Fonction utilitaire pour convertir une couleur hex en RGB
+  function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
   }
 </script>
 
@@ -1594,32 +1677,212 @@ body {
   border: 2px solid #fff;
 }
 
-/* Inline annotation styles */
+/* Inline annotation styles - Version améliorée */
 .inline-annotation {
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin: 0 1px;
-  color: #fff;
+  display: inline;
+  border-radius: 2px;
+  padding: 0 1px;
+  margin: 0;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: normal;
   position: relative;
   transition: all 0.2s ease;
+  line-height: inherit;
+  font-size: inherit;
+  vertical-align: baseline;
+  opacity: 0.7;
+  text-decoration: none;
+  border-bottom: 2px solid rgba(0,0,0,0.1);
 }
 
 .inline-annotation:hover {
-  transform: scale(1.02);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  opacity: 0.9;
+  border-bottom: 2px solid currentColor;
+  box-shadow: none;
+  transform: none;
 }
 
-.inline-annotation .ann-label {
-  font-size: 0.7rem;
-  font-weight: bold;
-  margin-left: 4px;
+/* Style de base pour toutes les annotations */
+.inline-annotation {
+  display: inline;
+  padding: 2px 4px;
+  margin: 0 1px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: normal;
+  position: relative;
+  line-height: inherit;
+  white-space: normal;
+  transition: all 0.2s ease;
+}
+
+/* Style spécifique pour la zone de texte brut */
+.text-content .inline-annotation {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(0,0,0,0.6);
+  margin: 0 2px;
+  border-radius: 3px;
+  background-color: inherit;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  border: none;
+}
+
+.text-content .inline-annotation:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+/* Style spécifique pour le contenu structuré - Version ultra-fine */
+.structured-content-body .inline-annotation {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+  text-decoration: none;
+  position: relative;
+  background: none !important;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+
+.structured-content-body .inline-annotation::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background-color: rgba(var(--highlight-color, 255, 235, 59), 0.2);
+  transition: all 0.2s ease;
+}
+
+.structured-content-body .inline-annotation:hover::after {
+  background-color: rgba(var(--highlight-color, 255, 235, 59), 0.4);
+  height: 2px;
+}
+
+/* Style de base pour les labels d'annotation */
+.inline-annotation .ann-label {
+  font-size: 0.65rem;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.5);
   color: #fff;
   white-space: nowrap;
+  line-height: 1;
+  position: absolute;
+  z-index: 10;
+}
+
+/* Style spécifique pour les labels dans le texte brut */
+.text-content .inline-annotation .ann-label {
+  display: inline-block;
+  margin: 0;
+  padding: 0 4px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  position: static;
+  transform: none;
+  vertical-align: baseline;
+}
+
+/* Style spécifique pour les labels dans le contenu structuré - Version améliorée */
+.structured-content-body .inline-annotation .ann-label {
+  display: none;
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  font-size: 0.6rem;
+  padding: 1px 4px;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.2s ease;
+  z-index: 1000;
+  line-height: normal;
+  margin: 0;
+}
+
+.structured-content-body .inline-annotation:hover .ann-label {
+  display: block;
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Ajuster l'espacement vertical */
+.structured-content-body p + p {
+  margin-top: 1em;
+}
+
+/* Amélioration de la lisibilité du contenu structuré */
+.structured-content-body {
+  line-height: 1.6;
+  font-size: 1rem;
+  color: #1a1a1a;
+  letter-spacing: normal;
+  word-spacing: normal;
+}
+
+.structured-content-body p {
+  margin: 0.7em 0;
+}
+
+/* Préserver la structure du document */
+.structured-content-body .inline-annotation {
+  position: relative;
+  z-index: 1;
+  display: inline;
+  line-height: inherit;
+  vertical-align: baseline;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Amélioration de la lisibilité du contenu structuré */
+.structured-content-body {
+  line-height: 1.8;
+  font-size: 1rem;
+  color: #1a1a1a;
+  letter-spacing: 0.01em;
+}
+
+/* Affichage du label au survol */
+.inline-annotation:hover .ann-label {
+  display: inline-block;
+}
+
+.structured-content-body p {
+  margin-bottom: 1em;
+}
+
+/* Animation subtile au survol */
+.structured-content-body .inline-annotation .ann-label {
+  transition: opacity 0.2s ease;
+  opacity: 0;
+  transform: translateY(2px);
+}
+
+.structured-content-body .inline-annotation:hover .ann-label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Style pour les sections du contenu structuré */
+.structured-content-body h1,
+.structured-content-body h2,
+.structured-content-body h3,
+.structured-content-body h4 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  color: #2d3748;
+  font-weight: 600;
 }
 
 /* Enhanced text content for better selection */
@@ -3049,6 +3312,90 @@ let currentEditingAnnotationId = null;
 let editModal = null;
 let contextMenuTarget = null;
 
+// Fonction pour charger les annotations dans le contenu structuré
+function loadAnnotationsInStructuredContent() {
+    const pageId = document.getElementById('page-text')?.dataset?.pageId;
+    if (!pageId) return;
+
+    fetch(`/annotation/page/${pageId}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.annotations && data.annotations.length > 0) {
+                const structuredContent = document.querySelector('.structured-content-body');
+                if (structuredContent) {
+                    // Pour chaque annotation, ajouter au contenu structuré
+                    data.annotations.forEach(annotation => {
+                        // Pour chaque annotation, récupérer la couleur du type d'annotation
+                        let annotationType = document.querySelector(`.label-btn[data-name="${annotation.type}"]`);
+                        let color = annotationType ? annotationType.dataset.color : '#ffeb3b';
+                        
+                        const text = annotation.selected_text;
+                        const type = annotation.type;
+                        
+                        // Convertir le texte en format HTML safe pour la recherche
+                        const textAsHtml = text
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')
+                            .replace(/"/g, '&quot;')
+                            .replace(/'/g, '&#039;');
+                                
+                        // Créer un regex qui prend en compte le format HTML
+                        const regexEscaped = textAsHtml.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const regex = new RegExp(regexEscaped, 'g');
+                        
+                        // Convertir la couleur hex en RGB pour l'utiliser avec opacity
+                        const getRGB = (hex) => {
+                            const r = parseInt(hex.slice(1, 3), 16);
+                            const g = parseInt(hex.slice(3, 5), 16);
+                            const b = parseInt(hex.slice(5, 7), 16);
+                            return `${r}, ${g}, ${b}`;
+                        };
+                        
+                        // Créer le span d'annotation avec le nouveau style
+                        const annotationSpan = `<span class="inline-annotation" 
+                                                   style="background-color: ${color}">
+                                                ${textAsHtml}
+                                                <span class="ann-label">${type}</span>
+                                             </span>`;
+                        
+                        // Remplacer uniquement si le texte existe et n'est pas déjà dans un span d'annotation
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = structuredContent.innerHTML;
+                        const textNodes = [];
+                        
+                        function findTextNodes(node) {
+                            if (node.nodeType === 3) { // Text node
+                                textNodes.push(node);
+                            } else if (node.nodeType === 1 && !node.classList.contains('inline-annotation')) {
+                                for (const child of node.childNodes) {
+                                    findTextNodes(child);
+                                }
+                            }
+                        }
+                        
+                        findTextNodes(tempDiv);
+                        
+                        textNodes.forEach(node => {
+                            const nodeContent = node.textContent;
+                            if (nodeContent.includes(text)) {
+                                const newContent = nodeContent.replace(regex, annotationSpan);
+                                const span = document.createElement('span');
+                                span.innerHTML = newContent;
+                                node.parentNode.replaceChild(span, node);
+                            }
+                        });
+                        
+                        structuredContent.innerHTML = tempDiv.innerHTML;
+                    });
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading annotations for structured content:', error);
+        });
+}
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Build type mapping
@@ -3061,8 +3408,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize Prodigy-like toolbar
     initializeProdigyToolbar();
     
-    // Load and render existing annotations
+    // Load and render existing annotations in both areas
     loadAndRenderAnnotations();
+    loadAnnotationsInStructuredContent(); // Ajout de cette ligne
     
     // Initialize modals and existing functionality
     initializeModals();
@@ -3527,13 +3875,32 @@ function clearPageAnnotations() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            loadAndRenderAnnotations(); // Reload clean text
+            // Nettoyer la zone principale
+            loadAndRenderAnnotations();
+            
+            // Nettoyer le contenu structuré
+            const structuredContent = document.querySelector('.structured-content-body');
+            if (structuredContent) {
+                // Sauvegarder le contenu texte original sans annotations
+                const originalText = structuredContent.innerText;
+                
+                // Supprimer toutes les annotations
+                const annotations = structuredContent.querySelectorAll('.inline-annotation');
+                annotations.forEach(annotation => {
+                    const textNode = document.createTextNode(annotation.textContent.replace(annotation.querySelector('.ann-label').textContent, ''));
+                    annotation.parentNode.replaceChild(textNode, annotation);
+                });
+                
+                // Normaliser les nœuds de texte adjacents
+                structuredContent.normalize();
+            }
+            
+            showSuccessMessage('Toutes les annotations ont été supprimées');
         }
     })
     .catch(error => {
         console.error('Error clearing annotations:', error);
-        // Fallback: just reload the page
-        location.reload();
+        showErrorMessage('Erreur lors de la suppression des annotations');
     });
 }
 
