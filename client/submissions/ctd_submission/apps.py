@@ -5,7 +5,9 @@ from django.apps import AppConfig
 from django.db.models.signals import post_migrate
 import logging
 
+# Configuration du logger avec un niveau de logging plus élevé pour réduire les messages
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)  # Ne montrer que les warnings et erreurs
 
 
 class CtdSubmissionConfig(AppConfig):

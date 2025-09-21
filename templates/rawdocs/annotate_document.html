@@ -1736,14 +1736,15 @@ body {
 /* Style spécifique pour le contenu structuré - Version ultra-fine */
 .structured-content-body .inline-annotation {
   display: inline;
-  padding: 0;
+  padding: 2px 1px;
   margin: 0;
-  border-radius: 0;
+  border-radius: 2px;
   text-decoration: none;
   position: relative;
-  background: none !important;
   line-height: inherit;
   vertical-align: baseline;
+  background-color: rgba(37, 99, 235, 0.1) !important;
+  transition: background-color 0.2s ease;
 }
 
 .structured-content-body .inline-annotation::after {
@@ -1752,14 +1753,13 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 2px;
-  background-color: rgba(var(--highlight-color, 255, 235, 59), 0.9);
+  height: 100%;
+  background-color: rgba(59, 130, 246, 0.1);
   transition: all 0.2s ease;
 }
 
-.structured-content-body .inline-annotation:hover::after {
-  background-color: rgba(var(--highlight-color, 255, 235, 59), 0.9);
-  height: 2px;
+.structured-content-body .inline-annotation:hover {
+  background-color: rgba(37, 99, 235, 0.15) !important;
 }
 
 /* Style de base pour les labels d'annotation */
