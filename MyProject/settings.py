@@ -204,33 +204,17 @@ CONVERTIO_API_KEY = "c14c6e0d62a6a7a98acb9bc629bbd273"
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'formatters': {
-        'simple': {
-            'format': '[%(levelname)s] %(message)s'
-        },
-    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'simple',
-            'level': 'WARNING',
+            'level': 'INFO',
         },
     },
     'loggers': {
         '': {
             'handlers': ['console'],
-            'level': 'WARNING',
+            'level': 'INFO',
             'propagate': True,
-        },
-        'django': {
-            'handlers': ['console'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'client.submissions.ctd_submission': {
-            'handlers': ['console'],
-            'level': 'WARNING',
-            'propagate': False,
         },
     },
 }
