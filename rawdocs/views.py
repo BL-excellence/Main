@@ -1074,6 +1074,109 @@ def ai_annotate_page_groq(request, page_id):
 
 
 @login_required
+@csrf_exempt 
+def ai_annotate_document_groq(request, doc_id):
+    """Annotation automatique d'un document complet avec Groq"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        # Vérifier les permissions
+        if not (is_annotateur(request.user) or is_expert(request.user)):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+
+        # Récupérer le document
+        document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
+        
+        print(f"🔍 Démarrage annotation Groq document {doc_id}")
+        
+        # Initialiser l'analyseur Groq
+        groq_annotator = GroqAnnotator()
+        
+        # Analyser toutes les pages
+        pages = document.pages.all().order_by('page_number')
+        total_annotations = 0
+        pages_annotated = 0
+
+        for page in pages:
+            try:
+                print(f"📄 Annotation page {page.page_number}/{document.total_pages}")
+
+                # Effacer les annotations existantes
+                page.annotations.all().delete()
+
+                # Créer données pour annotation
+                page_data = {
+                    'page_num': page.page_number,
+                    'text': page.cleaned_text,
+                    'char_count': len(page.cleaned_text)
+                }
+
+                # Obtenir les annotations pour cette page
+                annotations, schema = groq_annotator.annotate_page_with_groq(page_data)
+
+                # Sauvegarder les annotations
+                saved_count = 0
+                for ann_data in annotations:
+                    try:
+                        ann_type, _ = AnnotationType.objects.get_or_create(
+                            name=ann_data['type'],
+                            defaults={
+                                'display_name': ann_data['type'].replace('_', ' ').title(),
+                                'color': '#3b82f6',
+                                'description': f"GROQ detected {ann_data['type']}"
+                            }
+                        )
+
+                        Annotation.objects.create(
+                            page=page,
+                            annotation_type=ann_type,
+                            start_pos=ann_data.get('start_pos', 0),
+                            end_pos=ann_data.get('end_pos', 0),
+                            selected_text=ann_data.get('text', ''),
+                            confidence_score=ann_data.get('confidence', 0.8) * 100,
+                            ai_reasoning=ann_data.get('reasoning', 'GROQ bulk annotation'),
+                            created_by=request.user
+                        )
+                        saved_count += 1
+                    except Exception as e:
+                        print(f"❌ Erreur sauvegarde annotation page {page.page_number}: {e}")
+                        continue
+
+                # Mettre à jour les statistiques
+                total_annotations += saved_count
+                if saved_count > 0:
+                    pages_annotated += 1
+                    page.is_annotated = True
+                    page.annotated_at = datetime.now()
+                    page.annotated_by = request.user
+                    page.save()
+
+                # Pause pour éviter les limites d'API
+                time.sleep(2)
+
+            except Exception as e:
+                print(f"❌ Erreur page {page.page_number}: {e}")
+                continue
+
+        print(f"✅ Annotation document terminée: {pages_annotated} pages, {total_annotations} annotations")
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Document annoté avec succès! {pages_annotated} pages, {total_annotations} annotations.',
+            'pages_annotated': pages_annotated,
+            'total_annotations': total_annotations,
+            'total_pages': document.total_pages
+        })
+
+    except Exception as e:
+        print(f"❌ Erreur annotation document {doc_id}: {e}")
+        return JsonResponse({
+            'error': f'Erreur lors de l\'annotation: {str(e)}'
+        }, status=500)
+
+
+@login_required
 def get_document_status(request, doc_id):
     """Get document validation status"""
     try:

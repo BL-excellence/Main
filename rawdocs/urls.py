@@ -105,6 +105,13 @@ urlpatterns = [
         name='ai_annotate_page_groq'
     ),
 
+    # 13b) Annotation automatique avec Groq (document complet)
+    path(
+        'annotation/groq/document/<int:doc_id>/',
+        views.ai_annotate_document_groq,
+        name='ai_annotate_document_groq'
+    ),
+
     # 14) Sauvegarde d'une annotation manuelle
     path(
         'annotation/manual/',

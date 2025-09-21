@@ -12,6 +12,139 @@
 <script type="text/javascript">
   // Variable globale pour l'ID du document
   var DOCUMENT_ID = {{ document.id }};
+
+  // Définition de la fonction ici pour s'assurer qu'elle est disponible globalement
+  function annotateWithGroqAll() {
+    const btn = document.getElementById('groq-annotate-all-btn');
+    const loading = document.getElementById('ai-loading');
+    const validateBtn = document.getElementById('validate-page-btn');
+    
+    if (!btn || !loading || typeof DOCUMENT_ID === 'undefined') {
+        console.error('Annotation impossible : ID du document non disponible ou éléments manquants');
+        showErrorMessage('Éléments manquants pour l\'annotation du document');
+        return;
+    }
+
+    btn.style.display = 'none';
+    loading.style.display = 'flex';
+    loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Annotation du document en cours...';
+
+    fetch(`/annotation/groq/document/${DOCUMENT_ID}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            mode: 'structured'
+        })
+    })
+    .then(handleResponse)
+    .then(data => {
+        if (data.success) {
+            showSuccessMessage(`🎉 Document annoté! ${data.annotations_created} annotations créées`);
+            
+            if (data.total_pages > 0) {
+                showAlert(`${data.total_pages} pages traitées avec succès!`, 'success', '#10b981');
+            }
+
+            // Au lieu de recharger la page, on va afficher les annotations dans le contenu structuré
+            const annotations = data.annotations || [];
+            const structuredContent = document.querySelector('.structured-content-body');
+            
+            if (structuredContent && annotations.length > 0) {
+                let htmlContent = structuredContent.innerHTML;
+                
+                // Pour chaque annotation
+                annotations.forEach(annotation => {
+                    const text = annotation.text || annotation.selected_text;
+                    const type = annotation.type || annotation.entity_type;
+                    const color = annotation.color || '#ffeb3b'; // couleur par défaut si non spécifiée
+                    
+                    // Convertir le texte en format HTML safe pour la recherche
+                    const textAsHtml = text
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#039;');
+                            
+                    // Créer un regex qui prend en compte le format HTML
+                    const regexEscaped = textAsHtml.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(regexEscaped, 'g');
+                    
+                    // Créer le span d'annotation avec le texte original
+                    const annotationSpan = `<span class="inline-annotation" 
+                                               style="background-color: ${color}; 
+                                                      padding: 2px 4px; 
+                                                      margin: 0 1px; 
+                                                      border-radius: 3px; 
+                                                      cursor: pointer;">
+                                            ${textAsHtml}
+                                            <span class="ann-label" 
+                                                  style="font-size: 0.7rem; 
+                                                         font-weight: bold; 
+                                                         margin-left: 4px; 
+                                                         padding: 2px 6px; 
+                                                         border-radius: 4px; 
+                                                         background: rgba(0,0,0,0.6); 
+                                                         color: #fff; 
+                                                         white-space: nowrap;">
+                                                ${type}
+                                            </span>
+                                         </span>`;
+                    
+                    // Remplacer uniquement si le texte existe et n'est pas déjà dans un span d'annotation
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = htmlContent;
+                    const textNodes = [];
+                    
+                    function findTextNodes(node) {
+                        if (node.nodeType === 3) { // Text node
+                            textNodes.push(node);
+                        } else if (node.nodeType === 1 && !node.classList.contains('inline-annotation')) {
+                            for (const child of node.childNodes) {
+                                findTextNodes(child);
+                            }
+                        }
+                    }
+                    
+                    findTextNodes(tempDiv);
+                    
+                    textNodes.forEach(node => {
+                        const nodeContent = node.textContent;
+                        if (nodeContent.includes(text)) {
+                            const newContent = nodeContent.replace(regex, annotationSpan);
+                            const span = document.createElement('span');
+                            span.innerHTML = newContent;
+                            node.parentNode.replaceChild(span, node);
+                        }
+                    });
+                    
+                    htmlContent = tempDiv.innerHTML;
+                });
+                
+                // Mettre à jour le contenu avec toutes les annotations
+                structuredContent.innerHTML = htmlContent;
+                
+                showSuccessMessage(`${annotations.length} annotations ajoutées au contenu structuré`);
+            } else {
+                console.log('Pas de contenu structuré ou pas d\'annotations à afficher');
+            }
+        } else {
+            throw new Error(data.error || 'Erreur inconnue lors de l\'annotation');
+        }
+    })
+    .catch(error => {
+        console.error('Annotation Error:', error);
+        showErrorMessage(`Erreur annotation: ${error.message}`);
+    })
+    .finally(() => {
+        btn.style.display = 'flex';
+        loading.style.display = 'none';
+        loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> IA en cours...';
+    });
+  }
 </script>
 
 <!-- Tous les styles CSS existants restent identiques -->
@@ -1530,6 +1663,29 @@ body {
     display: block;
 }
 
+.actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.toggle-content-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.toggle-content-btn:hover {
+    background-color: #e9ecef;
+}
+
 </style>
 
 <!-- Annotation Header -->
@@ -1732,11 +1888,14 @@ body {
     <!-- Groupe 1: Actions IA et Validation -->
     <div class="action-group">
       <h4 class="group-title">IA & Validation</h4>
-      <div class="buttons-row">
-        <button id="groq-annotate-btn" class="btn-groq" onclick="annotateWithGroq()">
-          <i class="fas fa-rocket"></i> Annotation AI
-        </button>
+          <div class="buttons-row">
+            <button id="groq-annotate-btn" class="btn-groq" onclick="annotateWithGroq()">
+              <i class="fas fa-rocket"></i> Annotation AI (Page)
+            </button>
 
+            <button id="groq-annotate-all-btn" class="btn-groq" onclick="annotateWithGroqAll()">
+              <i class="fas fa-rocket"></i> Annotation AI (Document)
+            </button>
 
 
         <button id="validate-page-btn" class="btn-validate" onclick="validatePage()"
@@ -1926,16 +2085,41 @@ body {
 <!-- NOUVELLE SECTION: Contenu Structuré pour Annotateur -->
 <!-- À placer après la section "page-regulatory-analysis" et avant la section "text-content-card main-content" -->
 
-{% if document.structured_html or show_structured_content %}
+<!-- Section de Contenu Structuré -->
 <section class="structured-content-section">
     <div class="structured-content-header">
-        <h3><i class="fas fa-layer-group"></i> Contenu Structuré (Non-éditable)</h3>
-        <button class="toggle-content-btn" onclick="toggleStructuredContent()" title="Masquer/Afficher">
-            <i class="fas fa-eye-slash"></i>
-        </button>
+        <div class="header">
+            <div class="main-info">
+                <div class="icon-container">
+                    <div class="icon-chip">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                </div>
+                <div class="title-section">
+                    <h3>Contenu Structuré</h3>
+                    <div class="details">
+                        <span class="meta-badge info">
+                            <i class="fas fa-file-alt"></i> Page {{ current_page.page_number }}
+                        </span>
+                        <span class="meta-badge warning">
+                            <i class="fas fa-lock"></i> Non-éditable
+                        </span>
+                        <span class="meta-badge success">
+                            <i class="fas fa-highlighter"></i> Annotations Activées
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="toggle-content-btn" onclick="toggleStructuredContent()" title="Masquer/Afficher le contenu structuré">
+                    <i class="fas fa-eye-slash"></i>
+                    <span>Masquer</span>
+                </button>
+            </div>
+        </div>
     </div>
-    
-    <!-- Zone d'annotation structurée -->
+
+    <!-- Carte de Contenu Structuré -->
     <div class="structured-content-card" id="structured-content-container">
         <div class="structured-content-body" id="structured-annotation-area" data-page-id="{{ current_page.id }}">
             {% if document.structured_html %}
@@ -2017,44 +2201,116 @@ body {
   {% endif %}
 </section>
 
-{% endif %}
-
 <style>
 
-/* Styles pour la section structurée avec annotation */
+/* Styles améliorés pour la section structurée */
 .structured-content-section {
-    margin-bottom: 2rem;
+    margin: 3rem 0;
+    background: var(--pharma-bg-card);
+    border-radius: var(--pharma-radius);
+    box-shadow: var(--pharma-shadow);
+    animation: fadeInUp 0.6s;
 }
 
 .structured-content-header {
-    background: linear-gradient(120deg, #f0f9ff 70%, #e0f2fe 100%);
-    border: 1.5px solid var(--pharma-info);
+    background: linear-gradient(135deg, var(--pharma-primary) 0%, var(--pharma-accent) 100%);
+    border: none;
     border-radius: var(--pharma-radius) var(--pharma-radius) 0 0;
-    padding: 1rem 1.5rem;
+    padding: 2rem;
     position: relative;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    color: white;
+    overflow: hidden;
 }
 
 .structured-content-header.hidden + .structured-content-card {
     display: none;
 }
 
-.toggle-content-btn {
-    background: var(--pharma-primary);
+/* Styles communs pour les boutons d'action */
+.toggle-content-btn,
+.zoom-content-btn {
+    background: rgba(255, 255, 255, 0.15);
     color: white;
-    border: none;
-    border-radius: 50%;
-    width: 35px;
-    height: 35px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 10px 20px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Styles spécifiques pour le bouton de zoom */
+.zoom-content-btn {
+    margin-right: 10px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.zoom-content-btn.zoomed i {
+    transform: rotate(180deg);
+}
+
+.zoom-content-btn.zoomed {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
 }
 
 .toggle-content-btn:hover {
-    background: var(--pharma-primary-dark);
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.toggle-content-btn:active {
+    transform: translateY(0);
+}
+
+.toggle-content-btn i {
+    font-size: 1.1rem;
+    transition: transform 0.3s ease;
+}
+
+.toggle-content-btn:hover i {
     transform: scale(1.1);
+}
+
+.toggle-content-btn.btn-show {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Animations pour le contenu */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeOutUp {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+/* Style pour la section quand le contenu est masqué */
+.structured-content-section.content-hidden {
+    margin-bottom: 1rem;
 }
 
 .structured-content-card {
@@ -2063,6 +2319,34 @@ body {
     border-top: none;
     border-radius: 0 0 var(--pharma-radius) var(--pharma-radius);
     box-shadow: var(--pharma-shadow);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: top center;
+}
+
+.structured-content-card.zoomed {
+    margin: 1rem 0;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    position: relative;
+}
+
+/* Style de la scrollbar pour le contenu zoomé */
+.structured-content-card.zoomed::-webkit-scrollbar {
+    width: 8px;
+}
+
+.structured-content-card.zoomed::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.structured-content-card.zoomed::-webkit-scrollbar-thumb {
+    background: var(--pharma-primary);
+    border-radius: 4px;
+}
+
+.structured-content-card.zoomed::-webkit-scrollbar-thumb:hover {
+    background: var(--pharma-primary-dark);
 }
 
 .structured-content-body {
@@ -2076,6 +2360,35 @@ body {
     -moz-user-select: text;
     -ms-user-select: text;
     position: relative;
+    background: white;
+    min-height: 300px;
+    border: 1px solid var(--pharma-border);
+    border-radius: 0 0 var(--pharma-radius) var(--pharma-radius);
+}
+
+.structured-content-body .inline-annotation {
+    display: inline-block;
+    padding: 2px 4px;
+    margin: 0 1px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.structured-content-body .inline-annotation:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.structured-content-body .ann-label {
+    font-size: 0.7rem;
+    font-weight: bold;
+    margin-left: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    white-space: nowrap;
 }
 
 /* Rendre le contenu non-éditable mais sélectionnable */
@@ -2097,16 +2410,24 @@ body {
 
 /* Indicateur visuel pour le contenu non-éditable */
 .structured-content-body::before {
-    content: "🔒 Zone d'annotation (contenu non-éditable)";
+    content: "🎯 Zone d'annotation active - Sélectionnez du texte pour annoter";
     display: block;
-    background: #e0f2fe;
-    color: var(--pharma-info);
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
+    background: var(--pharma-glass);
+    color: var(--pharma-primary);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
     font-weight: 600;
-    border-left: 4px solid var(--pharma-info);
+    border: 2px solid var(--pharma-info);
+    text-align: center;
+    animation: pulseHighlight 2s infinite;
+}
+
+@keyframes pulseHighlight {
+    0% { border-color: var(--pharma-info); }
+    50% { border-color: var(--pharma-accent); }
+    100% { border-color: var(--pharma-info); }
 }
 
 /* Styles pour la section de contenu structuré dans l'annotateur */
@@ -3030,16 +3351,59 @@ function showSelectionAlert(message) {
     setTimeout(() => alert.remove(), 3000);
 }
 
-function toggleStructuredContent() {
-    const header = document.querySelector('.structured-content-header');
-    const btn = header.querySelector('.toggle-content-btn i');
+// Fonction pour gérer le zoom du contenu structuré
+function toggleZoom() {
+    const container = document.getElementById('structured-content-container');
+    const btn = document.querySelector('.zoom-content-btn');
+    const btnIcon = btn.querySelector('i');
+    const btnText = btn.querySelector('span');
     
-    if (header.classList.contains('hidden')) {
-        header.classList.remove('hidden');
-        btn.className = 'fas fa-eye-slash';
+    if (container.classList.contains('zoomed')) {
+        // Dézoomer
+        container.classList.remove('zoomed');
+        container.style.transform = 'scale(1)';
+        container.style.maxHeight = '';
+        container.style.overflowY = '';
+        btnIcon.className = 'fas fa-search-plus';
+        btnText.textContent = 'Zoom';
+        btn.classList.remove('zoomed');
     } else {
-        header.classList.add('hidden');
-        btn.className = 'fas fa-eye';
+        // Zoomer
+        container.classList.add('zoomed');
+        container.style.transform = 'scale(1.1)';
+        container.style.maxHeight = '80vh';
+        container.style.overflowY = 'auto';
+        btnIcon.className = 'fas fa-search-minus';
+        btnText.textContent = 'Dézoom';
+        btn.classList.add('zoomed');
+    }
+}
+
+function toggleStructuredContent() {
+    const section = document.querySelector('.structured-content-section');
+    const container = document.getElementById('structured-content-container');
+    const btn = document.querySelector('.toggle-content-btn');
+    const btnIcon = btn.querySelector('i');
+    const btnText = btn.querySelector('span');
+    
+    if (container.style.display === 'none') {
+        // Afficher le contenu
+        container.style.display = 'block';
+        container.style.animation = 'fadeInDown 0.3s ease-out';
+        btnIcon.className = 'fas fa-eye-slash';
+        btnText.textContent = 'Masquer';
+        btn.classList.remove('btn-show');
+        section.classList.remove('content-hidden');
+    } else {
+        // Masquer le contenu
+        container.style.animation = 'fadeOutUp 0.3s ease-out';
+        setTimeout(() => {
+            container.style.display = 'none';
+            section.classList.add('content-hidden');
+        }, 280);
+        btnIcon.className = 'fas fa-eye';
+        btnText.textContent = 'Afficher';
+        btn.classList.add('btn-show');
     }
 }
 

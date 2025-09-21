@@ -1,0 +1,81 @@
+@login_required
+@csrf_exempt 
+def ai_annotate_document_groq(request, doc_id):
+    """AI annotation of entire document with GROQ"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id)
+
+        # Initialize GROQ annotator 
+        groq_annotator = GroqAnnotator()
+
+        # Get structured HTML content
+        structured_html = document.structured_html
+        if not structured_html:
+            return JsonResponse({'error': 'No structured content available'}, status=400)
+
+        # Clear existing AI annotations
+        Annotation.objects.filter(
+            page__document=document,
+            source='ai'
+        ).delete()
+
+        # Get document context
+        doc_context = f"{document.title} - {document.doc_type} - {document.source}"
+
+        # Process document content
+        annotations_data = groq_annotator.annotate_structured_content(
+            html_content=structured_html,
+            document_context=doc_context
+        )
+
+        # Save annotations
+        saved_annotations = []
+        for page in document.pages.all():
+            page_annotations = annotations_data.get(page.page_number, [])
+            
+            for ann_data in page_annotations:
+                try:
+                    ann_type, _ = AnnotationType.objects.get_or_create(
+                        name=ann_data['type'],
+                        defaults={
+                            'display_name': ann_data['type'].replace('_', ' ').title(),
+                            'color': groq_annotator.get_color_for_type(ann_data['type'])
+                        }
+                    )
+
+                    annotation = Annotation.objects.create(
+                        page=page,
+                        annotation_type=ann_type,
+                        start_pos=ann_data['start_pos'],
+                        end_pos=ann_data['end_pos'],
+                        selected_text=ann_data['text'],
+                        confidence_score=ann_data['confidence'] * 100,
+                        ai_reasoning=ann_data['reasoning'],
+                        source='ai',
+                        created_by=request.user
+                    )
+                    saved_annotations.append(annotation)
+
+                except Exception as e:
+                    print(f"Error saving annotation: {e}")
+                    continue
+
+        # Update document status
+        document.ai_annotated = True
+        document.ai_annotated_at = timezone.now()
+        document.save()
+
+        return JsonResponse({
+            'success': True,
+            'annotations_created': len(saved_annotations),
+            'message': f'Document processed with {len(saved_annotations)} annotations created'
+        })
+
+    except Exception as e:
+        print(f"Document annotation error: {e}")
+        return JsonResponse({
+            'error': f'Error processing document: {str(e)}'
+        }, status=500)
