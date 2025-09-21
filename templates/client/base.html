@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <link rel="stylesheet" href="{% static 'css/client.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -27,6 +28,7 @@
     <!-- Scripts -->
     <script src="{% static 'js/main.js' %}"></script>
     <script src="{% static 'js/library.js' %}"></script>
+    <script src="{% static 'js/client.js' %}"></script>
     {% block extra_js %}{% endblock %}
     {% chatbot_widget %}
 </body>
