@@ -6,71 +6,299 @@
 {% block page_subtitle %}Liste des documents terminés par les annotateurs{% endblock %}
 
 {% block content %}
-<div class="row">
-    {% if page_obj %}
-        {% for document in page_obj %}
-            <div class="col-md-6 col-lg-4 mb-4">
-                <div class="stat-card h-100">
-                    <h6 class="mb-2">{{ document.file.name|basename|truncatechars:40 }}</h6>
-                    
-                    <div class="text-muted small mb-3">
-                        <div><i class="fas fa-calendar"></i> {{ document.expert_ready_at|date:"d/m/Y" }}</div>
-                        <div><i class="fas fa-list-ol"></i> {{ document.total_pages }} pages</div>
-                        <div><i class="fas fa-tags"></i> {{ document.annotation_count }} annotations</div>
-                        <div><i class="fas fa-user"></i> Par {{ document.annotator.username|default:"Non défini" }}</div>
-                        {% if document.pending_annotations > 0 %}
-                            <div><i class="fas fa-clock"></i> {{ document.pending_annotations }} en attente</div>
-                        {% endif %}
-                    </div>
-                    <div class="d-grid">
-                        <a href="{% url 'expert:review_document' document.id %}" class="btn btn-primary">
-                            <i class="fas fa-eye"></i> Réviser
-                        </a>
-                    </div>
-                </div>
+<style>
+:root {
+    --primary: #0ea5e9;
+    --primary-light: #38bdf8;
+    --primary-dark: #0284c7;
+    --accent: #10b981;
+    --accent-light: #34d399;
+    --warning: #f59e0b;
+    --error: #dc2626;
+    --text: #000000;
+    --text-muted: #6b7280;
+    --text-secondary: #4b5563;
+    --card-bg: rgba(255,255,255,0.09);
+    --card-border: rgba(14,165,233,0.15);
+    --hover-bg: rgba(255,255,255,0.13);
+}
+
+/* ... styles précédents ... */
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.02rem;
+}
+.table th {
+    text-align: left;
+    padding: 0.7rem 1rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    border-bottom: 1px solid rgba(14,165,233,0.07);
+    text-transform: uppercase;
+    font-size: 0.92rem;
+    letter-spacing: .04em;
+    white-space: nowrap;
+}
+.table td {
+    padding: 0.7rem 1rem;
+    color: var(--text);
+    border-bottom: 1px solid rgba(14,165,233,0.04);
+    white-space: nowrap;
+    vertical-align: middle;
+    font-size: 1rem;
+}
+.table tr:hover td {
+    background: var(--hover-bg);
+}
+.table .filename {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    font-weight: 500;
+    font-size: 1.05em;
+}
+.table .fa-file-pdf {
+    color: #e11d48;
+    font-size: 1.22em;
+}
+
+/* ===== AJOUT POUR LIMITER LA COLONNE DU TITRE ===== */
+.document-title-col {
+    max-width: 210px;
+    min-width: 120px;
+    width: 1%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+@media (max-width: 800px) {
+    .document-title-col {
+        max-width: 120px;
+        min-width: 70px;
+    }
+}
+/* =============================================== */
+
+.table-actions {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.38rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border: 1px solid transparent;
+    user-select: none;
+}
+.badge.validated {
+    background: rgba(16,185,129,0.12);
+    color: #10b981;
+    border-color: rgba(16,185,129,0.24);
+}
+.badge.pending {
+    background: rgba(245,158,11,0.11);
+    color: #f59e0b;
+    border-color: rgba(245,158,11,0.24);
+}
+.badge.refused {
+    background: rgba(220,38,38,0.12);
+    color: #dc2626;
+    border-color: rgba(220,38,38,0.18);
+}
+.badge.correction {
+    background: rgba(56,189,248,0.09);
+    color: #0ea5e9;
+    border-color: rgba(14,165,233,0.20);
+}
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 1.15rem;
+    background: var(--glass-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-muted);
+    width: 2.1rem;
+    height: 2.1rem;
+    transition: all 0.18s;
+    cursor: pointer;
+    text-decoration: none;
+}
+.action-btn.view { color: var(--primary-dark); }
+.action-btn.view:hover { color: var(--primary); border-color: var(--primary-light); background: var(--hover-bg);}
+.action-btn:focus { outline: 2px solid var(--primary-light); }
+@media (max-width: 900px) {
+    .dashboard-container { padding: 0.1rem;}
+    .card { padding: 0.5rem;}
+    .table th, .table td { padding: 0.45rem;}
+}
+@media (max-width: 600px) {
+    .table-actions { flex-direction: column; gap: 0.17rem; }
+    .table .filename { font-size: 0.99rem;}
+    .card-title { font-size: 1rem;}
+    .table th, .table td { font-size: 0.93rem;}
+}
+.pagination-modern {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.46rem;
+    flex-wrap: wrap;
+    margin-top: 1.6rem;
+}
+.page-btn {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.36rem 1.15rem;
+    font-size: 0.97rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: box-shadow 0.2s;
+    box-shadow: 0 1px 4px rgba(14,165,233,0.10);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.page-btn:disabled, .page-btn.disabled {
+    background: #e5e7eb;
+    color: #94a3b8;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+.page-btn.active, .page-btn[aria-current="page"] {
+    background: linear-gradient(135deg, var(--accent), var(--primary-light));
+    color: white;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(16,185,129,0.08);
+    border: 1.5px solid var(--accent);
+}
+</style>
+
+<div class="dashboard-container">
+    <div class="card">
+        <h2 class="card-title">
+            <i class="fas fa-folder-open"></i>
+            Documents à Réviser
+        </h2>
+
+        {% if page_obj %}
+            <div class="overflow-x-auto" style="overflow-x:auto;">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="document-title-col">Fichier</th>
+                            <th>Date fin</th>
+                            <th>Pages</th>
+                            <th>Annotations</th>
+                            <th>Annotateur</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for document in page_obj %}
+                        <tr>
+                            <td class="document-title-col">
+                                <div class="filename">
+                                    <i class="fas fa-file-pdf"></i>
+                                    {{ document.file.name|basename|truncatechars:32 }}
+                                </div>
+                            </td>
+                            <td>{{ document.expert_ready_at|date:"d/m/Y" }}</td>
+                            <td>{{ document.total_pages }}</td>
+                            <td>
+                                <span class="badge pending">
+                                    <i class="fas fa-tags"></i> {{ document.annotation_count }}
+                                </span>
+                                {% if document.pending_annotations > 0 %}
+                                    <span class="badge correction">
+                                        <i class="fas fa-clock"></i> {{ document.pending_annotations }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge">
+                                    <i class="fas fa-user"></i> {{ document.annotator.username|default:"Non défini" }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge validated">
+                                    <i class="fas fa-check-circle"></i> Terminé
+                                </span>
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    {% if document.id %}
+                                    <a href="{% url 'expert:review_document' document.id %}"
+                                       class="action-btn view"
+                                       aria-label="Réviser"
+                                       title="Réviser">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% else %}
+                                    <span class="badge refused">Sans ID</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-        {% endfor %}
-        
-        <!-- Pagination -->
-        {% if page_obj.has_other_pages %}
-        <div class="col-12">
-            <nav aria-label="Page navigation">
-                <ul class="pagination justify-content-center">
-                    {% if page_obj.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page=1">Première</a>
-                        </li>
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Précédente</a>
-                        </li>
-                    {% endif %}
-                    
-                    <li class="page-item active">
-                        <span class="page-link">
-                            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
-                        </span>
-                    </li>
-                    
-                    {% if page_obj.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Suivante</a>
-                        </li>
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Dernière</a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </nav>
-        </div>
-        {% endif %}
-    {% else %}
-        <div class="col-12">
-            <div class="stat-card text-center py-5">
+            
+            <!-- Pagination Modern -->
+            {% if page_obj.has_other_pages %}
+            <div class="pagination-modern">
+                {% if page_obj.has_previous %}
+                    <a href="?page=1" class="page-btn" title="Première page">
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                    <a href="?page={{ page_obj.previous_page_number }}" class="page-btn" title="Page précédente">
+                        <i class="fas fa-angle-left"></i>
+                    </a>
+                {% else %}
+                    <button class="page-btn disabled" disabled><i class="fas fa-angle-double-left"></i></button>
+                    <button class="page-btn disabled" disabled><i class="fas fa-angle-left"></i></button>
+                {% endif %}
+
+                <button class="page-btn active" aria-current="page" disabled>
+                    Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                </button>
+
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="page-btn" title="Page suivante">
+                        <i class="fas fa-angle-right"></i>
+                    </a>
+                    <a href="?page={{ page_obj.paginator.num_pages }}" class="page-btn" title="Dernière page">
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                {% else %}
+                    <button class="page-btn disabled" disabled><i class="fas fa-angle-right"></i></button>
+                    <button class="page-btn disabled" disabled><i class="fas fa-angle-double-right"></i></button>
+                {% endif %}
+            </div>
+            {% endif %}
+        {% else %}
+            <div style="text-align:center; color:var(--text-muted); padding:2rem 0;">
                 <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
                 <h6 class="text-muted">Aucun document à réviser</h6>
                 <p class="text-muted">Tous les documents ont été révisés.</p>
             </div>
-        </div>
-    {% endif %}
+        {% endif %}
+    </div>
 </div>
+<style>
+  .table-actions { position: relative; }
+  .action-btn { position: relative; z-index: 1; }
+</style>
 {% endblock %}

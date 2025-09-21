@@ -4,212 +4,370 @@
 {% block content %}
 
 <style>
-    :root {
-        --primary: #0ea5e9;
-        --primary-light: #38bdf8;
-        --accent: #10b981;
-        --text: #000000;
-        --card-bg: rgba(255, 255, 255, 0.95);
-        --card-border: rgba(14, 165, 233, 0.15);
-    }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
 
-    .annotation-container {
-        max-width: 1400px;
-        margin: 2rem auto;
-        padding: 0 1.5rem;
-    }
+:root {
+    --pharma-primary: #0ea5e9;
+    --pharma-primary-dark: #0284c7;
+    --pharma-primary-light: #38bdf8;
+    --pharma-accent: #10b981;
+    --pharma-accent-light: #34d399;
+    --pharma-success: #059669;
+    --pharma-warn: #f59e0b;
+    --pharma-error: #dc2626;
+    --pharma-text: #1f2937;
+    --pharma-text-soft: #6b7280;
+    --pharma-bg: #f8fafc;
+    --pharma-card: #ffffff;
+    --pharma-border: #e2e8f0;
+    --pharma-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --pharma-radius: 16px;
+    --pharma-radius-sm: 12px;
+    --pharma-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-    .annotation-header {
-        background: var(--card-bg);
-        border: 1px solid var(--card-border);
-        border-radius: 16px;
-        padding: 1.5rem 2rem;
-        margin-bottom: 2rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
+* {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
 
-    .annotation-types-panel {
-        background: var(--card-bg);
-        border: 1px solid var(--card-border);
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-    }
+body {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    min-height: 100vh;
+    color: var(--pharma-text);
+    margin: 0;
+    padding: 0;
+}
 
-    .annotation-types {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-        margin: 1rem 0;
-    }
+.annotation-container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
 
-    .annotation-type-btn {
-        /* Background and border are set inline per type color */
-        border: 2px solid transparent;
-        padding: 0.5rem 1rem;
-        border-radius: 999px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        font-weight: 500;
-        position: relative;
-    }
+.card {
+    background: var(--pharma-card);
+    border-radius: var(--pharma-radius);
+    box-shadow: var(--pharma-shadow);
+    border: 1px solid var(--pharma-border);
+    transition: var(--pharma-transition);
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
 
-    .annotation-type-btn:hover {
-        filter: brightness(1.05);
-        transform: translateY(-2px);
-    }
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+}
 
-    /* Clearly show the selected label by drawing a ring using its own color */
-    .annotation-type-btn.active {
-        outline: 3px solid var(--label-color);
-        outline-offset: 2px;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-        transform: translateY(-2px) scale(1.02);
-        filter: brightness(1.03);
-        color: #ffffff;
-    }
+/* Header stylisé */
+.annotation-header {
+    background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
+    color: #fff;
+    padding: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    border-radius: var(--pharma-radius);
+    box-shadow: var(--pharma-shadow);
+    margin-bottom: 2rem;
+}
 
-    .text-content-card {
-        background: var(--card-bg);
-        border: 1px solid var(--card-border);
-        border-radius: 16px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-    }
+.header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
 
-    .text-content {
-        background: #fafbfc;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 2rem;
-        line-height: 1.8;
-        font-size: 1rem;
-        color: #1f2937;
-        white-space: pre-wrap;
-        min-height: 500px;
-        cursor: text;
-    }
+.header-info h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
 
+.document-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    opacity: 0.9;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-outline {
+    padding: 0.6rem 1.2rem;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 500;
+    transition: var(--pharma-transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.btn-outline:hover {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+/* Types d'annotations */
+.annotation-types-panel {
+    background: var(--pharma-card);
+    border: 1px solid var(--pharma-border);
+    border-radius: var(--pharma-radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--pharma-shadow);
+}
+
+.annotation-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 1rem 0;
+}
+
+.annotation-type-btn {
+    border: 2px solid transparent;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    position: relative;
+    background: var(--pharma-primary);
+    color: #fff;
+}
+
+.annotation-type-btn:hover {
+    filter: brightness(1.05);
+    transform: translateY(-2px);
+}
+
+.annotation-type-btn.active {
+    outline: 3px solid var(--label-color);
+    outline-offset: 2px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    transform: translateY(-2px) scale(1.02);
+    filter: brightness(1.03);
+    color: #ffffff;
+}
+
+/* Document Text */
+.text-content-card {
+    background: var(--pharma-card);
+    border: 1px solid var(--pharma-border);
+    border-radius: var(--pharma-radius);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--pharma-shadow);
+}
+
+.text-content {
+    background: #fafbfc;
+    border: 1px solid #e5e7eb;
+    border-radius: var(--pharma-radius-sm);
+    padding: 2rem;
+    line-height: 1.8;
+    font-size: 1rem;
+    color: var(--pharma-text);
+    white-space: pre-wrap;
+    min-height: 500px;
+    cursor: text;
+}
+
+/* Page Navigation */
+.page-navigation {
+    background: var(--pharma-card);
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--pharma-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--pharma-shadow);
+}
+
+.page-indicator-modern {
+    background: linear-gradient(135deg, var(--pharma-primary), var(--pharma-accent));
+    color: #fff;
+    padding: 0.6rem 1.2rem;
+    border-radius: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+}
+
+.nav-btn {
+    padding: 0.6rem 1.2rem;
+    background: var(--pharma-primary);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: var(--pharma-transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: none;
+    cursor: pointer;
+}
+
+.nav-btn:hover {
+    background: var(--pharma-primary-dark);
+    color: #fff;
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+.nav-btn:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.inline-annotation {
+    background-color: #fff3cd;
+    padding: 2px 4px;
+    margin: 0 1px;
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+}
+
+.inline-annotation .ann-label {
+    font-size: 0.7rem;
+    font-weight: bold;
+    margin-left: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    white-space: nowrap;
+}
+
+/* Responsive header for mobile */
+@media (max-width: 700px) {
+    .annotation-header,
     .page-navigation {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: rgba(14, 165, 233, 0.05);
-        padding: 1rem;
-        border-radius: 12px;
-        margin-bottom: 1.5rem;
+        flex-direction: column !important;
+        gap: 1rem !important;
     }
-
-    .nav-btn {
-        background: var(--primary);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: 500;
-    }
-
-    .nav-btn:hover {
-        background: var(--primary-light);
-        color: white;
-        text-decoration: none;
-    }
-
-    .inline-annotation {
-        background-color: #fff3cd;
-        padding: 2px 4px;
-        margin: 0 1px;
-        border-radius: 3px;
-        cursor: pointer;
-        position: relative;
-    }
-
-    .inline-annotation .ann-label {
-        font-size: 0.7rem;
-        font-weight: bold;
-        margin-left: 4px;
-        padding: 2px 6px;
-        border-radius: 4px;
-        background: rgba(0,0,0,0.6);
-        color: #fff;
-        white-space: nowrap;
-    }
+}
 </style>
 
 <div class="annotation-container">
-    <!-- Header -->
-    <div class="annotation-header">
-        <div>
-            <h2 style="color: var(--primary); margin: 0;">{{ document.title }}</h2>
-            <p style="color: #6b7280; margin: 0.5rem 0 0 0;">Page {{ current_page.page_number }} / {{ total_pages }}</p>
+    <div class="card">
+        <!-- Header stylisé -->
+        <div class="annotation-header">
+            <div class="header-info">
+                <h2><i class="fas fa-highlighter"></i> {{ document.title }}</h2>
+                <div class="document-meta">
+                    <span class="meta-item"><i class="fas fa-file-alt"></i> {{ total_pages }} pages</span>
+                    <span class="meta-item"><i class="fas fa-calendar"></i> {{ document.created_at|date:"d/m/Y" }}</span>
+                    <span class="meta-item"><i class="fas fa-tags"></i> Annotation manuelle avancée</span>
+                </div>
+                <p style="color: #e0e7ef; margin: 0.5rem 0 0 0;">Page {{ current_page.page_number }} / {{ total_pages }}</p>
+            </div>
+            <div class="header-actions">
+                <a href="{% url 'expert:review_document' document.id %}" class="btn-outline" title="Retour à la révision">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
         </div>
-        <a href="{% url 'expert:review_document' document.id %}" class="nav-btn">
-            <i class="fas fa-arrow-left"></i> Retour
-        </a>
-    </div>
 
-    <!-- Annotation Types -->
-    <div class="annotation-types-panel">
-        <h3 style="color: var(--text); margin-bottom: 1rem;">
-            <i class="fas fa-tags" style="color: var(--primary);"></i>
-            Types d'Annotation
-        </h3>
-        <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 1rem;">
-            Cliquez sur un type, puis surlignez le texte dans le document
-        </p>
-        
-        <div class="annotation-types">
-            {% for ann_type in annotation_types %}
-            <button class="annotation-type-btn" 
-                    data-id="{{ ann_type.id }}" 
-                    data-name="{{ ann_type.name }}" 
-                    data-color="{{ ann_type.color }}"
-                    style="background: {{ ann_type.color }}; color: #ffffff; border-color: {{ ann_type.color }}; --label-color: {{ ann_type.color }};">
-                {{ ann_type.display_name }}
-            </button>
-            {% endfor %}
+        <!-- Annotation Types -->
+        <div class="annotation-types-panel">
+            <h3 style="color: var(--pharma-text); margin-bottom: 1rem;">
+                <i class="fas fa-tags" style="color: var(--pharma-primary);"></i>
+                Types d'Annotation
+            </h3>
+            <p style="color: var(--pharma-text-soft); font-size: 0.9rem; margin-bottom: 1rem;">
+                Cliquez sur un type, puis surlignez le texte dans le document
+            </p>
+            <div class="annotation-types">
+                {% for ann_type in annotation_types %}
+                <button class="annotation-type-btn" 
+                        data-id="{{ ann_type.id }}" 
+                        data-name="{{ ann_type.name }}" 
+                        data-color="{{ ann_type.color }}"
+                        style="background: {{ ann_type.color }}; color: #ffffff; border-color: {{ ann_type.color }}; --label-color: {{ ann_type.color }};">
+                    {{ ann_type.display_name }}
+                </button>
+                {% endfor %}
+            </div>
         </div>
-    </div>
 
-    <!-- Page Navigation -->
-    <div class="page-navigation">
-        {% if current_page.page_number > 1 %}
-            <a href="?page={{ current_page.page_number|add:'-1' }}" class="nav-btn">
-                <i class="fas fa-chevron-left"></i> Page Précédente
-            </a>
-        {% else %}
-            <span></span>
-        {% endif %}
-        
-        <span style="color: var(--primary); font-weight: 600;">
-            Page {{ current_page.page_number }} / {{ total_pages }}
-        </span>
-        
-        {% if current_page.page_number < total_pages %}
-            <a href="?page={{ current_page.page_number|add:'1' }}" class="nav-btn">
-                Page Suivante <i class="fas fa-chevron-right"></i>
-            </a>
-        {% else %}
-            <span></span>
-        {% endif %}
-    </div>
-
-    <!-- Document Text -->
-    <div class="text-content-card">
-        <h3 style="color: var(--text); margin-bottom: 1rem;">
-            <i class="fas fa-file-text"></i>
-            Page {{ current_page.page_number }}
-            {% if existing_annotations %}
-                <span style="color: var(--accent); font-size: 0.9rem;">
-                    ({{ existing_annotations|length }} annotations)
-                </span>
+        <!-- Page Navigation -->
+        <div class="page-navigation">
+            {% if current_page.page_number > 1 %}
+                <a href="?page={{ current_page.page_number|add:'-1' }}" class="nav-btn">
+                    <i class="fas fa-chevron-left"></i> Page Précédente
+                </a>
+            {% else %}
+                <button class="nav-btn" disabled>
+                    <i class="fas fa-chevron-left"></i> Page Précédente
+                </button>
             {% endif %}
-        </h3>
+            
+            <div class="page-indicator-modern">
+                <i class="fas fa-file-text"></i>
+                Page {{ current_page.page_number }} / {{ total_pages }}
+            </div>
+            
+            {% if current_page.page_number < total_pages %}
+                <a href="?page={{ current_page.page_number|add:'1' }}" class="nav-btn">
+                    Page Suivante <i class="fas fa-chevron-right"></i>
+                </a>
+            {% else %}
+                <button class="nav-btn" disabled style="background: var(--pharma-accent);">
+                    <i class="fas fa-flag-checkered"></i> Dernière page
+                </button>
+            {% endif %}
+        </div>
 
-        <div id="page-text" class="text-content" data-page-id="{{ current_page.id }}">
-            <!-- Text will be populated by JavaScript -->
+        <!-- Document Text -->
+        <div class="text-content-card">
+            <h3 style="color: var(--pharma-text); margin-bottom: 1rem;">
+                <i class="fas fa-file-text"></i>
+                Page {{ current_page.page_number }}
+                {% if existing_annotations %}
+                    <span style="color: var(--pharma-accent); font-size: 0.9rem;">
+                        ({{ existing_annotations|length }} annotations)
+                    </span>
+                {% endif %}
+            </h3>
+
+            <div id="page-text" class="text-content" data-page-id="{{ current_page.id }}">
+                <!-- Text will be populated by JavaScript -->
+            </div>
         </div>
     </div>
 </div>
