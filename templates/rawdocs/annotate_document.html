@@ -1835,12 +1835,38 @@ body {
     </button>
     {% endfor %}
 
-    <button class="annotation-type-btn-add" onclick="showAddAnnotationTypeModal()" type="button">
+    <button class="annotation-type-btn-add" data-bs-toggle="modal" data-bs-target="#addAnnotationTypeModal" type="button">
       <i class="fas fa-plus"></i> Add Custom Type
     </button>
     <button id="clear-annotations-btn" class="label-btn" style="background:#6b7280;color:white;">
       🧹 Clear All
     </button>
+  </div>
+
+  <!-- Modal pour ajouter un type d'annotation -->
+  <div class="modal fade" id="addAnnotationTypeModal" tabindex="-1" aria-labelledby="addAnnotationTypeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addAnnotationTypeModalLabel">Ajouter un type d'annotation</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="new-annotation-display-name" class="form-label">Nom d'affichage</label>
+            <input type="text" class="form-control" id="new-annotation-display-name" required>
+          </div>
+          <div class="mb-3">
+            <label for="new-annotation-name" class="form-label">Nom technique</label>
+            <input type="text" class="form-control" id="new-annotation-name" readonly>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="button" class="btn btn-primary" onclick="createAnnotationType()">Créer</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="context-menu" class="context-menu hidden">
