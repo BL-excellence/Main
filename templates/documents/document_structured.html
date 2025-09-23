@@ -14,77 +14,214 @@
   }
   .doc-structured-meta {
     font-size: .9rem;
-    color: #6b7280; /* Tailwind slate-500 */
+    color: #6b7280;
   }
-  .doc-structured-wrapper {
-    position: relative;
-    background: #f8fafc; /* slate-50 */
-    border: 1px solid #e5e7eb; /* slate-200 */
+  
+  /* Split View Container */
+  .split-view-container {
+    display: flex;
+    height: calc(100vh - 300px); /* Ajustez selon votre header */
+    min-height: 600px;
+    gap: 8px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
     border-radius: .5rem;
-    padding: .75rem;
+    padding: 8px;
   }
-  .doc-structured-canvas {
+  
+  /* Left Panel - Structured Content */
+  .structured-panel {
+    flex: 1;
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: .25rem;
-    overflow: auto;
-    min-height: 400px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
-  .toolbar-actions button {
+  
+  .structured-panel-header {
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 40%, #8b5cf6 100%);
+    color: white;
+    padding: 12px 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .structured-panel-content {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+  
+  /* Right Panel - PDF Original */
+  .pdf-panel {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: .25rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .pdf-panel-header {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 40%, #f97316 100%);
+    color: white;
+    padding: 12px 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .pdf-panel-content {
+    flex: 1;
+    overflow: hidden;
+  }
+  
+  .pdf-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+  
+  /* Resizer entre les deux panneaux */
+  .panel-resizer {
+    width: 4px;
+    background: #e5e7eb;
+    cursor: col-resize;
+    position: relative;
+    transition: background-color 0.2s;
+  }
+  
+  .panel-resizer:hover {
+    background: #3b82f6;
+  }
+  
+  .panel-resizer::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 20px;
+    background: #9ca3af;
+    border-radius: 2px;
+  }
+  
+  /* Toggle Buttons */
+  .view-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  
+  .view-toggle button {
+    padding: 8px 16px;
     border: 1px solid #e5e7eb;
     background: white;
-    padding: .4rem .65rem;
-    border-radius: .5rem;
-    font-size: .9rem;
+    border-radius: 6px;
     cursor: pointer;
+    font-weight: 500;
   }
-  .toolbar-actions button:hover {
+  
+  .view-toggle button.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+  }
+  
+  .view-toggle button:hover:not(.active) {
     background: #f9fafb;
   }
+  
+  /* Single View Mode */
+  .single-view .pdf-panel,
+  .single-view .panel-resizer {
+    display: none;
+  }
+  
+  .single-view.pdf-only .structured-panel {
+    display: none;
+  }
+  
+  .single-view.pdf-only .pdf-panel,
+  .single-view.pdf-only .panel-resizer {
+    display: flex;
+  }
+
+  /* Toolbar Actions */
+  .toolbar-actions {
+    display: flex;
+    gap: 6px;
+  }
+  
+  .toolbar-actions button {
+    border: 1px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: .85rem;
+    cursor: pointer;
+  }
+  
+  .toolbar-actions button:hover {
+    background: rgba(255,255,255,0.2);
+  }
+
   /* Floating zoom controls */
   .floating-zoom-controls {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.9);
     border: 1px solid #e5e7eb;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     border-radius: 12px;
     backdrop-filter: blur(8px);
-    z-index: 1030;
+    z-index: 100;
   }
+  
   .floating-zoom-controls .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
     border: 1px solid #e5e7eb;
     background: white;
     cursor: pointer;
   }
+  
   .floating-zoom-controls .btn:hover { background: #f9fafb; }
-  .floating-zoom-controls .divider { width: 1px; height: 22px; background: #e5e7eb; margin: 0 4px; }
-  .floating-zoom-controls .zoom-label { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; color: #374151; }
+  .floating-zoom-controls .divider { width: 1px; height: 20px; background: #e5e7eb; margin: 0 4px; }
+  .floating-zoom-controls .zoom-label { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; color: #374151; font-size: 0.85rem; }
 
   /* Zoom container */
   #zoomContainer {
-    transform-origin: top center;
+    transform-origin: top left;
+    padding: 16px;
   }
 
   /* Edit mode */
   .edit-mode .pdf-text-element, .edit-mode .pdf-cell {
-    outline: 1px dashed rgba(14,165,233,0.5) !important; /* cyan-500 */
+    outline: 1px dashed rgba(14,165,233,0.5) !important;
     outline-offset: 0;
   }
   .edit-mode .pdf-text-element[contenteditable="true"], .edit-mode .pdf-cell[contenteditable="true"] {
     background: rgba(14,165,233,0.06);
   }
+  
   /* Toast */
   #ds-toast { position: fixed; top: 16px; right: 16px; z-index: 2000; display: none; }
   #ds-toast .toast-box {
@@ -93,9 +230,28 @@
   }
   #ds-toast.success .toast-box { background: rgba(16,185,129,0.95); }
   #ds-toast.error .toast-box { background: rgba(239,68,68,0.95); }
-/* Structured header (from rawdocs) */
-  .structured-header { position: relative; overflow: hidden; border-radius: 24px; padding: 24px; color: #fff; background: linear-gradient(135deg, var(--primary, #3b82f6) 0%, var(--primary-light, #60a5fa) 40%, var(--secondary, #8b5cf6) 100%); box-shadow: 0 25px 50px -12px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.05) inset; margin-bottom: 16px; border: none; backdrop-filter: blur(20px); }
-  .structured-header::before { content:''; position:absolute; inset:0; background: radial-gradient(circle at 20% 50%, rgba(255,255,255,.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,.08) 0%, transparent 50%), radial-gradient(circle at 40% 80%, rgba(255,255,255,.06) 0%, transparent 50%); animation: float 20s ease-in-out infinite; pointer-events: none; }
+
+/* Structured header */
+  .structured-header { 
+    position: relative; 
+    overflow: hidden; 
+    border-radius: 24px; 
+    padding: 24px; 
+    color: #fff; 
+    background: linear-gradient(135deg, var(--primary, #3b82f6) 0%, var(--primary-light, #60a5fa) 40%, var(--secondary, #8b5cf6) 100%); 
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.05) inset; 
+    margin-bottom: 16px; 
+    border: none; 
+    backdrop-filter: blur(20px); 
+  }
+  .structured-header::before { 
+    content:''; 
+    position:absolute; 
+    inset:0; 
+    background: radial-gradient(circle at 20% 50%, rgba(255,255,255,.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,.08) 0%, transparent 50%), radial-gradient(circle at 40% 80%, rgba(255,255,255,.06) 0%, transparent 50%); 
+    animation: float 20s ease-in-out infinite; 
+    pointer-events: none; 
+  }
   @keyframes float { 0%,100%{transform:translateY(0) rotate(0)} 33%{transform:translateY(-10px) rotate(1deg)} 66%{transform:translateY(5px) rotate(-1deg)} }
   .sh-content{ position:relative; z-index:2 }
   .sh-grid{ display:grid; grid-template-columns:1fr auto; gap:16px; align-items:flex-start; margin-bottom:12px; }
@@ -106,6 +262,22 @@
   .sh-actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end }
   .sh-actions .btn{ border-color: rgba(255,255,255,0.35) }
   .meta-badge{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background: rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); font-weight:600; font-size:.85rem }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .split-view-container {
+      flex-direction: column;
+      height: auto;
+    }
+    
+    .panel-resizer {
+      display: none;
+    }
+    
+    .structured-panel, .pdf-panel {
+      min-height: 400px;
+    }
+  }
 </style>
 {% endblock %}
 
@@ -127,8 +299,8 @@
       </div>
       <div class="sh-actions">
         {% if document %}
-          <a class="btn" href="{% url 'rawdocs:view_original_document' document.id %}" target="_blank" title="PDF original">
-            <i class="fas fa-file-pdf" aria-hidden="true"></i>
+          <a class="btn" href="{% url 'rawdocs:view_original_document' document.id %}" target="_blank" title="PDF original dans un nouvel onglet">
+            <i class="fas fa-external-link-alt" aria-hidden="true"></i>
           </a>
           <a class="btn" href="?regen=1" title="Régénérer">
             <i class="fas fa-rotate-right" aria-hidden="true"></i>
@@ -162,41 +334,151 @@
   </div>
 </div>
 
-<div class="doc-structured-wrapper">
-  <div class="doc-structured-canvas">
-    {% if structured_html %}
-      <div id="zoomContainer">
-        {{ structured_html|safe }}
-      </div>
-    {% else %}
-      <div class="p-4 text-center" style="color:#6b7280;">
-        <i class="fas fa-info-circle" aria-hidden="true"></i>
-        Aucun contenu structuré disponible pour l’instant.
-      </div>
-    {% endif %}
+<!-- View Toggle Buttons -->
+<div class="view-toggle">
+  <button id="splitViewBtn" class="active">
+    <i class="fas fa-columns"></i> Vue divisée
+  </button>
+  <button id="structuredOnlyBtn">
+    <i class="fas fa-layer-group"></i> Contenu structuré uniquement
+  </button>
+  <button id="pdfOnlyBtn">
+    <i class="fas fa-file-pdf"></i> PDF original uniquement
+  </button>
+</div>
 
-    <!-- Floating Zoom Controls -->
-    <div class="floating-zoom-controls">
-      <button class="btn" type="button" id="zoomOutBtn" title="Zoom -">
-        <i class="fas fa-search-minus" aria-hidden="true"></i>
-      </button>
-      <span class="zoom-label" id="zoomLabel">100%</span>
-      <button class="btn" type="button" id="zoomInBtn" title="Zoom +">
-        <i class="fas fa-search-plus" aria-hidden="true"></i>
-      </button>
-      <div class="divider"></div>
-      <button class="btn" type="button" id="zoomResetBtn" title="Réinitialiser">
-        <i class="fas fa-compress" aria-hidden="true"></i>
-      </button>
+<!-- Split View Container -->
+<div class="split-view-container" id="splitContainer">
+  <!-- Left Panel - Structured Content -->
+  <div class="structured-panel" id="structuredPanel">
+    <div class="structured-panel-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-layer-group"></i>
+        <span>Contenu Structuré</span>
+      </div>
+      <div class="toolbar-actions">
+        <button id="syncScrollBtn" title="Synchroniser le défilement">
+          <i class="fas fa-link"></i>
+        </button>
+      </div>
+    </div>
+    <div class="structured-panel-content">
+      {% if structured_html %}
+        <div id="zoomContainer">
+          {{ structured_html|safe }}
+        </div>
+      {% else %}
+        <div class="p-4 text-center" style="color:#6b7280;">
+          <i class="fas fa-info-circle" aria-hidden="true"></i>
+          Aucun contenu structuré disponible pour l'instant.
+        </div>
+      {% endif %}
+
+      <!-- Floating Zoom Controls for Structured Content -->
+      <div class="floating-zoom-controls">
+        <button class="btn" type="button" id="zoomOutBtn" title="Zoom -">
+          <i class="fas fa-search-minus" aria-hidden="true"></i>
+        </button>
+        <span class="zoom-label" id="zoomLabel">100%</span>
+        <button class="btn" type="button" id="zoomInBtn" title="Zoom +">
+          <i class="fas fa-search-plus" aria-hidden="true"></i>
+        </button>
+        <div class="divider"></div>
+        <button class="btn" type="button" id="zoomResetBtn" title="Réinitialiser">
+          <i class="fas fa-compress" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resizer -->
+  <div class="panel-resizer" id="panelResizer"></div>
+
+  <!-- Right Panel - PDF Original -->
+  <div class="pdf-panel" id="pdfPanel">
+    <div class="pdf-panel-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-file-pdf"></i>
+        <span>PDF Original</span>
+      </div>
+      <div class="toolbar-actions">
+        <button id="refreshPdfBtn" title="Actualiser le PDF">
+          <i class="fas fa-refresh"></i>
+        </button>
+        <button id="fullscreenPdfBtn" title="Plein écran">
+          <i class="fas fa-expand"></i>
+        </button>
+      </div>
+    </div>
+    <div class="pdf-panel-content">
+      {% if document %}
+        <!-- Tentative 1: Iframe -->
+        <iframe 
+          class="pdf-frame" 
+          id="pdfFrame"
+          src="{% url 'rawdocs:view_original_document' document.id %}#view=FitH&toolbar=1&navpanes=0&scrollbar=1"
+          title="PDF Original"
+          allow="fullscreen">
+        </iframe>
+        
+        <!-- Tentative 2: Object (fallback caché) -->
+        <object 
+          class="pdf-frame" 
+          id="pdfObject"
+          data="{% url 'rawdocs:view_original_document' document.id %}" 
+          type="application/pdf"
+          style="display: none;">
+          <p>Votre navigateur ne peut pas afficher le PDF.</p>
+        </object>
+        
+        <!-- Fallback pour les navigateurs qui ne supportent pas les PDFs -->
+        <div id="pdfFallback" style="display: none; padding: 20px; text-align: center;">
+          <div style="background: #f3f4f6; border-radius: 8px; padding: 20px; margin: 20px;">
+            <i class="fas fa-file-pdf" style="font-size: 48px; color: #ef4444; margin-bottom: 16px;"></i>
+            <h3 style="margin: 0 0 12px 0; color: #374151;">Votre navigateur ne peut pas afficher ce PDF</h3>
+            <p style="color: #6b7280; margin-bottom: 16px;">Utilisez l'une des options ci-dessous :</p>
+            
+            <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+              <a href="{% url 'rawdocs:view_original_document' document.id %}" 
+                 target="_blank" 
+                 style="background: #3b82f6; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">
+                <i class="fas fa-external-link-alt"></i> Ouvrir dans un nouvel onglet
+              </a>
+              
+              <a href="{% url 'rawdocs:view_original_document' document.id %}?download=1" 
+                 style="background: #059669; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">
+                <i class="fas fa-download"></i> Télécharger
+              </a>
+              
+              <button onclick="reloadPdfFrame()" 
+                      style="background: #7c3aed; color: white; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;">
+                <i class="fas fa-refresh"></i> Recharger
+              </button>
+              
+              <button onclick="switchToObjectView()" 
+                      style="background: #f59e0b; color: white; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;">
+                <i class="fas fa-exchange-alt"></i> Mode alternatif
+              </button>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="p-4 text-center" style="color:#6b7280;">
+          <i class="fas fa-info-circle" aria-hidden="true"></i>
+          Aucun PDF original disponible.
+        </div>
+      {% endif %}
     </div>
   </div>
 </div>
+
 <div id="ds-toast"><div class="toast-box"></div></div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 (function() {
+  // Elements
   const zoomContainer = document.getElementById('zoomContainer');
   const zoomInBtn = document.getElementById('zoomInBtn');
   const zoomOutBtn = document.getElementById('zoomOutBtn');
@@ -206,8 +488,23 @@
   const copyHtmlBtn = document.getElementById('copyHtmlBtn');
   const downloadHtmlBtn = document.getElementById('downloadHtmlBtn');
   const saveEditsBtn = document.getElementById('saveEditsBtn');
+  
+  // Split view elements
+  const splitContainer = document.getElementById('splitContainer');
+  const structuredPanel = document.getElementById('structuredPanel');
+  const pdfPanel = document.getElementById('pdfPanel');
+  const panelResizer = document.getElementById('panelResizer');
+  const splitViewBtn = document.getElementById('splitViewBtn');
+  const structuredOnlyBtn = document.getElementById('structuredOnlyBtn');
+  const pdfOnlyBtn = document.getElementById('pdfOnlyBtn');
+  const syncScrollBtn = document.getElementById('syncScrollBtn');
+  const refreshPdfBtn = document.getElementById('refreshPdfBtn');
+  const fullscreenPdfBtn = document.getElementById('fullscreenPdfBtn');
+  const pdfFrame = document.getElementById('pdfFrame');
+  
   const saveUrl = "{% url 'rawdocs:save_structured_edits' document.id %}";
 
+  // CSRF Token
   function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -224,18 +521,25 @@
   }
   const csrfToken = getCookie('csrftoken');
 
+  // Toast function
   function showToast(type, message) {
     const t = document.getElementById('ds-toast');
-    if (!t) return; t.className = ''; t.classList.add(type); t.style.display = 'block';
-    const box = t.querySelector('.toast-box'); if (box) box.textContent = message || '';
+    if (!t) return; 
+    t.className = ''; 
+    t.classList.add(type); 
+    t.style.display = 'block';
+    const box = t.querySelector('.toast-box'); 
+    if (box) box.textContent = message || '';
     setTimeout(() => { t.style.display = 'none'; }, 1800);
   }
 
+  // Zoom functionality
   let zoom = 1.0;
   const Z_MIN = 0.25;
   const Z_MAX = 3.0;
   const Z_STEP = 0.1;
   let editMode = false;
+  let syncScroll = false;
 
   function applyZoom() {
     if (!zoomContainer) return;
@@ -248,13 +552,14 @@
     applyZoom();
   }
 
+  // Zoom controls
   if (zoomInBtn) zoomInBtn.addEventListener('click', () => setZoom(zoom + Z_STEP));
   if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => setZoom(zoom - Z_STEP));
   if (zoomResetBtn) zoomResetBtn.addEventListener('click', () => setZoom(1.0));
 
-  // Keyboard shortcuts (Ctrl/Cmd + +/-, Ctrl/Cmd + 0)
+  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     const accel = isMac ? e.metaKey : e.ctrlKey;
     if (!accel) return;
     if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom(zoom + Z_STEP); }
@@ -262,22 +567,113 @@
     if (e.key === '0') { e.preventDefault(); setZoom(1.0); }
   });
 
-  // Mouse wheel + Ctrl => zoom
+  // Mouse wheel zoom
   document.addEventListener('wheel', (e) => {
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     const accelKey = isMac ? e.metaKey : e.ctrlKey;
-    if (accelKey) {
+    if (accelKey && e.target.closest('.structured-panel-content')) {
       e.preventDefault();
       const delta = Math.sign(e.deltaY);
-      if (delta > 0) setZoom(zoom - Z_STEP); else setZoom(zoom + Z_STEP);
+      if (delta > 0) setZoom(zoom - Z_STEP); 
+      else setZoom(zoom + Z_STEP);
     }
   }, { passive: false });
 
-  // Edit mode toggle: make structural text elements editable
+  // View Toggle Functions
+  function setViewMode(mode) {
+    // Remove active class from all buttons
+    document.querySelectorAll('.view-toggle button').forEach(btn => btn.classList.remove('active'));
+    
+    // Reset classes
+    splitContainer.className = 'split-view-container';
+    
+    switch(mode) {
+      case 'split':
+        splitViewBtn.classList.add('active');
+        break;
+      case 'structured':
+        structuredOnlyBtn.classList.add('active');
+        splitContainer.classList.add('single-view');
+        break;
+      case 'pdf':
+        pdfOnlyBtn.classList.add('active');
+        splitContainer.classList.add('single-view', 'pdf-only');
+        break;
+    }
+  }
+
+  // View toggle event listeners
+  if (splitViewBtn) splitViewBtn.addEventListener('click', () => setViewMode('split'));
+  if (structuredOnlyBtn) structuredOnlyBtn.addEventListener('click', () => setViewMode('structured'));
+  if (pdfOnlyBtn) pdfOnlyBtn.addEventListener('click', () => setViewMode('pdf'));
+
+  // Panel Resizer Functionality
+  let isResizing = false;
+  let startX = 0;
+  let startLeftWidth = 0;
+
+  if (panelResizer) {
+    panelResizer.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      startX = e.clientX;
+      startLeftWidth = structuredPanel.getBoundingClientRect().width;
+      document.body.style.cursor = 'col-resize';
+      document.addEventListener('mousemove', handleResize);
+      document.addEventListener('mouseup', stopResize);
+    });
+  }
+
+  function handleResize(e) {
+    if (!isResizing) return;
+    const diff = e.clientX - startX;
+    const containerWidth = splitContainer.getBoundingClientRect().width - 8; // Account for gap
+    const newLeftWidth = Math.max(200, Math.min(containerWidth - 200, startLeftWidth + diff));
+    const leftPercent = (newLeftWidth / containerWidth) * 100;
+    const rightPercent = 100 - leftPercent;
+    
+    structuredPanel.style.flex = `0 0 ${leftPercent}%`;
+    pdfPanel.style.flex = `0 0 ${rightPercent}%`;
+  }
+
+  function stopResize() {
+    isResizing = false;
+    document.body.style.cursor = '';
+    document.removeEventListener('mousemove', handleResize);
+    document.removeEventListener('mouseup', stopResize);
+  }
+
+  // Sync Scroll Functionality
+  if (syncScrollBtn) {
+    syncScrollBtn.addEventListener('click', () => {
+      syncScroll = !syncScroll;
+      syncScrollBtn.style.background = syncScroll ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
+      syncScrollBtn.title = syncScroll ? 'Désynchroniser le défilement' : 'Synchroniser le défilement';
+    });
+  }
+
+  // PDF Controls
+  if (refreshPdfBtn) {
+    refreshPdfBtn.addEventListener('click', () => {
+      if (pdfFrame) {
+        pdfFrame.src = pdfFrame.src; // Reload iframe
+      }
+    });
+  }
+
+  if (fullscreenPdfBtn && pdfFrame) {
+    fullscreenPdfBtn.addEventListener('click', () => {
+      if (pdfFrame.requestFullscreen) {
+        pdfFrame.requestFullscreen();
+      }
+    });
+  }
+
+  // Edit Mode Functions
   function setEditMode(on) {
     editMode = !!on;
     document.body.classList.toggle('edit-mode', editMode);
     if (!zoomContainer) return;
+    
     const editableSelectors = ['.pdf-text-element', '.pdf-cell'];
     editableSelectors.forEach(sel => {
       zoomContainer.querySelectorAll(sel).forEach(el => {
@@ -285,20 +681,21 @@
         el.spellcheck = false;
       });
     });
-    // Change button style
+    
     if (toggleEditBtn) {
       if (editMode) {
         toggleEditBtn.style.borderColor = '#0ea5e9';
         toggleEditBtn.style.color = '#0ea5e9';
       } else {
-        toggleEditBtn.style.borderColor = '#e5e7eb';
-        toggleEditBtn.style.color = 'inherit';
+        toggleEditBtn.style.borderColor = 'rgba(255,255,255,0.35)';
+        toggleEditBtn.style.color = 'white';
       }
     }
   }
 
   if (toggleEditBtn) toggleEditBtn.addEventListener('click', () => setEditMode(!editMode));
 
+  // Save Edits Function
   async function saveEdits() {
     if (!zoomContainer) return;
     const formatted_content = zoomContainer.innerHTML;
@@ -316,14 +713,13 @@
       });
       const data = await resp.json();
       if (data && data.success) {
-        // Visual feedback
-        saveEditsBtn.style.borderColor = '#10b981'; // green-500
+        saveEditsBtn.style.borderColor = '#10b981';
         saveEditsBtn.style.color = '#10b981';
         saveEditsBtn.title = data.message || 'Modifications enregistrées';
         showToast('success', data.message || 'Modifications sauvegardées');
         setTimeout(() => {
-          saveEditsBtn.style.borderColor = '#e5e7eb';
-          saveEditsBtn.style.color = 'inherit';
+          saveEditsBtn.style.borderColor = 'rgba(255,255,255,0.35)';
+          saveEditsBtn.style.color = 'white';
           saveEditsBtn.title = 'Enregistrer les modifications';
         }, 1400);
       } else {
@@ -333,27 +729,34 @@
       showToast('error', 'Erreur réseau lors de la sauvegarde');
     }
   }
+  
   if (saveEditsBtn) saveEditsBtn.addEventListener('click', saveEdits);
 
-  // Copy current HTML to clipboard (content only)
+  // Copy HTML Function
   async function copyHtml() {
     if (!zoomContainer) return;
     const html = zoomContainer.innerHTML;
     try {
       await navigator.clipboard.writeText(html);
-      toggleEditBtn && (toggleEditBtn.title = 'Copié!');
-      setTimeout(() => { toggleEditBtn && (toggleEditBtn.title = 'Mode édition'); }, 1200);
+      showToast('success', 'HTML copié dans le presse-papiers');
     } catch (e) {
-      console.log('Clipboard not available, creating a fallback textarea');
       const ta = document.createElement('textarea');
-      ta.value = html; document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); } catch(_){}
+      ta.value = html; 
+      document.body.appendChild(ta); 
+      ta.select();
+      try { 
+        document.execCommand('copy'); 
+        showToast('success', 'HTML copié');
+      } catch(_) {
+        showToast('error', 'Impossible de copier');
+      }
       document.body.removeChild(ta);
     }
   }
+  
   if (copyHtmlBtn) copyHtmlBtn.addEventListener('click', copyHtml);
 
-  // Download current HTML (content only)
+  // Download HTML Function
   function downloadHtml() {
     if (!zoomContainer) return;
     const html = zoomContainer.innerHTML;
@@ -361,13 +764,329 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const filename = ({{ document.id|default:'0' }}).toString() + '_structured.html';
-    a.href = url; a.download = filename; document.body.appendChild(a); a.click();
-    document.body.removeChild(a); URL.revokeObjectURL(url);
+    a.href = url; 
+    a.download = filename; 
+    document.body.appendChild(a); 
+    a.click();
+    document.body.removeChild(a); 
+    URL.revokeObjectURL(url);
+    showToast('success', 'HTML téléchargé');
   }
+  
   if (downloadHtmlBtn) downloadHtmlBtn.addEventListener('click', downloadHtml);
 
-  // Initial zoom
+  // Scroll Synchronization
+  let structuredScrollTimeout;
+  let pdfScrollTimeout;
+
+  const structuredContent = document.querySelector('.structured-panel-content');
+  const pdfContent = pdfFrame;
+
+  if (structuredContent && syncScroll) {
+    structuredContent.addEventListener('scroll', () => {
+      if (!syncScroll || structuredScrollTimeout) return;
+      structuredScrollTimeout = setTimeout(() => {
+        structuredScrollTimeout = null;
+      }, 50);
+      
+      // Sync with PDF if possible
+      try {
+        const scrollPercentage = structuredContent.scrollTop / (structuredContent.scrollHeight - structuredContent.clientHeight);
+        // This would require PDF.js or similar integration for full sync
+        console.log('Structured scroll:', scrollPercentage);
+      } catch (e) {
+        // PDF sync not available
+      }
+    });
+  }
+
+  // Initialize
   applyZoom();
+  
+  // Keyboard shortcuts for view modes
+  document.addEventListener('keydown', (e) => {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const accel = isMac ? e.metaKey : e.ctrlKey;
+    
+    if (accel && e.shiftKey) {
+      switch(e.key) {
+        case '1':
+          e.preventDefault();
+          setViewMode('split');
+          break;
+        case '2':
+          e.preventDefault();
+          setViewMode('structured');
+          break;
+        case '3':
+          e.preventDefault();
+          setViewMode('pdf');
+          break;
+      }
+    }
+  });
+
+  // Save view mode preference
+  function saveViewMode(mode) {
+    try {
+      localStorage.setItem('preferredViewMode', mode);
+    } catch (e) {
+      // localStorage not available
+    }
+  }
+
+  // Load view mode preference
+  function loadViewMode() {
+    try {
+      const saved = localStorage.getItem('preferredViewMode');
+      if (saved && ['split', 'structured', 'pdf'].includes(saved)) {
+        setViewMode(saved);
+      }
+    } catch (e) {
+      // localStorage not available
+    }
+  }
+
+  // Update view mode saving
+  if (splitViewBtn) splitViewBtn.addEventListener('click', () => {
+    setViewMode('split');
+    saveViewMode('split');
+  });
+  if (structuredOnlyBtn) structuredOnlyBtn.addEventListener('click', () => {
+    setViewMode('structured');
+    saveViewMode('structured');
+  });
+  if (pdfOnlyBtn) pdfOnlyBtn.addEventListener('click', () => {
+    setViewMode('pdf');
+    saveViewMode('pdf');
+  });
+
+  // Load saved preference on page load
+  loadViewMode();
+
+  // Handle window resize
+  window.addEventListener('resize', () => {
+    // Reset flex if window is resized
+    if (window.innerWidth <= 768) {
+      structuredPanel.style.flex = '';
+      pdfPanel.style.flex = '';
+    }
+  });
+
+  // Add loading indicator for PDF
+  if (pdfFrame) {
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.id = 'pdfLoadingIndicator';
+    loadingIndicator.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #6b7280;
+      font-size: 14px;
+      z-index: 10;
+      text-align: center;
+    `;
+    loadingIndicator.innerHTML = `
+      <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6; margin-bottom: 12px;"></i>
+        <div>Chargement du PDF...</div>
+      </div>
+    `;
+    
+    const pdfPanelContent = document.querySelector('.pdf-panel-content');
+    if (pdfPanelContent) {
+      pdfPanelContent.style.position = 'relative';
+      pdfPanelContent.appendChild(loadingIndicator);
+    }
+    
+    // Timeout pour détecter si le PDF ne se charge pas
+    const pdfTimeout = setTimeout(() => {
+      if (loadingIndicator && loadingIndicator.parentNode) {
+        loadingIndicator.innerHTML = `
+          <div style="background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 20px; border-radius: 8px;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 24px; margin-bottom: 12px;"></i>
+            <div><strong>Le PDF prend du temps à charger</strong></div>
+            <div style="font-size: 12px; margin-top: 8px;">Vérifiez votre connexion ou utilisez les options alternatives</div>
+          </div>
+        `;
+        // Afficher le fallback après 10 secondes
+        const fallback = document.getElementById('pdfFallback');
+        if (fallback) {
+          fallback.style.display = 'block';
+        }
+      }
+    }, 10000);
+    
+    pdfFrame.addEventListener('load', () => {
+      clearTimeout(pdfTimeout);
+      if (loadingIndicator && loadingIndicator.parentNode) {
+        loadingIndicator.parentNode.removeChild(loadingIndicator);
+      }
+      
+      // Vérifier si l'iframe a réellement chargé un PDF
+      setTimeout(() => {
+        try {
+          const iframeDoc = pdfFrame.contentDocument || pdfFrame.contentWindow.document;
+          if (!iframeDoc || iframeDoc.title.includes('Error') || iframeDoc.body.innerHTML.includes('Error')) {
+            throw new Error('PDF loading failed');
+          }
+        } catch (e) {
+          // Si on ne peut pas accéder au contenu de l'iframe ou s'il y a une erreur
+          const fallback = document.getElementById('pdfFallback');
+          if (fallback) {
+            fallback.style.display = 'block';
+          }
+        }
+      }, 1000);
+    });
+    
+    pdfFrame.addEventListener('error', () => {
+      clearTimeout(pdfTimeout);
+      if (loadingIndicator) {
+        loadingIndicator.innerHTML = `
+          <div style="background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 20px; border-radius: 8px;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 24px; margin-bottom: 12px;"></i>
+            <div><strong>Erreur de chargement du PDF</strong></div>
+            <div style="font-size: 12px; margin-top: 8px;">Utilisez les options alternatives ci-dessous</div>
+          </div>
+        `;
+      }
+      const fallback = document.getElementById('pdfFallback');
+      if (fallback) {
+        fallback.style.display = 'block';
+      }
+    });
+  }
+
+  // Fonction globale pour recharger le PDF
+  window.reloadPdfFrame = function() {
+    if (pdfFrame) {
+      const loadingIndicator = document.getElementById('pdfLoadingIndicator');
+      const fallback = document.getElementById('pdfFallback');
+      
+      if (fallback) fallback.style.display = 'none';
+      if (loadingIndicator) loadingIndicator.remove();
+      
+      // Recharger l'iframe
+      pdfFrame.src = pdfFrame.src;
+      
+      // Recréer l'indicateur de chargement
+      if (pdfFrame) {
+        const newLoadingIndicator = document.createElement('div');
+        newLoadingIndicator.id = 'pdfLoadingIndicator';
+        newLoadingIndicator.style.cssText = `
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          color: #6b7280;
+          font-size: 14px;
+          z-index: 10;
+          text-align: center;
+        `;
+        newLoadingIndicator.innerHTML = `
+          <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6; margin-bottom: 12px;"></i>
+            <div>Rechargement du PDF...</div>
+          </div>
+        `;
+        
+        const pdfPanelContent = document.querySelector('.pdf-panel-content');
+        if (pdfPanelContent) {
+          pdfPanelContent.appendChild(newLoadingIndicator);
+        }
+      }
+    }
+  };
+
+  // Fonction pour basculer vers la vue Object
+  window.switchToObjectView = function() {
+    const pdfFrame = document.getElementById('pdfFrame');
+    const pdfObject = document.getElementById('pdfObject');
+    const fallback = document.getElementById('pdfFallback');
+    
+    if (pdfFrame && pdfObject) {
+      pdfFrame.style.display = 'none';
+      pdfObject.style.display = 'block';
+      if (fallback) fallback.style.display = 'none';
+      
+      showToast('success', 'Basculé vers le mode alternatif');
+    }
+  };
+
+  // Fonction pour détecter si le PDF se charge dans l'iframe
+  function detectPdfLoading() {
+    if (!pdfFrame) return;
+    
+    const timeoutId = setTimeout(() => {
+      try {
+        // Essayer d'accéder au contenu de l'iframe
+        const iframeDoc = pdfFrame.contentDocument || pdfFrame.contentWindow.document;
+        
+        // Si on ne peut pas accéder au contenu ou si c'est une page d'erreur
+        if (!iframeDoc || 
+            iframeDoc.title.toLowerCase().includes('error') || 
+            iframeDoc.body.innerHTML.toLowerCase().includes('error') ||
+            iframeDoc.body.innerHTML.trim() === '') {
+          
+          console.log('PDF loading failed, showing fallback options');
+          const fallback = document.getElementById('pdfFallback');
+          if (fallback) {
+            fallback.style.display = 'block';
+          }
+        }
+      } catch (e) {
+        // Cross-origin restriction - PDF probablement chargé correctement
+        console.log('PDF iframe loaded (cross-origin restriction detected)');
+      }
+    }, 8000); // Attendre 8 secondes
+
+    // Nettoyer le timeout si l'iframe charge
+    pdfFrame.addEventListener('load', () => {
+      clearTimeout(timeoutId);
+    });
+  }
+
+  // Lancer la détection au chargement
+  if (pdfFrame) {
+    detectPdfLoading();
+  }
+
+  // Double-click to toggle full-screen for panels
+  if (structuredPanel) {
+    const structuredHeader = structuredPanel.querySelector('.structured-panel-header');
+    if (structuredHeader) {
+      structuredHeader.addEventListener('dblclick', () => {
+        setViewMode('structured');
+        saveViewMode('structured');
+      });
+    }
+  }
+
+  if (pdfPanel) {
+    const pdfHeader = pdfPanel.querySelector('.pdf-panel-header');
+    if (pdfHeader) {
+      pdfHeader.addEventListener('dblclick', () => {
+        setViewMode('pdf');
+        saveViewMode('pdf');
+      });
+    }
+  }
+
+  // Show keyboard shortcuts in console (for power users)
+  console.log(`
+🚀 Raccourcis clavier disponibles:
+   Ctrl/Cmd + Shift + 1: Vue divisée
+   Ctrl/Cmd + Shift + 2: Contenu structuré uniquement
+   Ctrl/Cmd + Shift + 3: PDF original uniquement
+   Ctrl/Cmd + Plus: Zoom avant
+   Ctrl/Cmd + Moins: Zoom arrière
+   Ctrl/Cmd + 0: Réinitialiser le zoom
+   
+💡 Double-cliquez sur l'en-tête d'un panneau pour le mettre en plein écran
+  `);
+
 })();
 </script>
 {% endblock %}

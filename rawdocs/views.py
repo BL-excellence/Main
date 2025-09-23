@@ -1369,46 +1369,208 @@ def delete_annotation_type(request):
     
 @login_required
 def view_original_document(request, document_id):
-    """View the original document PDF - RAWDOCS VERSION"""
+    """View the original document PDF - RAWDOCS VERSION AMÉLIORÉE"""
     document = get_object_or_404(RawDocument, id=document_id)
+    
+    # Paramètre pour téléchargement direct
+    download = request.GET.get('download', '0') == '1'
     
     # Case 1: Document has a local file
     if document.file:
         try:
-            # Serve the PDF file directly in browser
-            response = HttpResponse(document.file.read(), content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="{document.file.name}"'
+            # Réinitialiser la position du fichier
+            document.file.seek(0)
+            
+            # Lire le contenu du fichier
+            file_content = document.file.read()
+            
+            # Vérifier que le fichier n'est pas vide
+            if not file_content:
+                raise Exception("Le fichier PDF est vide")
+            
+            # Créer la réponse HTTP
+            response = HttpResponse(file_content, content_type='application/pdf')
+            
+            # Nom du fichier propre
+            filename = document.file.name
+            if not filename.lower().endswith('.pdf'):
+                filename += '.pdf'
+            
+            # Headers pour l'affichage dans le navigateur ou téléchargement
+            if download:
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            else:
+                response['Content-Disposition'] = f'inline; filename="{filename}"'
+            
+            # Headers supplémentaires pour améliorer la compatibilité
+            # Dans votre vue view_original_document, après la ligne response = HttpResponse(file_content, content_type='application/pdf')
+            response['X-Frame-Options'] = 'SAMEORIGIN'  # Permettre iframe sur même domaine
+            response['Content-Security-Policy'] = "frame-ancestors 'self'"
+            response['X-PDF-Options'] = 'toolbar=yes,scrollbars=yes,location=no,menubar=yes'
+                        
             return response
+            
         except Exception as e:
-            # If file doesn't exist, show error
-            return HttpResponse(
-                f"<html><body><h2>Erreur</h2>"
-                f"<p>Le fichier PDF n'a pas pu être chargé: {str(e)}</p>"
-                f"<script>window.close();</script></body></html>"
-            )
-    
+            # Logging pour débugger
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Erreur lors du chargement du PDF {document_id}: {str(e)}")
+            
+            # Page d'erreur avec plus d'informations
+            error_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Erreur - PDF non disponible</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; margin: 40px; background: #f8fafc; }}
+                    .error-container {{ background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }}
+                    .error-icon {{ font-size: 48px; color: #ef4444; margin-bottom: 20px; }}
+                    h2 {{ color: #dc2626; margin: 0 0 16px 0; }}
+                    p {{ color: #6b7280; line-height: 1.6; }}
+                    .btn {{ background: #3b82f6; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; margin-right: 10px; }}
+                    .btn:hover {{ background: #2563eb; }}
+                    .btn-secondary {{ background: #6b7280; }}
+                    .btn-secondary:hover {{ background: #4b5563; }}
+                    .details {{ background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 20px 0; font-size: 14px; }}
+                </style>
+            </head>
+            <body>
+                <div class="error-container">
+                    <div class="error-icon">📄❌</div>
+                    <h2>Fichier PDF non accessible</h2>
+                    <p>Le fichier PDF n'a pas pu être chargé. Cela peut être dû à :</p>
+                    <ul>
+                        <li>Le fichier a été déplacé ou supprimé</li>
+                        <li>Problème de permissions d'accès</li>
+                        <li>Fichier corrompu</li>
+                        <li>Problème temporaire du serveur</li>
+                    </ul>
+                    
+                    <div class="details">
+                        <strong>Détails techniques :</strong><br>
+                        Document ID: {document_id}<br>
+                        Fichier: {document.file.name if document.file else 'N/A'}<br>
+                        Erreur: {str(e)}
+                    </div>
+                    
+                    <div>
+                        <a href="javascript:history.back()" class="btn">← Retour</a>
+                        <a href="javascript:location.reload()" class="btn btn-secondary">🔄 Réessayer</a>
+                    </div>
+                </div>
+                
+                <script>
+                    // Notifier le parent si on est dans une iframe
+                    if (window.parent !== window) {{
+                        window.parent.postMessage({{
+                            type: 'pdf-load-error',
+                            message: 'Erreur de chargement du PDF'
+                        }}, '*');
+                    }}
+                </script>
+            </body>
+            </html>
+            """
+            return HttpResponse(error_html, status=500)
+
     # Case 2: Document was uploaded via URL
     elif document.url:
         try:
-            # Redirect to the original URL
-            return redirect(document.url)
+            if download:
+                # Redirection vers l'URL pour téléchargement
+                return redirect(document.url)
+            else:
+                # Pour les URLs, on redirige directement
+                response = redirect(document.url)
+                return response
+                
         except Exception as e:
-            return HttpResponse(
-                f"<html><body><h2>Erreur</h2>"
-                f"<p>Impossible d'accéder au document via URL: {str(e)}</p>"
-                f"<p><a href='{document.url}' target='_blank'>Essayer d'ouvrir directement: {document.url}</a></p>"
-                f"<script>window.close();</script></body></html>"
-            )
-    
+            error_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>URL non accessible</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; margin: 40px; background: #f8fafc; }}
+                    .error-container {{ background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }}
+                    .error-icon {{ font-size: 48px; color: #f59e0b; margin-bottom: 20px; }}
+                    h2 {{ color: #d97706; margin: 0 0 16px 0; }}
+                    p {{ color: #6b7280; line-height: 1.6; }}
+                    .btn {{ background: #3b82f6; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; margin-right: 10px; }}
+                    a {{ color: #3b82f6; }}
+                </style>
+            </head>
+            <body>
+                <div class="error-container">
+                    <div class="error-icon">🌐❌</div>
+                    <h2>URL non accessible</h2>
+                    <p>L'URL source du document n'est pas accessible actuellement.</p>
+                    
+                    <p><strong>URL source :</strong><br>
+                    <a href="{document.url}" target="_blank">{document.url}</a></p>
+                    
+                    <p>Vous pouvez essayer de :</p>
+                    <ul>
+                        <li><a href="{document.url}" target="_blank">Ouvrir l'URL directement dans un nouvel onglet</a></li>
+                        <li>Vérifier votre connexion internet</li>
+                        <li>Réessayer plus tard</li>
+                    </ul>
+                    
+                    <div>
+                        <a href="javascript:history.back()" class="btn">← Retour</a>
+                    </div>
+                </div>
+                
+                <script>
+                    if (window.parent !== window) {{
+                        window.parent.postMessage({{
+                            type: 'pdf-load-error',
+                            message: 'URL non accessible'
+                        }}, '*');
+                    }}
+                </script>
+            </body>
+            </html>
+            """
+            return HttpResponse(error_html, status=500)
+
     # Case 3: No file and no URL
     else:
-        return HttpResponse(
-            "<html><body><h2>Aucun fichier disponible</h2>"
-            "<p>Ce document n'a ni fichier PDF ni URL source associé.</p>"
-            "<script>window.close();</script></body></html>"
-        )
-
-
+        error_html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Aucun fichier disponible</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; background: #f8fafc; }
+                .error-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; text-align: center; }
+                .error-icon { font-size: 48px; color: #6b7280; margin-bottom: 20px; }
+                h2 { color: #374151; margin: 0 0 16px 0; }
+                p { color: #6b7280; line-height: 1.6; }
+                .btn { background: #3b82f6; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; }
+            </style>
+        </head>
+        <body>
+            <div class="error-container">
+                <div class="error-icon">📄</div>
+                <h2>Aucun fichier disponible</h2>
+                <p>Ce document n'a ni fichier PDF ni URL source associé.</p>
+                <a href="javascript:history.back()" class="btn">← Retour</a>
+            </div>
+            
+            <script>
+                if (window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'pdf-load-error',
+                        message: 'Aucun fichier disponible'
+                    }, '*');
+                }
+            </script>
+        </body>
+        </html>
+        """
+        return HttpResponse(error_html, status=404)
 
 @login_required
 def document_structured(request, document_id):
