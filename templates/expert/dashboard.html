@@ -629,7 +629,7 @@
                                     <span class="badge pending"><i class="fas fa-file"></i> À réviser</span>
                                 {% endif %}
                             </td>
-                            <td>{{ doc.file.name|truncatechars:30 }}</td>
+                            <td>{{ doc.title|truncatechars:30 }}</td>
                             <td>{{ doc.pages.count }}</td>
                             <td>
                                 <i class="fas fa-user"></i> {{ doc.annotator.username }}
@@ -708,7 +708,7 @@
                             </td>
                             <td>
                                 <div class="font-medium text-gray-900">
-                                    {{ doc.file.name|truncatechars:50 }}
+                                    {{ doc.title|truncatechars:50 }}
                                 </div>
                                 <div class="text-sm text-gray-500">
                                     Par {{ doc.annotator.username }}
