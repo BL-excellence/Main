@@ -54,6 +54,7 @@
     flex: 1;
     overflow: auto;
     position: relative;
+    padding-right: 80px;
   }
   
   /* Right Panel - PDF Original */
@@ -176,36 +177,77 @@
 
   /* Floating zoom controls */
   .floating-zoom-controls {
-    position: absolute;
-    right: 16px;
-    bottom: 16px;
-    display: flex;
+    position: sticky;
+    bottom: 24px;
+    margin-left: auto;
+    margin-right: 24px;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    border-radius: 12px;
-    backdrop-filter: blur(8px);
+    gap: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    backdrop-filter: none;
     z-index: 100;
   }
-  
-  .floating-zoom-controls .btn {
+
+  .floating-zoom-controls .floating-btn {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
-    background: white;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.95), rgba(14, 165, 233, 0.95));
+    box-shadow: 0 18px 35px rgba(37, 99, 235, 0.25);
+    color: white;
     cursor: pointer;
+    margin-left: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
   }
-  
-  .floating-zoom-controls .btn:hover { background: #f9fafb; }
-  .floating-zoom-controls .divider { width: 1px; height: 20px; background: #e5e7eb; margin: 0 4px; }
-  .floating-zoom-controls .zoom-label { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; color: #374151; font-size: 0.85rem; }
+
+  .floating-zoom-controls .floating-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.65), transparent 60%);
+    pointer-events: none;
+  }
+
+  .floating-zoom-controls .floating-btn:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 28px 45px rgba(37, 99, 235, 0.3);
+  }
+
+  .floating-zoom-controls .floating-btn.secondary {
+    background: linear-gradient(135deg, rgba(129, 140, 248, 0.95), rgba(165, 180, 252, 0.95));
+    box-shadow: 0 14px 30px rgba(99, 102, 241, 0.25);
+  }
+
+  .floating-zoom-controls .floating-btn.secondary:hover {
+    box-shadow: 0 22px 40px rgba(99, 102, 241, 0.3);
+  }
+
+  .floating-zoom-controls .zoom-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 56px;
+    height: 44px;
+    margin-left: 12px;
+    padding: 0 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.85);
+    color: #1f2937;
+    font-size: 0.9rem;
+    font-weight: 600;
+    box-shadow: 0 12px 30px rgba(37, 99, 235, 0.15);
+  }
 
   /* Zoom container */
   #zoomContainer {
@@ -375,16 +417,15 @@
       {% endif %}
 
       <!-- Floating Zoom Controls for Structured Content -->
-      <div class="floating-zoom-controls">
-        <button class="btn" type="button" id="zoomOutBtn" title="Zoom -">
+      <div class="floating-zoom-controls" aria-label="Contrôles de zoom">
+        <button class="floating-btn" type="button" id="zoomOutBtn" title="Zoom -">
           <i class="fas fa-search-minus" aria-hidden="true"></i>
         </button>
         <span class="zoom-label" id="zoomLabel">100%</span>
-        <button class="btn" type="button" id="zoomInBtn" title="Zoom +">
+        <button class="floating-btn" type="button" id="zoomInBtn" title="Zoom +">
           <i class="fas fa-search-plus" aria-hidden="true"></i>
         </button>
-        <div class="divider"></div>
-        <button class="btn" type="button" id="zoomResetBtn" title="Réinitialiser">
+        <button class="floating-btn secondary" type="button" id="zoomResetBtn" title="Réinitialiser">
           <i class="fas fa-compress" aria-hidden="true"></i>
         </button>
       </div>
