@@ -459,11 +459,11 @@ class UserProfile(models.Model):
         ('annotateur', 'Annotateur'),
         ('expert', 'Expert'),
         ('client', 'Client'),
-        ('dev_metier', 'Dev métier'),  # Gardé depuis le premier modèle
+        ('dev_metier', 'Dev métier'),
     ]
-
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='client')
+    planned_documents = models.PositiveIntegerField(default=0)  # AJOUTER CETTE LIGNE
 
     def __str__(self):
         return f"{self.user.username} - {self.role}"

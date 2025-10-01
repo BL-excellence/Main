@@ -178,11 +178,23 @@ def register(request):
 
 # ——— Métadonneur Views ——————————————————————————————
 
+from .models import UserProfile  # déjà importé
+
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_metadonneur)
 def dashboard_view(request):
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)  # Récupérer ou créer le profil
+
+    if request.method == 'POST':
+        planned_value = request.POST.get('planned_number')
+        try:
+            profile.planned_documents = int(planned_value)
+            profile.save()
+            messages.success(request, "Nombre de documents planifiés mis à jour.")
+        except (TypeError, ValueError):
+            messages.error(request, "Valeur invalide pour le nombre planifié.")
+
     docs = RawDocument.objects.filter(owner=request.user).order_by('-created_at')
-    # KPI calculés pour métadonneur (plus réalistes)
     total_imported = docs.count()
     validated_count = docs.filter(is_validated=True).count()
     pending_validation_count = docs.filter(is_validated=False).count()
@@ -190,15 +202,14 @@ def dashboard_view(request):
     context = {
         'documents': docs,
         'total_scrapped': total_imported,
-        'total_planned': 150,  # Valeur fixe plus cohérente
+        'total_planned': profile.planned_documents,  # <-- Utiliser la valeur du profil
         'total_completed': validated_count,
         'in_progress': pending_validation_count,
         'pending_validation_count': pending_validation_count,
         'total_imported': total_imported,
         'total_in_reextraction': total_imported,
-        # Placeholder charts
         'pie_data': json.dumps([15, 8, 12, 5, 3]),
-        'bar_data': json.dumps([150, total_imported, validated_count, pending_validation_count]),
+        'bar_data': json.dumps([profile.planned_documents, total_imported, validated_count, pending_validation_count]),
     }
     return render(request, 'rawdocs/dashboard.html', context)
 
