@@ -109,6 +109,17 @@ class RawDocument(models.Model):
     # Validation par expert
     is_expert_validated = models.BooleanField(default=False, help_text="Document validé par un expert")
     expert_validated_at = models.DateTimeField(null=True, blank=True, help_text="Date de validation par un expert")
+    
+    # Cache Mistral pour éviter les re-analyses multiples
+    mistral_analyzed = models.BooleanField(default=False, help_text="Document analysé par Mistral pour les types d'annotation")
+    mistral_analyzed_at = models.DateTimeField(null=True, blank=True, help_text="Date d'analyse par Mistral")
+    mistral_suggested_types = models.JSONField(null=True, blank=True, help_text="Types d'annotation suggérés par Mistral (cache)")
+    mistral_document_language = models.CharField(max_length=10, blank=True, help_text="Langue détectée par Mistral")
+    mistral_document_domain = models.CharField(max_length=255, blank=True, help_text="Domaine/contexte détecté par Mistral")
+    
+    # Cache Llama pour les suggestions de types d'annotation
+    llama_suggested_types = models.JSONField(null=True, blank=True, help_text="Types d'annotation suggérés par Llama (cache)")
+    llama_suggestions_at = models.DateTimeField(null=True, blank=True, help_text="Date des suggestions par Llama")
 
     def __str__(self):
         owner_name = self.owner.username if self.owner else "–"

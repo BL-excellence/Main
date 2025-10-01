@@ -12,6 +12,16 @@
 <script type="text/javascript">
   // Variable globale pour l'ID du document
   var DOCUMENT_ID = {{ document.id }};
+  
+  // Variables pour le cache Mistral - maintenant activées après migrations
+  var MISTRAL_CACHE_EXISTS = {{ document.mistral_analyzed|default:False|yesno:"true,false" }};
+  var MISTRAL_CACHED_TYPES = {% if document.mistral_suggested_types %}{{ document.mistral_suggested_types|safe }}{% else %}[]{% endif %};
+  var MISTRAL_DOCUMENT_LANGUAGE = "{{ document.mistral_document_language|default:'fr' }}";
+  var MISTRAL_DOCUMENT_DOMAIN = "{{ document.mistral_document_domain|default:'Non défini' }}";
+  
+  // Variables pour le cache Llama - maintenant activées après migrations
+  var LLAMA_CACHED_TYPES = {% if document.llama_suggested_types %}{{ document.llama_suggested_types|safe }}{% else %}[]{% endif %};
+  var LLAMA_CACHE_EXISTS = {% if document.llama_suggested_types %}true{% else %}false{% endif %};
 
   // Fonction pour ajouter une annotation au contenu structuré
   function addAnnotationToStructuredContent(annotation) {
@@ -2088,15 +2098,21 @@ body {
   <p class="instructions">Cliquez sur un type, puis surlignez le texte dans le document</p>
   
   <div class="toolbar" id="label-toolbar">
-    {% for ann_type in annotation_types %}
-    <button class="label-btn" 
-      data-id="{{ ann_type.id }}" 
-      data-name="{{ ann_type.name }}" 
-      data-color="{{ ann_type.color }}"
-      style="background: {{ ann_type.color }}">
-      {{ ann_type.display_name }}
-    </button>
-    {% endfor %}
+    {% comment %}
+    Les types de base ne sont chargés que si Mistral n'a pas encore analysé ce document.
+    Une fois que Mistral a proposé ses types, ils remplacent complètement les types de base.
+    {% endcomment %}
+    {% if not document.mistral_analyzed %}
+      {% for ann_type in annotation_types %}
+      <button class="label-btn" 
+        data-id="{{ ann_type.id }}" 
+        data-name="{{ ann_type.name }}" 
+        data-color="{{ ann_type.color }}"
+        style="background: {{ ann_type.color }}">
+        {{ ann_type.display_name }}
+      </button>
+      {% endfor %}
+    {% endif %}
 
     <button class="annotation-type-btn-add" data-bs-toggle="modal" data-bs-target="#addAnnotationTypeModal" type="button">
       <i class="fas fa-plus"></i> Add Custom Type
@@ -2195,35 +2211,7 @@ body {
       </div>
     </div>
 
-    <!-- Groupe 2: Actions JSON -->
-    <div class="action-group">
-      <h4 class="group-title">Export JSON</h4>
-      <div class="buttons-row">
-        <div class="json-action-pair">
-          <button id="generate-page-json-btn" class="btn-json-page" onclick="generatePageJson()">
-            <i class="fas fa-code"></i> Générer JSON Page
-          </button>
-
-          <a href="{% url 'rawdocs:view_page_annotation_json' current_page.id %}"
-             class="btn-view-json-page" target="_blank" title="Voir le JSON de cette page">
-            <i class="fas fa-file-code"></i>
-          </a>
-        </div>
-
-        <div class="json-action-pair">
-          <button id="generate-document-json-btn" class="btn-json-document" onclick="generateDocumentJson()">
-            <i class="fas fa-file-contract"></i> Générer JSON Global
-          </button>
-
-          <a href="{% url 'rawdocs:view_document_annotation_json' document.id %}"
-             class="btn-view-json-global" target="_blank" title="Voir le JSON du document complet">
-            <i class="fas fa-book-open"></i>
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Groupe 3: Révision Expert -->
+    <!-- Groupe 2: Révision Expert -->
     <div class="action-group">
       <h4 class="group-title">Révision Expert</h4>
       <div class="buttons-row">
@@ -3491,10 +3479,12 @@ function loadAnnotationsInStructuredContent() {
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Build type mapping
+    // Build type mapping - seulement si Mistral n'a pas encore analysé ce document
+    {% if not document.mistral_analyzed %}
     {% for ann_type in annotation_types %}
     annotationTypeMap['{{ ann_type.name|escapejs }}'] = {{ ann_type.id }};
     {% endfor %}
+    {% endif %}
 
     console.log('📋 Annotation type mapping loaded:', annotationTypeMap);
 
@@ -3510,7 +3500,11 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeExistingFunctionality();
     
     // Charger automatiquement les types d'annotation suggérés par Mistral
-    loadMistralAnnotationTypes();
+    // Vérifier d'abord le cache pour éviter les appels multiples
+    checkMistralCacheAndLoad();
+    
+    // Charger automatiquement les types Llama en cache si disponibles
+    loadLlamaCachedTypes();
 });
 
 function showTab(tabName) {
@@ -4420,9 +4414,8 @@ function validatePage() {
                 const mainContent = document.querySelector('.text-content-card');
                 mainContent.parentNode.insertBefore(successDiv, mainContent);
 
-                if (data.ai_improved) {
-                    showLearningWidget(data);
-                }
+                // Toujours afficher le widget d'apprentissage après validation
+                showLearningWidget(data);
 
                 btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Page Validée 🎓';
                 btn.disabled = true;
@@ -4442,6 +4435,78 @@ function validatePage() {
             btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Validate Page';
         });
     }
+}
+
+// Learning Widget Functions
+function showLearningWidget(data) {
+    let widget = document.getElementById('learning-widget') || createLearningWidget();
+
+    fetch('/learning/dashboard/')
+        .then(response => response.json())
+        .then(learningData => {
+            const avgScore = (learningData.average_feedback_score * 100).toFixed(0);
+            const {performanceLevel, performanceIcon} = getPerformanceLevel(avgScore);
+
+            widget.innerHTML = `
+                <h4><i class="fas fa-chart-line"></i> Progrès d'Apprentissage IA</h4>
+                <div class="learning-metrics">
+                    <div class="metric">
+                        <span class="metric-label">Score Réel:</span>
+                        <span class="metric-value">${avgScore}%</span>
+                        <span class="performance-indicator">${performanceIcon} ${performanceLevel}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Validations:</span>
+                        <span class="metric-value">${learningData.total_feedbacks}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Amélioration:</span>
+                        <span class="metric-value">📈 Active</span>
+                    </div>
+                </div>
+                <div class="learning-explanation">
+                    <small><i class="fas fa-info-circle"></i> Score basé sur annotations correctes, erreurs et manqués</small>
+                </div>
+            `;
+            widget.style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Learning Dashboard Error:', error);
+            widget.innerHTML = `
+                <h4><i class="fas fa-chart-line"></i> Progrès d'Apprentissage</h4>
+                <div class="learning-error">
+                    <i class="fas fa-exclamation-triangle"></i> Données non disponibles
+                </div>
+            `;
+        });
+}
+
+function createLearningWidget() {
+    const widget = document.createElement('section');
+    widget.id = 'learning-widget';
+    widget.className = 'learning-dashboard-widget';
+    document.querySelector('.text-content-card')?.appendChild(widget);
+    return widget;
+}
+
+function getPerformanceLevel(score) {
+    score = parseInt(score);
+    if (score >= 90) return {performanceLevel: 'Excellent', performanceIcon: '🏆'};
+    if (score >= 75) return {performanceLevel: 'Bon', performanceIcon: '👍'};
+    if (score >= 50) return {performanceLevel: 'Apprentissage', performanceIcon: '🎓'};
+    return {performanceLevel: 'Nécessite entrainement', performanceIcon: '📚'};
+}
+
+// Context Menu Functions
+function addContextMenuToButtons() {
+    document.querySelectorAll('.label-btn').forEach(btn => {
+        // Remove existing listeners to prevent duplicates
+        btn.removeEventListener('contextmenu', handleRightClick);
+        // Add new listener only to annotation type buttons
+        if (!btn.classList.contains('annotation-type-btn-add') && btn.id !== 'clear-annotations-btn') {
+            btn.addEventListener('contextmenu', handleRightClick);
+        }
+    });
 }
 
 function annotateWithGroq() {
@@ -4545,22 +4610,57 @@ function getCookie(name) {
 }
 
 function submitDocumentForExpert() {
-    if (confirm('Soumettre ce document complet pour révision expert ?')) {
+    if (confirm('Soumettre ce document complet pour révision expert ? Le JSON global sera généré automatiquement.')) {
         const documentId = {{ document.id }};
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-        fetch(`/submit-for-expert/${documentId}/`, {
+        const btn = document.getElementById('submit-document-expert-btn');
+        
+        // Désactiver le bouton et afficher le chargement
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération JSON et soumission...';
+        
+        // Étape 1: Générer le JSON global automatiquement
+        console.log('🔄 Génération automatique du JSON global avant soumission...');
+        
+        fetch(`/annotation/document/${documentId}/generate-summary/`, {
             method: 'POST',
-            headers: { 'X-CSRFToken': csrfToken }
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json'
+            }
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert(data.message);
+                console.log('✅ JSON global généré avec succès');
+                
+                // Étape 2: Soumettre le document à l'expert
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Soumission à l\'expert...';
+                
+                return fetch(`/submit-for-expert/${documentId}/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+            } else {
+                throw new Error(data.error || 'Erreur lors de la génération du JSON global');
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ JSON global généré et document soumis à l\'expert avec succès !');
                 location.reload();
             } else {
-                alert('Erreur: ' + data.error);
+                throw new Error(data.error || 'Erreur lors de la soumission à l\'expert');
             }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur: ' + error.message);
+            
+            // Réactiver le bouton en cas d'erreur
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-user-graduate"></i> Soumission à l\'Expert';
         });
     }
 }
@@ -4629,9 +4729,10 @@ function createAnnotationType() {
 }
 
 function addNewAnnotationButtonToAnnotateur(annotationType) {
-    const existingButton = document.querySelector(`[data-name="${annotationType.display_name}"]`);
+    // Vérifier si un bouton avec ce nom existe déjà (en utilisant data-name)
+    const existingButton = document.querySelector(`[data-name="${annotationType.name}"]`);
     if (existingButton && !existingButton.classList.contains('annotation-type-btn-add')) {
-        console.log('Button already exists for type:', annotationType.display_name);
+        console.log('Button already exists for type:', annotationType.name);
         return;
     }
     
@@ -4663,83 +4764,14 @@ function addNewAnnotationButtonToAnnotateur(annotationType) {
 
     newButton.addEventListener('contextmenu', handleRightClick);
 
-    const container = document.querySelector('.toolbar');
+    const container = document.getElementById('label-toolbar');
     const addButton = document.querySelector('.annotation-type-btn-add');
     if (container && addButton) {
         container.insertBefore(newButton, addButton);
+        console.log(`✅ Nouveau type d'annotation "${annotationType.display_name}" ajouté à la toolbar`);
+    } else {
+        console.error('❌ Impossible de trouver la toolbar ou le bouton d\'ajout');
     }
-}
-
-// Learning Widget Functions
-function showLearningWidget(data) {
-    let widget = document.getElementById('learning-widget') || createLearningWidget();
-
-    fetch('/learning/dashboard/')
-        .then(response => response.json())
-        .then(learningData => {
-            const avgScore = (learningData.average_feedback_score * 100).toFixed(0);
-            const {performanceLevel, performanceIcon} = getPerformanceLevel(avgScore);
-
-            widget.innerHTML = `
-                <h4><i class="fas fa-chart-line"></i> Progrès d'Apprentissage IA</h4>
-                <div class="learning-metrics">
-                    <div class="metric">
-                        <span class="metric-label">Score Réel:</span>
-                        <span class="metric-value">${avgScore}%</span>
-                        <span class="performance-indicator">${performanceIcon} ${performanceLevel}</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Validations:</span>
-                        <span class="metric-value">${learningData.total_feedbacks}</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Amélioration:</span>
-                        <span class="metric-value">📈 Active</span>
-                    </div>
-                </div>
-                <div class="learning-explanation">
-                    <small><i class="fas fa-info-circle"></i> Score basé sur annotations correctes, erreurs et manqués</small>
-                </div>
-            `;
-            widget.style.display = 'block';
-        })
-        .catch(error => {
-            console.error('Learning Dashboard Error:', error);
-            widget.innerHTML = `
-                <h4><i class="fas fa-chart-line"></i> Progrès d'Apprentissage</h4>
-                <div class="learning-error">
-                    <i class="fas fa-exclamation-triangle"></i> Données non disponibles
-                </div>
-            `;
-        });
-}
-
-function createLearningWidget() {
-    const widget = document.createElement('section');
-    widget.id = 'learning-widget';
-    widget.className = 'learning-dashboard-widget';
-    document.querySelector('.text-content-card')?.appendChild(widget);
-    return widget;
-}
-
-function getPerformanceLevel(score) {
-    score = parseInt(score);
-    if (score >= 90) return {performanceLevel: 'Excellent', performanceIcon: '🏆'};
-    if (score >= 75) return {performanceLevel: 'Bon', performanceIcon: '👍'};
-    if (score >= 50) return {performanceLevel: 'Apprentissage', performanceIcon: '🎓'};
-    return {performanceLevel: 'Nécessite entrainement', performanceIcon: '📚'};
-}
-
-// Context Menu Functions
-function addContextMenuToButtons() {
-    document.querySelectorAll('.label-btn').forEach(btn => {
-        // Remove existing listeners to prevent duplicates
-        btn.removeEventListener('contextmenu', handleRightClick);
-        // Add new listener only to annotation type buttons
-        if (!btn.classList.contains('annotation-type-btn-add') && btn.id !== 'clear-annotations-btn') {
-            btn.addEventListener('contextmenu', handleRightClick);
-        }
-    });
 }
 
 function handleRightClick(e) {
@@ -5216,6 +5248,172 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
+ * Charge automatiquement les types d'annotation Llama depuis le cache si disponibles
+ */
+function loadLlamaCachedTypes() {
+    console.log("🔍 Vérification du cache Llama...");
+    
+    // Vérifier si le cache Llama existe côté serveur
+    if (LLAMA_CACHE_EXISTS && LLAMA_CACHED_TYPES && LLAMA_CACHED_TYPES.length > 0) {
+        console.log("💾 Cache Llama trouvé côté serveur, ajout des types existants");
+        
+        // Vérifier si la barre d'outils existe
+        var toolbar = document.getElementById('label-toolbar');
+        if (!toolbar) {
+            console.log("⚠️ Barre d'outils non trouvée, Llama sera chargé plus tard");
+            return;
+        }
+        
+        // Ajouter les types Llama à la barre d'outils existante (sans vider)
+        LLAMA_CACHED_TYPES.forEach(function(type) {
+            // Vérifier si le type n'existe pas déjà
+            var existingButton = toolbar.querySelector(`[data-name="${type.name}"]`);
+            if (existingButton) {
+                console.log(`Type ${type.name} déjà présent, ignoré`);
+                return;
+            }
+            
+            var button = document.createElement('button');
+            button.className = 'label-btn';
+            button.dataset.id = type.id;
+            button.dataset.name = type.name;
+            button.dataset.color = type.color;
+            button.style.background = type.color;
+            button.textContent = type.display_name;
+            button.title = `${type.display_name} (Llama)`;
+            
+            button.addEventListener('click', function() {
+                document.querySelectorAll('.label-btn').forEach(function(b) {
+                    b.classList.remove('active');
+                });
+                
+                button.classList.add('active');
+                currentLabel = {
+                    id: button.dataset.id,
+                    name: button.dataset.name,
+                    color: button.dataset.color
+                };
+            });
+            
+            // Insérer avant les boutons spéciaux (Add Custom Type et Clear)
+            var addButton = toolbar.querySelector('.annotation-type-btn-add');
+            if (addButton) {
+                toolbar.insertBefore(button, addButton);
+            } else {
+                toolbar.appendChild(button);
+            }
+            
+            annotationTypeMap[type.name] = type.id;
+        });
+        
+        // Afficher une notification discrète
+        var cacheDiv = document.createElement('div');
+        cacheDiv.className = 'validation-success';
+        cacheDiv.innerHTML = '<i class="fas fa-robot" style="font-size: 1.5rem;"></i>' +
+            '<div><strong>🤖 Types d\'annotation Llama restaurés</strong>' +
+            '<div style="font-size: 0.9rem; opacity: 0.9;">' +
+            'Llama avait suggéré ' + LLAMA_CACHED_TYPES.length + ' types pour ce document' + 
+            '</div></div>';
+        
+        var mainContent = document.querySelector('.text-content-card');
+        if (mainContent) {
+            mainContent.parentNode.insertBefore(cacheDiv, mainContent);
+            setTimeout(function() {
+                cacheDiv.remove();
+            }, 3000);
+        }
+        
+        console.log(`✅ ${LLAMA_CACHED_TYPES.length} types d'annotation Llama ajoutés`);
+    } else {
+        console.log("ℹ️ Pas de cache Llama trouvé pour ce document");
+    }
+}
+
+/**
+ * Vérifie d'abord le cache Mistral côté serveur avant de lancer une nouvelle analyse
+ * Ceci évite de relancer Mistral à chaque rechargement de page
+ */
+function checkMistralCacheAndLoad() {
+    console.log("🔍 Vérification du cache Mistral...");
+    
+    // Clé unique pour ce document
+    var cacheKey = 'mistral_analyzed_' + DOCUMENT_ID;
+    var cachedAnalysis = localStorage.getItem(cacheKey);
+    
+    // Vérifier d'abord le localStorage (cache côté client)
+    if (cachedAnalysis) {
+        console.log("💾 Cache Mistral trouvé dans localStorage, pas de nouvelle analyse");
+        try {
+            var analysisData = JSON.parse(cachedAnalysis);
+            if (analysisData.entity_types && analysisData.entity_types.length > 0) {
+                updateToolbarWithMistralTypes(analysisData.entity_types);
+                
+                // Afficher notification depuis cache localStorage
+                var cacheDiv = document.createElement('div');
+                cacheDiv.className = 'validation-success';
+                cacheDiv.innerHTML = '<i class="fas fa-brain" style="font-size: 1.5rem;"></i>' +
+                    '<div><strong>Types d\'annotation personnalisés (cache)</strong>' +
+                    '<div style="font-size: 0.9rem; opacity: 0.9;">' +
+                    'Mistral : ' + analysisData.entity_types.length + ' types spécialisés en ' + (analysisData.language || 'fr') + 
+                    '</div></div>';
+                
+                var mainContent = document.querySelector('.text-content-card');
+                if (mainContent) {
+                    mainContent.parentNode.insertBefore(cacheDiv, mainContent);
+                    setTimeout(function() {
+                        cacheDiv.remove();
+                    }, 3000);
+                }
+                return; // Arrêter ici, ne pas faire d'appel API
+            }
+        } catch (e) {
+            console.log("⚠️ Erreur lors de la lecture du cache localStorage, suppression...");
+            localStorage.removeItem(cacheKey);
+        }
+    }
+    
+    // Vérifier ensuite le cache côté serveur (variables passées du template)
+    if (MISTRAL_CACHE_EXISTS && MISTRAL_CACHED_TYPES && MISTRAL_CACHED_TYPES.length > 0) {
+        console.log("💾 Cache Mistral trouvé côté serveur, utilisation des données existantes");
+        
+        // Sauvegarder dans localStorage pour les prochains rechargements
+        var analysisData = {
+            entity_types: MISTRAL_CACHED_TYPES,
+            language: MISTRAL_DOCUMENT_LANGUAGE,
+            domain: MISTRAL_DOCUMENT_DOMAIN,
+            cached_at: new Date().toISOString()
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(analysisData));
+        
+        // Utiliser directement les types du cache
+        updateToolbarWithMistralTypes(MISTRAL_CACHED_TYPES);
+        
+        // Afficher une notification discrète
+        var cacheDiv = document.createElement('div');
+        cacheDiv.className = 'validation-success';
+        cacheDiv.innerHTML = '<i class="fas fa-brain" style="font-size: 1.5rem;"></i>' +
+            '<div><strong>� Types d\'annotation personnalisés chargés</strong>' +
+            '<div style="font-size: 0.9rem; opacity: 0.9;">' +
+            'Mistral a remplacé les types par défaut par ' + MISTRAL_CACHED_TYPES.length + ' types spécialisés (' + MISTRAL_DOCUMENT_LANGUAGE + ')' + 
+            '</div></div>';
+        
+        var mainContent = document.querySelector('.text-content-card');
+        if (mainContent) {
+            mainContent.parentNode.insertBefore(cacheDiv, mainContent);
+            setTimeout(function() {
+                cacheDiv.remove();
+            }, 3000);
+        }
+        
+        return; // Important: arrêter ici, ne pas faire d'appel API
+    }
+    
+    // Pas de cache côté serveur, lancer une nouvelle analyse automatiquement
+    console.log("🔄 Pas de cache Mistral trouvé, lancement d'une nouvelle analyse automatique");
+    loadMistralAnnotationTypes();
+}
+
+/**
  * Fonction pour charger automatiquement les types d'annotation suggérés par Mistral
  */
 function loadMistralAnnotationTypes() {
@@ -5257,6 +5455,17 @@ function loadMistralAnnotationTypes() {
                 console.log('✅ Mistral a suggéré', entityCount, 'types d\'annotation en', displayLanguage);
                 
                 if (data.entity_types && data.entity_types.length > 0) {
+                    // Sauvegarder dans localStorage pour les prochains rechargements
+                    var cacheKey = 'mistral_analyzed_' + DOCUMENT_ID;
+                    var analysisData = {
+                        entity_types: data.entity_types,
+                        language: data.displayed_language || 'fr',
+                        domain: data.document_domain || '',
+                        cached_at: new Date().toISOString()
+                    };
+                    localStorage.setItem(cacheKey, JSON.stringify(analysisData));
+                    console.log("💾 Sauvegarde du cache Mistral dans localStorage pour document", DOCUMENT_ID);
+                    
                     // Mettre à jour l'interface
                     updateToolbarWithMistralTypes(data.entity_types);
                     
@@ -5264,11 +5473,13 @@ function loadMistralAnnotationTypes() {
                     var successDiv = document.createElement('div');
                     successDiv.className = 'validation-success';
                     successDiv.innerHTML = '<i class="fas fa-brain" style="font-size: 1.5rem;"></i>' +
-                        '<div><strong>✅ Types d\'annotation optimisés</strong>' +
+                        '<div><strong>🔄 Types d\'annotation personnalisés</strong>' +
                         '<div style="font-size: 0.9rem; opacity: 0.9;">' +
-                        'Mistral a identifié ' + entityCount + ' types pertinents' + 
+                        'Mistral a remplacé les types par défaut par ' + entityCount + ' types spécialisés' + 
                         (displayLanguage ? ' <span class="badge bg-info" title="Langue détectée automatiquement">' + displayLanguage + '</span>' : '') + 
-                        '</div></div>';                var mainContent = document.querySelector('.text-content-card');
+                        '</div></div>';
+                        
+                var mainContent = document.querySelector('.text-content-card');
                 if (mainContent) {
                     mainContent.parentNode.insertBefore(successDiv, mainContent);
                     setTimeout(function() {
@@ -5293,7 +5504,8 @@ function loadMistralAnnotationTypes() {
 }
 
 /**
- * Met à jour la barre d'outils avec les types d'annotation suggérés
+ * Met à jour la barre d'outils avec SEULEMENT les types d'annotation suggérés par Mistral
+ * REMPLACE tous les types existants (types de base)
  */
 function updateToolbarWithMistralTypes(entityTypes) {
     if (!entityTypes || entityTypes.length === 0) return;
@@ -5301,18 +5513,23 @@ function updateToolbarWithMistralTypes(entityTypes) {
     var toolbar = document.getElementById('label-toolbar');
     if (!toolbar) return;
     
-    // Sauvegarder les boutons spéciaux
+    console.log('🔄 Début de updateToolbarWithMistralTypes avec', entityTypes.length, 'types');
+    
+    // Sauvegarder SEULEMENT les boutons spéciaux (Add Custom Type et Clear All)
     var specialButtons = [];
     toolbar.querySelectorAll('button').forEach(function(btn) {
         if (btn.classList.contains('annotation-type-btn-add') || btn.id === 'clear-annotations-btn') {
             specialButtons.push(btn.cloneNode(true));
+            console.log('📌 Sauvegarde du bouton spécial:', btn.textContent.trim());
         }
     });
     
-    // Vider la barre d'outils
+    console.log('📋 Boutons spéciaux sauvegardés:', specialButtons.length);
+    
+    // VIDER complètement la barre d'outils pour remplacer par les types Mistral
     toolbar.innerHTML = '';
     
-    // Ajouter les nouveaux types
+    // Ajouter SEULEMENT les types suggérés par Mistral
     entityTypes.forEach(function(type) {
         var button = document.createElement('button');
         button.className = 'label-btn';
@@ -5321,6 +5538,7 @@ function updateToolbarWithMistralTypes(entityTypes) {
         button.dataset.color = type.color;
         button.style.background = type.color;
         button.textContent = type.display_name;
+        button.title = `${type.display_name} (Mistral AI)`;
         
         button.addEventListener('click', function() {
             document.querySelectorAll('.label-btn').forEach(function(b) {
@@ -5339,22 +5557,58 @@ function updateToolbarWithMistralTypes(entityTypes) {
         annotationTypeMap[type.name] = type.id;
     });
     
-    // Réajouter les boutons spéciaux
+    // Réajouter SEULEMENT les boutons spéciaux à la fin avec événements corrects
     specialButtons.forEach(function(btn) {
+        // Créer un nouveau bouton pour éviter les problèmes de clonage d'événements
+        var newBtn = document.createElement('button');
+        newBtn.className = btn.className;
+        newBtn.innerHTML = btn.innerHTML;
+        
+        // Copier tous les attributs
+        for (var i = 0; i < btn.attributes.length; i++) {
+            var attr = btn.attributes[i];
+            newBtn.setAttribute(attr.name, attr.value);
+        }
+        
+        // Attacher les bons événements
         if (btn.classList.contains('annotation-type-btn-add')) {
-            btn.onclick = showAddAnnotationTypeModal;
+            newBtn.onclick = showAddAnnotationTypeModal;
+            newBtn.setAttribute('data-bs-toggle', 'modal');
+            newBtn.setAttribute('data-bs-target', '#addAnnotationTypeModal');
         } else if (btn.id === 'clear-annotations-btn') {
-            btn.addEventListener('click', function() {
+            newBtn.addEventListener('click', function() {
                 if (confirm('Êtes-vous sûr de vouloir effacer toutes les annotations de cette page?')) {
                     clearAllAnnotations();
                 }
             });
         }
-        toolbar.appendChild(btn);
+        
+        toolbar.appendChild(newBtn);
+        console.log('✅ Bouton spécial restauré:', newBtn.textContent.trim());
     });
     
-    console.log('🔄 Barre d\'outils mise à jour avec les types d\'annotation suggérés par Mistral');
+    console.log(`🔄 Barre d'outils remplacée par ${entityTypes.length} types d'annotation Mistral uniquement`);
 }
+
+// Event listener pour la génération automatique du nom technique
+document.addEventListener('DOMContentLoaded', function() {
+    const displayNameInput = document.getElementById('new-annotation-display-name');
+    const nameInput = document.getElementById('new-annotation-name');
+    
+    if (displayNameInput && nameInput) {
+        displayNameInput.addEventListener('input', function() {
+            // Générer automatiquement le nom technique à partir du nom d'affichage
+            const displayName = this.value.trim();
+            const technicalName = displayName
+                .toLowerCase()
+                .replace(/[^a-zA-Z0-9\s]/g, '') // Enlever les caractères spéciaux
+                .replace(/\s+/g, '_') // Remplacer les espaces par des underscores
+                .substring(0, 50); // Limiter la longueur
+            
+            nameInput.value = technicalName;
+        });
+    }
+});
 
 console.log('Prodigy-like annotation system with full functionality loaded successfully');
 </script>
