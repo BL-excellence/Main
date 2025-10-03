@@ -23,80 +23,223 @@
   var LLAMA_CACHED_TYPES = {% if document.llama_suggested_types %}{{ document.llama_suggested_types|safe }}{% else %}[]{% endif %};
   var LLAMA_CACHE_EXISTS = {% if document.llama_suggested_types %}true{% else %}false{% endif %};
 
+  // Fonction de diagnostic pour les problèmes d'espacement
+  function debugSpacing(element, action) {
+    const textContent = element.textContent;
+    const innerHTML = element.innerHTML;
+    console.log(`🔧 Debug ${action}:`, {
+      'Contenu texte': JSON.stringify(textContent),
+      'HTML interne': innerHTML,
+      'Espaces détectés': {
+        'début': textContent.match(/^\s+/) ? textContent.match(/^\s+/)[0].length : 0,
+        'fin': textContent.match(/\s+$/) ? textContent.match(/\s+$/)[0].length : 0,
+        'total': textContent.length
+      },
+      'Attribut original': element.getAttribute('data-original-text') || 'Non défini'
+    });
+  }
+
   // Fonction pour ajouter une annotation au contenu structuré
   function addAnnotationToStructuredContent(annotation) {
     const structuredContent = document.querySelector('.structured-content-body');
-    if (!structuredContent) return;
+    if (!structuredContent) {
+        console.warn('⚠️ Structured content area not found');
+        return;
+    }
 
     const text = annotation.text || annotation.selected_text;
-    const type = annotation.type || annotation.entity_type;
-    const color = annotation.color || '#ffeb3b'; // couleur par défaut
+    const type = annotation.type_display || annotation.type;
+    const color = annotation.color || '#ffeb3b';
+    const annotationId = annotation.id || `temp-${Date.now()}`;
     
-    // Convertir la couleur hex en RGB pour le gradient
+    console.log(`🎨 Adding annotation to structured content: "${text.substring(0, 30)}..."`);
+    
+    // Convert color to RGB for gradient
     const rgb = hexToRgb(color || '#ffeb3b');
     const rgbValues = rgb ? `${rgb.r},${rgb.g},${rgb.b}` : '255,235,59';
 
-    // Convertir le texte en format HTML safe pour la recherche
-    const textAsHtml = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-            
-    // Créer un regex qui prend en compte le format HTML
-    const regexEscaped = textAsHtml.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(regexEscaped, 'g');
-    
-    // Créer le span d'annotation
-    const annotationSpan = `<span class="inline-annotation" 
-                               style="--highlight-color: ${rgbValues}; 
-                                      cursor: pointer;">
-                            ${textAsHtml}
-                            <span class="ann-label" 
-                                  style="font-size: 0.7rem; 
-                                         font-weight: bold; 
-                                         margin-left: 4px; 
-                                         padding: 2px 6px; 
-                                         border-radius: 4px; 
-                                         background: rgba(0,0,0,0.6); 
-                                         color: #fff; 
-                                         white-space: nowrap;">
-                                ${type}
-                            </span>
-                         </span>`;
-    
-    // Remplacer uniquement si le texte existe et n'est pas déjà dans un span d'annotation
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = structuredContent.innerHTML;
-    const textNodes = [];
-    
-    function findTextNodes(node) {
-        if (node.nodeType === 3) { // Text node
-            textNodes.push(node);
-        } else if (node.nodeType === 1 && !node.classList.contains('inline-annotation')) {
-            for (const child of node.childNodes) {
-                findTextNodes(child);
+    // Create tree walker to find text nodes
+    const walker = document.createTreeWalker(
+        structuredContent,
+        NodeFilter.SHOW_TEXT,
+        {
+            acceptNode: function(node) {
+                // Skip if already inside an annotation
+                let parent = node.parentNode;
+                while (parent && parent !== structuredContent) {
+                    if (parent.classList && parent.classList.contains('inline-annotation')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    parent = parent.parentNode;
+                }
+                return NodeFilter.FILTER_ACCEPT;
             }
+        }
+    );
+    
+    // Find and wrap the text
+    let textNode;
+    let found = false;
+    
+    while (textNode = walker.nextNode()) {
+        const nodeText = textNode.textContent;
+        const index = nodeText.indexOf(text);
+        
+        if (index !== -1) {
+            found = true;
+            console.log(`✅ Found text at position ${index}`);
+            
+            // Split the text node
+            const before = nodeText.substring(0, index);
+            const match = nodeText.substring(index, index + text.length);
+            const after = nodeText.substring(index + text.length);
+            
+            // Create annotation span
+            const span = document.createElement('span');
+            span.className = 'inline-annotation';
+            span.dataset.annotationId = annotationId;
+            span.style.cssText = `
+                background-color: rgba(${rgbValues}, 0.2);
+                color: inherit;
+                font-family: inherit;
+                font-size: inherit;
+                font-weight: inherit;
+                padding: 2px 4px;
+                margin: 0 1px;
+                border-radius: 3px;
+                cursor: pointer;
+            `;
+            span.textContent = match;
+            
+            // Store original text for restoration
+            span.setAttribute('data-original-text', match);
+            
+            // Add label
+            const label = document.createElement('span');
+            label.className = 'ann-label';
+            label.style.cssText = `
+                font-size: 0.7rem;
+                font-weight: bold;
+                margin-left: 4px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                background: rgba(0,0,0,0.6);
+                color: #fff;
+                white-space: nowrap;
+                display: none;
+            `;
+            label.textContent = type;
+            span.appendChild(label);
+            
+            // Add click handler for deletion
+            span.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const originalText = this.getAttribute('data-original-text');
+                if (originalText) {
+                    const textNode = document.createTextNode(originalText);
+                    this.parentNode.replaceChild(textNode, this);
+                    deleteAnnotationFromDB(annotationId);
+                }
+            });
+            
+            // Replace the text node with our annotated version
+            const parent = textNode.parentNode;
+            if (before) parent.insertBefore(document.createTextNode(before), textNode);
+            parent.insertBefore(span, textNode);
+            if (after) parent.insertBefore(document.createTextNode(after), textNode);
+            parent.removeChild(textNode);
+            
+            break; 
         }
     }
     
-    findTextNodes(tempDiv);
+    if (!found) {
+        console.warn(`⚠️ Could not find text in structured content: "${text.substring(0, 50)}..."`);
+    }
     
-    textNodes.forEach(node => {
-        const nodeContent = node.textContent;
-        if (nodeContent.includes(text)) {
-            const newContent = nodeContent.replace(regex, annotationSpan);
-            const span = document.createElement('span');
-            span.innerHTML = newContent;
-            node.parentNode.replaceChild(span, node);
-        }
+    addAnnotationEventListeners();
+}
+
+
+  function addAnnotationEventListeners() {
+    const annotations = document.querySelectorAll('.inline-annotation');
+    annotations.forEach(annotation => {
+      // Enlever les anciens gestionnaires pour éviter les doublons
+      annotation.removeEventListener('mouseenter', showAnnotationLabel);
+      annotation.removeEventListener('mouseleave', hideAnnotationLabel);
+      annotation.removeEventListener('click', handleAnnotationClick);
+      
+      // Ajouter les nouveaux gestionnaires
+      annotation.addEventListener('mouseenter', showAnnotationLabel);
+      annotation.addEventListener('mouseleave', hideAnnotationLabel);
+      annotation.addEventListener('click', handleAnnotationClick);
     });
-    
-    structuredContent.innerHTML = tempDiv.innerHTML;
   }
 
-  // Définition de la fonction ici pour s'assurer qu'elle est disponible globalement
+  // Fonctions pour gérer l'affichage des labels
+  function showAnnotationLabel(event) {
+    const label = event.target.querySelector('.ann-label');
+    if (label) {
+      label.style.display = 'block';
+      label.style.opacity = '1';
+    }
+  }
+
+  function hideAnnotationLabel(event) {
+    const label = event.target.querySelector('.ann-label');
+    if (label) {
+      label.style.opacity = '0';
+      setTimeout(() => {
+        if (label.style.opacity === '0') {
+          label.style.display = 'none';
+        }
+      }, 200);
+    }
+  }
+
+  function handleAnnotationClick(event) {
+    event.preventDefault();
+    const annotationId = event.target.getAttribute('data-annotation-id');
+    console.log('Annotation cliquée:', annotationId);
+    // Ajouter ici la logique pour éditer/supprimer l'annotation si nécessaire
+  }
+
+  // Fonction utilitaire pour supprimer une annotation en préservant l'espacement
+  function removeAnnotationPreservingSpaces(annotationElement) {
+    // Utiliser le texte original stocké pour une restauration exacte
+    const originalText = annotationElement.getAttribute('data-original-text');
+    
+    if (originalText) {
+      // Restauration exacte du texte original
+      const textNode = document.createTextNode(originalText);
+      annotationElement.parentNode.insertBefore(textNode, annotationElement);
+      annotationElement.parentNode.removeChild(annotationElement);
+      return textNode;
+    } else {
+      // Méthode de fallback si pas de texte stocké
+      const labelElement = annotationElement.querySelector('.ann-label');
+      let textContent = '';
+      
+      // Parcourir les nœuds enfants pour extraire seulement le texte (pas le label)
+      for (let node of annotationElement.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          textContent += node.textContent;
+        } else if (node !== labelElement && node.nodeType === Node.ELEMENT_NODE) {
+          textContent += node.textContent;
+        }
+      }
+      
+      // Créer le nœud de texte avec le contenu exact
+      const textNode = document.createTextNode(textContent);
+      annotationElement.parentNode.insertBefore(textNode, annotationElement);
+      annotationElement.parentNode.removeChild(annotationElement);
+      
+      return textNode;
+    }
+  }
+
   function annotateWithGroqAll() {
     const btn = document.getElementById('groq-annotate-all-btn');
     const loading = document.getElementById('ai-loading');
@@ -119,101 +262,32 @@
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            mode: 'structured'
+            mode: 'structured'  // Request structured mode annotations
         })
     })
     .then(handleResponse)
     .then(data => {
         if (data.success) {
-            showSuccessMessage(`🎉 Document annoté! ${data.annotations_created} annotations créées`);
+            console.log(`✅ AI annotation completed with mode: ${data.mode}`);
+            
+            showSuccessMessage(`🎉 Document annoté! ${data.total_annotations} annotations créées`);
             
             if (data.total_pages > 0) {
                 showAlert(`${data.total_pages} pages traitées avec succès!`, 'success', '#10b981');
             }
 
-            // Au lieu de recharger la page, on va afficher les annotations dans le contenu structuré
-            const annotations = data.annotations || [];
-            const structuredContent = document.querySelector('.structured-content-body');
-            
-            if (structuredContent && annotations.length > 0) {
-                let htmlContent = structuredContent.innerHTML;
+            // CRITICAL: Reload both raw text AND structured content annotations
+            setTimeout(() => {
+                console.log('🔄 Reloading annotations in both areas...');
                 
-                // Pour chaque annotation
-                annotations.forEach(annotation => {
-                    const text = annotation.text || annotation.selected_text;
-                    const type = annotation.type || annotation.entity_type;
-                    const color = annotation.color || '#ffeb3b'; // couleur par défaut si non spécifiée
-                    
-                    // Convertir le texte en format HTML safe pour la recherche
-                    const textAsHtml = text
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')
-                        .replace(/"/g, '&quot;')
-                        .replace(/'/g, '&#039;');
-                            
-                    // Créer un regex qui prend en compte le format HTML
-                    const regexEscaped = textAsHtml.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp(regexEscaped, 'g');
-                    
-                    // Créer le span d'annotation avec le texte original
-                    const annotationSpan = `<span class="inline-annotation" 
-                                               style="background-color: ${color}; 
-                                                      padding: 2px 4px; 
-                                                      margin: 0 1px; 
-                                                      border-radius: 3px; 
-                                                      cursor: pointer;">
-                                            ${textAsHtml}
-                                            <span class="ann-label" 
-                                                  style="font-size: 0.7rem; 
-                                                         font-weight: bold; 
-                                                         margin-left: 4px; 
-                                                         padding: 2px 6px; 
-                                                         border-radius: 4px; 
-                                                         background: rgba(0,0,0,0.6); 
-                                                         color: #fff; 
-                                                         white-space: nowrap;">
-                                                ${type}
-                                            </span>
-                                         </span>`;
-                    
-                    // Remplacer uniquement si le texte existe et n'est pas déjà dans un span d'annotation
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = htmlContent;
-                    const textNodes = [];
-                    
-                    function findTextNodes(node) {
-                        if (node.nodeType === 3) { // Text node
-                            textNodes.push(node);
-                        } else if (node.nodeType === 1 && !node.classList.contains('inline-annotation')) {
-                            for (const child of node.childNodes) {
-                                findTextNodes(child);
-                            }
-                        }
-                    }
-                    
-                    findTextNodes(tempDiv);
-                    
-                    textNodes.forEach(node => {
-                        const nodeContent = node.textContent;
-                        if (nodeContent.includes(text)) {
-                            const newContent = nodeContent.replace(regex, annotationSpan);
-                            const span = document.createElement('span');
-                            span.innerHTML = newContent;
-                            node.parentNode.replaceChild(span, node);
-                        }
-                    });
-                    
-                    htmlContent = tempDiv.innerHTML;
-                });
+                // Reload raw text area
+                loadAndRenderAnnotations();
                 
-                // Mettre à jour le contenu avec toutes les annotations
-                structuredContent.innerHTML = htmlContent;
+                // Reload structured content area
+                loadAnnotationsInStructuredContent();
                 
-                showSuccessMessage(`${annotations.length} annotations ajoutées au contenu structuré`);
-            } else {
-                console.log('Pas de contenu structuré ou pas d\'annotations à afficher');
-            }
+                console.log('✅ Both areas reloaded');
+            }, 1500);
         } else {
             throw new Error(data.error || 'Erreur inconnue lors de l\'annotation');
         }
@@ -227,9 +301,8 @@
         loading.style.display = 'none';
         loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> IA en cours...';
     });
-  }
+}
 
-  // Fonction utilitaire pour convertir une couleur hex en RGB
   function hexToRgb(hex) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
@@ -238,6 +311,237 @@
       b: parseInt(result[3], 16)
     } : null;
   }
+
+  function getXPath(node) {
+    if (node.id) {
+        return `//*[@id="${node.id}"]`;
+    }
+    
+    if (node === document.body) {
+        return '/html/body';
+    }
+    
+    let ix = 0;
+    let siblings = node.parentNode.childNodes;
+    
+    for (let i = 0; i < siblings.length; i++) {
+        let sibling = siblings[i];
+        if (sibling === node) {
+            let path = getXPath(node.parentNode);
+            let tag = node.tagName ? node.tagName.toLowerCase() : 'text()';
+            return `${path}/${tag}[${ix + 1}]`;
+        }
+        if (sibling.nodeType === 1 && sibling.tagName === node.tagName) {
+            ix++;
+        }
+    }
+}
+
+function getTextNodeOffset(textNode, endOffset) {
+    return endOffset;
+}
+
+function restoreAnnotationFromXPath(annotation) {
+    if (annotation.mode !== 'structured' || !annotation.start_xpath) {
+        return false;
+    }
+    
+    const structuredArea = document.getElementById("structured-annotation-area");
+    if (!structuredArea) return false;
+    
+    try {
+        const startNode = document.evaluate(
+            annotation.start_xpath,
+            document,
+            null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            null
+        ).singleNodeValue;
+        
+        const endNode = document.evaluate(
+            annotation.end_xpath,
+            document,
+            null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            null
+        ).singleNodeValue;
+        
+        if (!startNode || !endNode) {
+            console.warn('Could not resolve XPath for annotation:', annotation.id);
+            return false;
+        }
+        
+        const range = document.createRange();
+        const startTextNode = findTextNodeAtOffset(startNode, annotation.start_offset);
+        const endTextNode = findTextNodeAtOffset(endNode, annotation.end_offset);
+        
+        if (!startTextNode || !endTextNode) {
+            console.warn('Could not find text nodes for annotation:', annotation.id);
+            return false;
+        }
+        
+        range.setStart(startTextNode.node, startTextNode.offset);
+        range.setEnd(endTextNode.node, endTextNode.offset);
+        
+        // CAPTURE COMPLÈTE DE L'ÉTAT ORIGINAL avant toute modification
+        const originalState = {
+            startContainer: range.startContainer,
+            endContainer: range.endContainer,
+            startOffset: range.startOffset,
+            endOffset: range.endOffset,
+            originalText: range.toString(),
+            
+            // Capturer l'état des nœuds de texte complets pour restauration exacte
+            beforeText: '',
+            selectedText: range.toString(),
+            afterText: ''
+        };
+        
+        // Capturer le texte avant la sélection dans le même nœud
+        if (range.startContainer.nodeType === Node.TEXT_NODE) {
+            originalState.beforeText = range.startContainer.textContent.substring(0, range.startOffset);
+            originalState.afterText = range.startContainer.textContent.substring(range.endOffset);
+        }
+        
+        console.log('📊 État original capturé:', originalState);
+        
+        const span = document.createElement("span");
+        span.classList.add("inline-annotation");
+        span.setAttribute("data-annotation-id", annotation.id);
+        span.style.background = annotation.color;
+        span.style.padding = "2px 4px";
+        span.style.margin = "0 1px";
+        span.style.borderRadius = "3px";
+        span.style.cursor = "pointer";
+        
+        const fragment = range.cloneContents();
+        span.appendChild(fragment);
+        
+        // Stocker l'état complet pour restauration exacte
+        span.setAttribute('data-original-text', originalState.selectedText);
+        span.setAttribute('data-before-text', originalState.beforeText);
+        span.setAttribute('data-after-text', originalState.afterText);
+        span.setAttribute('data-start-offset', originalState.startOffset);
+        span.setAttribute('data-end-offset', originalState.endOffset);
+        
+        console.log('💾 Données stockées dans span:', {
+            originalText: originalState.selectedText,
+            beforeText: originalState.beforeText,
+            afterText: originalState.afterText
+        });
+        
+        range.deleteContents();
+        range.insertNode(span);
+        
+        const label = document.createElement("span");
+        label.className = "ann-label";
+        label.textContent = annotation.type_display;
+        span.appendChild(label);
+        
+        span.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Debug avant suppression
+            debugSpacing(this, 'avant suppression');
+            
+            // NOUVELLE MÉTHODE: Restauration complète avec contexte
+            const originalText = this.getAttribute('data-original-text');
+            const beforeText = this.getAttribute('data-before-text');
+            const afterText = this.getAttribute('data-after-text');
+            
+            if (originalText !== null && beforeText !== null && afterText !== null) {
+                console.log('� Restauration complète avec contexte:', {
+                    before: JSON.stringify(beforeText),
+                    selected: JSON.stringify(originalText), 
+                    after: JSON.stringify(afterText)
+                });
+                
+                // Reconstruire le nœud de texte complet avec son contexte
+                const fullText = beforeText + originalText + afterText;
+                const textNode = document.createTextNode(fullText);
+                
+                // Remplacer le parent du span par le nœud de texte reconstitué
+                const parentElement = this.parentNode;
+                const grandParent = parentElement.parentNode;
+                
+                if (grandParent) {
+                    grandParent.insertBefore(textNode, parentElement);
+                    grandParent.removeChild(parentElement);
+                } else {
+                    parentElement.insertBefore(textNode, this);
+                    parentElement.removeChild(this);
+                }
+                
+                console.log('✅ Texte complet restauré:', JSON.stringify(fullText));
+            } else {
+                // Fallback vers l'ancienne méthode
+                const originalTextFallback = this.getAttribute('data-original-text');
+                
+                if (originalTextFallback) {
+                    console.log('🔍 Restauration fallback avec texte original:', JSON.stringify(originalTextFallback));
+                    const textNode = document.createTextNode(originalTextFallback);
+                    this.parentNode.insertBefore(textNode, this);
+                    this.parentNode.removeChild(this);
+                    console.log('✅ Texte restauré (fallback):', JSON.stringify(textNode.textContent));
+                } else {
+                    console.warn('⚠️ Pas de texte original stocké, utilisation de fallback manuel');
+                    
+                    const labelElement = this.querySelector('.ann-label');
+                    let textContent = '';
+                    
+                    for (let node of this.childNodes) {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            textContent += node.textContent;
+                        } else if (node !== labelElement && node.nodeType === Node.ELEMENT_NODE) {
+                            textContent += node.textContent;
+                        }
+                    }
+                    
+                    console.log('🔍 Fallback manuel texte extrait:', JSON.stringify(textContent));
+                    const textNode = document.createTextNode(textContent);
+                    this.parentNode.insertBefore(textNode, this);
+                    this.parentNode.removeChild(this);
+                }
+            }
+            
+            deleteAnnotationFromDB(annotation.id);
+        });
+        
+        console.log('✅ Restored annotation from XPath:', annotation.id);
+        return true;
+        
+    } catch (error) {
+        console.error('Error restoring annotation from XPath:', error);
+        return false;
+    }
+}
+
+function findTextNodeAtOffset(element, offset) {
+    let currentOffset = 0;
+    const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+    
+    let node;
+    while (node = walker.nextNode()) {
+        const nodeLength = node.textContent.length;
+        if (currentOffset + nodeLength >= offset) {
+            return {
+                node: node,
+                offset: offset - currentOffset
+            };
+        }
+        currentOffset += nodeLength;
+    }
+    
+    return null;
+}
+
+
 </script>
 
 <!-- Tous les styles CSS existants restent identiques -->
@@ -1687,43 +1991,46 @@ body {
   border: 2px solid #fff;
 }
 
-/* Inline annotation styles - Version améliorée */
+/* Inline annotation styles - Version corrigée pour préserver l'apparence du texte */
 .inline-annotation {
   display: inline;
   border-radius: 2px;
-  padding: 0 1px;
+  padding: 1px 3px;
   margin: 0;
   cursor: pointer;
-  font-weight: normal;
-  position: relative;
-  transition: all 0.2s ease;
-  line-height: inherit;
+  font-weight: inherit;
   font-size: inherit;
+  font-family: inherit;
+  position: relative;
+  transition: background-color 0.2s ease;
+  line-height: inherit;
   vertical-align: baseline;
-  opacity: 0.7;
   text-decoration: none;
-  border-bottom: 2px solid rgba(0,0,0,0.1);
+  /* Supprimé opacity qui rendait le texte flou */
+  /* Supprimé border-bottom qui déformait l'apparence */
 }
 
 .inline-annotation:hover {
-  opacity: 0.9;
-  border-bottom: 2px solid currentColor;
-  box-shadow: none;
-  transform: none;
+  /* Supprimé les transformations qui déformaient le texte */
+  background-color: rgba(0,0,0,0.05);
 }
 
-/* Style de base pour toutes les annotations */
+/* Style unifié pour toutes les annotations - ÉVITE les duplications */
 .inline-annotation {
-  display: inline;
+  display: inline !important;
   padding: 2px 4px;
   margin: 0 1px;
   border-radius: 3px;
   cursor: pointer;
-  font-weight: normal;
+  font-weight: inherit;
+  font-family: inherit;
+  font-size: inherit;
   position: relative;
   line-height: inherit;
-  white-space: normal;
-  transition: all 0.2s ease;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+  vertical-align: baseline;
+  text-decoration: none;
 }
 
 /* Style spécifique pour la zone de texte brut */
@@ -1743,48 +2050,63 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
 
-/* Style spécifique pour le contenu structuré - Version ultra-fine */
+/* Preserve document structure during annotation - Version corrigée */
 .structured-content-body .inline-annotation {
-  display: inline;
-  padding: 2px 1px;
-  margin: 0;
-  border-radius: 2px;
-  text-decoration: none;
+  display: inline !important; /* Force inline flow */
+  padding: 1px 2px !important; /* Minimal padding */
+  margin: 0 !important; /* No margin shifts */
+  line-height: inherit !important; /* Match surrounding text */
+  vertical-align: baseline !important; /* No vertical shifts */
+  font-family: inherit !important; /* Preserve font */
+  font-size: inherit !important; /* Preserve size */
+  font-weight: inherit !important; /* Preserve weight */
+  color: inherit !important; /* Preserve text color */
+  text-decoration: none !important; /* No underlines */
   position: relative;
-  line-height: inherit;
-  vertical-align: baseline;
-  background-color: rgba(37, 99, 235, 0.1) !important;
+  z-index: 1;
+  border-radius: 2px;
   transition: background-color 0.2s ease;
-}
-
-.structured-content-body .inline-annotation::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 100%;
-  background-color: rgba(59, 130, 246, 0.1);
-  transition: all 0.2s ease;
 }
 
 .structured-content-body .inline-annotation:hover {
   background-color: rgba(37, 99, 235, 0.15) !important;
 }
 
-/* Style de base pour les labels d'annotation */
-.inline-annotation .ann-label {
-  font-size: 0.65rem;
-  font-weight: bold;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(0,0,0,0.5);
-  color: #fff;
-  white-space: nowrap;
-  line-height: 1;
+/* Style spécifique pour les labels dans le contenu structuré - Version améliorée */
+.structured-content-body .inline-annotation .ann-label {
+  display: none;
   position: absolute;
-  z-index: 10;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+  line-height: normal;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
+
+.structured-content-body .inline-annotation:hover .ann-label {
+  display: block;
+  opacity: 1;
+}
+
+/* Style pour les annotations avec survol visible */
+.inline-annotation:hover {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  transition: background-color 0.2s ease;
+}
+
+
+
 
 /* Style spécifique pour les labels dans le texte brut */
 .text-content .inline-annotation .ann-label {
@@ -1799,32 +2121,7 @@ body {
   vertical-align: baseline;
 }
 
-/* Style spécifique pour les labels dans le contenu structuré - Version améliorée */
-.structured-content-body .inline-annotation .ann-label {
-  display: none;
-  position: absolute;
-  bottom: -16px;
-  left: 50%;
-  transform: translateX(-50%) scale(0.9);
-  font-size: 0.6rem;
-  padding: 1px 4px;
-  background: rgba(0,0,0,0.7);
-  color: white;
-  border-radius: 3px;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: all 0.2s ease;
-  z-index: 1000;
-  line-height: normal;
-  margin: 0;
-}
 
-.structured-content-body .inline-annotation:hover .ann-label {
-  display: block;
-  opacity: 1;
-  transform: translateX(-50%) scale(1);
-}
 
 /* Ajuster l'espacement vertical */
 .structured-content-body p + p {
@@ -1844,16 +2141,6 @@ body {
   margin: 0.7em 0;
 }
 
-/* Préserver la structure du document */
-.structured-content-body .inline-annotation {
-  position: relative;
-  z-index: 1;
-  display: inline;
-  line-height: inherit;
-  vertical-align: baseline;
-  padding-top: 0;
-  padding-bottom: 0;
-}
 
 /* Amélioration de la lisibilité du contenu structuré */
 .structured-content-body {
@@ -1872,17 +2159,8 @@ body {
   margin-bottom: 1em;
 }
 
-/* Animation subtile au survol */
-.structured-content-body .inline-annotation .ann-label {
-  transition: opacity 0.2s ease;
-  opacity: 0;
-  transform: translateY(2px);
-}
 
-.structured-content-body .inline-annotation:hover .ann-label {
-  opacity: 1;
-  transform: translateY(0);
-}
+
 
 /* Style pour les sections du contenu structuré */
 .structured-content-body h1,
@@ -2681,19 +2959,7 @@ body {
     border-radius: 0 0 var(--pharma-radius) var(--pharma-radius);
 }
 
-.structured-content-body .inline-annotation {
-    display: inline-block;
-    padding: 2px 4px;
-    margin: 0 1px;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
 
-.structured-content-body .inline-annotation:hover {
-    transform: scale(1.05);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
 
 .structured-content-body .ann-label {
     font-size: 0.7rem;
@@ -3393,89 +3659,146 @@ let currentEditingAnnotationId = null;
 let editModal = null;
 let contextMenuTarget = null;
 
-// Fonction pour charger les annotations dans le contenu structuré
 function loadAnnotationsInStructuredContent() {
-    const pageId = document.getElementById('page-text')?.dataset?.pageId;
-    if (!pageId) return;
+    const structuredArea = document.getElementById('structured-annotation-area');
+    if (!structuredArea) {
+        console.log('⚠️ No structured area found');
+        return;
+    }
+    
+    const pageId = structuredArea.dataset.pageId;
+    if (!pageId) {
+        console.log('⚠️ No pageId on structured area');
+        return;
+    }
+
+    console.log('🔍 Loading structured annotations for page', pageId);
 
     fetch(`/annotation/page/${pageId}/`)
         .then(response => response.json())
         .then(data => {
             if (data.success && data.annotations && data.annotations.length > 0) {
-                const structuredContent = document.querySelector('.structured-content-body');
-                if (structuredContent) {
-                    // Pour chaque annotation, ajouter au contenu structuré
-                    data.annotations.forEach(annotation => {
-                        // Pour chaque annotation, récupérer la couleur du type d'annotation
-                        let annotationType = document.querySelector(`.label-btn[data-name="${annotation.type}"]`);
-                        let color = annotationType ? annotationType.dataset.color : '#ffeb3b';
-                        
-                        const text = annotation.selected_text;
-                        const type = annotation.type;
-                        
-                        // Convertir le texte en format HTML safe pour la recherche
-                        const textAsHtml = text
-                            .replace(/&/g, '&amp;')
-                            .replace(/</g, '&lt;')
-                            .replace(/>/g, '&gt;')
-                            .replace(/"/g, '&quot;')
-                            .replace(/'/g, '&#039;');
-                                
-                        // Créer un regex qui prend en compte le format HTML
-                        const regexEscaped = textAsHtml.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        const regex = new RegExp(regexEscaped, 'g');
-                        
-                        // Convertir la couleur hex en RGB pour l'utiliser avec opacity
-                        const getRGB = (hex) => {
-                            const r = parseInt(hex.slice(1, 3), 16);
-                            const g = parseInt(hex.slice(3, 5), 16);
-                            const b = parseInt(hex.slice(5, 7), 16);
-                            return `${r}, ${g}, ${b}`;
-                        };
-                        
-                        // Créer le span d'annotation avec le nouveau style
-                        const annotationSpan = `<span class="inline-annotation" 
-                                                   style="background-color: ${color}">
-                                                ${textAsHtml}
-                                                <span class="ann-label">${type}</span>
-                                             </span>`;
-                        
-                        // Remplacer uniquement si le texte existe et n'est pas déjà dans un span d'annotation
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = structuredContent.innerHTML;
-                        const textNodes = [];
-                        
-                        function findTextNodes(node) {
-                            if (node.nodeType === 3) { // Text node
-                                textNodes.push(node);
-                            } else if (node.nodeType === 1 && !node.classList.contains('inline-annotation')) {
-                                for (const child of node.childNodes) {
-                                    findTextNodes(child);
-                                }
-                            }
+                // FILTER: Only process structured annotations
+                const structuredAnnotations = data.annotations.filter(ann => ann.mode === 'structured');
+                
+                console.log(`📥 Found ${structuredAnnotations.length} STRUCTURED annotations (${data.annotations.length} total)`);
+                
+                structuredAnnotations.forEach(annotation => {
+                    // Try XPath first
+                    if (annotation.start_xpath) {
+                        const restored = restoreAnnotationFromXPath(annotation);
+                        if (restored) {
+                            console.log('✅ XPath restored:', annotation.id);
+                            return;
                         }
-                        
-                        findTextNodes(tempDiv);
-                        
-                        textNodes.forEach(node => {
-                            const nodeContent = node.textContent;
-                            if (nodeContent.includes(text)) {
-                                const newContent = nodeContent.replace(regex, annotationSpan);
-                                const span = document.createElement('span');
-                                span.innerHTML = newContent;
-                                node.parentNode.replaceChild(span, node);
-                            }
-                        });
-                        
-                        structuredContent.innerHTML = tempDiv.innerHTML;
-                    });
-                }
+                    }
+                    
+                    // Fallback to text search
+                    console.log('⚠️ XPath failed, text fallback for:', annotation.id);
+                    restoreAnnotationByText(annotation, structuredArea);
+                });
+            } else {
+                console.log('ℹ️ No annotations to load');
             }
         })
         .catch(error => {
-            console.error('Error loading annotations for structured content:', error);
+            console.error('❌ Error loading structured annotations:', error);
         });
 }
+
+
+
+
+
+function restoreAnnotationByText(annotation, container) {
+    const text = annotation.selected_text.trim();
+    const type = annotation.type_display;
+    const color = annotation.color;
+    
+    // Normalize the search text
+    const normalizedSearchText = text.replace(/\s+/g, ' ');
+    
+    const walker = document.createTreeWalker(
+        container,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+    
+    let textNode;
+    while (textNode = walker.nextNode()) {
+        // Skip if already inside an annotation
+        let parent = textNode.parentNode;
+        while (parent && parent !== container) {
+            if (parent.classList && parent.classList.contains('inline-annotation')) {
+                textNode = null;
+                break;
+            }
+            parent = parent.parentNode;
+        }
+        if (!textNode) continue;
+        
+        const nodeText = textNode.textContent;
+        const normalizedNodeText = nodeText.replace(/\s+/g, ' ');
+        
+        // Try exact match first
+        let index = nodeText.indexOf(text);
+        
+        // Try normalized match
+        if (index === -1) {
+            const normIndex = normalizedNodeText.indexOf(normalizedSearchText);
+            if (normIndex !== -1) {
+                // Find actual position in original text
+                let charCount = 0;
+                for (let i = 0; i < nodeText.length; i++) {
+                    if (!/\s/.test(nodeText[i])) charCount++;
+                    if (charCount >= normIndex) {
+                        index = i;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (index !== -1) {
+            const before = nodeText.substring(0, index);
+            const match = nodeText.substring(index, index + text.length);
+            const after = nodeText.substring(index + text.length);
+            
+            const span = document.createElement('span');
+            span.className = 'inline-annotation';
+            span.dataset.annotationId = annotation.id;
+            span.style.cssText = `background-color: ${color}; color: inherit; padding: 1px 3px; border-radius: 3px; cursor: pointer;`;
+            span.textContent = match;
+            
+            const label = document.createElement('span');
+            label.className = 'ann-label';
+            label.style.display = 'none';
+            label.textContent = type;
+            span.appendChild(label);
+            
+            span.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const textNode = document.createTextNode(match);
+                this.parentNode.replaceChild(textNode, this);
+                deleteAnnotationFromDB(annotation.id);
+            });
+            
+            const parent = textNode.parentNode;
+            parent.insertBefore(document.createTextNode(before), textNode);
+            parent.insertBefore(span, textNode);
+            parent.insertBefore(document.createTextNode(after), textNode);
+            parent.removeChild(textNode);
+            
+            console.log('✅ Restored by text:', annotation.id, text.substring(0, 30));
+            break;
+        }
+    }
+}
+
+
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -3567,10 +3890,10 @@ function initializeProdigyToolbar() {
     if (structuredArea) {
         structuredArea.addEventListener("mouseup", handleTextSelection);
         
-        // Empêcher l'édition mais permettre la sélection
+        // Prevent editing while allowing selection
         structuredArea.addEventListener("keydown", function(e) {
-            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && 
-                e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' &&
+            // Allow navigation keys only
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) &&
                 !e.ctrlKey && !e.metaKey) {
                 e.preventDefault();
             }
@@ -3579,6 +3902,11 @@ function initializeProdigyToolbar() {
         structuredArea.addEventListener("paste", function(e) {
             e.preventDefault();
         });
+        
+        // Important: prevent contenteditable behavior
+        structuredArea.contentEditable = "false";
+        structuredArea.style.userSelect = "text";
+        structuredArea.style.webkitUserSelect = "text";
     }
     
     // Clear button (code existant)
@@ -3593,22 +3921,27 @@ function loadAndRenderAnnotations() {
     const pageEl = document.getElementById("page-text");
     const pageId = pageEl.dataset.pageId;
     
-    // Store the original clean text
     const originalText = `{{ current_page.cleaned_text|escapejs }}`;
     
-    console.log('🔄 Loading annotations for page:', pageId);
+    console.log('🔄 Loading RAW text annotations for page:', pageId);
     
-    // Load annotations from backend
     fetch(`/annotation/page/${pageId}/`)
         .then(response => response.json())
         .then(data => {
             console.log('📥 Received annotation data:', data);
             
             if (data.success && data.annotations && data.annotations.length > 0) {
-                console.log(`✅ Found ${data.annotations.length} annotations to render`);
+                // FILTER: Only process raw text annotations
+                const rawAnnotations = data.annotations.filter(ann => ann.mode === 'raw' || !ann.mode);
                 
-                // Use the original text for rendering
-                renderInlineAnnotations(originalText, data.annotations);
+                console.log(`✅ Found ${rawAnnotations.length} RAW annotations (${data.annotations.length} total)`);
+                
+                if (rawAnnotations.length > 0) {
+                    renderInlineAnnotations(originalText, rawAnnotations);
+                } else {
+                    console.log('ℹ️ No RAW annotations, showing clean text');
+                    pageEl.textContent = originalText;
+                }
             } else {
                 console.log('ℹ️ No annotations found, showing clean text');
                 pageEl.textContent = originalText;
@@ -3631,11 +3964,7 @@ function renderInlineAnnotations(originalText, annotations) {
     
     console.log('🎨 Rendering', annotations.length, 'annotations');
     
-    // Start with clean text
-    let cleanText = originalText;
-    let workingText = cleanText;
-    
-    // Sort annotations by length (longest first) to avoid overlapping issues
+    let workingText = originalText;
     const sortedAnnotations = [...annotations].sort((a, b) => b.selected_text.length - a.selected_text.length);
     
     let processedAnnotations = 0;
@@ -3643,35 +3972,60 @@ function renderInlineAnnotations(originalText, annotations) {
     for (let ann of sortedAnnotations) {
         const searchText = ann.selected_text.trim();
         
-        // Find the text in the working text (case-insensitive)
-        const searchTextLower = searchText.toLowerCase();
-        const workingTextLower = workingText.toLowerCase();
+        // CRITICAL FIX: Normalize whitespace for matching
+        const normalizedSearchText = searchText.replace(/\s+/g, ' ');
+        const normalizedWorkingText = workingText.replace(/\s+/g, ' ');
         
-        let startIndex = workingTextLower.indexOf(searchTextLower);
+        // Try exact match first
+        let startIndex = workingText.indexOf(searchText);
+        
+        // If exact match fails, try normalized match
+        if (startIndex === -1) {
+            const normalizedIndex = normalizedWorkingText.indexOf(normalizedSearchText);
+            if (normalizedIndex !== -1) {
+                // Find the original position by counting characters
+                let charCount = 0;
+                for (let i = 0; i < workingText.length; i++) {
+                    if (!/\s/.test(workingText[i])) charCount++;
+                    if (charCount === normalizedIndex) {
+                        startIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
         
         if (startIndex !== -1) {
-            // Get the actual text (preserving case)
             const actualText = workingText.slice(startIndex, startIndex + searchText.length);
             
-            // Create the replacement HTML
-            const annotationHtml = `<span class="inline-annotation" data-annotation-id="${ann.id}" style="background:${ann.color}; padding: 2px 4px; margin: 0 1px; border-radius: 3px; cursor: pointer;">${actualText}<span class="ann-label">${ann.type_display}</span></span>`;
+            const annotationHtml = `<span class="inline-annotation" 
+                                          data-annotation-id="${ann.id}" 
+                                          data-original-text="${actualText.replace(/"/g, '&quot;')}"
+                                          style="background-color: ${ann.color}20; 
+                                                 color: inherit;
+                                                 padding: 1px 3px; 
+                                                 margin: 0 1px; 
+                                                 border-radius: 3px; 
+                                                 cursor: pointer;">
+                                     ${actualText}
+                                     <span class="ann-label" style="display: none;">${ann.type_display}</span>
+                                   </span>`;
             
-            // Replace the text
             workingText = workingText.slice(0, startIndex) + annotationHtml + workingText.slice(startIndex + searchText.length);
             
             processedAnnotations++;
-            console.log('✅ Processed annotation:', searchText);
+            console.log('✅ Processed annotation:', searchText.substring(0, 50));
         } else {
-            console.log('❌ Could not find text in document:', searchText);
+            console.log('❌ Could not find text:', searchText.substring(0, 80));
         }
     }
     
     console.log(`🎨 Successfully processed ${processedAnnotations}/${annotations.length} annotations`);
     
-    // Set the HTML content
     pageEl.innerHTML = workingText;
-
-    // Add click events for deletion
+    addAnnotationEventListeners();
+    
+    // Add deletion handlers
     pageEl.querySelectorAll('.inline-annotation').forEach(annotation => {
         annotation.addEventListener('click', function(e) {
             e.preventDefault();
@@ -3679,19 +4033,32 @@ function renderInlineAnnotations(originalText, annotations) {
             window.getSelection().removeAllRanges();
             
             const annotationId = this.dataset.annotationId;
-            const annotationText = this.textContent.replace(this.querySelector('.ann-label').textContent, '').trim();
+            const originalText = this.getAttribute('data-original-text');
             
-            // Remplacer l'élément annoté par son texte brut
-            const textNode = document.createTextNode(annotationText);
-            this.parentNode.replaceChild(textNode, this);
+            if (originalText) {
+                const textNode = document.createTextNode(originalText);
+                this.parentNode.replaceChild(textNode, this);
+            } else {
+                const label = this.querySelector('.ann-label');
+                let textContent = '';
+                for (let node of this.childNodes) {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        textContent += node.textContent;
+                    } else if (node !== label && node.nodeType === Node.ELEMENT_NODE) {
+                        textContent += node.textContent;
+                    }
+                }
+                const textNode = document.createTextNode(textContent);
+                this.parentNode.replaceChild(textNode, this);
+            }
             
-            // Supprimer l'annotation de la base de données
             deleteAnnotationFromDB(annotationId);
         });
     });
-    
-    console.log('🎨 Annotations rendered successfully');
 }
+
+
+
 
 
 function handleTextSelection() {
@@ -3701,7 +4068,6 @@ function handleTextSelection() {
         return;
     }
 
-    // Vérifier si on est dans une annotation existante
     const range = selection.getRangeAt(0);
     if (isWithinAnnotation(range)) {
         selection.removeAllRanges();
@@ -3714,6 +4080,12 @@ function handleTextSelection() {
     }
 
     const selectedText = selection.toString().trim();
+    const originalSelectedText = selection.toString(); // Texte original SANS trim pour préservation des espaces
+    
+    console.log('🔍 Texte sélectionné:', {
+        'avec trim': JSON.stringify(selectedText),
+        'sans trim': JSON.stringify(originalSelectedText)
+    });
     
     // Déterminer quelle zone utiliser (page-text ou structured-annotation-area)
     let targetArea = null;
@@ -3730,6 +4102,256 @@ function handleTextSelection() {
              document.getElementById("structured-annotation-area").contains(range.commonAncestorContainer)) {
         targetArea = document.getElementById("structured-annotation-area");
         pageId = targetArea.dataset.pageId;
+        
+        // TRAITEMENT SPÉCIAL POUR LA ZONE STRUCTURÉE - MULTI-NODE HANDLING
+        console.log('Wrapping text:', selectedText.substring(0, 50));
+        
+        try {
+            // CAS SPÉCIAL: Sélection d'un seul nœud texte (un mot)
+            if (range.startContainer === range.endContainer && range.startContainer.nodeType === 3) {
+                console.log('Single node selection detected');
+                
+                const textNode = range.startContainer;
+                const span = document.createElement('span');
+                span.className = 'inline-annotation';
+                span.dataset.annotationId = 'temp-' + Date.now();
+                span.style.background = currentLabel.color;
+                span.style.padding = '2px 4px';
+                span.style.margin = '0';
+                span.style.borderRadius = '3px';
+                span.style.cursor = 'pointer';
+                
+                const before = textNode.textContent.substring(0, range.startOffset);
+                const selected = textNode.textContent.substring(range.startOffset, range.endOffset);
+                const after = textNode.textContent.substring(range.endOffset);
+                
+                // IMPORTANT: Stocker l'état original pour restauration exacte
+                console.log('📊 État capturé pour annotation temporaire:', {
+                    before: JSON.stringify(before),
+                    selected: JSON.stringify(selected),
+                    after: JSON.stringify(after)
+                });
+                
+                span.textContent = selected;
+                
+                // Stocker les données originales pour restauration exacte
+                span.setAttribute('data-original-text', selected);
+                span.setAttribute('data-before-text', before);
+                span.setAttribute('data-after-text', after);
+                
+                // Ajouter le label
+                const label = document.createElement('span');
+                label.className = 'ann-label';
+                label.style.cssText = 'font-size:0.7rem;font-weight:bold;margin-left:4px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,0.6);color:#fff;';
+                label.textContent = currentLabel.name;
+                span.appendChild(label);
+                
+                textNode.parentNode.insertBefore(document.createTextNode(before), textNode);
+                textNode.parentNode.insertBefore(span, textNode);
+                textNode.parentNode.insertBefore(document.createTextNode(after), textNode);
+                textNode.remove();
+                
+                // Gestionnaire de clic amélioré SANS trim()
+                span.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Debug avant suppression
+                    debugSpacing(this, 'suppression annotation temporaire');
+                    
+                    // Utiliser les données stockées pour restauration exacte
+                    const originalText = this.getAttribute('data-original-text');
+                    const beforeText = this.getAttribute('data-before-text');
+                    const afterText = this.getAttribute('data-after-text');
+                    
+                    if (originalText && beforeText !== null && afterText !== null) {
+                        console.log('🔄 Restauration annotation temporaire:', {
+                            before: JSON.stringify(beforeText),
+                            selected: JSON.stringify(originalText),
+                            after: JSON.stringify(afterText)
+                        });
+                        
+                        // Reconstruire le nœud de texte complet
+                        const fullText = beforeText + originalText + afterText;
+                        const textNode = document.createTextNode(fullText);
+                        
+                        // Remplacer tous les nœuds (before, span, after) par un seul nœud unifié
+                        const parentNode = this.parentNode;
+                        const prevSibling = this.previousSibling;
+                        const nextSibling = this.nextSibling;
+                        
+                        // Supprimer before, span, after
+                        if (prevSibling && prevSibling.nodeType === Node.TEXT_NODE) {
+                            prevSibling.remove();
+                        }
+                        if (nextSibling && nextSibling.nodeType === Node.TEXT_NODE) {
+                            nextSibling.remove();
+                        }
+                        
+                        // Remplacer le span par le texte unifié
+                        this.replaceWith(textNode);
+                        
+                        console.log('✅ Annotation temporaire restaurée:', JSON.stringify(fullText));
+                    } else {
+                        // Fallback SANS trim()
+                        const labelElement = this.querySelector('.ann-label');
+                        let textContent = '';
+                        
+                        for (let node of this.childNodes) {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                textContent += node.textContent;
+                            } else if (node !== labelElement && node.nodeType === Node.ELEMENT_NODE) {
+                                textContent += node.textContent;
+                            }
+                        }
+                        
+                        console.log('🔍 Fallback temporaire (SANS trim):', JSON.stringify(textContent));
+                        this.replaceWith(document.createTextNode(textContent));
+                    }
+                });
+                
+                console.log('✅ Single word annotated');
+                
+                // Sauvegarder avec le texte original (sans trim)
+                saveManualAnnotation({
+                    page_id: pageId,
+                    type_id: currentLabel.id,
+                    selected_text: originalSelectedText,
+                    start_pos: 0,
+                    end_pos: originalSelectedText.length,
+                    mode: 'structured'
+                });
+                
+                selection.removeAllRanges();
+                return; // Sortie anticipée
+            }
+            
+            // MULTI-NODE: Obtenir tous les nœuds texte dans la sélection
+            const textNodes = [];
+            const walker = document.createTreeWalker(
+                range.commonAncestorContainer,
+                NodeFilter.SHOW_TEXT,
+                {
+                    acceptNode: function(node) {
+                        const nodeRange = document.createRange();
+                        nodeRange.selectNodeContents(node);
+                        if (range.compareBoundaryPoints(Range.START_TO_END, nodeRange) > 0 &&
+                            range.compareBoundaryPoints(Range.END_TO_START, nodeRange) < 0) {
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                }
+            );
+            
+            let node;
+            while (node = walker.nextNode()) {
+                textNodes.push(node);
+            }
+            
+            console.log('Found', textNodes.length, 'text nodes');
+            
+            // Envelopper chaque nœud texte
+            const annotationId = 'temp-' + Date.now();
+            textNodes.forEach((textNode, idx) => {
+                const span = document.createElement('span');
+                span.className = 'inline-annotation';
+                span.dataset.annotationId = annotationId + '-' + idx;
+                span.style.background = currentLabel.color;
+                span.style.padding = '2px 4px';
+                span.style.margin = '0';
+                span.style.borderRadius = '3px';
+                span.style.cursor = 'pointer';
+                
+                const isStart = textNode === range.startContainer;
+                const isEnd = textNode === range.endContainer;
+                
+                let text;
+                if (isStart && isEnd) {
+                    text = textNode.textContent.substring(range.startOffset, range.endOffset);
+                    const before = textNode.textContent.substring(0, range.startOffset);
+                    const after = textNode.textContent.substring(range.endOffset);
+                    
+                    span.textContent = text;
+                    if (idx === 0) {
+                        const label = document.createElement('span');
+                        label.className = 'ann-label';
+                        label.style.cssText = 'font-size:0.7rem;font-weight:bold;margin-left:4px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,0.6);color:#fff;';
+                        label.textContent = currentLabel.name;
+                        span.appendChild(label);
+                    }
+                    
+                    textNode.parentNode.insertBefore(document.createTextNode(before), textNode);
+                    textNode.parentNode.insertBefore(span, textNode);
+                    textNode.parentNode.insertBefore(document.createTextNode(after), textNode);
+                    textNode.remove();
+                } else if (isStart) {
+                    text = textNode.textContent.substring(range.startOffset);
+                    const before = textNode.textContent.substring(0, range.startOffset);
+                    
+                    span.textContent = text;
+                    const label = document.createElement('span');
+                    label.className = 'ann-label';
+                    label.style.cssText = 'font-size:0.7rem;font-weight:bold;margin-left:4px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,0.6);color:#fff;';
+                    label.textContent = currentLabel.name;
+                    span.appendChild(label);
+                    
+                    textNode.parentNode.insertBefore(document.createTextNode(before), textNode);
+                    textNode.parentNode.insertBefore(span, textNode);
+                    textNode.remove();
+                } else if (isEnd) {
+                    text = textNode.textContent.substring(0, range.endOffset);
+                    const after = textNode.textContent.substring(range.endOffset);
+                    
+                    span.textContent = text;
+                    textNode.parentNode.insertBefore(span, textNode);
+                    textNode.parentNode.insertBefore(document.createTextNode(after), textNode);
+                    textNode.remove();
+                } else {
+                    span.textContent = textNode.textContent;
+                    textNode.parentNode.replaceChild(span, textNode);
+                }
+                
+                span.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Restauration SANS trim() pour préserver les espaces
+                    const labelElement = this.querySelector('.ann-label');
+                    let textContent = '';
+                    
+                    for (let node of this.childNodes) {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            textContent += node.textContent;
+                        } else if (node !== labelElement && node.nodeType === Node.ELEMENT_NODE) {
+                            textContent += node.textContent;
+                        }
+                    }
+                    
+                    console.log('🔄 Suppression annotation multi-nœuds:', JSON.stringify(textContent));
+                    this.replaceWith(document.createTextNode(textContent));
+                });
+            });
+            
+            console.log('✅ Wrapped', textNodes.length, 'nodes');
+            
+            // Sauvegarder avec le texte original (sans trim)
+            saveManualAnnotation({
+                page_id: pageId,
+                type_id: currentLabel.id,
+                selected_text: originalSelectedText,
+                start_pos: 0,
+                end_pos: originalSelectedText.length,
+                mode: 'structured'
+            });
+                
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error: ' + error.message);
+        }
+        
+        selection.removeAllRanges();
+        return;
     }
     
     if (!targetArea || !pageId) {
@@ -3737,7 +4359,7 @@ function handleTextSelection() {
         return;
     }
 
-    // Reste du code existant...
+    // CODE EXISTANT POUR LA ZONE DE TEXTE BRUT (page-text)
     const cleanText = targetArea.textContent || targetArea.innerText;
     let startPos = cleanText.toLowerCase().indexOf(selectedText.toLowerCase());
     
@@ -3748,7 +4370,7 @@ function handleTextSelection() {
     
     const endPos = startPos + selectedText.length;
 
-    // Créer l'annotation visuelle (code existant)
+    // Créer l'annotation visuelle
     const span = document.createElement("span");
     span.classList.add("inline-annotation");
     span.setAttribute("data-annotation-id", "temp-" + Date.now());
@@ -3768,17 +4390,18 @@ function handleTextSelection() {
         console.error('Error inserting annotation:', e);
     }
 
-    // Sauvegarder en base
+    // Sauvegarder en base avec le texte original (sans trim)
     saveManualAnnotation({
         page_id: pageId,
         type_id: currentLabel.id,
-        selected_text: selectedText,
+        selected_text: originalSelectedText,
         start_pos: startPos,
         end_pos: endPos
     });
 
     selection.removeAllRanges();
 }
+
 
 function isWithinAnnotation(range) {
     const startContainer = range.startContainer;
@@ -3971,11 +4594,20 @@ function clearPageAnnotations() {
                 // Sauvegarder le contenu texte original sans annotations
                 const originalText = structuredContent.innerText;
                 
-                // Supprimer toutes les annotations
+                // Supprimer toutes les annotations en préservant l'espacement
                 const annotations = structuredContent.querySelectorAll('.inline-annotation');
                 annotations.forEach(annotation => {
-                    const textNode = document.createTextNode(annotation.textContent.replace(annotation.querySelector('.ann-label').textContent, ''));
-                    annotation.parentNode.replaceChild(textNode, annotation);
+                    // Extraire le texte en préservant les espaces
+                    const labelElement = annotation.querySelector('.ann-label');
+                    let annotationText = annotation.textContent;
+                    if (labelElement) {
+                        annotationText = annotationText.replace(labelElement.textContent, '');
+                    }
+                    
+                    // NE PAS utiliser trim() - préserver l'espacement original
+                    const textNode = document.createTextNode(annotationText);
+                    annotation.parentNode.insertBefore(textNode, annotation);
+                    annotation.parentNode.removeChild(annotation);
                 });
                 
                 // Normaliser les nœuds de texte adjacents
@@ -3992,6 +4624,23 @@ function clearPageAnnotations() {
 }
 
 function saveManualAnnotation(data) {
+    // CRITICAL: Determine which area was annotated
+    const structuredArea = document.getElementById('structured-annotation-area');
+    const pageTextArea = document.getElementById('page-text');
+    
+    // Check if the annotation was made in structured content
+    const selection = window.getSelection();
+    const wasInStructured = structuredArea && structuredArea.contains(selection.anchorNode);
+    
+    // Force the correct mode
+    if (wasInStructured) {
+        data.mode = 'structured';
+        console.log('📝 Saving as STRUCTURED annotation');
+    } else {
+        data.mode = 'raw';
+        console.log('📝 Saving as RAW text annotation');
+    }
+    
     fetch('/annotation/manual/', {
         method: 'POST',
         headers: {
@@ -4003,36 +4652,19 @@ function saveManualAnnotation(data) {
     .then(response => response.json())
     .then(result => {
         if (result.success) {
-            console.log('✅ Annotation enregistrée avec succès, ID:', result.annotation_id);
+            console.log('✅ Annotation saved, ID:', result.annotation_id, 'Mode:', data.mode);
             
-            // Trouver l'annotation temporaire et mettre à jour son ID avec l'ID réel
+            // Update the temporary annotation with the real ID
             const tempAnnotations = document.querySelectorAll('.inline-annotation[data-annotation-id^="temp-"]');
             if (tempAnnotations.length > 0) {
-                // Prendre la dernière annotation temporaire créée
                 const latestTemp = tempAnnotations[tempAnnotations.length - 1];
                 latestTemp.dataset.annotationId = result.annotation_id;
-                
-                // Mettre à jour l'indicateur visuel pour montrer que l'enregistrement est réussi
-                const indicator = latestTemp.querySelector('.saving-indicator');
-                if (indicator) {
-                    indicator.style.background = "#4CAF50"; // Vert pour indiquer le succès
-                    indicator.title = "Annotation enregistrée";
-                    
-                    // Faire disparaître l'indicateur après 2 secondes
-                    setTimeout(() => {
-                        indicator.style.opacity = "0";
-                        indicator.style.transition = "opacity 0.5s ease";
-                        
-                        // Supprimer complètement l'indicateur après la transition
-                        setTimeout(() => indicator.remove(), 500);
-                    }, 2000);
-                }
             }
         } else {
-            console.error('❌ Erreur lors de l\'enregistrement:', result.error);
-            alert('Erreur: ' + result.error);
+            console.error('❌ Save failed:', result.error);
+            alert('Error: ' + result.error);
             
-            // Si l'enregistrement a échoué, supprimer l'annotation temporaire
+            // Remove failed annotation from UI
             const tempAnnotations = document.querySelectorAll('.inline-annotation[data-annotation-id^="temp-"]');
             if (tempAnnotations.length > 0) {
                 tempAnnotations[tempAnnotations.length - 1].remove();
@@ -4041,15 +4673,15 @@ function saveManualAnnotation(data) {
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Erreur lors de la sauvegarde');
+        alert('Error saving annotation');
         
-        // En cas d'erreur, supprimer l'annotation temporaire
         const tempAnnotations = document.querySelectorAll('.inline-annotation[data-annotation-id^="temp-"]');
         if (tempAnnotations.length > 0) {
             tempAnnotations[tempAnnotations.length - 1].remove();
         }
     });
 }
+
 
 function addClickHandlerToTempAnnotation(span) {
     span.addEventListener('click', function(e) {
@@ -4061,12 +4693,32 @@ function addClickHandlerToTempAnnotation(span) {
         if (this.dataset.annotationId.startsWith('temp-')) {
             this.remove();
         } else {
-            // Récupérer le texte sans le label
-            const annotationText = this.textContent.replace(this.querySelector('.ann-label') ? this.querySelector('.ann-label').textContent : '', '').trim();
+            // Utiliser le texte original stocké pour une restauration exacte
+            const originalText = this.getAttribute('data-original-text');
             
-            // Remplacer l'élément annoté par son texte brut
-            const textNode = document.createTextNode(annotationText);
-            this.parentNode.replaceChild(textNode, this);
+            if (originalText) {
+                // Restauration exacte du texte original
+                const textNode = document.createTextNode(originalText);
+                this.parentNode.insertBefore(textNode, this);
+                this.parentNode.removeChild(this);
+            } else {
+                // Méthode de fallback si pas de texte stocké
+                const labelElement = this.querySelector('.ann-label');
+                let textContent = '';
+                
+                // Parcourir les nœuds enfants pour extraire seulement le texte (pas le label)
+                for (let node of this.childNodes) {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        textContent += node.textContent;
+                    } else if (node !== labelElement && node.nodeType === Node.ELEMENT_NODE) {
+                        textContent += node.textContent;
+                    }
+                }
+                
+                const textNode = document.createTextNode(textContent);
+                this.parentNode.insertBefore(textNode, this);
+                this.parentNode.removeChild(this);
+            }
             
             // Supprimer l'annotation de la base de données
             deleteAnnotationFromDB(this.dataset.annotationId);
@@ -4523,7 +5175,10 @@ function annotateWithGroq() {
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+                mode: 'structured'
+            })
         })
         .then(response => response.json())
         .then(data => {
@@ -4543,9 +5198,17 @@ function annotateWithGroq() {
                 const mainContent = document.querySelector('.text-content-card');
                 mainContent.parentNode.insertBefore(successDiv, mainContent);
 
+                // Reload raw text annotations
                 setTimeout(() => {
                     loadAndRenderAnnotations();
-                }, 1500);
+                }, 500);
+                
+                // Apply to structured content
+                if (data.annotations && data.annotations.length > 0) {
+                    data.annotations.forEach(ann => {
+                        addAnnotationToStructuredContent(ann);
+                    });
+                }
 
             } else {
                 alert('Erreur: ' + data.error);
@@ -4562,10 +5225,8 @@ function annotateWithGroq() {
     }
 }
 
-// Delete annotation function
-function deleteAnnotation(annotationId) {
-    if (!confirm('Supprimer cette annotation ?')) return;
 
+function deleteAnnotation(annotationId) {
     fetch(`/annotation/${annotationId}/delete/`, {
         method: 'POST',
         headers: {

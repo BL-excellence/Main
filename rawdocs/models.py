@@ -426,6 +426,33 @@ class Annotation(models.Model):
     ]
     source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='ai')
 
+    mode = models.CharField(
+        max_length=20, 
+        choices=[('raw', 'Raw Text'), ('structured', 'Structured HTML')],
+        default='raw',
+        help_text="Annotation mode: raw text or structured HTML"
+    )
+    start_xpath = models.TextField(
+        blank=True, 
+        null=True,
+        help_text="XPath to start node for structured annotations"
+    )
+    end_xpath = models.TextField(
+        blank=True, 
+        null=True,
+        help_text="XPath to end node for structured annotations"
+    )
+    start_offset = models.IntegerField(
+        null=True, 
+        blank=True,
+        help_text="Character offset within start node"
+    )
+    end_offset = models.IntegerField(
+        null=True, 
+        blank=True,
+        help_text="Character offset within end node"
+    )
+    
     # Manual validation
     is_validated = models.BooleanField(default=False)
     validated_by = models.ForeignKey(

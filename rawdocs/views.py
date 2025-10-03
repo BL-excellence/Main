@@ -824,8 +824,8 @@ def annotate_document(request, doc_id):
     })
 
 
-@login_required(login_url='rawdocs:login')
-@user_passes_test(is_annotateur)
+@login_required
+@csrf_exempt
 def save_manual_annotation(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -835,27 +835,44 @@ def save_manual_annotation(request):
         page = get_object_or_404(DocumentPage, id=data['page_id'])
         atype = get_object_or_404(AnnotationType, id=data['type_id'])
 
+        # Get mode from request, default to 'raw'
+        mode = data.get('mode', 'raw')
+        
+        print(f"💾 Saving annotation with mode: {mode}")  # Debug log
+
         ann = Annotation.objects.create(
             page=page,
             annotation_type=atype,
-            start_pos=data['start_pos'],
-            end_pos=data['end_pos'],
+            start_pos=data.get('start_pos', 0),
+            end_pos=data.get('end_pos', 0),
             selected_text=data['selected_text'],
             confidence_score=100.0,
-            created_by=request.user
+            created_by=request.user,
+            source='manual',
+            mode=mode,  # THIS IS CRITICAL
+            start_xpath=data.get('start_xpath'),
+            end_xpath=data.get('end_xpath'),
+            start_offset=data.get('start_offset'),
+            end_offset=data.get('end_offset')
         )
 
         return JsonResponse({
             'success': True,
             'annotation_id': ann.id,
-            'message': 'Annotation sauvegardée'
+            'message': 'Annotation sauvegardée',
+            'mode': ann.mode,  # Return it to verify
+            'saved_data': {
+                'mode': mode,
+                'has_xpath': bool(data.get('start_xpath'))
+            }
         })
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JsonResponse({
             'error': str(e),
             'message': 'Erreur lors de la sauvegarde'
-        }, status=500)
-    
+        }, status=500)   
 
 @login_required
 def get_page_annotations(request, page_id):
@@ -874,8 +891,11 @@ def get_page_annotations(request, page_id):
                 'type_display': a.annotation_type.display_name,
                 'color': a.annotation_type.color,
                 'confidence': a.confidence_score,
-                'reasoning': a.ai_reasoning,
+                'reasoning': a.ai_reasoning or '',
                 'is_validated': getattr(a, 'is_validated', False),
+                'mode': getattr(a, 'mode', 'raw'),  # Add mode with fallback
+                'start_xpath': getattr(a, 'start_xpath', None),
+                'end_xpath': getattr(a, 'end_xpath', None),
             })
 
         return JsonResponse({
@@ -886,7 +906,8 @@ def get_page_annotations(request, page_id):
         })
         
     except Exception as e:
-        print(f"Error loading annotations: {e}")
+        import traceback
+        traceback.print_exc()
         return JsonResponse({
             'success': False,
             'error': str(e),
@@ -895,7 +916,7 @@ def get_page_annotations(request, page_id):
             'total_annotations': 0
         })
     
-
+    
 @login_required
 @csrf_exempt  
 def delete_annotation(request, annotation_id):
@@ -1081,27 +1102,22 @@ def ai_annotate_page_groq(request, page_id):
 
     try:
         page = get_object_or_404(DocumentPage, id=page_id)
-
-        # Clear existing annotations
         page.annotations.all().delete()
 
-        # Initialize RLHF annotator
-        groq_annotator = GroqAnnotator()
+        # Check requested mode
+        data = json.loads(request.body) if request.body else {}
+        requested_mode = data.get('mode', 'raw')
 
-        # Create page data for dynamic annotation
+        groq_annotator = GroqAnnotator()
         page_data = {
             'page_num': page.page_number,
             'text': page.cleaned_text,
             'char_count': len(page.cleaned_text)
         }
 
-        # Get annotations with dynamic schema
         annotations, schema = groq_annotator.annotate_page_with_groq(page_data)
-
-        # Store in session for feedback processing
         request.session[f'ai_annotations_{page_id}'] = annotations
 
-        # Save to DB
         saved_count = 0
         for ann_data in annotations:
             try:
@@ -1122,14 +1138,14 @@ def ai_annotate_page_groq(request, page_id):
                     selected_text=ann_data.get('text', ''),
                     confidence_score=ann_data.get('confidence', 0.8) * 100,
                     ai_reasoning=ann_data.get('reasoning', 'GROQ classification'),
-                    created_by=request.user
+                    created_by=request.user,
+                    mode=requested_mode  # ← FIX
                 )
                 saved_count += 1
             except Exception as e:
                 print(f"Error saving annotation: {e}")
                 continue
 
-        # Update page status
         if saved_count > 0:
             page.is_annotated = True
             page.annotated_at = datetime.now()
@@ -1140,7 +1156,8 @@ def ai_annotate_page_groq(request, page_id):
             'success': True,
             'annotations_created': saved_count,
             'message': f'{saved_count} annotations créées avec GROQ!',
-            'learning_enhanced': True
+            'learning_enhanced': True,
+            'mode': requested_mode
         })
 
     except Exception as e:
@@ -1148,7 +1165,8 @@ def ai_annotate_page_groq(request, page_id):
         return JsonResponse({
             'error': f'Erreur GROQ: {str(e)}'
         }, status=500)
-
+    
+    
 
 @login_required
 @csrf_exempt 
@@ -1158,19 +1176,18 @@ def ai_annotate_document_groq(request, doc_id):
         return JsonResponse({'error': 'POST required'}, status=405)
 
     try:
-        # Vérifier les permissions
         if not (is_annotateur(request.user) or is_expert(request.user)):
             return JsonResponse({'error': 'Permission denied'}, status=403)
 
-        # Récupérer le document
         document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
         
-        print(f"🔍 Démarrage annotation Groq document {doc_id}")
+        # CRITICAL: Check if mode was requested
+        data = json.loads(request.body) if request.body else {}
+        requested_mode = data.get('mode', 'raw')  # Default to 'raw' for backward compatibility
         
-        # Initialiser l'analyseur Groq
+        print(f"🔍 Démarrage annotation Groq document {doc_id} with mode: {requested_mode}")
+        
         groq_annotator = GroqAnnotator()
-        
-        # Analyser toutes les pages
         pages = document.pages.all().order_by('page_number')
         total_annotations = 0
         pages_annotated = 0
@@ -1178,22 +1195,17 @@ def ai_annotate_document_groq(request, doc_id):
         for page in pages:
             try:
                 print(f"📄 Annotation page {page.page_number}/{document.total_pages}")
-
-                # Effacer les annotations existantes
                 page.annotations.all().delete()
 
-                # Créer données pour annotation
                 page_data = {
                     'page_num': page.page_number,
                     'text': page.cleaned_text,
                     'char_count': len(page.cleaned_text)
                 }
 
-                # Obtenir les annotations pour cette page
                 annotations, schema = groq_annotator.annotate_page_with_groq(page_data)
-
-                # Sauvegarder les annotations
                 saved_count = 0
+                
                 for ann_data in annotations:
                     try:
                         ann_type, _ = AnnotationType.objects.get_or_create(
@@ -1205,7 +1217,8 @@ def ai_annotate_document_groq(request, doc_id):
                             }
                         )
 
-                        Annotation.objects.create(
+                        # CRITICAL FIX: Save with the requested mode
+                        annotation = Annotation.objects.create(
                             page=page,
                             annotation_type=ann_type,
                             start_pos=ann_data.get('start_pos', 0),
@@ -1213,14 +1226,15 @@ def ai_annotate_document_groq(request, doc_id):
                             selected_text=ann_data.get('text', ''),
                             confidence_score=ann_data.get('confidence', 0.8) * 100,
                             ai_reasoning=ann_data.get('reasoning', 'GROQ bulk annotation'),
-                            created_by=request.user
+                            created_by=request.user,
+                            mode=requested_mode  # ← FIX: Use requested mode instead of hardcoded 'raw'
                         )
                         saved_count += 1
+                        
                     except Exception as e:
                         print(f"❌ Erreur sauvegarde annotation page {page.page_number}: {e}")
                         continue
 
-                # Mettre à jour les statistiques
                 total_annotations += saved_count
                 if saved_count > 0:
                     pages_annotated += 1
@@ -1229,21 +1243,22 @@ def ai_annotate_document_groq(request, doc_id):
                     page.annotated_by = request.user
                     page.save()
 
-                # Pause pour éviter les limites d'API
                 time.sleep(2)
 
             except Exception as e:
                 print(f"❌ Erreur page {page.page_number}: {e}")
                 continue
 
-        print(f"✅ Annotation document terminée: {pages_annotated} pages, {total_annotations} annotations")
+        print(f"✅ Annotation document terminée: {pages_annotated} pages, {total_annotations} annotations with mode={requested_mode}")
 
         return JsonResponse({
             'success': True,
             'message': f'Document annoté avec succès! {pages_annotated} pages, {total_annotations} annotations.',
             'pages_annotated': pages_annotated,
             'total_annotations': total_annotations,
-            'total_pages': document.total_pages
+            'total_pages': document.total_pages,
+            'mode': requested_mode,  # Return the mode so frontend knows
+            'annotations': []  # Frontend will reload them
         })
 
     except Exception as e:
@@ -1251,6 +1266,7 @@ def ai_annotate_document_groq(request, doc_id):
         return JsonResponse({
             'error': f'Erreur lors de l\'annotation: {str(e)}'
         }, status=500)
+
 
 
 @login_required
@@ -1815,6 +1831,29 @@ def save_structured_edits(request, document_id):
         print(f"Error in save_structured_edits: {str(e)}")
         return JsonResponse({'success': False, 'error': f'Erreur serveur: {str(e)}'}, status=500)
 
+
+def manual_annotation_view(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        
+        annotation = Annotation.objects.create(
+            page_id=data['page_id'],
+            annotation_type_id=data['type_id'],
+            selected_text=data['selected_text'],
+            start_pos=data.get('start_pos', 0),
+            end_pos=data.get('end_pos', 0),
+            source='manual',
+            # NEW FIELDS:
+            mode=data.get('mode', 'raw'),
+            start_xpath=data.get('start_xpath'),
+            end_xpath=data.get('end_xpath'),
+            start_offset=data.get('start_offset'),
+            end_offset=data.get('end_offset')
+        )
+        
+        return JsonResponse({'success': True, 'annotation_id': annotation.id})
+    
+    
         
 @login_required
 def document_detail(request, document_id):
