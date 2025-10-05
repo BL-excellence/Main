@@ -126,7 +126,8 @@
                 background: rgba(0,0,0,0.6);
                 color: #fff;
                 white-space: nowrap;
-                display: none;
+                display: inline;   // ← label visible en permanence
+                opacity: 1;
             `;
             label.textContent = type;
             span.appendChild(label);
@@ -3932,7 +3933,7 @@ function loadAndRenderAnnotations() {
             
             if (data.success && data.annotations && data.annotations.length > 0) {
                 // FILTER: Only process raw text annotations
-                const rawAnnotations = data.annotations.filter(ann => ann.mode === 'raw' || !ann.mode);
+                const rawAnnotations = data.annotations.filter(ann =>['raw', 'structured', null, undefined].includes(ann.mode));
                 
                 console.log(`✅ Found ${rawAnnotations.length} RAW annotations (${data.annotations.length} total)`);
                 
@@ -3998,18 +3999,7 @@ function renderInlineAnnotations(originalText, annotations) {
         if (startIndex !== -1) {
             const actualText = workingText.slice(startIndex, startIndex + searchText.length);
             
-            const annotationHtml = `<span class="inline-annotation" 
-                                          data-annotation-id="${ann.id}" 
-                                          data-original-text="${actualText.replace(/"/g, '&quot;')}"
-                                          style="background-color: ${ann.color}20; 
-                                                 color: inherit;
-                                                 padding: 1px 3px; 
-                                                 margin: 0 1px; 
-                                                 border-radius: 3px; 
-                                                 cursor: pointer;">
-                                     ${actualText}
-                                     <span class="ann-label" style="display: none;">${ann.type_display}</span>
-                                   </span>`;
+            const annotationHtml = `<span class="inline-annotation" data-annotation-id="${ann.id}" data-original-text="${actualText.replace(/"/g, '&quot;')}" style="background-color: ${ann.color}20; color: inherit; padding: 1px 3px; margin: 0 1px; border-radius: 3px; cursor: pointer;">${actualText}<span class="ann-label" style="display: none;">${ann.type_display}</span></span>`;
             
             workingText = workingText.slice(0, startIndex) + annotationHtml + workingText.slice(startIndex + searchText.length);
             
