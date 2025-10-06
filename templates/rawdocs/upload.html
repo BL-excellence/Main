@@ -668,16 +668,90 @@
     }
   }
 
+  /* Drag and Drop Zone */
+  .drop-zone {
+    border: 2px dashed rgba(14,165,233,0.3);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    background: rgba(255,255,255,0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    backdrop-filter: blur(10px);
+    margin-bottom: 1rem;
+  }
+
+  .drop-zone:hover {
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(14,165,233,0.12);
+  }
+
+  .drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(16, 185, 129, 0.1);
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+  }
+
+  .drop-zone .drop-icon {
+    font-size: 3rem;
+    color: var(--accent-light);
+    margin-bottom: 1rem;
+    transition: transform 0.3s ease;
+  }
+
+  .drop-zone:hover .drop-icon {
+    transform: scale(1.1);
+  }
+
+  .drop-zone .drop-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .drop-zone .drop-subtext {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+
+  .drop-zone .file-info {
+    display: none;
+    font-size: 0.9rem;
+    color: var(--success-green);
+    font-weight: 600;
+  }
+
+  .drop-zone.has-file .file-info {
+    display: block;
+  }
+
+  .drop-zone.has-file .drop-icon,
+  .drop-zone.has-file .drop-text,
+  .drop-zone.has-file .drop-subtext {
+    display: none;
+  }
+
   @media (max-width: 500px) {
-    .upload-title, .card-title { 
-      font-size: 1rem; 
+    .upload-title, .card-title {
+      font-size: 1rem;
     }
-    .btn, .btn-primary { 
-      font-size: 0.93rem; 
-      padding: 0.67rem 1.1rem; 
+    .btn, .btn-primary {
+      font-size: 0.93rem;
+      padding: 0.67rem 1.1rem;
     }
-    .form-group { 
-      margin-bottom: 0.6rem; 
+    .form-group {
+      margin-bottom: 0.6rem;
+    }
+    .drop-zone {
+      padding: 1.5rem 1rem;
+    }
+    .drop-zone .drop-icon {
+      font-size: 2.5rem;
     }
   }
 </style>
@@ -706,12 +780,18 @@
 
     <div class="form-group">
       <label for="pdf_file">Depuis un fichier local :</label>
+      <div class="drop-zone" id="dropZone">
+        <i class="fas fa-cloud-upload-alt drop-icon"></i>
+        <div class="drop-text">Glissez-déposez votre document PDF ici</div>
+        <div class="drop-subtext">ou cliquez pour sélectionner un fichier</div>
+        <div class="file-info" id="fileInfo"></div>
+      </div>
       <input
         type="file"
         name="pdf_file"
         id="pdf_file"
         accept="application/pdf"
-        class="form-input"
+        style="display: none;"
       />
     </div>
 
@@ -1589,6 +1669,80 @@ document.getElementById('validateButton')?.addEventListener('click', function() 
   `;
   document.body.appendChild(popup);
 });
+
+	// Drag and Drop functionality
+	const dropZone = document.getElementById('dropZone');
+	const fileInput = document.getElementById('pdf_file');
+	const fileInfo = document.getElementById('fileInfo');
+
+	// Prevent default drag behaviors
+	['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+	  dropZone.addEventListener(eventName, preventDefaults, false);
+	  document.body.addEventListener(eventName, preventDefaults, false);
+	});
+
+	// Highlight drop zone when item is dragged over it
+	['dragenter', 'dragover'].forEach(eventName => {
+	  dropZone.addEventListener(eventName, highlight, false);
+	});
+
+	['dragleave', 'drop'].forEach(eventName => {
+	  dropZone.addEventListener(eventName, unhighlight, false);
+	});
+
+	// Handle drop
+	dropZone.addEventListener('drop', handleDrop, false);
+
+	// Handle click to open file dialog
+	dropZone.addEventListener('click', () => {
+	  fileInput.click();
+	});
+
+	// Handle file selection via input
+	fileInput.addEventListener('change', handleFiles, false);
+
+	function preventDefaults(e) {
+	  e.preventDefault();
+	  e.stopPropagation();
+	}
+
+	function highlight(e) {
+	  dropZone.classList.add('dragover');
+	}
+
+	function unhighlight(e) {
+	  dropZone.classList.remove('dragover');
+	}
+
+	function handleDrop(e) {
+	  const dt = e.dataTransfer;
+	  const files = dt.files;
+	  handleFiles(files);
+	}
+
+	function handleFiles(files) {
+	  if (files instanceof FileList) {
+	    [...files].forEach(uploadFile);
+	  } else if (files.target && files.target.files) {
+	    [...files.target.files].forEach(uploadFile);
+	  }
+	}
+
+	function uploadFile(file) {
+	  if (file.type !== 'application/pdf') {
+	    alert('Veuillez sélectionner un fichier PDF uniquement.');
+	    return;
+	  }
+
+	  // Set the file to the input
+	  const dataTransfer = new DataTransfer();
+	  dataTransfer.items.add(file);
+	  fileInput.files = dataTransfer.files;
+
+	  // Update UI
+	  dropZone.classList.add('has-file');
+	  fileInfo.textContent = `Fichier sélectionné: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+	}
 
 console.log(`
 🚀 Raccourcis clavier disponibles:
