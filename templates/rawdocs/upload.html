@@ -309,6 +309,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    position: relative;
   }
 
   .structured-panel-header {
@@ -450,49 +451,67 @@
   /* Floating zoom controls */
   .floating-zoom-controls {
     position: absolute;
-    right: 16px;
-    bottom: 16px;
-    display: flex;
+    right: 18px;
+    bottom: 18px;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    gap: 6px;
+    padding: 7px 9px;
+    background: linear-gradient(135deg, rgba(59,130,246,0.45), rgba(14,165,233,0.35));
+    border: 1px solid rgba(255,255,255,0.22);
+    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
     border-radius: 12px;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(11px);
     z-index: 100;
+    color: rgba(255,255,255,0.85);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .floating-zoom-controls:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px rgba(30, 64, 175, 0.24);
+    background: linear-gradient(135deg, rgba(59,130,246,0.52), rgba(14,165,233,0.42));
+    border-color: rgba(255,255,255,0.28);
   }
 
   .floating-zoom-controls .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
-    background: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255,255,255,0.88);
     cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
   }
 
-  .floating-zoom-controls .btn:hover { 
-    background: #f9fafb; 
+  .floating-zoom-controls .btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px) scale(1.03);
   }
 
-  .floating-zoom-controls .divider { 
-    width: 1px; 
-    height: 20px; 
-    background: #e5e7eb; 
-    margin: 0 4px; 
+  .floating-zoom-controls .btn:active {
+    transform: scale(0.94);
   }
 
-  .floating-zoom-controls .zoom-label { 
-    min-width: 48px; 
-    text-align: center; 
-    font-variant-numeric: tabular-nums; 
-    color: #374151; 
-    font-size: 0.85rem; 
+  .floating-zoom-controls .divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255,255,255,0.3);
+    margin: 0 4px;
+  }
+
+  .floating-zoom-controls .zoom-label {
+    min-width: 40px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.015em;
+    color: rgba(255,255,255,0.82);
   }
 
   /* Zoom container */
@@ -1028,21 +1047,21 @@
               <pre style="white-space: pre-wrap; font-family: monospace; line-height: 1.5;">{{ extracted_text }}</pre>
             </div>
           {% endif %}
+        </div>
 
-          <!-- Floating Zoom Controls -->
-          <div class="floating-zoom-controls">
-            <button class="btn" type="button" id="zoomOutBtn" title="Zoom -">
-              <i class="fas fa-search-minus"></i>
-            </button>
-            <span class="zoom-label" id="zoomLabel">100%</span>
-            <button class="btn" type="button" id="zoomInBtn" title="Zoom +">
-              <i class="fas fa-search-plus"></i>
-            </button>
-            <div class="divider"></div>
-            <button class="btn" type="button" id="zoomResetBtn" title="Réinitialiser">
-              <i class="fas fa-compress"></i>
-            </button>
-          </div>
+        <!-- Floating Zoom Controls -->
+        <div class="floating-zoom-controls">
+          <button class="btn" type="button" id="zoomOutBtn" title="Zoom -">
+            <i class="fas fa-search-minus"></i>
+          </button>
+          <span class="zoom-label" id="zoomLabel">100%</span>
+          <button class="btn" type="button" id="zoomInBtn" title="Zoom +">
+            <i class="fas fa-search-plus"></i>
+          </button>
+          <div class="divider"></div>
+          <button class="btn" type="button" id="zoomResetBtn" title="Réinitialiser">
+            <i class="fas fa-compress"></i>
+          </button>
         </div>
       </div>
 
