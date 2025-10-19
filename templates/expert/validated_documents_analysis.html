@@ -1,0 +1,736 @@
+{#template expert/validated_documents_analysis.html#}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Analyse des Documents Validés - Expert{% endblock %}
+
+{% block extra_css %}
+<style>
+    .document-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+
+    .document-card:hover {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+
+    .document-validated {
+        border-left: 4px solid #28a745;
+    }
+
+    .document-expert-validated {
+        border-left: 4px solid #007bff;
+    }
+
+    .badge-validated {
+        background-color: #28a745;
+        color: white;
+    }
+
+    .badge-expert {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .relations-container {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        padding: 15px;
+        background-color: #f8f9fa;
+    }
+
+    .relation-item {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+
+    .relation-type {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 0.85em;
+        font-weight: 500;
+    }
+
+    .relation-type-contains { background-color: #d4edda; color: #155724; }
+    .relation-type-manufactured_by { background-color: #cce5ff; color: #004085; }
+    .relation-type-has_dosage { background-color: #fff3cd; color: #856404; }
+    .relation-type-used_for { background-color: #d1ecf1; color: #0c5460; }
+    .relation-type-contraindicated_with { background-color: #f8d7da; color: #721c24; }
+
+    .page-analysis {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .page-item-card {
+        background: white;
+        border: 1px solid #dee2e6;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+    }
+
+    .importance-score {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-weight: bold;
+    }
+
+    .score-high { background-color: #dc3545; color: white; }
+    .score-medium { background-color: #ffc107; color: #212529; }
+    .score-low { background-color: #6c757d; color: white; }
+
+    .loading-spinner {
+        display: none;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .entity-badge {
+        display: inline-block;
+        margin: 2px;
+        padding: 3px 8px;
+        background-color: #e9ecef;
+        border-radius: 3px;
+        font-size: 0.85em;
+    }
+
+    .obligation-item {
+        background-color: #fff3cd;
+        border: 1px solid #ffc107;
+        padding: 8px;
+        margin: 5px 0;
+        border-radius: 4px;
+    }
+
+    .tab-content {
+        padding: 20px;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-top: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-search-plus"></i> Analyse Sémantique des Documents Validés
+            </h1>
+
+            <!-- Filtres -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label>Type de document</label>
+                            <select id="filter-doc-type" class="form-control">
+                                <option value="">Tous</option>
+                                <option value="guide">Guide</option>
+                                <option value="rapport">Rapport</option>
+                                <option value="regulation">Réglementation</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label>Source</label>
+                            <select id="filter-source" class="form-control">
+                                <option value="">Toutes</option>
+                                <option value="EMA">EMA</option>
+                                <option value="FDA">FDA</option>
+                                <option value="ANSM">ANSM</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label>Statut</label>
+                            <select id="filter-status" class="form-control">
+                                <option value="">Tous</option>
+                                <option value="validated">Validé par métadonneur</option>
+                                <option value="expert_validated">Validé par expert</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label>&nbsp;</label>
+                            <button id="btn-refresh" class="btn btn-primary btn-block">
+                                <i class="fas fa-sync"></i> Actualiser
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Liste des documents -->
+            <div id="documents-container">
+                <div class="text-center p-5">
+                    <i class="fas fa-spinner fa-spin fa-3x text-primary"></i>
+                    <p class="mt-3">Chargement des documents validés...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour l'analyse page par page -->
+<div class="modal fade" id="pageAnalysisModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-alt"></i> Analyse Page par Page
+                </h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs pour navigation -->
+                <ul class="nav nav-tabs" id="analysisTabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="overview-tab" data-toggle="tab" href="#overview">
+                            Vue d'ensemble
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="pages-tab" data-toggle="tab" href="#pages">
+                            Pages individuelles
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="relations-tab" data-toggle="tab" href="#relations">
+                            Relations trouvées
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="entities-tab" data-toggle="tab" href="#entities">
+                            Entités détectées
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="analysisTabContent">
+                    <!-- Vue d'ensemble -->
+                    <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                        <div id="overview-content">
+                            <!-- Contenu dynamique -->
+                        </div>
+                    </div>
+
+                    <!-- Pages individuelles -->
+                    <div class="tab-pane fade" id="pages" role="tabpanel">
+                        <div id="pages-content">
+                            <!-- Contenu dynamique -->
+                        </div>
+                    </div>
+
+                    <!-- Relations -->
+                    <div class="tab-pane fade" id="relations" role="tabpanel">
+                        <div id="relations-content">
+                            <!-- Contenu dynamique -->
+                        </div>
+                    </div>
+
+                    <!-- Entités -->
+                    <div class="tab-pane fade" id="entities" role="tabpanel">
+                        <div id="entities-content">
+                            <!-- Contenu dynamique -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-success" id="btn-export-analysis">
+                    <i class="fas fa-download"></i> Exporter l'analyse
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Variables globales
+let allDocuments = [];
+let currentDocument = null;
+let currentAnalysis = null;
+
+// Fonction pour charger les documents validés
+async function loadValidatedDocuments() {
+    try {
+        const response = await fetch('/expert/validated-documents/');
+        const data = await response.json();
+
+        if (data.success) {
+            allDocuments = data.documents;
+            displayDocuments(allDocuments);
+        } else {
+            showError('Erreur lors du chargement des documents');
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        showError('Erreur de connexion');
+    }
+}
+
+// Fonction pour afficher les documents
+function displayDocuments(documents) {
+    const container = document.getElementById('documents-container');
+
+    if (documents.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> Aucun document validé trouvé
+            </div>
+        `;
+        return;
+    }
+
+    let html = '<div class="row">';
+
+    documents.forEach(doc => {
+        const validationBadge = doc.is_expert_validated
+            ? '<span class="badge badge-expert">Validé Expert</span>'
+            : '<span class="badge badge-validated">Validé Métadonneur</span>';
+
+        const analysisStatus = doc.pages_analyzed > 0
+            ? `<span class="badge badge-info">${doc.pages_analyzed}/${doc.total_pages} pages analysées</span>`
+            : '<span class="badge badge-warning">Non analysé</span>';
+
+        html += `
+            <div class="col-md-6 col-lg-4">
+                <div class="document-card ${doc.is_expert_validated ? 'document-expert-validated' : 'document-validated'}">
+                    <h5>${doc.title || 'Document #' + doc.id}</h5>
+                    <div class="mb-2">
+                        ${validationBadge}
+                        ${analysisStatus}
+                    </div>
+                    <p class="small text-muted mb-2">
+                        <strong>Type:</strong> ${doc.doc_type || 'N/A'}<br>
+                        <strong>Source:</strong> ${doc.source || 'N/A'}<br>
+                        <strong>Pays:</strong> ${doc.country || 'N/A'}<br>
+                        <strong>Pages:</strong> ${doc.total_pages}
+                    </p>
+                    ${doc.summary ? `<p class="small">${doc.summary}</p>` : ''}
+                    <div class="btn-group btn-group-sm w-100" role="group">
+                        <button class="btn btn-primary" onclick="analyzeDocument(${doc.id})">
+                            <i class="fas fa-robot"></i> Analyser
+                        </button>
+                        <button class="btn btn-info" onclick="viewAnalysis(${doc.id})"
+                                ${doc.pages_analyzed === 0 ? 'disabled' : ''}>
+                            <i class="fas fa-eye"></i> Voir
+                        </button>
+                        <button class="btn btn-success" onclick="openSemanticJson(${doc.id})">
+                            <i class="fas fa-code"></i> JSON
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Fonction pour analyser un document
+async function analyzeDocument(docId) {
+    if (!confirm('Voulez-vous lancer l\'analyse page par page de ce document ?')) {
+        return;
+    }
+
+    currentDocument = allDocuments.find(d => d.id === docId);
+
+    // Afficher le modal avec spinner
+    $('#pageAnalysisModal').modal('show');
+    document.getElementById('overview-content').innerHTML = `
+        <div class="text-center p-5">
+            <i class="fas fa-spinner fa-spin fa-3x text-primary"></i>
+            <p class="mt-3">Analyse en cours... Cela peut prendre quelques minutes.</p>
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`/expert/document/${docId}/analyze-pages-relations/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                force_reanalyze: false
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            currentAnalysis = data;
+            displayAnalysisResults(data);
+            showSuccess(`Analyse terminée: ${data.total_relations} relations trouvées`);
+
+            // Recharger la liste des documents
+            await loadValidatedDocuments();
+        } else {
+            showError(data.error || 'Erreur lors de l\'analyse');
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        showError('Erreur de connexion');
+    }
+}
+
+// Fonction pour voir l'analyse existante
+async function viewAnalysis(docId) {
+    currentDocument = allDocuments.find(d => d.id === docId);
+
+    $('#pageAnalysisModal').modal('show');
+
+    try {
+        const response = await fetch(`/expert/document/${docId}/get-page-relations/`);
+        const data = await response.json();
+
+        if (data.success) {
+            currentAnalysis = data;
+            displayExistingAnalysis(data);
+        } else {
+            showError(data.error || 'Erreur lors du chargement');
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        showError('Erreur de connexion');
+    }
+}
+
+// Fonction pour afficher les résultats d'analyse
+function displayAnalysisResults(data) {
+    // Vue d'ensemble
+    let overviewHtml = `
+        <h4>Résultats de l'analyse</h4>
+        <div class="row mt-3">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-primary">${data.pages_analyzed}</h3>
+                        <p class="mb-0">Pages analysées</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-success">${data.total_relations}</h3>
+                        <p class="mb-0">Relations trouvées</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-info">${countEntities(data.pages_data)}</h3>
+                        <p class="mb-0">Entités détectées</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-warning">${countObligations(data.pages_data)}</h3>
+                        <p class="mb-0">Obligations</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('overview-content').innerHTML = overviewHtml;
+
+    // Pages individuelles
+    displayPagesAnalysis(data.pages_data);
+
+    // Relations
+    displayRelations(data.pages_data);
+
+    // Entités
+    displayEntities(data.pages_data);
+}
+
+// Fonction pour afficher l'analyse page par page
+function displayPagesAnalysis(pagesData) {
+    let html = '<div class="accordion" id="pagesAccordion">';
+
+    pagesData.forEach((page, index) => {
+        const scoreClass = page.importance_score > 70 ? 'score-high' :
+                          page.importance_score > 30 ? 'score-medium' : 'score-low';
+
+        html += `
+            <div class="card">
+                <div class="card-header" id="heading${index}">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link" type="button" data-toggle="collapse"
+                                data-target="#collapse${index}">
+                            Page ${page.page_number}
+                            <span class="importance-score ${scoreClass}">
+                                Score: ${page.importance_score || 0}
+                            </span>
+                            ${page.newly_analyzed ? '<span class="badge badge-success ml-2">Nouvelle</span>' : ''}
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapse${index}" class="collapse" data-parent="#pagesAccordion">
+                    <div class="card-body">
+                        ${page.summary ? `<p><strong>Résumé:</strong> ${page.summary}</p>` : ''}
+
+                        ${page.relations && page.relations.length > 0 ? `
+                            <h6>Relations (${page.relations.length})</h6>
+                            <div class="relations-container">
+                                ${page.relations.map(rel => `
+                                    <div class="relation-item">
+                                        <span class="relation-type relation-type-${rel.type}">
+                                            ${rel.type}
+                                        </span>
+                                        <strong>${rel.source.value}</strong> → <strong>${rel.target.value}</strong>
+                                        ${rel.description ? `<br><small>${rel.description}</small>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+
+                        ${page.obligations && page.obligations.length > 0 ? `
+                            <h6 class="mt-3">Obligations (${page.obligations.length})</h6>
+                            ${page.obligations.map(ob => `
+                                <div class="obligation-item">
+                                    ${ob.description}
+                                    ${ob.deadline ? `<br><small>Délai: ${ob.deadline}</small>` : ''}
+                                    ${ob.authority ? `<br><small>Autorité: ${ob.authority}</small>` : ''}
+                                </div>
+                            `).join('')}
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    document.getElementById('pages-content').innerHTML = html;
+}
+
+// Fonction pour afficher toutes les relations
+function displayRelations(pagesData) {
+    const allRelations = [];
+    pagesData.forEach(page => {
+        if (page.relations) {
+            page.relations.forEach(rel => {
+                allRelations.push({...rel, page_number: page.page_number});
+            });
+        }
+    });
+
+    // Grouper par type de relation
+    const groupedRelations = {};
+    allRelations.forEach(rel => {
+        if (!groupedRelations[rel.type]) {
+            groupedRelations[rel.type] = [];
+        }
+        groupedRelations[rel.type].push(rel);
+    });
+
+    let html = '<div class="relations-summary">';
+
+    Object.entries(groupedRelations).forEach(([type, relations]) => {
+        html += `
+            <h5 class="mt-3">
+                <span class="relation-type relation-type-${type}">${type}</span>
+                <span class="badge badge-secondary ml-2">${relations.length}</span>
+            </h5>
+            <div class="relations-list">
+                ${relations.map(rel => `
+                    <div class="relation-item">
+                        <strong>${rel.source.value}</strong> → <strong>${rel.target.value}</strong>
+                        <span class="badge badge-light ml-2">Page ${rel.page_number}</span>
+                        ${rel.description ? `<br><small class="text-muted">${rel.description}</small>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    document.getElementById('relations-content').innerHTML = html;
+}
+
+// Fonction pour afficher les entités
+function displayEntities(pagesData) {
+    const allEntities = {};
+
+    pagesData.forEach(page => {
+        if (page.entities) {
+            Object.entries(page.entities).forEach(([type, entities]) => {
+                if (!allEntities[type]) {
+                    allEntities[type] = new Set();
+                }
+                if (Array.isArray(entities)) {
+                    entities.forEach(entity => allEntities[type].add(entity));
+                }
+            });
+        }
+    });
+
+    let html = '<div class="entities-summary">';
+
+    Object.entries(allEntities).forEach(([type, entities]) => {
+        const entitiesArray = Array.from(entities);
+        if (entitiesArray.length > 0) {
+            html += `
+                <h5 class="mt-3">${type} <span class="badge badge-secondary">${entitiesArray.length}</span></h5>
+                <div class="entity-list">
+                    ${entitiesArray.map(entity => `
+                        <span class="entity-badge">${entity}</span>
+                    `).join('')}
+                </div>
+            `;
+        }
+    });
+
+    html += '</div>';
+    document.getElementById('entities-content').innerHTML = html;
+}
+
+// Fonction pour ouvrir le JSON sémantique
+function openSemanticJson(docId) {
+    window.open(`/expert/semantic-json/${docId}/`, '_blank');
+}
+
+// Fonctions utilitaires
+function countEntities(pagesData) {
+    const entities = new Set();
+    pagesData.forEach(page => {
+        if (page.entities) {
+            Object.values(page.entities).forEach(entityList => {
+                if (Array.isArray(entityList)) {
+                    entityList.forEach(entity => entities.add(entity));
+                }
+            });
+        }
+    });
+    return entities.size;
+}
+
+function countObligations(pagesData) {
+    let count = 0;
+    pagesData.forEach(page => {
+        if (page.obligations) {
+            count += page.obligations.length;
+        }
+    });
+    return count;
+}
+
+function displayExistingAnalysis(data) {
+    // Similaire à displayAnalysisResults mais avec les données existantes
+    displayAnalysisResults({
+        pages_analyzed: data.total_pages_analyzed,
+        total_relations: data.pages.reduce((acc, p) => acc + (p.relations?.length || 0), 0),
+        pages_data: data.pages
+    });
+}
+
+// Filtres
+document.getElementById('filter-doc-type').addEventListener('change', applyFilters);
+document.getElementById('filter-source').addEventListener('change', applyFilters);
+document.getElementById('filter-status').addEventListener('change', applyFilters);
+
+function applyFilters() {
+    const docType = document.getElementById('filter-doc-type').value;
+    const source = document.getElementById('filter-source').value;
+    const status = document.getElementById('filter-status').value;
+
+    let filtered = allDocuments;
+
+    if (docType) {
+        filtered = filtered.filter(d => d.doc_type === docType);
+    }
+
+    if (source) {
+        filtered = filtered.filter(d => d.source === source);
+    }
+
+    if (status === 'validated') {
+        filtered = filtered.filter(d => !d.is_expert_validated);
+    } else if (status === 'expert_validated') {
+        filtered = filtered.filter(d => d.is_expert_validated);
+    }
+
+    displayDocuments(filtered);
+}
+
+// Export
+document.getElementById('btn-export-analysis').addEventListener('click', function() {
+    if (!currentAnalysis) return;
+
+    const exportData = {
+        document: currentDocument,
+        analysis: currentAnalysis,
+        exported_at: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analysis_doc_${currentDocument.id}_${Date.now()}.json`;
+    a.click();
+});
+
+// Refresh
+document.getElementById('btn-refresh').addEventListener('click', loadValidatedDocuments);
+
+// Messages
+function showSuccess(message) {
+    // Implémenter selon votre système de notification
+    console.log('Success:', message);
+}
+
+function showError(message) {
+    // Implémenter selon votre système de notification
+    console.error('Error:', message);
+}
+
+// Fonction pour obtenir le CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    loadValidatedDocuments();
+});
+</script>
+{% endblock %}

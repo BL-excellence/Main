@@ -171,23 +171,23 @@ urlpatterns = [
         views.create_annotation_type,
         name='create_annotation_type'
     ),
-    path('delete-annotation-type/', 
-         views.delete_annotation_type, 
+    path('delete-annotation-type/',
+         views.delete_annotation_type,
          name='delete_annotation_type'
-    ),
-    
-    path('documents/<int:document_id>/view-original/', 
-         views.view_original_document, 
+         ),
+
+    path('documents/<int:document_id>/view-original/',
+         views.view_original_document,
          name='view_original_document'
-    ),
-    
+         ),
+
     # Document detail view
     path(
         'documents/<int:document_id>/',
         views.document_detail,
         name='document_detail'
     ),
-    
+
     # ——— URL Contenu structuré ——————————————————
     path(
         'documents/<int:document_id>/structured/',
@@ -300,7 +300,7 @@ urlpatterns = [
         name='get_annotation_details'
     ),
     path('learning/metadata-dashboard/', views.metadata_learning_dashboard, name='metadata_learning_dashboard'),
-    
+
     # URLs Développement Métier
     path(
         'dev-metier/',
@@ -315,17 +315,20 @@ urlpatterns = [
     ),
     path('clear_page_annotations/<int:page_id>/', views.clear_page_annotations, name='clear_page_annotations'),
 
-    path('dev-metier/documents/<int:doc_id>/save-json/', views.save_document_json_devmetier, name='save_document_json_devmetier'),
-    
-        # API pour la suggestion d'annotations avec Mistral
-    path('api/mistral/suggest_annotations/<int:page_id>/', views.mistral_suggest_annotations, name='mistral_suggest_annotations'),
-    
+    path('dev-metier/documents/<int:doc_id>/save-json/', views.save_document_json_devmetier,
+         name='save_document_json_devmetier'),
+
+    # API pour la suggestion d'annotations avec Mistral
+    path('api/mistral/suggest_annotations/<int:page_id>/', views.mistral_suggest_annotations,
+         name='mistral_suggest_annotations'),
+
     # API pour l'analyse du document avec Mistral (types d'entités dynamiques)
-    path('api/mistral/analyze_document/<int:document_id>/', views.mistral_analyze_document, name='mistral_analyze_document'),
+    path('api/mistral/analyze_document/<int:document_id>/', views.mistral_analyze_document,
+         name='mistral_analyze_document'),
 
     # Page de test pour Mistral Annotation (temporaire pour débogage)
     path('test_mistral/', views.test_mistral_page, name='test_mistral'),
-    
+
     # API pour l'analyse directe de texte avec Mistral (pour la page de test)
     path('api/mistral/direct_analysis/', views.mistral_direct_analysis, name='mistral_direct_analysis'),
     path('save-edited-text/', views.save_edited_text, name='save_edited_text'),

@@ -1,58 +1,61 @@
 # rawdocs/views.py
-from django.utils import timezone  # AJOUT pour corriger le timezone warning
+# Replace / consolidate the top imports block with this
+from datetime import datetime, timezone as dt_timezone
 import time
-from .groq_annotation_system import GroqAnnotator
 import os
 import json
+import re
+
 import requests
-from datetime import datetime
+from pymongo import MongoClient
 from PyPDF2 import PdfReader
-from client.products.models import Product
+from bs4 import BeautifulSoup
+
+from collections import OrderedDict
+
+from django.conf import settings
+from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.files.base import ContentFile
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, views as auth_views
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User, Group
 from django.core.paginator import Paginator
 from django.db import transaction, models
 from django import forms
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth import views as auth_views
-from django.http import HttpResponse
-from django.views.decorators.http import require_POST
-from difflib import SequenceMatcher
-from .metadata_rlhf_learning import MetadataRLHFLearner
-from datetime import timezone as dt_timezone
-from django.conf import settings
-from pymongo import MongoClient
-from django.utils import timezone
-import re
-from bs4 import BeautifulSoup
-from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from django.views.decorators.http import require_POST, require_http_methods
+from django.urls import reverse
 
-from .models import (
-    RawDocument, MetadataLog,
-    DocumentPage, AnnotationType,
-    Annotation, AnnotationSession,
-    AILearningMetrics, AnnotationFeedback,
-    GlobalSummaryEditHistory
-)
+from difflib import SequenceMatcher
+
+from .groq_annotation_system import GroqAnnotator
+from .metadata_rlhf_learning import MetadataRLHFLearner
+from .rlhf_learning import RLHFGroqAnnotator
 from .utils import extract_metadonnees, extract_full_text
 from .annotation_utils import extract_pages_from_pdf
-from .rlhf_learning import RLHFGroqAnnotator
+from .regulatory_analyzer import RegulatoryAnalyzer
+from .models import (
+    RawDocument, MetadataLog, DocumentPage,
+    AnnotationType, Annotation, AnnotationSession,
+    AILearningMetrics, AnnotationFeedback,
+    GlobalSummaryEditHistory, DocumentRegulatoryAnalysis
+)
 
+import zipfile
+from io import BytesIO
 
 # --- Mongo client (réutilisé) ---
 try:
     _mongo_client = MongoClient(settings.MONGO_URI, serverSelectionTimeoutMS=5000)
-    _mongo_coll   = _mongo_client[settings.MONGO_DB][settings.MONGO_COLLECTION]
+    _mongo_coll = _mongo_client[settings.MONGO_DB][settings.MONGO_COLLECTION]
     print("✅ Mongo prêt :", settings.MONGO_URI, settings.MONGO_DB, settings.MONGO_COLLECTION)
 except Exception as e:
     _mongo_client = None
-    _mongo_coll   = None
+    _mongo_coll = None
     print("⚠️ Mongo init KO:", e)
 
 
@@ -75,8 +78,8 @@ class RegisterForm(UserCreationForm):
         ("Metadonneur", "Métadonneur"),
         ("Annotateur", "Annotateur"),
         ("Expert", "Expert"),
-        ("Client", "Client"), 
-        ("DevMetier",   "Dev métier"), 
+        ("Client", "Client"),
+        ("DevMetier", "Dev métier"),
     ], label="Profil")
 
     class Meta:
@@ -119,8 +122,9 @@ def is_annotateur(user):
 def is_expert(user):
     return user.groups.filter(name="Expert").exists()
 
-def is_dev_metier(user):                              
-    return user.groups.filter(name="DevMetier").exists()    
+
+def is_dev_metier(user):
+    return user.groups.filter(name="DevMetier").exists()
 
 
 # ——— Authentication ————————————————————————————————————
@@ -167,7 +171,7 @@ def register(request):
                 return redirect('expert:dashboard')  # Expert dashboard
             elif grp == "Client":
                 return redirect('/client/')  # Client dashboard
-            elif   grp == "DevMetier":   
+            elif grp == "DevMetier":
                 return redirect('rawdocs:dev_metier_dashboard')  # dev metier dashboard
             else:
                 return redirect('rawdocs:dashboard')  # Fallback
@@ -180,6 +184,7 @@ def register(request):
 
 from .models import UserProfile  # déjà importé
 
+
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_metadonneur)
 def dashboard_view(request):
@@ -188,30 +193,122 @@ def dashboard_view(request):
     if request.method == 'POST':
         planned_value = request.POST.get('planned_number')
         try:
-            profile.planned_documents = int(planned_value)
+            profile.planned_documents = int(planned_value or 0)
             profile.save()
             messages.success(request, "Nombre de documents planifiés mis à jour.")
         except (TypeError, ValueError):
             messages.error(request, "Valeur invalide pour le nombre planifié.")
+        except Exception as e:
+            # Probablement migration non appliquée (colonne manquante)
+            messages.error(
+                request,
+                "Impossible d'enregistrer le nombre planifié. Assurez-vous d'avoir exécuté les migrations (makemigrations/migrate)."
+            )
 
     docs = RawDocument.objects.filter(owner=request.user).order_by('-created_at')
     total_imported = docs.count()
     validated_count = docs.filter(is_validated=True).count()
     pending_validation_count = docs.filter(is_validated=False).count()
 
+    planned = getattr(profile, 'planned_documents', 0)
+
     context = {
         'documents': docs,
         'total_scrapped': total_imported,
-        'total_planned': profile.planned_documents,  # <-- Utiliser la valeur du profil
+        'total_planned': planned,  # <-- Utiliser la valeur du profil
         'total_completed': validated_count,
         'in_progress': pending_validation_count,
         'pending_validation_count': pending_validation_count,
         'total_imported': total_imported,
         'total_in_reextraction': total_imported,
         'pie_data': json.dumps([15, 8, 12, 5, 3]),
-        'bar_data': json.dumps([profile.planned_documents, total_imported, validated_count, pending_validation_count]),
+        'bar_data': json.dumps([planned, total_imported, validated_count, pending_validation_count]),
     }
     return render(request, 'rawdocs/dashboard.html', context)
+
+
+# Wrapper sécurisé pour extract_metadonnees qui garantit toujours un dict
+# et fusionne avec des valeurs par défaut
+
+def safe_extract_metadata(file_path, url=""):
+    """
+    Wrapper sécurisé pour extract_metadonnees qui garantit toujours un dict
+    """
+    try:
+        result = extract_metadonnees(file_path, url)
+
+        # Vérification stricte du type
+        if not isinstance(result, dict):
+            print(f"⚠️ ALERTE: extract_metadonnees a retourné un {type(result)}")
+            print(f"⚠️ Valeur reçue: {result}")
+            return {
+                'title': '',
+                'type': '',
+                'publication_date': '',
+                'version': '',
+                'source': '',
+                'context': '',
+                'country': '',
+                'language': 'en',
+                'url_source': url or '',
+                'quality': {
+                    'extraction_rate': 0,
+                    'field_scores': {},
+                    'extraction_reasoning': {},
+                    'extracted_fields': 0,
+                    'total_fields': 8,
+                    'llm_powered': False
+                }
+            }
+
+        # S'assurer que tous les champs requis existent
+        default_metadata = {
+            'title': '',
+            'type': '',
+            'publication_date': '',
+            'version': '',
+            'source': '',
+            'context': '',
+            'country': '',
+            'language': 'en',
+            'url_source': url or '',
+            'quality': {
+                'extraction_rate': 0,
+                'field_scores': {},
+                'extraction_reasoning': {},
+                'extracted_fields': 0,
+                'total_fields': 8,
+                'llm_powered': False
+            }
+        }
+
+        # Fusionner avec les valeurs par défaut
+        return {**default_metadata, **result}
+
+    except Exception as e:
+        print(f"❌ Exception dans safe_extract_metadata: {e}")
+        import traceback
+        traceback.print_exc()
+
+        return {
+            'title': '',
+            'type': '',
+            'publication_date': '',
+            'version': '',
+            'source': '',
+            'context': '',
+            'country': '',
+            'language': 'en',
+            'url_source': url or '',
+            'quality': {
+                'extraction_rate': 0,
+                'field_scores': {},
+                'extraction_reasoning': {},
+                'extracted_fields': 0,
+                'total_fields': 8,
+                'llm_powered': False
+            }
+        }
 
 
 @login_required(login_url='rawdocs:login')
@@ -225,7 +322,7 @@ def upload_pdf(request):
         doc_id = request.POST.get('doc_id')
         rd = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
         edit_form = MetadataEditForm(request.POST)
-        
+
         ai_metadata = rd.original_ai_metadata or {}
 
         if edit_form.is_valid():
@@ -233,7 +330,7 @@ def upload_pdf(request):
             changes_made = False
             field_mapping = {
                 'title': 'title',
-                'type': 'doc_type', 
+                'type': 'doc_type',
                 'publication_date': 'publication_date',
                 'version': 'version',
                 'source': 'source',
@@ -242,12 +339,12 @@ def upload_pdf(request):
                 'language': 'language',
                 'url_source': 'url_source'
             }
-            
+
             for form_field, model_field in field_mapping.items():
                 new_value = edit_form.cleaned_data.get(form_field, '') or ''
                 old_value = getattr(rd, model_field, '') or ''
                 human_metadata[form_field] = new_value
-                
+
                 if str(old_value) != str(new_value):
                     changes_made = True
                     MetadataLog.objects.create(
@@ -256,7 +353,7 @@ def upload_pdf(request):
                         modified_by=request.user
                     )
                     setattr(rd, model_field, new_value)
-            
+
             if changes_made:
                 rd.save()
                 from .metadata_rlhf_learning import MetadataRLHFLearner
@@ -282,7 +379,7 @@ def upload_pdf(request):
             else:
                 messages.info(request, "Aucune modification détectée.")
 
-        metadata = extract_metadonnees(rd.file.path, rd.url or "")
+        metadata = safe_extract_metadata(rd.file.path, rd.url or "")
         text = extract_full_text(rd.file.path)
 
         # Générer le HTML structuré et le sauvegarder dans RawDocument
@@ -292,7 +389,7 @@ def upload_pdf(request):
 
         initial_data = {
             'title': rd.title or '',
-            'type': rd.doc_type or '', 
+            'type': rd.doc_type or '',
             'publication_date': rd.publication_date or '',
             'version': rd.version or '',
             'source': rd.source or '',
@@ -302,7 +399,7 @@ def upload_pdf(request):
             'url_source': rd.url_source or (rd.url or ''),
         }
         edit_form = MetadataEditForm(initial=initial_data)
-        
+
         context.update({
             'doc': rd,
             'metadata': metadata,
@@ -311,79 +408,223 @@ def upload_pdf(request):
             'edit_form': edit_form,
             'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
         })
-        
+
         return render(request, 'rawdocs/upload.html', context)
 
     # Handle file upload
     elif request.method == 'POST' and form.is_valid():
         try:
-            # Priority to local file
-            if form.cleaned_data.get('pdf_file'):
-                f = form.cleaned_data['pdf_file']
-                rd = RawDocument(owner=request.user)
-                rd.file.save(f.name, f)
-            else:
-                url = form.cleaned_data['pdf_url']
+            uploaded_file = form.cleaned_data.get('pdf_file')
+            url = form.cleaned_data.get('pdf_url')
+
+            if url:
+                # Traitement URL (PDF unique)
                 resp = requests.get(url, timeout=30)
                 resp.raise_for_status()
                 ts = datetime.now().strftime('%Y%m%d_%H%M%S')
                 fn = os.path.basename(url) or 'document.pdf'
                 rd = RawDocument(url=url, owner=request.user)
                 rd.file.save(os.path.join(ts, fn), ContentFile(resp.content))
-
-            rd.save()
-            metadata = extract_metadonnees(rd.file.path, rd.url or "") or {}
-            text = extract_full_text(rd.file.path)
-
-            # Générer et sauvegarder le HTML structuré immédiatement
-            structured_html = generate_structured_html(rd, request.user)
-
-            # Save extracted metadata to the model
-            if metadata:
-                rd.original_ai_metadata = metadata
-                rd.title = metadata.get('title', '')
-                rd.doc_type = metadata.get('type', '')
-                rd.publication_date = metadata.get('publication_date', '')
-                rd.version = metadata.get('version', '')
-                rd.source = metadata.get('source', '')
-                rd.context = metadata.get('context', '')
-                rd.country = metadata.get('country', '')
-                rd.language = metadata.get('language', '')
-                rd.url_source = metadata.get('url_source', rd.url or '')
                 rd.save()
-                print(f"✅ Métadonnées LLM sauvegardées pour le document {rd.pk}")
 
-            # VALIDATION AUTOMATIQUE si bouton "Valider" cliqué
-            if 'validate' in request.POST:
-                # Valider le document avec extraction des pages
-                validate_document_with_pages(rd)
-                messages.success(request, 'Document validé avec succès.')
-                return redirect('rawdocs:document_list')
+                # Extraire métadonnées et texte
+                metadata = safe_extract_metadata(rd.file.path, rd.url or "")
+                text = extract_full_text(rd.file.path)
 
-            # Create form for editing
-            initial_data = {
-                'title': rd.title or '',
-                'type': rd.doc_type or '', 
-                'publication_date': rd.publication_date or '',
-                'version': rd.version or '',
-                'source': rd.source or '',
-                'context': rd.context or '',
-                'country': rd.country or '',
-                'language': rd.language or '',
-                'url_source': rd.url_source or (rd.url or ''),
-            }
-            edit_form = MetadataEditForm(initial=initial_data)
+                # Générer HTML structuré
+                structured_html = generate_structured_html(rd, request.user)
 
-            context.update({
-                'doc': rd,
-                'metadata': metadata,
-                'extracted_text': text,
-                'structured_html': structured_html,
-                'edit_form': edit_form,
-                'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
-            })
-            messages.success(request, "Document importé avec succès!")
+                # Save extracted metadata to the model
+                if metadata:
+                    rd.original_ai_metadata = metadata
+                    rd.title = metadata.get('title', '')
+                    rd.doc_type = metadata.get('type', '')
+                    rd.publication_date = metadata.get('publication_date', '')
+                    rd.version = metadata.get('version', '')
+                    rd.source = metadata.get('source', '')
+                    rd.context = metadata.get('context', '')
+                    rd.country = metadata.get('country', '')
+                    rd.language = metadata.get('language', '')
+                    rd.url_source = metadata.get('url_source', rd.url or '')
+                    rd.save()
+                    print(f"✅ Métadonnées LLM sauvegardées pour le document {rd.pk}")
 
+                # Validation automatique si demandée
+                if 'validate' in request.POST:
+                    validate_document_with_pages(rd)
+                    messages.success(request, 'Document validé avec succès.')
+                    return redirect('rawdocs:document_list')
+
+                # Create form for editing
+                initial_data = {
+                    'title': rd.title or '',
+                    'type': rd.doc_type or '',
+                    'publication_date': rd.publication_date or '',
+                    'version': rd.version or '',
+                    'source': rd.source or '',
+                    'context': rd.context or '',
+                    'country': rd.country or '',
+                    'language': rd.language or '',
+                    'url_source': rd.url_source or (rd.url or ''),
+                }
+                edit_form = MetadataEditForm(initial=initial_data)
+
+                context.update({
+                    'doc': rd,
+                    'metadata': metadata,
+                    'extracted_text': text,
+                    'structured_html': structured_html,
+                    'edit_form': edit_form,
+                    'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
+                })
+                messages.success(request, "Document importé avec succès depuis l'URL!")
+
+            elif uploaded_file:
+                # Vérifier si c'est un ZIP
+                if uploaded_file.name.lower().endswith('.zip'):
+                    # Traiter le ZIP
+                    processed_docs = []
+                    with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
+                        for file_info in zip_ref.infolist():
+                            if file_info.filename.lower().endswith('.pdf'):
+                                # Extraire le PDF en mémoire
+                                with zip_ref.open(file_info) as pdf_file:
+                                    pdf_content = pdf_file.read()
+                                    pdf_io = BytesIO(pdf_content)
+
+                                    # Créer un RawDocument pour ce PDF
+                                    rd = RawDocument(owner=request.user)
+                                    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+                                    fn = os.path.basename(file_info.filename)
+                                    rd.file.save(os.path.join(ts, fn), ContentFile(pdf_content))
+                                    rd.save()
+
+                                    # Extraire métadonnées et texte
+                                    metadata = safe_extract_metadata(rd.file.path, "")
+                                    text = extract_full_text(rd.file.path)
+                                    metadata['source'] = 'client'
+
+                                    # Générer HTML structuré
+                                    structured_html = generate_structured_html(rd, request.user)
+
+                                    # Sauvegarder les métadonnées dans le modèle
+                                    if metadata:
+                                        rd.original_ai_metadata = metadata
+                                        rd.title = metadata.get('title', '')
+                                        rd.doc_type = metadata.get('type', '')
+                                        rd.publication_date = metadata.get('publication_date', '')
+                                        rd.version = metadata.get('version', '')
+                                        rd.source = metadata.get('source', '')
+                                        rd.context = metadata.get('context', '')
+                                        rd.country = metadata.get('country', '')
+                                        rd.language = metadata.get('language', '')
+                                        rd.url_source = metadata.get('url_source', '')
+                                        rd.save()
+
+                                    # Validation si demandée
+                                    if 'validate' in request.POST:
+                                        validate_document_with_pages(rd)
+
+                                    # Ajouter les données pour l'affichage
+                                    initial_data = {
+                                        'title': rd.title or '',
+                                        'type': rd.doc_type or '',
+                                        'publication_date': rd.publication_date or '',
+                                        'version': rd.version or '',
+                                        'source': rd.source or '',
+                                        'context': rd.context or '',
+                                        'country': rd.country or '',
+                                        'language': rd.language or '',
+                                        'url_source': rd.url_source or '',
+                                    }
+                                    edit_form = MetadataEditForm(initial=initial_data)
+
+                                    processed_docs.append({
+                                        'doc': rd,
+                                        'metadata': metadata,
+                                        'extracted_text': text,
+                                        'structured_html': structured_html,
+                                        'edit_form': edit_form,
+                                        'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
+                                    })
+                            else:
+                                print(f"Ignoré non-PDF dans ZIP: {file_info.filename}")
+
+                    if processed_docs:
+                        messages.success(request, f"{len(processed_docs)} PDFs importés et traités depuis le ZIP!")
+                        # Mettre à jour le contexte pour afficher tous les documents extraits
+                        context.update({
+                            'processed_docs': processed_docs,  # Liste des documents pour affichage
+                            'is_zip_upload': True  # Indicateur pour le template
+                        })
+                        return render(request, 'rawdocs/upload.html', context)
+                    else:
+                        messages.error(request, "Aucun PDF valide trouvé dans le ZIP.")
+
+                else:
+                    # Traitement PDF unique
+                    rd = RawDocument(owner=request.user)
+                    rd.file.save(uploaded_file.name, uploaded_file)
+                    rd.save()
+
+                    # Extraire métadonnées et texte
+                    metadata = safe_extract_metadata(rd.file.path, "")
+                    text = extract_full_text(rd.file.path)
+                    metadata['source'] = 'client'
+
+                    # Générer HTML structuré
+                    structured_html = generate_structured_html(rd, request.user)
+
+                    # Save extracted metadata to the model
+                    if metadata:
+                        rd.original_ai_metadata = metadata
+                        rd.title = metadata.get('title', '')
+                        rd.doc_type = metadata.get('type', '')
+                        rd.publication_date = metadata.get('publication_date', '')
+                        rd.version = metadata.get('version', '')
+                        rd.source = metadata.get('source', '')
+                        rd.context = metadata.get('context', '')
+                        rd.country = metadata.get('country', '')
+                        rd.language = metadata.get('language', '')
+                        rd.url_source = metadata.get('url_source', '')
+                        rd.save()
+                        print(f"✅ Métadonnées LLM sauvegardées pour le document {rd.pk}")
+
+                    # Validation automatique si demandée
+                    if 'validate' in request.POST:
+                        validate_document_with_pages(rd)
+                        messages.success(request, 'Document validé avec succès.')
+                        return redirect('rawdocs:document_list')
+
+                    # Create form for editing
+                    initial_data = {
+                        'title': rd.title or '',
+                        'type': rd.doc_type or '',
+                        'publication_date': rd.publication_date or '',
+                        'version': rd.version or '',
+                        'source': rd.source or '',
+                        'context': rd.context or '',
+                        'country': rd.country or '',
+                        'language': rd.language or '',
+                        'url_source': rd.url_source or '',
+                    }
+                    edit_form = MetadataEditForm(initial=initial_data)
+
+                    context.update({
+                        'doc': rd,
+                        'metadata': metadata,
+                        'extracted_text': text,
+                        'structured_html': structured_html,
+                        'edit_form': edit_form,
+                        'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
+                    })
+                    messages.success(request, "Document PDF importé avec succès!")
+
+            else:
+                messages.error(request, "Aucun fichier ou URL fourni.")
+
+        except zipfile.BadZipFile:
+            messages.error(request, "Fichier ZIP corrompu ou invalide.")
         except Exception as e:
             messages.error(request, f"Erreur lors de l'import: {str(e)}")
 
@@ -396,16 +637,16 @@ def generate_structured_html(raw_document, user):
     try:
         from documents.models import Document as DocModel
         from documents.utils.document_processor import DocumentProcessor
-        
+
         ext = os.path.splitext(raw_document.file.name)[1].lower().lstrip('.')
         allowed = {'pdf', 'docx', 'doc', 'txt', 'html', 'xlsx', 'xls', 'rtf'}
         file_type = ext if ext in allowed else 'pdf'
-        
+
         doc = DocModel.objects.filter(
-            original_file=raw_document.file.name, 
+            original_file=raw_document.file.name,
             uploaded_by=raw_document.owner or user
         ).first()
-        
+
         if not doc:
             doc = DocModel(
                 title=raw_document.title or os.path.basename(raw_document.file.name),
@@ -415,21 +656,21 @@ def generate_structured_html(raw_document, user):
                 uploaded_by=raw_document.owner or user,
             )
             doc.save()
-        
+
         processor = DocumentProcessor(doc)
         processor.process_document()
         structured_html = doc.formatted_content or ''
-        
+
         # SAUVEGARDER dans RawDocument
         raw_document.structured_html = structured_html
         raw_document.structured_html_generated_at = timezone.now()
         raw_document.structured_html_method = 'document_processor'
         raw_document.structured_html_confidence = 0.0
         raw_document.save()
-        
+
         print(f"✅ HTML structuré généré et sauvé pour le document {raw_document.id}")
         return structured_html
-        
+
     except Exception as e:
         print(f"⚠️ Erreur génération HTML structuré: {e}")
         return ""
@@ -460,7 +701,7 @@ def validate_document_with_pages(document):
                 document.save()
 
                 print(f"✅ Document {document.id} validé avec {document.total_pages} pages")
-                
+
         except Exception as e:
             print(f"⚠️ Erreur extraction pages: {e}")
             raise e
@@ -469,6 +710,7 @@ def validate_document_with_pages(document):
         document.is_validated = True
         document.validated_at = timezone.now()
         document.save()
+
 
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_metadonneur)
@@ -483,7 +725,7 @@ def document_list(request):
 @user_passes_test(is_metadonneur)
 def document_metadata(request, doc_id):
     rd = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
-    return JsonResponse(extract_metadonnees(rd.file.path, rd.url or ""))
+    return JsonResponse(safe_extract_metadata(rd.file.path, rd.url or ""))
 
 
 @login_required(login_url='rawdocs:login')
@@ -500,14 +742,15 @@ def delete_document(request, doc_id):
 @user_passes_test(is_metadonneur)
 def edit_metadata(request, doc_id):
     rd = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
-    metadata = extract_metadonnees(rd.file.path, rd.url or "")
+    metadata = safe_extract_metadata(rd.file.path, rd.url or "")
 
     if request.method == 'POST':
-        form = MetadataEditForm(request.POST)        
+        form = MetadataEditForm(request.POST)
         if form.is_valid():
             # Handle standard fields (your existing code)
-            standard_fields = ['title', 'type', 'publication_date', 'version', 'source', 'context', 'country', 'language', 'url_source']
-            
+            standard_fields = ['title', 'type', 'publication_date', 'version', 'source', 'context', 'country',
+                               'language', 'url_source']
+
             for field_name in standard_fields:
                 if field_name in form.cleaned_data:
                     new_value = form.cleaned_data[field_name]
@@ -531,7 +774,7 @@ def edit_metadata(request, doc_id):
             rd.language = form.cleaned_data.get('language', rd.language) or ''
             rd.url_source = form.cleaned_data.get('url_source', rd.url_source) or (rd.url or '')
             rd.save()
-            
+
             from .models import CustomField, CustomFieldValue
             for key, value in request.POST.items():
                 if key.startswith('custom_'):
@@ -548,18 +791,17 @@ def edit_metadata(request, doc_id):
                             old_val = custom_value.value
                             custom_value.value = value
                             custom_value.save()
-                            
+
                             MetadataLog.objects.create(
-                                document=rd, 
+                                document=rd,
                                 field_name=f"Custom: {field_name}",
-                                old_value=old_val, 
+                                old_value=old_val,
                                 new_value=value,
                                 modified_by=request.user
                             )
                     except CustomField.DoesNotExist:
                         pass
-            
-            
+
             return redirect('rawdocs:document_list')
     else:
         initial_data = {
@@ -576,7 +818,7 @@ def edit_metadata(request, doc_id):
         form = MetadataEditForm(initial=initial_data)
 
     logs = MetadataLog.objects.filter(document=rd).order_by('-modified_at')
-    
+
     # Load existing custom fields fo this document ONLY
     from .models import CustomField, CustomFieldValue
     custom_fields_data = []
@@ -586,7 +828,7 @@ def edit_metadata(request, doc_id):
             'type': custom_value.field.field_type,
             'value': custom_value.value
         })
-    
+
     return render(request, 'rawdocs/edit_metadata.html', {
         'form': form,
         'metadata': metadata,
@@ -594,6 +836,7 @@ def edit_metadata(request, doc_id):
         'logs': logs,
         'custom_fields_data': custom_fields_data  # ADD THIS LINE
     })
+
 
 @login_required(login_url='rawdocs:login')
 @user_passes_test(is_metadonneur)
@@ -605,7 +848,7 @@ def reextract_metadata(request, doc_id):
     rd = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
 
     try:
-        new_metadata = extract_metadonnees(rd.file.path, rd.url or "") or {}
+        new_metadata = safe_extract_metadata(rd.file.path, rd.url or "")
 
         # mapping: modèle -> clé metadata
         mapping = {
@@ -657,16 +900,16 @@ def validate_document(request, doc_id):
             try:
                 from documents.models import Document as DocModel
                 from documents.utils.document_processor import DocumentProcessor
-                
+
                 ext = os.path.splitext(document.file.name)[1].lower().lstrip('.')
                 allowed = {'pdf', 'docx', 'doc', 'txt', 'html', 'xlsx', 'xls', 'rtf'}
                 file_type = ext if ext in allowed else 'pdf'
-                
+
                 doc = DocModel.objects.filter(
-                    original_file=document.file.name, 
+                    original_file=document.file.name,
                     uploaded_by=document.owner or request.user
                 ).first()
-                
+
                 if not doc:
                     doc = DocModel(
                         title=document.title or os.path.basename(document.file.name),
@@ -676,19 +919,19 @@ def validate_document(request, doc_id):
                         uploaded_by=document.owner or request.user,
                     )
                     doc.save()
-                
+
                 processor = DocumentProcessor(doc)
                 processor.process_document()
-                
+
                 # Sauvegarder le HTML structuré
                 document.structured_html = doc.formatted_content or ''
                 document.structured_html_generated_at = timezone.now()
                 document.structured_html_method = 'document_processor'
                 document.structured_html_confidence = 0.0
                 document.save()
-                
+
                 print(f"✅ HTML structuré généré lors de la validation du document {doc_id}")
-                
+
             except Exception as e:
                 print(f"⚠️ Erreur génération HTML lors de validation: {e}")
                 messages.warning(request, f"Avertissement: Contenu structuré non généré: {str(e)}")
@@ -717,12 +960,13 @@ def validate_document(request, doc_id):
                     messages.success(request, f"Document validé ({document.total_pages} pages)")
                     create_product_from_metadata(document)
                     return redirect('rawdocs:document_list')
-                    
+
             except Exception as e:
                 messages.error(request, f"Erreur lors de l'extraction: {str(e)}")
                 return redirect('rawdocs:document_list')
 
     return render(request, 'rawdocs/validate_document.html', {'document': document})
+
 
 # ——— Annotateur Views ——————————————————————————————
 
@@ -788,31 +1032,47 @@ def annotation_dashboard(request):
     return render(request, 'rawdocs/annotation_dashboard.html', context)
 
 
-@login_required(login_url='rawdocs:login')
-@user_passes_test(is_annotateur)
 def annotate_document(request, doc_id):
+    """Vue d'annotation mise à jour avec analyse réglementaire"""
     document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
     pages = document.pages.all()
     pnum = int(request.GET.get('page', 1))
     page_obj = get_object_or_404(DocumentPage, document=document, page_number=pnum)
 
-    # Build contextual annotation types (reduced/dynamic)
-    used_type_ids = Annotation.objects.filter(page__document=document).values_list('annotation_type_id', flat=True).distinct()
-    context_text = " ".join([document.context or '', document.doc_type or '', document.source or '']).lower()
-    whitelist = set()
-    if any(k in context_text for k in ['pharma','pharmacie','medicament','drug','clinical','trial','essai']):
-        whitelist.update([AnnotationType.REQUIRED_DOCUMENT, AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.PROCEDURE_TYPE, AnnotationType.VARIATION_CODE, AnnotationType.REQUIRED_CONDITION, AnnotationType.FILE_TYPE])
-    elif any(k in context_text for k in ['regulatory','réglementaire','compliance']):
-        whitelist.update([AnnotationType.REQUIRED_DOCUMENT, AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.PROCEDURE_TYPE])
-    elif any(k in context_text for k in ['ema','europe','eu']):
-        whitelist.update([AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.PROCEDURE_TYPE, AnnotationType.REQUIRED_DOCUMENT])
-    elif any(k in context_text for k in ['fda','usa','united states']):
-        whitelist.update([AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.REQUIRED_DOCUMENT])
-    else:
-        whitelist.update([AnnotationType.REQUIRED_DOCUMENT, AnnotationType.AUTHORITY, AnnotationType.LEGAL_REFERENCE, AnnotationType.DELAY, AnnotationType.PROCEDURE_TYPE])
+    # Statistiques d'analyse réglementaire
+    regulatory_stats = {
+        'total_pages': document.total_pages,
+        'analyzed_pages': pages.filter(is_regulatory_analyzed=True).count(),
+        'high_importance_pages': pages.filter(regulatory_importance_score__gte=70).count(),
+    }
+    regulatory_stats['completion_percentage'] = int(
+        (regulatory_stats['analyzed_pages'] / regulatory_stats['total_pages'] * 100)) if regulatory_stats[
+                                                                                             'total_pages'] > 0 else 0
 
-    # Show all types so newly created custom types are available immediately
-    annotation_types = AnnotationType.objects.all().order_by('display_name')
+    # Analyse globale du document
+    try:
+        global_analysis = document.regulatory_analysis
+    except DocumentRegulatoryAnalysis.DoesNotExist:
+        global_analysis = None
+
+    # Build reduced, default annotation types + include types already used in this document
+    used_type_ids = Annotation.objects.filter(page__document=document).values_list('annotation_type_id', flat=True).distinct()
+
+    # Default whitelist (keywords-independent)
+    whitelist = {
+        AnnotationType.REQUIRED_DOCUMENT,
+        AnnotationType.AUTHORITY,
+        AnnotationType.LEGAL_REFERENCE,
+        AnnotationType.DELAY,
+        AnnotationType.PROCEDURE_TYPE,
+        AnnotationType.VARIATION_CODE,
+        AnnotationType.REQUIRED_CONDITION,
+        AnnotationType.FILE_TYPE,
+    }
+
+    base_qs = AnnotationType.objects.filter(name__in=list(whitelist))
+    used_qs = AnnotationType.objects.filter(id__in=used_type_ids)
+    annotation_types = (base_qs | used_qs).distinct().order_by('display_name')
 
     return render(request, 'rawdocs/annotate_document.html', {
         'document': document,
@@ -820,8 +1080,15 @@ def annotate_document(request, doc_id):
         'current_page': page_obj,
         'annotation_types': annotation_types,
         'existing_annotations': page_obj.annotations.all().order_by('start_pos'),
-        'total_pages': document.total_pages
+        'total_pages': document.total_pages,
+        # Nouvelles données pour l'analyse réglementaire
+        'regulatory_stats': regulatory_stats,
+        'global_analysis': global_analysis,
+        'page_analysis': page_obj.regulatory_analysis if page_obj.is_regulatory_analyzed else None,
+        'page_summary': page_obj.page_summary,
+        'page_importance_score': page_obj.regulatory_importance_score
     })
+
 
 
 @login_required
@@ -837,8 +1104,8 @@ def save_manual_annotation(request):
 
         # Get mode from request, default to 'raw'
         mode = data.get('mode', 'raw')
-        
-        print(f"💾 Saving annotation with mode: {mode}")  # Debug log
+        if mode not in ['raw', 'structured']:
+            mode = 'raw'
 
         ann = Annotation.objects.create(
             page=page,
@@ -849,7 +1116,7 @@ def save_manual_annotation(request):
             confidence_score=100.0,
             created_by=request.user,
             source='manual',
-            mode=mode,  # THIS IS CRITICAL
+            mode=mode,
             start_xpath=data.get('start_xpath'),
             end_xpath=data.get('end_xpath'),
             start_offset=data.get('start_offset'),
@@ -859,27 +1126,18 @@ def save_manual_annotation(request):
         return JsonResponse({
             'success': True,
             'annotation_id': ann.id,
-            'message': 'Annotation sauvegardée',
-            'mode': ann.mode,  # Return it to verify
-            'saved_data': {
-                'mode': mode,
-                'has_xpath': bool(data.get('start_xpath'))
-            }
+            'mode': ann.mode
         })
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({
-            'error': str(e),
-            'message': 'Erreur lors de la sauvegarde'
-        }, status=500)   
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 @login_required
 def get_page_annotations(request, page_id):
     try:
         page = get_object_or_404(DocumentPage, id=page_id)
         annotations = page.annotations.all().select_related('annotation_type').order_by('start_pos')
-        
+
         anns = []
         for a in annotations:
             anns.append({
@@ -893,7 +1151,7 @@ def get_page_annotations(request, page_id):
                 'confidence': a.confidence_score,
                 'reasoning': a.ai_reasoning or '',
                 'is_validated': getattr(a, 'is_validated', False),
-                'mode': getattr(a, 'mode', 'raw'),  # Add mode with fallback
+                'mode': getattr(a, 'mode', 'raw'),
                 'start_xpath': getattr(a, 'start_xpath', None),
                 'end_xpath': getattr(a, 'end_xpath', None),
             })
@@ -904,7 +1162,7 @@ def get_page_annotations(request, page_id):
             'page_text': page.cleaned_text,
             'total_annotations': len(anns)
         })
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -915,46 +1173,68 @@ def get_page_annotations(request, page_id):
             'page_text': '',
             'total_annotations': 0
         })
-    
-    
+
+
 @login_required
-@csrf_exempt  
+@csrf_exempt
 def delete_annotation(request, annotation_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
     try:
-        ann = get_object_or_404(Annotation, id=annotation_id)
-        
-        # Check permissions
-        if ann.created_by != request.user and not request.user.groups.filter(name="Expert").exists():
-            return JsonResponse({'error': 'Permission denied'}, status=403)
+        # Utiliser une transaction explicite pour s'assurer de la cohérence
+        from django.db import transaction
 
-        # Store page reference before deletion
-        page = ann.page
-        
-        # Delete the annotation
-        ann.delete()
-        
-        # Check if page still has annotations
-        remaining_annotations = page.annotations.count()
-        if remaining_annotations == 0:
-            page.is_annotated = False
-            page.save()
+        with transaction.atomic():
+            ann = get_object_or_404(Annotation, id=annotation_id)
+
+            # Check permissions
+            if ann.created_by != request.user and not request.user.groups.filter(name="Expert").exists():
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+
+            # Store page reference before deletion
+            page = ann.page
+            annotation_text = ann.selected_text[:50]  # For logging
+
+            # Log before deletion
+            print(f"🗑️ Deleting annotation {annotation_id}: '{annotation_text}' from page {page.id}")
+
+            # Delete the annotation
+            ann.delete()
+
+            # Force commit the transaction
+            transaction.on_commit(lambda: print(f"✅ Annotation {annotation_id} committed to database"))
+
+            # Check if page still has annotations
+            remaining_annotations = page.annotations.count()
+            print(f"📊 Remaining annotations on page {page.id}: {remaining_annotations}")
+
+            if remaining_annotations == 0:
+                page.is_annotated = False
+                page.save()
+                print(f"📄 Page {page.id} marked as not annotated")
 
         return JsonResponse({
             'success': True,
             'message': 'Annotation supprimée',
-            'remaining_annotations': remaining_annotations
+            'remaining_annotations': remaining_annotations,
+            'debug_info': {
+                'annotation_id': annotation_id,
+                'page_id': page.id,
+                'deleted_text': annotation_text,
+                'remaining_count': remaining_annotations
+            }
         })
-        
+
     except Exception as e:
-        print(f"Error deleting annotation: {e}")
+        print(f"❌ Error deleting annotation {annotation_id}: {e}")
+        import traceback
+        traceback.print_exc()
         return JsonResponse({
             'success': False,
             'error': str(e)
         }, status=500)
-    
+
 
 @login_required
 @csrf_exempt
@@ -1022,22 +1302,22 @@ def validate_page_annotations(request, page_id):
                 doc.save(update_fields=['is_ready_for_expert', 'expert_ready_at'])
         except Exception:
             pass
-        
+
         # Format score with enhanced details
         score_pct = int(feedback_result["feedback_score"] * 100)
         quality_label = "Excellente" if score_pct >= 85 else "Bonne" if score_pct >= 70 else "Moyenne" if score_pct >= 50 else "À améliorer"
-        
+
         # Get details from feedback result if available
         precision = feedback_result.get("precision", 0)
         recall = feedback_result.get("recall", 0)
-        
+
         # Build detailed message
         detailed_message = f'Page validée! Score: {score_pct}% ({quality_label}) - IA améliorée!'
-        
+
         # If we have precision and recall info, include it
         if precision and recall:
-            detailed_message = f'Page validée! Score: {score_pct}% ({quality_label}) - Précision: {int(precision*100)}%, Rappel: {int(recall*100)}% - IA améliorée!'
-            
+            detailed_message = f'Page validée! Score: {score_pct}% ({quality_label}) - Précision: {int(precision * 100)}%, Rappel: {int(recall * 100)}% - IA améliorée!'
+
         return JsonResponse({
             'success': True,
             'message': detailed_message,
@@ -1096,61 +1376,109 @@ def get_learning_dashboard(request):
 @login_required
 @csrf_exempt
 def ai_annotate_page_groq(request, page_id):
-    """AI annotation with GROQ and RLHF"""
+    """AI annotation with GROQ and RLHF for a single page.
+    - Expects POST.
+    - Optional JSON body: {"mode": "raw"|"structured"}
+    - Stores AI annotations in session key "ai_annotations_{page_id}" for later RLHF feedback processing.
+    """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
     try:
-        page = get_object_or_404(DocumentPage, id=page_id)
-        page.annotations.all().delete()
+        # Permissions: only annotators or experts
+        if not (is_annotateur(request.user) or is_expert(request.user)):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
 
-        # Check requested mode
-        data = json.loads(request.body) if request.body else {}
+        page = get_object_or_404(DocumentPage, id=page_id)
+
+        # Parse body for optional parameters
+        try:
+            data = json.loads(request.body.decode('utf-8')) if request.body else {}
+        except Exception:
+            data = {}
+
         requested_mode = data.get('mode', 'raw')
+        if requested_mode not in ['raw', 'structured']:
+            requested_mode = 'raw'
+
+        # Remove previous AI annotations on this page (we keep manual annotations if you prefer, adjust accordingly)
+        page.annotations.all().delete()
 
         groq_annotator = GroqAnnotator()
         page_data = {
             'page_num': page.page_number,
-            'text': page.cleaned_text,
-            'char_count': len(page.cleaned_text)
+            'text': page.cleaned_text or "",
+            'char_count': len(page.cleaned_text or "")
         }
 
         annotations, schema = groq_annotator.annotate_page_with_groq(page_data)
-        request.session[f'ai_annotations_{page_id}'] = annotations
+
+        # Persist session copy for RLHF feedback
+        try:
+            request.session[f'ai_annotations_{page_id}'] = annotations
+        except Exception:
+            # session might be not writable or too large; ignore silently
+            pass
 
         saved_count = 0
         for ann_data in annotations:
             try:
+                ann_type_name = ann_data.get('type', 'unknown').strip()
                 ann_type, _ = AnnotationType.objects.get_or_create(
-                    name=ann_data['type'],
+                    name=ann_type_name,
                     defaults={
-                        'display_name': ann_data['type'].replace('_', ' ').title(),
+                        'display_name': ann_type_name.replace('_', ' ').title(),
                         'color': '#3b82f6',
-                        'description': f"GROQ detected {ann_data['type']}"
+                        'description': f"GROQ detected {ann_type_name}"
                     }
                 )
+
+                # Sanitize fields to match model constraints
+                sel_text = (ann_data.get('text', '') or '')
+                if len(sel_text) > 500:
+                    sel_text = sel_text[:500]
+
+                start = ann_data.get('start_pos', 0) or 0
+                end = ann_data.get('end_pos', 0) or 0
+                try:
+                    start = int(start)
+                    end = int(end)
+                except Exception:
+                    start, end = 0, 0
+                if start < 0:
+                    start = 0
+                if end < start:
+                    end = start
+
+                conf = ann_data.get('confidence', 0.8)
+                try:
+                    conf = float(conf)
+                except Exception:
+                    conf = 0.8
+                # Store percentage to remain backward compatible with existing UI (0-100)
+                confidence_score = conf * 100 if conf <= 1.5 else conf
 
                 Annotation.objects.create(
                     page=page,
                     annotation_type=ann_type,
-                    start_pos=ann_data.get('start_pos', 0),
-                    end_pos=ann_data.get('end_pos', 0),
-                    selected_text=ann_data.get('text', ''),
-                    confidence_score=ann_data.get('confidence', 0.8) * 100,
+                    start_pos=start,
+                    end_pos=end,
+                    selected_text=sel_text,
+                    confidence_score=confidence_score,
                     ai_reasoning=ann_data.get('reasoning', 'GROQ classification'),
-                    created_by=request.user,
-                    mode=requested_mode  # ← FIX
+                    created_by=request.user
                 )
                 saved_count += 1
             except Exception as e:
-                print(f"Error saving annotation: {e}")
+                # log and continue with next annotation
+                print(f"Error saving annotation on page {page.id}: {e}")
                 continue
 
         if saved_count > 0:
             page.is_annotated = True
-            page.annotated_at = datetime.now()
+            page.annotated_at = timezone.now()
             page.annotated_by = request.user
-            page.save()
+            page.save(update_fields=['is_annotated', 'annotated_at', 'annotated_by'])
 
         return JsonResponse({
             'success': True,
@@ -1159,34 +1487,40 @@ def ai_annotate_page_groq(request, page_id):
             'learning_enhanced': True,
             'mode': requested_mode
         })
-
     except Exception as e:
-        print(f"GROQ annotation error: {e}")
-        return JsonResponse({
-            'error': f'Erreur GROQ: {str(e)}'
-        }, status=500)
-    
-    
+        print(f"GROQ annotation error (page {page_id}): {e}")
+        return JsonResponse({'error': f'Erreur GROQ: {str(e)}'}, status=500)
 
 @login_required
-@csrf_exempt 
+@csrf_exempt
 def ai_annotate_document_groq(request, doc_id):
-    """Annotation automatique d'un document complet avec Groq"""
+    """Annotation automatique d'un document complet avec Groq.
+    - Expects POST.
+    - Optional JSON body: {"mode": "raw"|"structured"}
+    - Iterates pages and annotates each page; returns counts.
+    """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
     try:
+        # Permissions: annotator or expert
         if not (is_annotateur(request.user) or is_expert(request.user)):
             return JsonResponse({'error': 'Permission denied'}, status=403)
 
         document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
-        
-        # CRITICAL: Check if mode was requested
-        data = json.loads(request.body) if request.body else {}
-        requested_mode = data.get('mode', 'raw')  # Default to 'raw' for backward compatibility
-        
+
+        # Parse optional params
+        try:
+            data = json.loads(request.body.decode('utf-8')) if request.body else {}
+        except Exception:
+            data = {}
+
+        requested_mode = data.get('mode', 'raw')
+        if requested_mode not in ['raw', 'structured']:
+            requested_mode = 'raw'
+
         print(f"🔍 Démarrage annotation Groq document {doc_id} with mode: {requested_mode}")
-        
+
         groq_annotator = GroqAnnotator()
         pages = document.pages.all().order_by('page_number')
         total_annotations = 0
@@ -1195,42 +1529,73 @@ def ai_annotate_document_groq(request, doc_id):
         for page in pages:
             try:
                 print(f"📄 Annotation page {page.page_number}/{document.total_pages}")
+
+                # Remove previous annotations for the page
                 page.annotations.all().delete()
 
                 page_data = {
                     'page_num': page.page_number,
-                    'text': page.cleaned_text,
-                    'char_count': len(page.cleaned_text)
+                    'text': page.cleaned_text or "",
+                    'char_count': len(page.cleaned_text or "")
                 }
 
                 annotations, schema = groq_annotator.annotate_page_with_groq(page_data)
+
+                # Optionally store per-page session info (for RLHF feedback)
+                try:
+                    request.session[f'ai_annotations_{page.id}'] = annotations
+                except Exception:
+                    pass
+
                 saved_count = 0
-                
                 for ann_data in annotations:
                     try:
+                        ann_type_name = ann_data.get('type', 'unknown').strip()
                         ann_type, _ = AnnotationType.objects.get_or_create(
-                            name=ann_data['type'],
+                            name=ann_type_name,
                             defaults={
-                                'display_name': ann_data['type'].replace('_', ' ').title(),
+                                'display_name': ann_type_name.replace('_', ' ').title(),
                                 'color': '#3b82f6',
-                                'description': f"GROQ detected {ann_data['type']}"
+                                'description': f"GROQ detected {ann_type_name}"
                             }
                         )
 
-                        # CRITICAL FIX: Save with the requested mode
-                        annotation = Annotation.objects.create(
+                        # Sanitize fields to match model constraints
+                        sel_text = (ann_data.get('text', '') or '')
+                        if len(sel_text) > 500:
+                            sel_text = sel_text[:500]
+
+                        start = ann_data.get('start_pos', 0) or 0
+                        end = ann_data.get('end_pos', 0) or 0
+                        try:
+                            start = int(start)
+                            end = int(end)
+                        except Exception:
+                            start, end = 0, 0
+                        if start < 0:
+                            start = 0
+                        if end < start:
+                            end = start
+
+                        conf = ann_data.get('confidence', 0.8)
+                        try:
+                            conf = float(conf)
+                        except Exception:
+                            conf = 0.8
+                        # Store percentage to remain backward compatible with existing UI (0-100)
+                        confidence_score = conf * 100 if conf <= 1.5 else conf
+
+                        Annotation.objects.create(
                             page=page,
                             annotation_type=ann_type,
-                            start_pos=ann_data.get('start_pos', 0),
-                            end_pos=ann_data.get('end_pos', 0),
-                            selected_text=ann_data.get('text', ''),
-                            confidence_score=ann_data.get('confidence', 0.8) * 100,
+                            start_pos=start,
+                            end_pos=end,
+                            selected_text=sel_text,
+                            confidence_score=confidence_score,
                             ai_reasoning=ann_data.get('reasoning', 'GROQ bulk annotation'),
-                            created_by=request.user,
-                            mode=requested_mode  # ← FIX: Use requested mode instead of hardcoded 'raw'
+                            created_by=request.user
                         )
                         saved_count += 1
-                        
                     except Exception as e:
                         print(f"❌ Erreur sauvegarde annotation page {page.page_number}: {e}")
                         continue
@@ -1239,14 +1604,15 @@ def ai_annotate_document_groq(request, doc_id):
                 if saved_count > 0:
                     pages_annotated += 1
                     page.is_annotated = True
-                    page.annotated_at = datetime.now()
+                    page.annotated_at = timezone.now()
                     page.annotated_by = request.user
-                    page.save()
+                    page.save(update_fields=['is_annotated', 'annotated_at', 'annotated_by'])
 
+                # Small delay to avoid API rate limits
                 time.sleep(2)
 
             except Exception as e:
-                print(f"❌ Erreur page {page.page_number}: {e}")
+                print(f"❌ Erreur lors de l'annotation de la page {page.page_number}: {e}")
                 continue
 
         print(f"✅ Annotation document terminée: {pages_annotated} pages, {total_annotations} annotations with mode={requested_mode}")
@@ -1257,17 +1623,11 @@ def ai_annotate_document_groq(request, doc_id):
             'pages_annotated': pages_annotated,
             'total_annotations': total_annotations,
             'total_pages': document.total_pages,
-            'mode': requested_mode,  # Return the mode so frontend knows
-            'annotations': []  # Frontend will reload them
+            'mode': requested_mode
         })
-
     except Exception as e:
         print(f"❌ Erreur annotation document {doc_id}: {e}")
-        return JsonResponse({
-            'error': f'Erreur lors de l\'annotation: {str(e)}'
-        }, status=500)
-
-
+        return JsonResponse({'error': f'Erreur lors de l\'annotation: {str(e)}'}, status=500)
 
 @login_required
 def get_document_status(request, doc_id):
@@ -1393,56 +1753,57 @@ def delete_annotation_type(request):
     except Exception as e:
         print(f"❌ Error deleting annotation type: {e}")
         return JsonResponse({'error': str(e)}, status=500)
-    
+
+
 @login_required
 def view_original_document(request, document_id):
     """View the original document PDF - RAWDOCS VERSION AMÉLIORÉE"""
     document = get_object_or_404(RawDocument, id=document_id)
-    
+
     # Paramètre pour téléchargement direct
     download = request.GET.get('download', '0') == '1'
-    
+
     # Case 1: Document has a local file
     if document.file:
         try:
             # Réinitialiser la position du fichier
             document.file.seek(0)
-            
+
             # Lire le contenu du fichier
             file_content = document.file.read()
-            
+
             # Vérifier que le fichier n'est pas vide
             if not file_content:
                 raise Exception("Le fichier PDF est vide")
-            
+
             # Créer la réponse HTTP
             response = HttpResponse(file_content, content_type='application/pdf')
-            
+
             # Nom du fichier propre
             filename = document.file.name
             if not filename.lower().endswith('.pdf'):
                 filename += '.pdf'
-            
+
             # Headers pour l'affichage dans le navigateur ou téléchargement
             if download:
                 response['Content-Disposition'] = f'attachment; filename="{filename}"'
             else:
                 response['Content-Disposition'] = f'inline; filename="{filename}"'
-            
+
             # Headers supplémentaires pour améliorer la compatibilité
             # Dans votre vue view_original_document, après la ligne response = HttpResponse(file_content, content_type='application/pdf')
             response['X-Frame-Options'] = 'SAMEORIGIN'  # Permettre iframe sur même domaine
             response['Content-Security-Policy'] = "frame-ancestors 'self'"
             response['X-PDF-Options'] = 'toolbar=yes,scrollbars=yes,location=no,menubar=yes'
-                        
+
             return response
-            
+
         except Exception as e:
             # Logging pour débugger
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Erreur lors du chargement du PDF {document_id}: {str(e)}")
-            
+
             # Page d'erreur avec plus d'informations
             error_html = f"""
             <!DOCTYPE html>
@@ -1473,20 +1834,20 @@ def view_original_document(request, document_id):
                         <li>Fichier corrompu</li>
                         <li>Problème temporaire du serveur</li>
                     </ul>
-                    
+
                     <div class="details">
                         <strong>Détails techniques :</strong><br>
                         Document ID: {document_id}<br>
                         Fichier: {document.file.name if document.file else 'N/A'}<br>
                         Erreur: {str(e)}
                     </div>
-                    
+
                     <div>
                         <a href="javascript:history.back()" class="btn">← Retour</a>
                         <a href="javascript:location.reload()" class="btn btn-secondary">🔄 Réessayer</a>
                     </div>
                 </div>
-                
+
                 <script>
                     // Notifier le parent si on est dans une iframe
                     if (window.parent !== window) {{
@@ -1511,7 +1872,7 @@ def view_original_document(request, document_id):
                 # Pour les URLs, on redirige directement
                 response = redirect(document.url)
                 return response
-                
+
         except Exception as e:
             error_html = f"""
             <!DOCTYPE html>
@@ -1533,22 +1894,22 @@ def view_original_document(request, document_id):
                     <div class="error-icon">🌐❌</div>
                     <h2>URL non accessible</h2>
                     <p>L'URL source du document n'est pas accessible actuellement.</p>
-                    
+
                     <p><strong>URL source :</strong><br>
                     <a href="{document.url}" target="_blank">{document.url}</a></p>
-                    
+
                     <p>Vous pouvez essayer de :</p>
                     <ul>
                         <li><a href="{document.url}" target="_blank">Ouvrir l'URL directement dans un nouvel onglet</a></li>
                         <li>Vérifier votre connexion internet</li>
                         <li>Réessayer plus tard</li>
                     </ul>
-                    
+
                     <div>
                         <a href="javascript:history.back()" class="btn">← Retour</a>
                     </div>
                 </div>
-                
+
                 <script>
                     if (window.parent !== window) {{
                         window.parent.postMessage({{
@@ -1585,7 +1946,7 @@ def view_original_document(request, document_id):
                 <p>Ce document n'a ni fichier PDF ni URL source associé.</p>
                 <a href="javascript:history.back()" class="btn">← Retour</a>
             </div>
-            
+
             <script>
                 if (window.parent !== window) {
                     window.parent.postMessage({
@@ -1599,6 +1960,7 @@ def view_original_document(request, document_id):
         """
         return HttpResponse(error_html, status=404)
 
+
 @login_required
 def document_structured(request, document_id):
     """
@@ -1610,18 +1972,18 @@ def document_structured(request, document_id):
     try:
         document = RawDocument.objects.get(id=document_id)
         doc = None
-        
+
         # Permissions identiques à tables/images
         if not request.user.is_staff and document.owner != request.user:
             messages.error(request, "Vous n'avez pas accès à ce document.")
             return redirect('rawdocs:document_list')
-        
+
         # Charger/générer HTML structuré
         structured_html = document.structured_html or ''
         method = document.structured_html_method or ''
         confidence = document.structured_html_confidence
         regen = request.GET.get('regen') in ['1', 'true', 'True']
-        
+
         if (regen or not structured_html) and getattr(document, 'file', None):
             try:
                 from documents.models import Document as DocModel
@@ -1629,7 +1991,8 @@ def document_structured(request, document_id):
                 ext = os.path.splitext(document.file.name)[1].lower().lstrip('.')
                 allowed = {'pdf', 'docx', 'doc', 'txt', 'html', 'xlsx', 'xls', 'rtf'}
                 file_type = ext if ext in allowed else 'pdf'
-                doc = DocModel.objects.filter(original_file=document.file.name, uploaded_by=document.owner or request.user).first()
+                doc = DocModel.objects.filter(original_file=document.file.name,
+                                              uploaded_by=document.owner or request.user).first()
                 if not doc:
                     doc = DocModel(
                         title=document.title or os.path.basename(document.file.name),
@@ -1649,15 +2012,16 @@ def document_structured(request, document_id):
                 structured_html = ''
                 method = 'document_processor'
                 confidence = None
-        
+
         # Sauvegarde cache si on a du contenu
         if structured_html:
             document.structured_html = structured_html
             document.structured_html_generated_at = timezone.now()
             document.structured_html_method = method
             document.structured_html_confidence = confidence
-            document.save(update_fields=['structured_html','structured_html_generated_at','structured_html_method','structured_html_confidence'])
-        
+            document.save(update_fields=['structured_html', 'structured_html_generated_at', 'structured_html_method',
+                                         'structured_html_confidence'])
+
         context = {
             'document': document,
             'structured_html': structured_html or '',
@@ -1666,7 +2030,7 @@ def document_structured(request, document_id):
             'doc_model_id': getattr(doc, 'id', None),
         }
         return render(request, 'documents/document_structured.html', context)
-        
+
     except RawDocument.DoesNotExist:
         messages.error(request, "Document non trouvé.")
         return redirect('rawdocs:document_list')
@@ -1689,7 +2053,6 @@ def document_structured(request, document_id):
         return render(request, 'documents/document_structured.html', context)
 
 
-
 @csrf_protect
 @login_required
 @require_POST
@@ -1697,17 +2060,17 @@ def save_structured_edits(request, document_id):
     try:
         # Lire le body par chunks pour éviter les dépassements mémoire
         body_unicode = request.body.decode('utf-8')
-        
+
         # Vérifier la taille avant de parser
         body_size = len(body_unicode)
         max_size = 20 * 1024 * 1024  # 20MB
-        
+
         if body_size > max_size:
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': f'Données trop volumineuses ({body_size / 1024 / 1024:.1f}MB). Maximum autorisé: {max_size / 1024 / 1024}MB'
             }, status=413)
-        
+
         data = json.loads(body_unicode)
         edits = data.get('edits', [])
         extraction_score = data.get('extraction_score', None)
@@ -1716,18 +2079,19 @@ def save_structured_edits(request, document_id):
         # Si c'est une sauvegarde complète du HTML (cas lourd)
         if (not edits) and formatted_content:
             document = get_object_or_404(RawDocument, id=document_id, owner=request.user)
-            
+
             # Compresser le contenu si trop volumineux
             if len(formatted_content) > 5 * 1024 * 1024:  # 5MB
-                print(f"⚠️ Contenu HTML volumineux ({len(formatted_content)/1024/1024:.1f}MB) - compression recommandée")
-            
+                print(
+                    f"⚠️ Contenu HTML volumineux ({len(formatted_content) / 1024 / 1024:.1f}MB) - compression recommandée")
+
             document.structured_html = formatted_content
             document.structured_html_generated_at = timezone.now()
             document.structured_html_method = 'manual_edit'
-            
+
             if extraction_score is not None:
                 document.extraction_score = extraction_score
-                
+
             document.save()
 
             return JsonResponse({
@@ -1736,7 +2100,7 @@ def save_structured_edits(request, document_id):
                 'updated_count': 0,
                 'total_elements': 0,
                 'extraction_score': extraction_score,
-                'content_size': f"{len(formatted_content)/1024/1024:.1f}MB"
+                'content_size': f"{len(formatted_content) / 1024 / 1024:.1f}MB"
             })
 
         # Traitement des modifications ponctuelles (plus léger)
@@ -1751,8 +2115,8 @@ def save_structured_edits(request, document_id):
         html_size = len(document.structured_html)
         if html_size > 10 * 1024 * 1024:  # 10MB
             return JsonResponse({
-                'success': False, 
-                'error': f'HTML trop volumineux pour modification ({html_size/1024/1024:.1f}MB)'
+                'success': False,
+                'error': f'HTML trop volumineux pour modification ({html_size / 1024 / 1024:.1f}MB)'
             }, status=413)
 
         soup = BeautifulSoup(document.structured_html, 'html.parser')
@@ -1763,17 +2127,17 @@ def save_structured_edits(request, document_id):
         max_edits = 1000
         if len(edits) > max_edits:
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': f'Trop de modifications ({len(edits)}). Maximum: {max_edits}'
             }, status=413)
 
         for edit in edits:
             element_id = edit.get('element_id')
             new_text = edit.get('new_text', '').strip()
-            
+
             if not element_id:
                 continue
-                
+
             # Limiter la taille du nouveau texte
             if len(new_text) > 10000:  # 10KB par élément
                 new_text = new_text[:10000]
@@ -1797,14 +2161,14 @@ def save_structured_edits(request, document_id):
 
         if updated_count > 0:
             new_html = str(soup)
-            
+
             # Vérifier la taille finale
             if len(new_html) > 15 * 1024 * 1024:  # 15MB
                 return JsonResponse({
-                    'success': False, 
-                    'error': f'HTML résultant trop volumineux ({len(new_html)/1024/1024:.1f}MB)'
+                    'success': False,
+                    'error': f'HTML résultant trop volumineux ({len(new_html) / 1024 / 1024:.1f}MB)'
                 }, status=413)
-                
+
             document.structured_html = new_html
             if extraction_score is not None:
                 document.extraction_score = extraction_score
@@ -1822,7 +2186,7 @@ def save_structured_edits(request, document_id):
             'total_elements': total_elements,
             'extraction_score': extraction_score
         })
-        
+
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'JSON invalide'}, status=400)
     except MemoryError:
@@ -1835,7 +2199,7 @@ def save_structured_edits(request, document_id):
 def manual_annotation_view(request):
     if request.method == 'POST':
         data = json.loads(request.body)
-        
+
         annotation = Annotation.objects.create(
             page_id=data['page_id'],
             annotation_type_id=data['type_id'],
@@ -1850,11 +2214,10 @@ def manual_annotation_view(request):
             start_offset=data.get('start_offset'),
             end_offset=data.get('end_offset')
         )
-        
+
         return JsonResponse({'success': True, 'annotation_id': annotation.id})
-    
-    
-        
+
+
 @login_required
 def document_detail(request, document_id):
     """
@@ -1862,29 +2225,30 @@ def document_detail(request, document_id):
     """
     try:
         document = get_object_or_404(RawDocument, id=document_id)
-        
+
         # Vérifier les permissions
         if not request.user.is_staff and document.owner != request.user:
             messages.error(request, "Vous n'avez pas accès à ce document.")
             return redirect('rawdocs:document_list')
-        
+
         # Ajouter basename pour le template
         document.basename = os.path.basename(document.file.name) if document.file else "Document sans fichier"
-        
+
         context = {
             'doc': document,
             'document': document,
         }
-        
+
         return render(request, 'rawdocs/details_metadata.html', context)
-        
+
     except RawDocument.DoesNotExist:
         messages.error(request, "Document non trouvé.")
         return redirect('rawdocs:document_list')
     except Exception as e:
         messages.error(request, f"Erreur lors de l'affichage du document: {str(e)}")
         return redirect('rawdocs:document_list')
-    
+
+
 @login_required
 def add_field_ajax(request):
     if request.method == 'POST':
@@ -1893,49 +2257,50 @@ def add_field_ajax(request):
         name = data.get('name')
         field_type = data.get('type', 'text')
         doc_id = data.get('doc_id')  # Get document ID
-        
+
         from .models import CustomField, CustomFieldValue, RawDocument
-        
+
         # Get the document
         document = get_object_or_404(RawDocument, id=doc_id)
-        
+
         # Get or create the field type globally (for field type reference)
         field, created = CustomField.objects.get_or_create(
             name=name,
             defaults={'field_type': field_type}
         )
-        
+
         # Create the field value ONLY for this specific document
         custom_value, value_created = CustomFieldValue.objects.get_or_create(
             document=document,
             field=field,
             defaults={'value': ''}  # Empty value initially
         )
-        
+
         if value_created:
             return JsonResponse({
-                'success': True, 
+                'success': True,
                 'message': f'Field "{name}" added to this document only!'
             })
         else:
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'message': f'Field "{name}" already exists for this document!'
             })
-    
+
     return JsonResponse({'success': False})
 
-@login_required  
+
+@login_required
 def save_custom_field(request):
     if request.method == 'POST':
         doc_id = request.POST.get('doc_id')
         field_name = request.POST.get('field_name')
         value = request.POST.get('value', '')
-        
+
         from .models import RawDocument, CustomField, CustomFieldValue
         document = get_object_or_404(RawDocument, id=doc_id)
         field = get_object_or_404(CustomField, name=field_name)
-        
+
         custom_value, created = CustomFieldValue.objects.get_or_create(
             document=document,
             field=field,
@@ -1944,9 +2309,9 @@ def save_custom_field(request):
         if not created:
             custom_value.value = value
             custom_value.save()
-            
+
         return JsonResponse({'success': True})
-    
+
     return JsonResponse({'success': False})
 
 
@@ -1954,29 +2319,29 @@ def create_product_from_metadata(document):
     """Create product from custom metadata fields"""
     from .models import CustomFieldValue
     from client.products.models import Product
-    
+
     # Find Product/Produit field (case insensitive)
     custom_values = CustomFieldValue.objects.filter(document=document)
-    
+
     product_field = None
     product_name = None
-    
+
     for custom_value in custom_values:
         field_name = custom_value.field.name.lower()
         if field_name in ['product', 'produit']:
             product_name = custom_value.value.strip()
             break
-    
+
     if not product_name:
         return None
-    
+
     # Create product with metadata fields
     product_data = {'name': product_name}
-    
+
     # Auto-map matching fields
     field_mapping = {
         'dosage': 'dosage',
-        'dose': 'dosage', 
+        'dose': 'dosage',
         'active_ingredient': 'active_ingredient',
         'substance_active': 'active_ingredient',
         'form': 'form',
@@ -1984,12 +2349,12 @@ def create_product_from_metadata(document):
         'therapeutic_area': 'therapeutic_area',
         'zone_therapeutique': 'therapeutic_area'
     }
-    
+
     for custom_value in custom_values:
         field_name = custom_value.field.name.lower()
         if field_name in field_mapping and custom_value.value:
             product_data[field_mapping[field_name]] = custom_value.value
-    
+
     # Create the product
     product = Product.objects.create(
         name=product_data['name'],
@@ -2000,7 +2365,7 @@ def create_product_from_metadata(document):
         status='commercialise',
         source_document=document
     )
-    
+
     print(f"✅ Product '{product.name}' created from metadata!")
     return product
 
@@ -2249,8 +2614,6 @@ def get_document_regulatory_summary(request, doc_id):
 
 # =================== MISE À JOUR DE LA VUE ANNOTATION EXISTANTE ===================
 
-@login_required
-@user_passes_test(is_annotateur)
 def annotate_document(request, doc_id):
     """Vue d'annotation mise à jour avec analyse réglementaire"""
     document = get_object_or_404(RawDocument, id=doc_id, is_validated=True)
@@ -2275,7 +2638,8 @@ def annotate_document(request, doc_id):
         global_analysis = None
 
     # Build reduced, default annotation types + include types already used in this document
-    used_type_ids = Annotation.objects.filter(page__document=document).values_list('annotation_type_id', flat=True).distinct()
+    used_type_ids = Annotation.objects.filter(page__document=document).values_list('annotation_type_id',
+                                                                                   flat=True).distinct()
 
     # Default whitelist (keywords-independent)
     whitelist = {
@@ -2509,8 +2873,10 @@ def dev_metier_dashboard(request):
 
     # Étapes exclusives pour la répartition
     uploaded_count = max(total_docs - validated_metadonneur_total, 0)  # déposés mais pas encore validés par métadonneur
-    in_annotation_count = max(validated_metadonneur_total - ready_for_expert_total, 0)  # validés par métadonneur mais pas encore prêts expert
-    awaiting_expert_count = max(ready_for_expert_total - expert_validated_total, 0)  # prêts expert mais pas encore validés expert
+    in_annotation_count = max(validated_metadonneur_total - ready_for_expert_total,
+                              0)  # validés par métadonneur mais pas encore prêts expert
+    awaiting_expert_count = max(ready_for_expert_total - expert_validated_total,
+                                0)  # prêts expert mais pas encore validés expert
 
     processed_percent = int((expert_validated_total / total_docs) * 100) if total_docs else 0
     validated_percent = int((validated_metadonneur_total / total_docs) * 100) if total_docs else 0
@@ -2550,12 +2916,14 @@ def dev_metier_dashboard(request):
         "pie_data": pie_data,
     })
 
+
 # =================== NOUVELLES VUES POUR JSON ET RÉSUMÉS D'ANNOTATIONS ===================
 
 from .regulatory_analyzer import RegulatoryAnalyzer
 
 from collections import OrderedDict
 from datetime import datetime
+
 
 def _build_entities_map(annotations_qs, use_display_name=True):
     """
@@ -2581,6 +2949,7 @@ def _build_entities_map(annotations_qs, use_display_name=True):
             seen_per_key[key].add(val)
 
     return entities
+
 
 @login_required
 @csrf_exempt
@@ -2641,7 +3010,6 @@ def generate_page_annotation_summary(request, page_id):
     except Exception as e:
         print(f"❌ Erreur génération résumé page {page_id}: {e}")
         return JsonResponse({'error': f'Erreur lors de la génération: {str(e)}'}, status=500)
-
 
 
 @login_required
@@ -2719,6 +3087,7 @@ def generate_document_annotation_summary(request, doc_id):
         print(f"❌ Erreur génération résumé document {doc_id}: {e}")
         return JsonResponse({'error': f'Erreur lors de la génération: {str(e)}'}, status=500)
 
+
 def generate_entities_based_page_summary(entities, page_number, document_title):
     """
     Résumé NL d'une page à partir du dict {entité -> [valeurs]}.
@@ -2756,7 +3125,7 @@ Réponds UNIQUEMENT par le paragraphe.
 
         analyzer = RegulatoryAnalyzer()
         response = analyzer.call_groq_api(prompt, max_tokens=280)
-        return response.strip() if response else f"Page {page_number}: synthèse de {total_pairs} élément(s) annoté(s) sur les entités « {', '.join(list(entities.keys())[:5])}{'…' if len(entities)>5 else ''} »."
+        return response.strip() if response else f"Page {page_number}: synthèse de {total_pairs} élément(s) annoté(s) sur les entités « {', '.join(list(entities.keys())[:5])}{'…' if len(entities) > 5 else ''} »."
     except Exception as e:
         print(f"❌ Erreur génération résumé (page): {e}")
         # Fallback minimal
@@ -2810,6 +3179,7 @@ Réponds UNIQUEMENT par le paragraphe.
         total_values = sum(len(v) for v in entities.values())
         return f"Document : {total_values} valeur(s) sur {len(entities)} entité(s)."
 
+
 @login_required
 def view_page_annotation_json(request, page_id):
     """
@@ -2846,7 +3216,7 @@ def view_page_annotation_json(request, page_id):
     except Exception as e:
         messages.error(request, f"Erreur: {str(e)}")
         return redirect('rawdocs:annotation_dashboard')
-    
+
 
 @login_required
 @user_passes_test(is_dev_metier)
@@ -2999,6 +3369,7 @@ def view_document_annotation_json(request, doc_id):
         messages.error(request, f"Erreur: {str(e)}")
         return redirect('rawdocs:annotation_dashboard')
 
+
 ##################edit################
 # Ajouter cette nouvelle vue dans rawdocs/views.py
 
@@ -3129,9 +3500,11 @@ def get_annotation_details(request, annotation_id):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+
 # =================== NOUVELLES VUES POUR L'ÉDITION DU RÉSUMÉ GLOBAL PAR L'EXPERT ===================
 
 from .models import GlobalSummaryEditHistory  # Import du modèle depuis models.py
+
 
 @login_required
 @user_passes_test(is_expert)
@@ -3179,6 +3552,7 @@ def edit_global_summary(request, doc_id):
         print(f"❌ Erreur modification résumé global du document {doc_id}: {e}")
         return JsonResponse({'error': f'Erreur lors de la modification: {str(e)}'}, status=500)
 
+
 @login_required
 @user_passes_test(is_expert)
 def get_global_summary_history(request, doc_id):
@@ -3206,6 +3580,7 @@ def get_global_summary_history(request, doc_id):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
 
 @login_required
 @user_passes_test(is_expert)
@@ -3238,7 +3613,6 @@ def validate_global_summary(request, doc_id):
     except Exception as e:
         print(f"❌ Erreur validation résumé global du document {doc_id}: {e}")
         return JsonResponse({'error': f'Erreur lors de la validation: {str(e)}'}, status=500)
-    
 
 
 @login_required
@@ -3247,28 +3621,28 @@ def metadata_learning_dashboard(request):
     """Dashboard showing AI learning statistics with proper calculations"""
     try:
         from .models import MetadataFeedback, MetadataLearningMetrics
-        
+
         total_feedbacks = MetadataFeedback.objects.count()
-        
+
         if total_feedbacks == 0:
             return render(request, 'rawdocs/learning_dashboard.html', {
                 'no_data': True
             })
-        
+
         # Calculate average score
         avg_score = MetadataFeedback.objects.aggregate(
             avg=models.Avg('feedback_score')
         )['avg'] or 0
-        
+
         # Field performance with percentages calculated
         field_stats = {}
         document_stats = {}  # NEW: Track per-document performance
-        
+
         for feedback in MetadataFeedback.objects.all():
             corrections = feedback.corrections_made
             doc_id = feedback.document.id
             doc_title = feedback.document.title or f"Document {doc_id}"
-            
+
             # Initialize document stats
             if doc_id not in document_stats:
                 document_stats[doc_id] = {
@@ -3278,37 +3652,37 @@ def metadata_learning_dashboard(request):
                     'missed': 0,
                     'precision': 0
                 }
-            
+
             for kept in corrections.get('kept_correct', []):
                 field = kept.get('field')
                 if field not in field_stats:
                     field_stats[field] = {'correct': 0, 'wrong': 0, 'missed': 0}
                 field_stats[field]['correct'] += 1
                 document_stats[doc_id]['correct'] += 1
-            
+
             for wrong in corrections.get('corrected_fields', []):
                 field = wrong.get('field')
                 if field not in field_stats:
                     field_stats[field] = {'correct': 0, 'wrong': 0, 'missed': 0}
                 field_stats[field]['wrong'] += 1
                 document_stats[doc_id]['wrong'] += 1
-            
+
             for missed in corrections.get('missed_fields', []):
                 field = missed.get('field')
                 if field not in field_stats:
                     field_stats[field] = {'correct': 0, 'wrong': 0, 'missed': 0}
                 field_stats[field]['missed'] += 1
                 document_stats[doc_id]['missed'] += 1
-        
+
         # Calculate precision percentages
         for field, stats in field_stats.items():
             total = stats['correct'] + stats['wrong'] + stats['missed']
             stats['precision'] = int((stats['correct'] / total * 100)) if total > 0 else 0
-        
+
         for doc_id, stats in document_stats.items():
             total = stats['correct'] + stats['wrong'] + stats['missed']
             stats['precision'] = int((stats['correct'] / total * 100)) if total > 0 else 0
-        
+
         # Get improvement trend
         feedbacks = MetadataFeedback.objects.order_by('created_at')
         improvement = 0
@@ -3316,7 +3690,7 @@ def metadata_learning_dashboard(request):
             first_score = feedbacks.first().feedback_score * 100
             last_score = feedbacks.last().feedback_score * 100
             improvement = int(last_score - first_score)
-        
+
         return render(request, 'rawdocs/learning_dashboard.html', {
             'total_feedbacks': total_feedbacks,
             'avg_score': int(avg_score * 100),
@@ -3325,20 +3699,21 @@ def metadata_learning_dashboard(request):
             'improvement': improvement,
             'has_data': True
         })
-        
+
     except Exception as e:
         print(f"Learning dashboard error: {e}")
         return render(request, 'rawdocs/learning_dashboard.html', {'error': str(e)})
 
-@login_required 
+
+@login_required
 def metadata_learning_api(request):
     """API for learning stats"""
     try:
         from .models import MetadataFeedback
-        
+
         total = MetadataFeedback.objects.count()
         avg = MetadataFeedback.objects.aggregate(avg=models.Avg('feedback_score'))['avg'] or 0
-        
+
         return JsonResponse({
             'total_feedbacks': total,
             'average_score': avg * 100,
@@ -3346,11 +3721,12 @@ def metadata_learning_api(request):
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-    
+
 
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+
 
 @require_http_methods(["POST"])
 def clear_page_annotations(request, page_id):
@@ -3417,7 +3793,8 @@ def save_document_json_devmetier(request, doc_id):
                 'modified': res.modified_count,
                 'upserted': getattr(res, "upserted_id", None) is not None
             }
-            print(f"✅ Mongo write d{doc_id}: matched={res.matched_count} modified={res.modified_count} upserted={getattr(res,'upserted_id',None)}")
+            print(
+                f"✅ Mongo write d{doc_id}: matched={res.matched_count} modified={res.modified_count} upserted={getattr(res, 'upserted_id', None)}")
         else:
             print("⚠️ Pas de connexion Mongo (_mongo_coll is None)")
 
@@ -3443,7 +3820,6 @@ def save_document_json_devmetier(request, doc_id):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
-
 @login_required
 @require_POST
 def mistral_suggest_annotations(request, page_id):
@@ -3451,7 +3827,7 @@ def mistral_suggest_annotations(request, page_id):
     Endpoint API pour suggérer des annotations à l'aide de Mistral AI
     Cette fonction utilise l'API Mistral pour analyser le texte d'une page
     et générer des suggestions d'entités à annoter
-    
+
     Si un document_id est fourni dans le corps de la requête et que le page_id est fictif (1),
     nous utilisons le document_id pour trouver la première page non annotée
     """
@@ -3462,48 +3838,48 @@ def mistral_suggest_annotations(request, page_id):
         # Vérifier si nous avons reçu un document_id dans le corps de la requête
         data = json.loads(request.body.decode('utf-8')) if request.body else {}
         document_id = data.get('document_id')
-        
+
         # Si nous avons un document_id et que le page_id est l'ID fictif (1)
         if document_id and page_id == 1:
             # Récupérer le document
             document = get_object_or_404(Document, id=document_id)
-            
+
             # Vérifier les permissions
             if not document.is_accessible_by(request.user):
                 return JsonResponse({'success': False, 'error': 'Accès non autorisé'}, status=403)
-            
+
             # Trouver la première page du document
             page = DocumentPage.objects.filter(document=document).order_by('page_number').first()
-            
+
             if not page:
                 return JsonResponse({'success': False, 'error': 'Aucune page trouvée pour ce document'}, status=404)
-            
+
         else:
             # Récupérer la page directement par son ID
             page = get_object_or_404(DocumentPage, id=page_id)
             document = page.document
-            
+
             # Vérifier les permissions
             if not document.is_accessible_by(request.user):
                 return JsonResponse({'success': False, 'error': 'Accès non autorisé'}, status=403)
-        
+
         # Supprimer les annotations existantes sur cette page
         Annotation.objects.filter(page=page).delete()
-        
+
         # Obtenir le texte de la page
         page_text = page.cleaned_text or ""
-        
+
         # Appeler l'API Mistral pour obtenir des suggestions d'annotations
         annotations_data = call_mistral_annotation(page_text, page.page_number)
-        
+
         # Créer les nouvelles annotations basées sur les suggestions de Mistral
         created_count = 0
         for ann_data in annotations_data:
             # Vérifier que les données sont valides
-            if not (isinstance(ann_data, dict) and 'text' in ann_data and 'type' in ann_data and 
-                   'start_pos' in ann_data and 'end_pos' in ann_data):
+            if not (isinstance(ann_data, dict) and 'text' in ann_data and 'type' in ann_data and
+                    'start_pos' in ann_data and 'end_pos' in ann_data):
                 continue
-            
+
             # Récupérer ou créer le type d'annotation
             ann_type_name = ann_data['type'].lower().strip()
             ann_type, created = AnnotationType.objects.get_or_create(
@@ -3513,7 +3889,7 @@ def mistral_suggest_annotations(request, page_id):
                     'description': f"Type détecté par Mistral AI: {ann_type_name}"
                 }
             )
-            
+
             # Créer l'annotation
             annotation = Annotation.objects.create(
                 page=page,
@@ -3527,17 +3903,17 @@ def mistral_suggest_annotations(request, page_id):
                 ai_reasoning=ann_data.get('reasoning', 'Détecté par Mistral AI')
             )
             created_count += 1
-        
+
         # Construire l'URL de redirection vers la page d'annotation
         redirect_url = f"/rawdocs/annotate/{document.id}/?page={page.page_number}"
-        
+
         return JsonResponse({
             'success': True,
             'message': f'Mistral AI a suggéré {created_count} annotations',
             'annotations_count': created_count,
             'redirect_url': redirect_url
         })
-        
+
     except Exception as e:
         print(f"❌ Erreur lors de la suggestion d'annotations avec Mistral: {e}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
@@ -3561,39 +3937,40 @@ def mistral_direct_analysis(request):
     import traceback
     from django.http import JsonResponse
     from .annotation_utils import call_mistral_annotation
-    
+
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Méthode HTTP non autorisée'}, status=405)
-    
+
     try:
         data = json.loads(request.body)
         text = data.get('text')
         page_number = data.get('page_number', 1)
-        
+
         if not text:
             return JsonResponse({'success': False, 'error': 'Aucun texte fourni'}, status=400)
-        
+
         # Limiter la taille du texte pour éviter les abus
         if len(text) > 10000:
             return JsonResponse({'success': False, 'error': 'Texte trop long (max 10000 caractères)'}, status=400)
-        
+
         # Appel à l'API Mistral
         print(f"🔍 Analyse directe Mistral d'un texte de {len(text)} caractères")
         annotations_data = call_mistral_annotation(text, page_number)
-        
+
         return JsonResponse({
             'success': True,
             'annotations': annotations_data,
             'text_length': len(text)
         })
-        
+
     except Exception as e:
         traceback.print_exc()
         print(f"❌ Exception lors de l'analyse Mistral: {e}")
         return JsonResponse({
-            'success': False, 
+            'success': False,
             'error': f"Une erreur est survenue lors de l'analyse: {str(e)}"
         }, status=500)
+
 
 def mistral_analyze_document(request, document_id):
     """
@@ -3602,11 +3979,11 @@ def mistral_analyze_document(request, document_id):
     """
     from .annotation_utils import analyze_document_context_with_mistral
     import traceback
-    
+
     # Débogage: Ajouter des logs au début
     print(f"🔵 API mistral_analyze_document appelée pour document_id={document_id}")
     print(f"🔵 Méthode: {request.method}, Utilisateur: {request.user}")
-    
+
     # Pour débogage: Retourner un succès simulé pour tester la redirection
     if request.GET.get('debug') == '1':
         print("🟠 MODE DEBUG: Retour d'une réponse simulée")
@@ -3622,31 +3999,31 @@ def mistral_analyze_document(request, document_id):
             'entity_types_count': 1,
             'annotation_url': f"/rawdocs/annotate_document/{document_id}/?page=1"
         })
-    
+
     try:
         # Récupérer le document
         document = get_object_or_404(RawDocument, id=document_id)
-        
+
         # Vérifier que l'utilisateur a accès au document
         if not document.is_accessible_by(request.user):
             print(f"🔴 Accès refusé: L'utilisateur {request.user} n'a pas accès au document {document_id}")
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': 'Vous n\'avez pas l\'autorisation d\'accéder à ce document'
             }, status=403)
-        
+
         # Log pour débuguer
         print(f"🔍 Début analyse Mistral du document ID={document_id}")
-        
+
         # Récupérer les pages du document pour l'analyse
         pages = DocumentPage.objects.filter(document=document).order_by('page_number')
-        
+
         if not pages.exists():
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': 'Aucune page trouvée pour ce document'
             }, status=404)
-        
+
         # Préparer un échantillon de texte pour l'analyse (premières pages)
         document_text = ""
         for page in pages[:5]:  # Limiter à 5 pages pour l'analyse
@@ -3654,63 +4031,78 @@ def mistral_analyze_document(request, document_id):
             if len(document_text) > 15000:  # Limiter la taille
                 document_text = document_text[:15000]
                 break
-                
+
         # Toujours détecter automatiquement la langue du document
         # et utiliser cette langue pour les annotations
         detect_document_language = True
         annotation_language = None  # Pas de langue forcée, on utilisera celle du document
-        
+
         # Détecter la langue avec une méthode qui prend en charge de nombreuses langues
-        
+
         # Marqueurs pour un large éventail de langues (ajout de langues européennes et mondiales)
         language_markers = {
             # Langues latines
-            'fr': ["le", "la", "les", "des", "pour", "avec", "par", "dans", "ce", "cette", "ces", "est", "sont", "était", "qui", "que"],
-            'es': ["el", "la", "los", "las", "de", "en", "para", "con", "por", "es", "son", "fue", "que", "pero", "como", "cuando"],
-            'it': ["il", "la", "i", "le", "di", "in", "per", "con", "da", "è", "sono", "era", "che", "ma", "come", "quando"],
-            'pt': ["o", "a", "os", "as", "de", "em", "para", "com", "por", "é", "são", "foi", "que", "mas", "como", "quando"],
-            'ro': ["un", "o", "și", "în", "la", "cu", "de", "pe", "pentru", "este", "sunt", "care", "că", "dar", "acest", "acesta"],
-            
+            'fr': ["le", "la", "les", "des", "pour", "avec", "par", "dans", "ce", "cette", "ces", "est", "sont",
+                   "était", "qui", "que"],
+            'es': ["el", "la", "los", "las", "de", "en", "para", "con", "por", "es", "son", "fue", "que", "pero",
+                   "como", "cuando"],
+            'it': ["il", "la", "i", "le", "di", "in", "per", "con", "da", "è", "sono", "era", "che", "ma", "come",
+                   "quando"],
+            'pt': ["o", "a", "os", "as", "de", "em", "para", "com", "por", "é", "são", "foi", "que", "mas", "como",
+                   "quando"],
+            'ro': ["un", "o", "și", "în", "la", "cu", "de", "pe", "pentru", "este", "sunt", "care", "că", "dar",
+                   "acest", "acesta"],
+
             # Langues germaniques
-            'en': ["the", "and", "of", "in", "to", "for", "with", "by", "this", "that", "is", "are", "was", "were", "which", "who"],
-            'de': ["der", "die", "das", "und", "in", "mit", "für", "von", "zu", "ist", "sind", "war", "wenn", "aber", "oder", "wie"],
-            'nl': ["de", "het", "een", "in", "op", "voor", "met", "door", "en", "is", "zijn", "was", "waren", "die", "dat", "als"],
-            'sv': ["en", "ett", "och", "att", "det", "är", "som", "för", "med", "på", "av", "den", "till", "inte", "har", "från"],
-            
+            'en': ["the", "and", "of", "in", "to", "for", "with", "by", "this", "that", "is", "are", "was", "were",
+                   "which", "who"],
+            'de': ["der", "die", "das", "und", "in", "mit", "für", "von", "zu", "ist", "sind", "war", "wenn", "aber",
+                   "oder", "wie"],
+            'nl': ["de", "het", "een", "in", "op", "voor", "met", "door", "en", "is", "zijn", "was", "waren", "die",
+                   "dat", "als"],
+            'sv': ["en", "ett", "och", "att", "det", "är", "som", "för", "med", "på", "av", "den", "till", "inte",
+                   "har", "från"],
+
             # Langues slaves
             'bg': ["на", "и", "за", "се", "от", "да", "в", "с", "по", "е", "са", "като", "че", "това", "тези", "този"],
-            'ru': ["и", "в", "не", "на", "с", "по", "для", "от", "из", "о", "что", "это", "этот", "как", "так", "когда"],
-            'pl': ["w", "i", "z", "na", "do", "się", "jest", "to", "że", "dla", "nie", "jak", "przez", "od", "po", "który"],
-            'cs': ["a", "v", "na", "s", "z", "do", "je", "to", "že", "pro", "jako", "když", "od", "nebo", "také", "který"],
-            
+            'ru': ["и", "в", "не", "на", "с", "по", "для", "от", "из", "о", "что", "это", "этот", "как", "так",
+                   "когда"],
+            'pl': ["w", "i", "z", "na", "do", "się", "jest", "to", "że", "dla", "nie", "jak", "przez", "od", "po",
+                   "który"],
+            'cs': ["a", "v", "na", "s", "z", "do", "je", "to", "že", "pro", "jako", "když", "od", "nebo", "také",
+                   "který"],
+
             # Autres langues européennes
-            'el': ["και", "του", "της", "τη", "σε", "από", "με", "για", "ο", "η", "το", "οι", "τα", "είναι", "που", "αυτό"],
-            'hu': ["a", "az", "és", "van", "egy", "hogy", "nem", "ez", "azt", "mint", "csak", "de", "ha", "vagy", "aki", "ami"],
-            'fi': ["ja", "on", "että", "ei", "se", "hän", "ovat", "oli", "kun", "mitä", "tai", "kuin", "mutta", "vain", "jos", "myös"]
+            'el': ["και", "του", "της", "τη", "σε", "από", "με", "για", "ο", "η", "το", "οι", "τα", "είναι", "που",
+                   "αυτό"],
+            'hu': ["a", "az", "és", "van", "egy", "hogy", "nem", "ez", "azt", "mint", "csak", "de", "ha", "vagy", "aki",
+                   "ami"],
+            'fi': ["ja", "on", "että", "ei", "se", "hän", "ovat", "oli", "kun", "mitä", "tai", "kuin", "mutta", "vain",
+                   "jos", "myös"]
         }
-        
+
         # Mapper le code de langue à un nom plus explicite pour les logs
         lang_names = {
-            'fr': 'Français', 
+            'fr': 'Français',
             'en': 'Anglais',
             'de': 'Allemand',
             'es': 'Espagnol',
             'it': 'Italien',
             'pt': 'Portugais'
         }
-        
+
         # Préparer le texte pour la détection
         document_text_lower = " " + document_text.lower() + " "
-        
+
         # Compter les occurrences de chaque marqueur de langue
         language_counts = {}
         for lang, markers in language_markers.items():
             count = sum(document_text_lower.count(f" {marker} ") for marker in markers)
             language_counts[lang] = count
-        
+
         # Mapper le code de langue à un nom plus explicite pour les logs
         lang_names = {
-            'fr': 'Français', 
+            'fr': 'Français',
             'en': 'Anglais',
             'de': 'Allemand',
             'es': 'Espagnol',
@@ -3727,62 +4119,64 @@ def mistral_analyze_document(request, document_id):
             'hu': 'Hongrois',
             'fi': 'Finnois'
         }
-        
+
         # Détection automatique de la langue du document
         document_language = "fr"  # Valeur par défaut
-        
+
         if detect_document_language:
             # Trouver la langue avec le plus de marqueurs
             if language_counts:
                 detected_lang = max(language_counts, key=language_counts.get)
                 lang_count = language_counts[detected_lang]
-                
+
                 # Vérifier si la détection est fiable (au moins 3 marqueurs trouvés)
                 if lang_count >= 3:
                     document_language = detected_lang
                     lang_name = lang_names.get(document_language, f'Autre ({document_language})')
-                    print(f"🔍 Langue du document détectée: {lang_name} ({document_language}) avec {lang_count} marqueurs")
+                    print(
+                        f"🔍 Langue du document détectée: {lang_name} ({document_language}) avec {lang_count} marqueurs")
                 else:
                     # Pas assez de marqueurs, utiliser la langue par défaut
                     document_language = "fr"
-                    print(f"⚠️ Détection de langue peu fiable ({lang_count} marqueurs). Document considéré en français par défaut")
+                    print(
+                        f"⚠️ Détection de langue peu fiable ({lang_count} marqueurs). Document considéré en français par défaut")
             else:
                 # Aucun marqueur trouvé, utiliser la langue par défaut
                 document_language = "fr"
                 print("⚠️ Aucun marqueur de langue trouvé. Document considéré en français par défaut")
-        
+
         # Toujours utiliser la langue du document pour les annotations
         language = document_language
         print(f"🔄 Utilisation automatique de la langue du document pour les annotations: {language}")
-            
+
         # Appeler Mistral pour l'analyse contextuelle
         print(f"📝 Appel à Mistral pour analyse document (langue: {language})")
         context_analysis = analyze_document_context_with_mistral(document_text, language)
-        
+
         if "error" in context_analysis and not context_analysis.get("entity_types"):
             print(f"❌ Erreur lors de l'analyse Mistral: {context_analysis['error']}")
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': f"Erreur lors de l'analyse: {context_analysis['error']}"
             }, status=500)
-        
+
         # Traiter les types d'entités proposés par Mistral
         entity_types = context_analysis.get("entity_types", [])
         print(f"✅ Mistral a proposé {len(entity_types)} types d'entités")
-        
+
         # Créer ou mettre à jour les types d'annotation dans la base de données
         created_types = []
         for entity_type in entity_types:
             name = entity_type.get("name", "").lower().strip()
             display_name = entity_type.get("display_name", name).strip()
             description = entity_type.get("description", "").strip()
-            
+
             if not name:
                 continue
-                
+
             # Générer une couleur aléatoire basée sur le nom (pour être cohérent)
             color = '#' + ''.join([format(hash(name + str(i)) % 256, '02x') for i in range(3)])
-            
+
             # Créer ou mettre à jour le type d'annotation
             ann_type, created = AnnotationType.objects.get_or_create(
                 name=name,
@@ -3792,13 +4186,13 @@ def mistral_analyze_document(request, document_id):
                     'color': color
                 }
             )
-            
+
             # Mettre à jour si le type existe déjà
             if not created:
                 ann_type.description = description
                 ann_type.display_name = display_name
                 ann_type.save()
-                
+
             created_types.append({
                 "id": ann_type.id,
                 "name": ann_type.name,
@@ -3806,14 +4200,14 @@ def mistral_analyze_document(request, document_id):
                 "description": ann_type.description,
                 "color": ann_type.color
             })
-        
+
         # Construire l'URL de redirection
         first_page = pages.first()
         annotation_url = f"/rawdocs/annotate/{document.id}/?page={first_page.page_number}"
-        
+
         # Obtenir le nom d'affichage de la langue
         detected_lang_name = lang_names.get(document_language, document_language)
-        
+
         # Retourner la réponse
         return JsonResponse({
             'success': True,
@@ -3825,17 +4219,17 @@ def mistral_analyze_document(request, document_id):
             'entity_types_count': len(created_types),
             'annotation_url': annotation_url
         })
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
         print(f"❌ Exception lors de l'analyse Mistral: {e}")
         return JsonResponse({
-            'success': False, 
+            'success': False,
             'error': f"Une erreur est survenue: {str(e)}"
         }, status=500)
 
-        
+
 from bs4 import BeautifulSoup
 from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.decorators import login_required
@@ -3846,6 +4240,8 @@ import json
 
 from .models import RawDocument, MetadataLog
 
+
+# ---- save_edited_text (remplacer / ajouter) ----
 @csrf_protect
 @login_required
 @require_POST
@@ -3858,12 +4254,11 @@ def save_edited_text(request):
         if not doc_id or not edits:
             return JsonResponse({'success': False, 'error': 'Missing required fields'}, status=400)
 
-        document = get_object_or_404(RawDocument, id=doc_id, owner=request.user)  # Permission check
+        document = get_object_or_404(RawDocument, id=doc_id, owner=request.user)
 
         if not document.structured_html:
             return JsonResponse({'success': False, 'error': 'No structured HTML to edit'}, status=400)
 
-        # Parse the HTML
         soup = BeautifulSoup(document.structured_html, 'html.parser')
         updated_count = 0
 
@@ -3871,29 +4266,27 @@ def save_edited_text(request):
             element_id = edit.get('element_id')
             new_text = edit.get('new_text', '').strip()
 
-            if not element_id or not new_text:
+            if not element_id or new_text is None:
                 continue
 
-            # Find the element by ID and update its text
             element = soup.find(id=element_id)
             if element:
-                old_text = element.text.strip()  # For logging
-                element.string = new_text  # Replace the text content
+                old_text = element.get_text().strip()
+                # Replace safely
+                element.string = new_text
                 updated_count += 1
 
-                # Log the change
                 MetadataLog.objects.create(
                     document=document,
-                    field_name='edited_text_' + element_id,
-                    old_value=old_text,
-                    new_value=new_text,
+                    field_name='edited_text_' + element_id[:200],
+                    old_value=old_text[:2000],
+                    new_value=new_text[:2000],
                     modified_by=request.user
                 )
 
-        # Save the updated HTML back to the model
         if updated_count > 0:
             document.structured_html = str(soup)
-            document.save()
+            document.save(update_fields=['structured_html'])
 
         return JsonResponse({
             'success': True,
@@ -3903,5 +4296,6 @@ def save_edited_text(request):
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
     except Exception as e:
-        print(f"Error in save_edited_text: {str(e)}")  # Log for debugging
+        import traceback
+        traceback.print_exc()
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

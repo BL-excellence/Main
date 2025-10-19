@@ -12,7 +12,7 @@ from django.utils import timezone
 from rawdocs.models import RawDocument
 from .json_enrichment import JSONEnricher
 from .views import expert_required
-
+from .llm_client import LLMClient
 
 from .services import apply_expert_deltas
 # ---------------------------------------------------------------------
@@ -757,3 +757,420 @@ def save_paragraph_relations(request, doc_id):
     except Exception as e:
         print(f"Erreur save_paragraph_relations: {e}")
         return JsonResponse({"success": False, "error": str(e)})
+
+
+# ---------------------------------------------------------------------
+#  NOUVEAU : RÉCUPÉRATION DES DOCUMENTS VALIDÉS PAR MÉTADONNEURS
+# ---------------------------------------------------------------------
+@expert_required
+def get_validated_documents(request):
+    """
+    Récupère tous les documents validés par les métadonneurs
+    pour l'analyse expert page par page
+    """
+    try:
+        # Récupérer tous les documents validés par les métadonneurs
+        validated_docs = RawDocument.objects.filter(
+            is_validated=True
+        ).select_related('owner').order_by('-validated_at')
+
+        documents_data = []
+        for doc in validated_docs:
+            # Compter les pages analysées
+            pages_analyzed = doc.pages.filter(is_regulatory_analyzed=True).count()
+            pages_with_annotations = doc.pages.filter(is_annotated=True).count()
+
+            # Vérifier si le fichier PDF existe physiquement
+            import os
+            pdf_file_exists = False
+            if doc.file:
+                try:
+                    pdf_file_exists = os.path.exists(doc.file.path)
+                except Exception:
+                    pdf_file_exists = False
+
+            doc_data = {
+                'id': doc.id,
+                'title': doc.title or f"Document #{doc.id}",
+                'doc_type': doc.doc_type,
+                'source': doc.source,
+                'country': doc.country,
+                'language': doc.language,
+                'validated_at': doc.validated_at.isoformat() if doc.validated_at else None,
+                'is_expert_validated': doc.is_expert_validated,
+                'expert_validated_at': doc.expert_validated_at.isoformat() if doc.expert_validated_at else None,
+                'total_pages': doc.total_pages,
+                'pages_analyzed': pages_analyzed,
+                'pages_with_annotations': pages_with_annotations,
+                'has_enriched_json': bool(doc.enriched_annotations_json),
+                'owner': doc.owner.username if doc.owner else None,
+                'summary': doc.global_annotations_summary[:200] if doc.global_annotations_summary else None,
+                'pdf_file_exists': pdf_file_exists  # NOUVEAU: Indique si le fichier PDF existe
+            }
+            documents_data.append(doc_data)
+
+        return JsonResponse({
+            'success': True,
+            'documents': documents_data,
+            'total_count': len(documents_data)
+        })
+
+    except Exception as e:
+        print(f"Erreur get_validated_documents: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+# ---------------------------------------------------------------------
+#  NOUVEAU : ANALYSE DES RELATIONS PAGE PAR PAGE
+# ---------------------------------------------------------------------
+@expert_required
+@csrf_exempt
+def analyze_document_pages_relations(request, doc_id):
+    """
+    Analyse toutes les pages d'un document validé pour trouver
+    les relations sémantiques possibles page par page
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST requis'})
+
+    try:
+        doc = get_object_or_404(RawDocument, pk=doc_id)
+
+        # Vérifier que le document est validé
+        if not doc.is_validated:
+            return JsonResponse({
+                'success': False,
+                'error': 'Ce document n\'est pas encore validé par un métadonneur'
+            })
+
+        payload = json.loads(request.body.decode('utf-8'))
+        page_numbers = payload.get('page_numbers', [])  # Si vide, analyse toutes les pages
+        force_reanalyze = payload.get('force_reanalyze', False)
+
+        # Récupérer les pages à analyser
+        pages_query = doc.pages.all()
+        if page_numbers:
+            pages_query = pages_query.filter(page_number__in=page_numbers)
+
+        pages_relations = []
+        llm_client = LLMClient()
+
+        if not llm_client.enabled:
+            return JsonResponse({'success': False, 'error': 'LLM non disponible'})
+
+        document_context = {
+            'doc_type': doc.doc_type,
+            'country': doc.country,
+            'language': doc.language,
+            'title': doc.title,
+            'source': doc.source
+        }
+
+        # Analyser chaque page
+        for page in pages_query.order_by('page_number'):
+            # Skip si déjà analysé (sauf si force_reanalyze)
+            if page.regulatory_analysis and not force_reanalyze:
+                # Utiliser l'analyse existante
+                page_data = {
+                    'page_number': page.page_number,
+                    'relations': page.regulatory_analysis.get('relations', []),
+                    'entities': page.regulatory_analysis.get('entities', {}),
+                    'already_analyzed': True
+                }
+                pages_relations.append(page_data)
+                continue
+
+            # Analyser la page pour trouver les relations
+            page_text = page.cleaned_text or page.raw_text
+
+            if not page_text.strip():
+                continue
+
+            prompt = f"""Analysez cette page de document pharmaceutique/réglementaire et identifiez:
+1. Toutes les entités importantes (produits, autorités, dates, procédures, etc.)
+2. Les relations entre ces entités
+3. Les obligations réglementaires
+
+Contexte du document:
+- Titre: {document_context.get('title', 'N/A')}
+- Type: {document_context.get('doc_type', 'N/A')}
+- Source: {document_context.get('source', 'N/A')}
+- Pays: {document_context.get('country', 'N/A')}
+
+Page {page.page_number}/{doc.total_pages}:
+{page_text[:3000]}  # Limiter à 3000 caractères
+
+Retournez un JSON structuré avec:
+{{
+    "entities": {{
+        "products": [],
+        "authorities": [],
+        "procedures": [],
+        "dates": [],
+        "regulations": [],
+        "other": []
+    }},
+    "relations": [
+        {{
+            "source": {{"type": "type_entité", "value": "valeur"}},
+            "target": {{"type": "type_entité", "value": "valeur"}},
+            "type": "type_relation",
+            "description": "Description de la relation",
+            "confidence": 0.9
+        }}
+    ],
+    "obligations": [
+        {{
+            "description": "Description de l'obligation",
+            "deadline": "délai si mentionné",
+            "authority": "autorité concernée"
+        }}
+    ],
+    "summary": "Résumé de la page en 2 phrases max"
+}}"""
+
+            messages = [
+                {
+                    "role": "system",
+                    "content": "Vous êtes un expert en analyse réglementaire pharmaceutique. Analysez précisément et retournez uniquement du JSON valide."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+
+            try:
+                result = llm_client.chat_json(messages=messages, max_tokens=2000)
+
+                if result:
+                    # Sauvegarder l'analyse dans la page
+                    page.regulatory_analysis = result
+                    page.is_regulatory_analyzed = True
+                    page.regulatory_analyzed_at = timezone.now()
+                    page.regulatory_analyzed_by = request.user
+
+                    # Calculer le score d'importance
+                    importance_score = 0
+                    if result.get('obligations'):
+                        importance_score += len(result['obligations']) * 20
+                    if result.get('relations'):
+                        importance_score += len(result['relations']) * 10
+                    if result.get('entities'):
+                        total_entities = sum(len(v) for v in result['entities'].values() if isinstance(v, list))
+                        importance_score += total_entities * 5
+
+                    page.regulatory_importance_score = min(100, importance_score)
+                    page.page_summary = result.get('summary', '')
+                    page.regulatory_obligations = result.get('obligations', [])
+                    page.critical_deadlines = [
+                        ob for ob in result.get('obligations', [])
+                        if ob.get('deadline')
+                    ]
+
+                    page.save()
+
+                    page_data = {
+                        'page_number': page.page_number,
+                        'relations': result.get('relations', []),
+                        'entities': result.get('entities', {}),
+                        'obligations': result.get('obligations', []),
+                        'summary': result.get('summary', ''),
+                        'importance_score': page.regulatory_importance_score,
+                        'newly_analyzed': True
+                    }
+                    pages_relations.append(page_data)
+
+            except Exception as llm_error:
+                print(f"Erreur LLM pour page {page.page_number}: {llm_error}")
+                pages_relations.append({
+                    'page_number': page.page_number,
+                    'error': str(llm_error)
+                })
+
+        # Mettre à jour le JSON enrichi global avec toutes les relations trouvées
+        all_relations = []
+        all_entities = {}
+
+        for page_data in pages_relations:
+            if 'relations' in page_data:
+                for rel in page_data['relations']:
+                    rel['page_number'] = page_data['page_number']
+                    all_relations.extend(page_data['relations'])
+
+            if 'entities' in page_data:
+                for entity_type, entities in page_data['entities'].items():
+                    if entity_type not in all_entities:
+                        all_entities[entity_type] = []
+                    all_entities[entity_type].extend(entities)
+
+        # Dédupliquer les entités
+        for entity_type in all_entities:
+            all_entities[entity_type] = list(set(all_entities[entity_type]))
+
+        # Mettre à jour le JSON enrichi du document
+        if not doc.enriched_annotations_json:
+            doc.enriched_annotations_json = {}
+
+        doc.enriched_annotations_json['page_by_page_analysis'] = {
+            'analyzed_at': timezone.now().isoformat(),
+            'analyzed_by': request.user.username,
+            'pages_analyzed': len(pages_relations),
+            'total_relations_found': len(all_relations),
+            'all_entities': all_entities,
+            'all_relations': all_relations
+        }
+
+        doc.save(update_fields=['enriched_annotations_json'])
+
+        return JsonResponse({
+            'success': True,
+            'pages_analyzed': len(pages_relations),
+            'total_relations': len(all_relations),
+            'pages_data': pages_relations,
+            'message': f"Analyse terminée: {len(all_relations)} relations trouvées sur {len(pages_relations)} pages"
+        })
+
+    except Exception as e:
+        print(f"Erreur analyze_document_pages_relations: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+# ---------------------------------------------------------------------
+#  NOUVEAU : RÉCUPÉRATION DES RELATIONS D'UN DOCUMENT PAGE PAR PAGE
+# ---------------------------------------------------------------------
+@expert_required
+def get_document_page_relations(request, doc_id):
+    """
+    Récupère toutes les relations analysées page par page pour un document
+    """
+    try:
+        doc = get_object_or_404(RawDocument, pk=doc_id)
+
+        if not doc.is_validated:
+            return JsonResponse({
+                'success': False,
+                'error': 'Document non validé'
+            })
+
+        pages_data = []
+        for page in doc.pages.all().order_by('page_number'):
+            if page.regulatory_analysis:
+                page_info = {
+                    'page_number': page.page_number,
+                    'summary': page.page_summary,
+                    'importance_score': page.regulatory_importance_score,
+                    'relations': page.regulatory_analysis.get('relations', []),
+                    'entities': page.regulatory_analysis.get('entities', {}),
+                    'obligations': page.regulatory_analysis.get('obligations', []),
+                    'analyzed_at': page.regulatory_analyzed_at.isoformat() if page.regulatory_analyzed_at else None
+                }
+                pages_data.append(page_info)
+
+        # Récupérer aussi l'analyse globale si elle existe
+        global_analysis = None
+        if doc.enriched_annotations_json and 'page_by_page_analysis' in doc.enriched_annotations_json:
+            global_analysis = doc.enriched_annotations_json['page_by_page_analysis']
+
+        return JsonResponse({
+            'success': True,
+            'document': {
+                'id': doc.id,
+                'title': doc.title,
+                'total_pages': doc.total_pages,
+                'validated_at': doc.validated_at.isoformat() if doc.validated_at else None
+            },
+            'pages': pages_data,
+            'global_analysis': global_analysis,
+            'total_pages_analyzed': len([p for p in pages_data if p.get('relations') or p.get('entities')])
+        })
+
+    except Exception as e:
+        print(f"Erreur get_document_page_relations: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@expert_required
+def get_single_page_relations(request, doc_id, page_num):
+    """
+    Récupère les relations sémantiques d'une seule page spécifique
+    """
+    try:
+        doc = get_object_or_404(RawDocument, pk=doc_id)
+        page = doc.pages.filter(page_number=page_num).first()
+
+        if not page:
+            return JsonResponse({
+                'success': False,
+                'error': f'Page {page_num} non trouvée'
+            })
+
+        relations = []
+        is_analyzed = page.is_regulatory_analyzed
+
+        if page.regulatory_analysis and 'relations' in page.regulatory_analysis:
+            relations = page.regulatory_analysis['relations']
+
+        return JsonResponse({
+            'success': True,
+            'page_number': page_num,
+            'is_analyzed': is_analyzed,
+            'relations': relations,
+            'entities': page.regulatory_analysis.get('entities', {}) if page.regulatory_analysis else {},
+            'summary': page.page_summary or '',
+            'analyzed_at': page.regulatory_analyzed_at.isoformat() if page.regulatory_analyzed_at else None
+        })
+
+    except Exception as e:
+        print(f"Erreur get_single_page_relations: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@expert_required
+@csrf_exempt
+def delete_page_relation(request, doc_id, page_num, relation_index):
+    """
+    Supprime une relation spécifique d'une page
+    """
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'DELETE required'}, status=405)
+
+    try:
+        doc = get_object_or_404(RawDocument, pk=doc_id)
+        page = doc.pages.filter(page_number=page_num).first()
+
+        if not page:
+            return JsonResponse({
+                'success': False,
+                'error': f'Page {page_num} non trouvée'
+            })
+
+        if not page.regulatory_analysis or 'relations' not in page.regulatory_analysis:
+            return JsonResponse({
+                'success': False,
+                'error': 'Aucune relation trouvée pour cette page'
+            })
+
+        relations = page.regulatory_analysis['relations']
+
+        if relation_index < 0 or relation_index >= len(relations):
+            return JsonResponse({
+                'success': False,
+                'error': 'Index de relation invalide'
+            })
+
+        # Supprimer la relation
+        deleted_relation = relations.pop(relation_index)
+
+        # Sauvegarder
+        page.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Relation supprimée avec succès',
+            'deleted_relation': deleted_relation
+        })
+
+    except Exception as e:
+        print(f"Erreur delete_page_relation: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})

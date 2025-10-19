@@ -151,9 +151,9 @@ ALLOWED_DOCUMENT_TYPES = [
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Auth redirects
-LOGIN_URL           = '/rawdocs/'
-LOGIN_REDIRECT_URL  = '/rawdocs/upload/'
-LOGOUT_REDIRECT_URL = '/rawdocs/'
+LOGIN_URL           = '/'
+LOGIN_REDIRECT_URL  = '/upload/'
+LOGOUT_REDIRECT_URL = '/'
 
 
 # Default primary key field type
@@ -198,6 +198,9 @@ if not DEBUG:
 else:
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
+
+# Autoriser l'affichage des fichiers dans les iframes du même domaine
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 CONVERTIO_API_KEY = "c14c6e0d62a6a7a98acb9bc629bbd273"
 

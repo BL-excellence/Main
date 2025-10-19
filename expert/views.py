@@ -1,4 +1,4 @@
-# expert/views.py
+﻿# expert/views.py
 import os
 import threading
 
@@ -394,8 +394,8 @@ def create_annotation_ajax(request):
         # MAJ page + JSON global (fusion) + déclenchement résumé global
         try:
             build_page_summary_and_json(page, request.user)
-            update_document_global_json(page.document, request.user)
-            trigger_summary_regeneration_safe(page.document, request.user, 3)
+            # Resume global (IMMEDIATE pour action manuelle expert - ignore le throttling)
+            REGENERATION_CACHE.pop(page.document.id, None); trigger_summary_regeneration_safe(page.document, request.user, 0)  # Immediate for manual expert action
         except Exception as e:
             print(f"✖️ Erreur MAJ JSON/summary (create): {e}")
 
@@ -482,8 +482,8 @@ def modify_annotation_ajax(request, annotation_id):
                 print(f"❌ Fallback page summary échoué: {e2}")
 
         # Déclenchement régénération globale (async)
-        try:
-            trigger_summary_regeneration_safe(page.document, request.user, 3)
+            # Resume global (IMMEDIATE pour action manuelle expert - ignore le throttling)
+            REGENERATION_CACHE.pop(page.document.id, None); trigger_summary_regeneration_safe(page.document, request.user, 0)  # Immediate for manual expert action
         except Exception as e:
             print(f"⚠️ Erreur déclenchement régénération (modify): {e}")
 
@@ -531,7 +531,7 @@ def debug_json_fusion(document, user_action="unknown"):
             json_entities_count = sum(len(values) for values in entities.values())
             json_entities_types = list(entities.keys())
 
-        print(f"🔍 DEBUG FUSION - Action: {user_action}")
+        print(f"[DEBUG] FUSION - Action: {user_action}")
         print(f"   📊 Annotations par statut: {status_counts}")
         print(f"   📊 Total annotations en DB: {total_annotations}")
         print(f"   📋 Total entités en JSON: {json_entities_count}")
@@ -1397,7 +1397,7 @@ def save_page_json(request, page_id):
 #             # Pack Size (ex: 20 comprimÃ©s, 100 ml, 6 sachets)
 #             pack_vals = set()
 #             for m in re.finditer(
-#                     r"(?i)\b([0-9]{1,4}\s*(?:comprim[Ã©e]s?|g[Ã©e]lules?|capsules?|sachets?|ml|ampoules?|unit[eÃ©]s?))\b",
+#                     r"(?i)\b([0-9]{1,4}\s*(?:comprim[ée]s?|g[ée]lules?|capsules?|sachets?|ml|ampoules?|unit[eÃ©]s?))\b",
 #                     new_summary):
 #                 pack_vals.add(m.group(1))
 #             if pack_vals:
@@ -1406,7 +1406,7 @@ def save_page_json(request, page_id):
 #             # Pharmaceutical Form
 #             form_vals = set()
 #             for m in re.finditer(
-#                     r"(?i)\b(comprim[Ã©e]s?|g[Ã©e]lules?|capsules?|sirop|solution|suspension|poudre|injectable|tablet[s]?)\b",
+#                     r"(?i)\b(comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable|tablet[s]?)\b",
 #                     new_summary):
 #                 form_vals.add(m.group(0))
 #             if form_vals:
@@ -1581,7 +1581,7 @@ def save_page_json(request, page_id):
 #             'entities_changes': human_diffs,
 #         })
 #     except Exception as e:
-#         print(f"âŒ save_summary_changes error: {e}")
+#         import traceback; print(f"[ERROR] save_summary_changes error: {e}"); print(traceback.format_exc())
 #         return JsonResponse({'error': str(e)}, status=500)
 
 # Modifier dans expert/views.py - Remplacer la fonction save_summary_changes existante
@@ -1657,7 +1657,7 @@ def save_summary_changes(request, doc_id):
                         if entity_type in allowed_keys:
                             current_entities[entity_type] = list(set(current_entities.get(entity_type, []) + values))
             except Exception as e:
-                print(f"âš ï¸ Erreur annotation IA automatique: {e}")
+                import traceback; print(f"[WARNING] Erreur annotation IA automatique: {e}"); print(traceback.format_exc())
 
         # Extraction des entitÃ©s du nouveau rÃ©sumÃ© (mÃ©thode existante)
         extracted_by_keys = extract_by_allowed_keys(new_summary, allowed_keys)
@@ -1690,7 +1690,7 @@ def save_summary_changes(request, doc_id):
             # Pack Size
             pack_vals = set()
             for m in re.finditer(
-                    r"(?i)\b([0-9]{1,4}\s*(?:comprim[Ã©e]s?|gÃ©?lules?|capsules?|sachets?|ml|ampoules?|unit[eÃ©]s?))\b",
+                    r"(?i)\b([0-9]{1,4}\s*(?:comprim[ée]s?|gÃ©?lules?|capsules?|sachets?|ml|ampoules?|unit[eÃ©]s?))\b",
                     new_summary):
                 pack_vals.add(m.group(1))
             if pack_vals:
@@ -1699,7 +1699,7 @@ def save_summary_changes(request, doc_id):
             # Pharmaceutical Form
             form_vals = set()
             for m in re.finditer(
-                    r"(?i)\b(comprim[Ã©e]s?|gÃ©?lules?|capsules?|sirop|solution|suspension|poudre|injectable|tablet[s]?)\b",
+                    r"(?i)\b(comprim[ée]s?|gÃ©?lules?|capsules?|sirop|solution|suspension|poudre|injectable|tablet[s]?)\b",
                     new_summary):
                 form_vals.add(m.group(0))
             if form_vals:
@@ -1835,7 +1835,7 @@ def save_summary_changes(request, doc_id):
         })
 
     except Exception as e:
-        print(f"â›” save_summary_changes error: {e}")
+        import traceback; print(f"[ERROR] save_summary_changes error: {e}"); print(traceback.format_exc())
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -1929,7 +1929,7 @@ def save_summary_changes(request, doc_id):
 #         return {}
 #
 #     except Exception as e:
-#         print(f"âš ï¸ Erreur annotation IA automatique: {e}")
+#         import traceback; print(f"[WARNING] Erreur annotation IA automatique: {e}"); print(traceback.format_exc())
 #         return {}
 
 
@@ -2211,26 +2211,26 @@ def extract_entities_from_text(text: str) -> dict:
     """
     base_patterns = {
         'Product': [
-            r'\b(?:produit|mÃ©dicament|product)\b\s*:?\s*((?-i:[A-Z])[\wÃ€-Ã¿\s\-\/]{2,60})',
-            r'\b(?:produit|product)\b\s+(?:est|is)\s+((?-i:[A-Z])[\wÃ€-Ã¿\s\-\/]{2,60})',
-            r'^(?:le\s+|the\s+)?([A-Z][\wÃ€-Ã¿\s\-\/]{3,60})\s+(?:est|sera|contient|is|contains)\b',
-            r'(?:nom du produit|product name)\s*:?\s*([A-Z][\wÃ€-Ã¿\s\-\/]{2,60})'
+            r'\b(?:produit|médicament|product)\b\s*:?\s*((?-i:[A-Z])[\w\s\-\/]{2,60})',
+            r'\b(?:produit|product)\b\s+(?:est|is)\s+((?-i:[A-Z])[\w\s\-\/]{2,60})',
+            r'^(?:le\s+|the\s+)?([A-Z][\w\s\-\/]{3,60})\s+(?:est|sera|contient|is|contains)\b',
+            r'(?:nom du produit|product name)\s*:?\s*([A-Z][\w\s\-\/]{2,60})'
         ],
         'Dosage': [
             r'\b([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|UI|iu|mg\/ml|g\/l))\b',
             r'(?:dosage|posologie|concentration|strength)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|UI|iu|mg\/ml|g\/l))',
         ],
         'Substance_Active': [
-            r'(?:substance active|principe actif|active ingredient)\s*:?\s*([A-Z][\wÃ€-Ã¿\s\-]{2,60})',
-            r'(?:contient|Ã  base de|contains)\s+([A-Z][\wÃ€-Ã¿\s\-]{2,60})'
+            r'(?:substance active|principe actif|active ingredient)\s*:?\s*([A-Z][\w\s\-]{2,60})',
+            r'(?:contient|à base de|contains)\s+([A-Z][\w\s\-]{2,60})'
         ],
         'Site': [
-            r'(?:site|usine|fabricant|manufacturing site|manufacturer)\s*:?\s*([A-Z][\wÃ€-Ã¿\s\.\-]{2,80})',
-            r'(?:fabriqu[Ã©e]|produit|manufactured|made)\s*(?:Ã |par|by|in)\s*([A-Z][\wÃ€-Ã¿\s\.\-]{2,80})'
+            r'(?:site|usine|fabricant|manufacturing site|manufacturer)\s*:?\s*([A-Z][\w\s\.\-]{2,80})',
+            r'(?:fabriqu[ée]|produit|manufactured|made)\s*(?:à|par|by|in)\s*([A-Z][\w\s\.\-]{2,80})'
         ],
         'Pays': [
-            r'(?:pays|country)\s*:?\s*([A-Z][\wÃ€-Ã¿\s\-]{2,40})',
-            r'(?:en|au|aux|in)\s+([A-Z][\wÃ€-Ã¿\s\-]{2,40})(?=[\s,\.]|$)'
+            r'(?:pays|country)\s*:?\s*([A-Z][\w\s\-]{2,40})',
+            r'(?:en|au|aux|in)\s+([A-Z][\w\s\-]{2,40})(?=[\s,\.]|$)'
         ],
         'Strength': [
             r'(?:strength|force|puissance|teneur)\s*(?:de|:)?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|UI|iu))',
@@ -2238,19 +2238,19 @@ def extract_entities_from_text(text: str) -> dict:
             r'(?:est\s+de|is)\s*([0-9]+(?:[.,][0-9]+)?\s*(?:mg|g|ml|l|Âµg|mcg|%|UI|iu))',
         ],
         'Form': [
-            r'(?:forme|form|presentation|pharmaceutical form)\s*:?\s*(\b(?:comprim[Ã©e]s?|g[Ã©e]lules?|capsules?|sirop|solution|suspension|poudre|injectable|gel|cr[Ã¨e]me|onguent|suppositoire|tablet[s]?)\b)',
-            r'(?:sous\s+forme\s+de|as\s+a)\s*(\b(?:comprim[Ã©e]s?|g[Ã©e]lules?|capsules?|sirop|solution|suspension|poudre|injectable|gel|cr[Ã¨e]me|onguent|suppositoire|tablet[s]?)\b)',
+            r'(?:forme|form|presentation|pharmaceutical form)\s*:?\s*(\b(?:comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable|gel|cr[èe]me|onguent|suppositoire|tablet[s]?)\b)',
+            r'(?:sous\s+forme\s+de|as\s+a)\s*(\b(?:comprim[ée]s?|g[ée]lules?|capsules?|sirop|solution|suspension|poudre|injectable|gel|cr[èe]me|onguent|suppositoire|tablet[s]?)\b)',
         ],
         'Batch_Size': [
-            r'(?:taille de lot|batch size|lot)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:unitÃ©s?|comprim[Ã©e]s?|g[Ã©e]lules?|capsules?|batches?))',
+            r'(?:taille de lot|batch size|lot)\s*:?\s*([0-9]+(?:[.,][0-9]+)?\s*(?:unités?|comprim[ée]s?|g[ée]lules?|capsules?|batches?))',
         ],
         'Shelf_Life': [
-            r'(?:durÃ©e de conservation|shelf life|pÃ©remption|expiry)\s*:?\s*([0-9]+\s*(?:mois|ans?|months?|years?|m|y))',
+            r'(?:durée de conservation|shelf life|péremption|expiry)\s*:?\s*([0-9]+\s*(?:mois|ans?|months?|years?|m|y))',
         ],
-        # --- NOUVEAU : Dates (mois + annÃ©e, d/m/Y, Y-m, etc.) ---
+        # --- NOUVEAU : Dates (mois + année, d/m/Y, Y-m, etc.) ---
         'Date': [
-            r'\b(?:\d{1,2}\s+)?(?:janvier|fÃ©vrier|fevrier|mars|avril|mai|juin|juillet|aoÃ»t|aout|septembre|octobre|novembre|dÃ©cembre|decembre|jan|janv\.?|fÃ©vr\.?|fevr\.?|avr\.?|juil\.?|sept\.?|oct\.?|nov\.?|dÃ©c\.?|dec\.?|january|february|march|april|may|june|july|august|september|october|november|december|jan\.?|feb\.?|mar\.?|apr\.?|jun\.?|jul\.?|aug\.?|sep\.?|oct\.?|nov\.?|dec\.?)\s*[,/-]?\s*(20\d{2}|19\d{2})\b',
-            r'\b(0?[1-9]|[12][0-9]|3[01])\s+(?:janvier|fÃ©vrier|fevrier|mars|avril|mai|juin|juillet|aoÃ»t|aout|septembre|octobre|novembre|dÃ©cembre|decembre|january|february|march|april|may|june|july|august|september|october|november|december)\s*(20\d{2}|19\d{2})\b',
+            r'\b(?:\d{1,2}\s+)?(?:janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre|jan|janv\.?|févr\.?|fevr\.?|avr\.?|juil\.?|sept\.?|oct\.?|nov\.?|déc\.?|dec\.?|january|february|march|april|may|june|july|august|september|october|november|december|jan\.?|feb\.?|mar\.?|apr\.?|jun\.?|jul\.?|aug\.?|sep\.?|oct\.?|nov\.?|dec\.?)\s*[,/-]?\s*(20\d{2}|19\d{2})\b',
+            r'\b(0?[1-9]|[12][0-9]|3[01])\s+(?:janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre|january|february|march|april|may|june|july|august|september|october|november|december)\s*(20\d{2}|19\d{2})\b',
             r'\b(0?[1-9]|1[0-2])[/-](20\d{2}|19\d{2})\b',
             r'\b(20\d{2}|19\d{2})-(0?[1-9]|1[0-2])\b',
             r'\b(0?[1-9]|[12][0-9]|3[01])[/-](0?[1-9]|1[0-2])[/-](20\d{2}|19\d{2})\b',
@@ -2473,8 +2473,8 @@ def _build_synonym_map(existing_keys: list[str]) -> dict:
             'date effective', 'date limite', 'date de validitÃ©', 'date de validite'
         ])
 
-    # DÃ©lai / Duration (durÃ©es, Ã  distinguer des dates)
-    bind('Delay', ['dÃ©lai', 'delai', 'durÃ©e', 'duree', 'duration', 'timeframe'])
+    # DÃ©lai / Duration (durées, Ã  distinguer des dates)
+    bind('Delay', ['dÃ©lai', 'delai', 'durée', 'duree', 'duration', 'timeframe'])
 
     return syn
 
@@ -2859,7 +2859,7 @@ def expert_annotate_document(request, doc_id):
 
 # Variables globales pour la gestion des rÃ©gÃ©nÃ©rations
 REGENERATION_CACHE = {}
-CACHE_DURATION = 30  # secondes entre rÃ©gÃ©nÃ©rations pour un mÃªme document
+CACHE_DURATION = 5  # secondes entre rÃ©gÃ©nÃ©rations pour un mÃªme document
 
 
 def should_regenerate_summary(document_id):
@@ -2892,7 +2892,7 @@ def trigger_summary_regeneration(document, user):
         result = auto_regenerate_summary_from_annotations(fake_request, document.id)
 
         if hasattr(result, 'status_code') and result.status_code == 200:
-            print(f"âœ… RÃ©gÃ©nÃ©ration rÃ©sumÃ© rÃ©ussie pour doc {document.id}")
+            print(f"[OK] Regeneration resume reussie pour doc {document.id}")
             return True
         else:
             print(f"âš ï¸ RÃ©gÃ©nÃ©ration rÃ©sumÃ© Ã©chouÃ©e pour doc {document.id}")
@@ -2903,27 +2903,23 @@ def trigger_summary_regeneration(document, user):
         return False
 
 
-def trigger_summary_regeneration_safe(document, user, delay_seconds=5):
-    """
-    Version sÃ©curisÃ©e avec dÃ©lai pour Ã©viter les rÃ©gÃ©nÃ©rations trop frÃ©quentes
-    """
+def trigger_summary_regeneration_safe(document, user, delay_seconds=1):  # Réduire de 5 à 1 seconde
+    """Version sécurisée avec délai réduit"""
     import time
     import threading
 
     def delayed_regeneration():
         try:
-            time.sleep(delay_seconds)  # Attendre un peu pour Ã©viter les appels multiples
+            time.sleep(delay_seconds)
             trigger_summary_regeneration(document, user)
         except Exception as e:
-            print(f"âš ï¸ Erreur rÃ©gÃ©nÃ©ration diffÃ©rÃ©e: {e}")
+            print(f"⚠️ Erreur régénération différée: {e}")
 
-    # ExÃ©cuter la rÃ©gÃ©nÃ©ration dans un thread sÃ©parÃ©
     thread = threading.Thread(target=delayed_regeneration)
     thread.daemon = True
     thread.start()
 
-    print(f"ðŸ”„ RÃ©gÃ©nÃ©ration automatique programmÃ©e dans {delay_seconds}s pour doc {document.id}")
-
+    print(f"🔄 Régénération programmée dans {delay_seconds}s pour doc {document.id}")
 
 # ===== FONCTIONS POUR L'ANNOTATION AUTOMATIQUE PAR IA =====
 
@@ -3328,11 +3324,11 @@ def await_ai_extract_and_annotate(document, old_summary, new_summary, allowed_ke
                 return created_map
 
             except Exception as e:
-                print(f"âš ï¸ Erreur annotation IA automatique: {e}")
+                import traceback; print(f"[WARNING] Erreur annotation IA automatique: {e}"); print(traceback.format_exc())
                 return {}
 
     except Exception as e:
-        print(f"âš ï¸ Erreur annotation IA automatique: {e}")
+        import traceback; print(f"[WARNING] Erreur annotation IA automatique: {e}"); print(traceback.format_exc())
         return {}
 
 
@@ -3640,7 +3636,7 @@ def cleanup_regeneration_cache():
         del REGENERATION_CACHE[key]
 
     if expired_keys:
-        print(f"ðŸ§¹ Cache rÃ©gÃ©nÃ©ration nettoyÃ©: {len(expired_keys)} entrÃ©es supprimÃ©es")
+        print(f"[CLEANUP] Cache regeneration nettoye: {len(expired_keys)} entrÃ©es supprimÃ©es")
 
 
 # ===== DÃ‰CORATEUR POUR EVITER LES APPELS TROP FREQUENTS =====
@@ -3948,8 +3944,10 @@ def expert_save_manual_annotation(request):
             page.document.save(update_fields=['global_annotations_json'])
 
             # rÃ©sumÃ© global (asynchrone / throttlÃ©)
+            # Resume global (IMMEDIATE pour action manuelle expert - ignore le throttling)
             try:
-                trigger_summary_regeneration_safe(page.document, request.user, 3)
+                REGENERATION_CACHE.pop(page.document.id, None)
+                trigger_summary_regeneration_safe(page.document, request.user, 0)  # Immediate for manual expert action
             except Exception as e:
                 print(f"âš ï¸ Erreur dÃ©clenchement rÃ©gÃ©nÃ©ration document (manual): {e}")
 
@@ -4092,7 +4090,8 @@ def expert_delete_annotation(request, annotation_id):
             document.save(update_fields=['global_annotations_json'])
 
             try:
-                trigger_summary_regeneration_safe(document, request.user, 3)
+                REGENERATION_CACHE.pop(document.id, None)
+                trigger_summary_regeneration_safe(document, request.user, 0)  # Immediate for manual expert action
             except Exception as e:
                 print(f"âš ï¸ Erreur dÃ©clenchement rÃ©gÃ©nÃ©ration aprÃ¨s suppression: {e}")
 
@@ -4589,9 +4588,7 @@ def generate_regulatory_analysis(request, doc_id):
 @user_passes_test(is_expert)
 @csrf_exempt
 def save_page_summary(request, page_id):
-    """
-    Version amÃ©liorÃ©e qui utilise le JSON de page existant pour une synchronisation intelligente.
-    """
+    """Version corrigée avec gestion d'erreurs robuste"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -4604,49 +4601,93 @@ def save_page_summary(request, page_id):
         auto_delete = data.get('auto_delete', True)
 
         if not new_summary:
-            return JsonResponse({'error': 'RÃ©sumÃ© vide'}, status=400)
+            return JsonResponse({'error': 'Résumé vide'}, status=400)
 
-        # Sauvegarder l'ancien rÃ©sumÃ© pour comparaison
         old_summary = page.annotations_summary or ""
 
-        # UTILISER LA NOUVELLE FONCTION DE SYNCHRONISATION INTELLIGENTE
-        if auto_annotate and old_summary != new_summary:
-            sync_result = synchronize_page_annotations_with_summary(
-                page=page,
-                old_summary=old_summary,
-                new_summary=new_summary,
-                user=request.user,
-                auto_delete=auto_delete
-            )
-        else:
-            sync_result = {
-                'annotations_created': 0,
-                'annotations_deleted': 0,
-                'annotations_rejected': 0,
-                'details': {}
-            }
+        print(f"\n{'=' * 60}")
+        print(f"📝 SAVE_PAGE_SUMMARY - Page {page.page_number}")
+        print(f"   Auto-annotate: {auto_annotate}, Auto-delete: {auto_delete}")
+        print(f"{'=' * 60}\n")
 
-        # Sauvegarder le nouveau rÃ©sumÃ©
+        # Initialiser sync_result avec structure complète
+        sync_result = {
+            'annotations_created': 0,
+            'annotations_deleted': 0,
+            'annotations_rejected': 0,
+            'details': {},
+            'errors': []  # ✅ Toujours initialiser
+        }
+
+        # SYNCHRONISATION
+        if auto_annotate and old_summary != new_summary:
+            try:
+                result = synchronize_page_annotations_with_summary(
+                    page=page,
+                    old_summary=old_summary,
+                    new_summary=new_summary,
+                    user=request.user,
+                    auto_delete=auto_delete
+                )
+
+                # ✅ Fusionner les résultats de manière sûre
+                if isinstance(result, dict):
+                    sync_result['annotations_created'] = result.get('annotations_created', 0)
+                    sync_result['annotations_deleted'] = result.get('annotations_deleted', 0)
+                    sync_result['annotations_rejected'] = result.get('annotations_rejected', 0)
+                    sync_result['details'] = result.get('details', {})
+                    # ✅ Ajouter les erreurs s'il y en a
+                    if 'errors' in result:
+                        sync_result['errors'].extend(result['errors'])
+
+                print(
+                    f"✅ Synchronisation OK: +{sync_result['annotations_created']} -{sync_result['annotations_deleted']}")
+
+            except Exception as e:
+                error_msg = f"Erreur synchronisation: {str(e)}"
+                print(f"❌ {error_msg}")
+                import traceback
+                traceback.print_exc()
+                sync_result['errors'].append(error_msg)
+
+        # Sauvegarder le résumé
         page.annotations_summary = new_summary
         page.annotations_summary_generated_at = timezone.now()
         page.save(update_fields=['annotations_summary', 'annotations_summary_generated_at'])
 
-        # Reconstruire le JSON de la page
-        build_page_summary_and_json(page, request.user)
+        # Reconstruire le JSON
+        try:
+            build_page_summary_and_json(page, request.user)
+        except Exception as e:
+            error_msg = f"Erreur JSON: {str(e)}"
+            print(f"❌ {error_msg}")
+            sync_result['errors'].append(error_msg)
 
-        response_data = {
+        # Message
+        message = 'Résumé sauvegardé'
+        if sync_result['annotations_created'] > 0 or sync_result['annotations_deleted'] > 0:
+            message = f"Synchronisation : +{sync_result['annotations_created']} -{sync_result['annotations_deleted']}"
+
+        # ✅ Vérification sûre des erreurs
+        if sync_result.get('errors'):  # Utiliser .get() au lieu d'accès direct
+            message += f" ({len(sync_result['errors'])} erreur(s))"
+
+        return JsonResponse({
             'success': True,
-            'message': f'Synchronisation intelligente rÃ©ussie : {sync_result["annotations_created"]} crÃ©Ã©es, {sync_result["annotations_deleted"] + sync_result["annotations_rejected"]} supprimÃ©es',
+            'message': message,
             'summary': new_summary,
             'sync_result': sync_result
-        }
-
-        return JsonResponse(response_data)
+        })
 
     except Exception as e:
-        print(f"Erreur synchronisation intelligente page {page_id}: {e}")
-        return JsonResponse({'error': f'Erreur: {str(e)}'}, status=500)
-
+        error_msg = f"Erreur save_page_summary: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': error_msg
+        }, status=500)
 # helpers -------------------------------------------------------------
 
 from typing import Dict, List, Iterable
@@ -5216,138 +5257,252 @@ def remove_page_annotations_for_entity_enhanced(page, entity_type, entity_value,
 
 def synchronize_page_annotations_with_summary(page, old_summary, new_summary, user, auto_delete=True):
     """
-    Synchronisation intelligente qui prend en compte le JSON de page existant
-    pour une analyse prÃ©cise des modifications et une annotation automatique optimisÃ©e.
+    VERSION DEBUG ULTRA-SIMPLE
     """
+    sync_result = {
+        'annotations_created': 0,
+        'annotations_deleted': 0,
+        'annotations_rejected': 0,
+        'details': {'added': {}, 'removed': {}},
+        'errors': []
+    }
+
     try:
-        from rawdocs.groq_annotation_system import GroqAnnotator
-        from django.utils import timezone
+        print(f"\n{'=' * 80}")
+        print(f"DEBUG SYNCHRONISATION - Page {page.page_number}")
+        print(f"{'=' * 80}")
+        print(f"\n📄 ANCIEN RÉSUMÉ:")
+        print(old_summary[:500])
+        print(f"\n📄 NOUVEAU RÉSUMÉ:")
+        print(new_summary[:500])
 
-        # 1. RÃ‰CUPÃ‰RER LE CONTEXTE EXISTANT
-        existing_json = getattr(page, 'annotations_json', {}) or {}
-        existing_entities = existing_json.get('entities', {})
-        page_text = _get_page_text(page)
+        # Extraction manuelle simple pour les dates
+        import re
 
-        # 2. ANALYSER LES CHANGEMENTS AVEC IA
-        ai_analysis = analyze_summary_changes_with_ai(
-            page=page,
-            old_summary=old_summary,
-            new_summary=new_summary,
-            existing_entities=existing_entities,
-            page_text=page_text
-        )
+        def extract_dates_simple(text):
+            """Extraction ultra-simple des dates"""
+            dates = []
+            # Chercher format "mai 2012", "May 2012", etc.
+            for match in re.finditer(
+                    r'\b(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+(\d{4})\b',
+                    text, re.IGNORECASE):
+                dates.append(match.group(0))
+            return dates
 
-        sync_result = {
-            'annotations_created': 0,
-            'annotations_deleted': 0,
-            'annotations_rejected': 0,
-            'details': {
-                'added': {},
-                'removed': {},
-                'modified': {},
-                'ai_analysis': ai_analysis
-            }
-        }
+        old_dates = extract_dates_simple(old_summary or "")
+        new_dates = extract_dates_simple(new_summary or "")
 
-        # 3. TRAITEMENT DES SUPPRESSIONS (basÃ© sur l'analyse IA)
-        entities_to_remove = ai_analysis.get('entities_to_remove', {})
-        if entities_to_remove and auto_delete:
-            for entity_type, values in entities_to_remove.items():
-                for value in values:
-                    result = remove_page_annotations_for_entity_enhanced(
-                        page=page,
-                        entity_type=entity_type,
-                        entity_value=value,
-                        user=user,
-                        existing_json=existing_json,
-                        confidence_threshold=ai_analysis.get('removal_confidence', 0.8)
-                    )
-                    sync_result['annotations_rejected'] += result['count']
+        print(f"\n📅 DATES DÉTECTÉES:")
+        print(f"   Anciennes: {old_dates}")
+        print(f"   Nouvelles: {new_dates}")
 
-        # 4. TRAITEMENT DES AJOUTS (basÃ© sur l'analyse IA + recherche dans le texte)
-        entities_to_add = ai_analysis.get('entities_to_add', {})
-        if entities_to_add:
-            for entity_type, values in entities_to_add.items():
-                for value_data in values:
-                    if isinstance(value_data, dict):
-                        value = value_data.get('value', '')
-                        confidence = value_data.get('confidence', 0.7)
-                        context = value_data.get('context', '')
+        # Normaliser pour comparaison
+        old_dates_lower = [d.lower().strip() for d in old_dates]
+        new_dates_lower = [d.lower().strip() for d in new_dates]
+
+        # Trouver suppressions et ajouts
+        removed_dates = [d for d in old_dates if d.lower().strip() not in new_dates_lower]
+        added_dates = [d for d in new_dates if d.lower().strip() not in old_dates_lower]
+
+        print(f"\n🔄 CHANGEMENTS:")
+        print(f"   ❌ À supprimer: {removed_dates}")
+        print(f"   ✅ À ajouter: {added_dates}")
+
+        # TRAITER LES SUPPRESSIONS
+        if removed_dates and auto_delete:
+            for date_value in removed_dates:
+                print(f"\n{'—' * 40}")
+                print(f"❌ SUPPRESSION DE: '{date_value}'")
+
+                # Chercher toutes les annotations de type Date sur cette page
+                all_page_annotations = Annotation.objects.filter(
+                    page=page,
+                    validation_status__in=['pending', 'validated', 'expert_created']
+                )
+
+                print(f"   📊 {all_page_annotations.count()} annotations totales sur la page")
+
+                # Filtrer par type Date
+                date_annotations = []
+                for ann in all_page_annotations:
+                    type_name = ann.annotation_type.name.lower()
+                    if 'date' in type_name or 'deadline' in type_name:
+                        date_annotations.append(ann)
+
+                print(f"   📅 {len(date_annotations)} annotations de type Date")
+
+                # Chercher correspondance
+                matched = []
+                for ann in date_annotations:
+                    ann_text = ann.selected_text.strip()
+                    print(f"      Comparaison: '{date_value}' vs '{ann_text}'")
+
+                    # Normaliser les deux
+                    norm1 = normalize_date_format(date_value)
+                    norm2 = normalize_date_format(ann_text)
+                    print(f"         Normalisé: '{norm1}' vs '{norm2}'")
+
+                    # Utiliser la fonction are_dates_equivalent pour gérer FR/EN
+                    if are_dates_equivalent(date_value, ann_text):
+                        matched.append(ann)
+                        print(f"         ✅ MATCH TROUVÉ (dates équivalentes)!")
                     else:
-                        value = str(value_data)
-                        confidence = 0.7
-                        context = ''
+                        print(f"         ❌ Dates différentes: '{date_value}' != '{ann_text}'")
 
-                    # CrÃ©er l'annotation avec recherche intelligente dans le texte
-                    annotation_created = create_page_annotation_with_smart_positioning(
-                        page=page,
-                        entity_type=entity_type,
-                        entity_value=value,
-                        user=user,
-                        confidence=confidence,
-                        context=context,
-                        existing_json=existing_json
-                    )
+                if matched:
+                    print(f"   ✅ {len(matched)} annotation(s) correspondante(s) trouvée(s)")
+                    for ann in matched:
+                        ann.validation_status = 'rejected'
+                        ann.validated_by = user
+                        ann.validated_at = timezone.now()
+                        ann.save()
+                        sync_result['annotations_rejected'] += 1
+                        print(f"      ⛔ Annotation {ann.id} rejetée: '{ann.selected_text}'")
+                else:
+                    print(f"   ⚠️ AUCUNE annotation correspondante trouvée!")
+                    sync_result['errors'].append(f"Annotation non trouvée pour: {date_value}")
 
-                    if annotation_created:
+        # TRAITER LES AJOUTS
+        if added_dates:
+            print(f"\n{'—' * 40}")
+            print(f"✅ AJOUTS:")
+            for date_value in added_dates:
+                print(f"   Nouvelle date à annoter: '{date_value}'")
+
+                # Créer l'annotation automatiquement
+                try:
+                    # Déterminer le type d'annotation (Date par défaut)
+                    annotation_type_name = 'Date'
+
+                    # Appeler la fonction de création
+                    created = create_page_annotation_if_exists(page, annotation_type_name, date_value, user)
+
+                    if created:
                         sync_result['annotations_created'] += 1
-                        sync_result['details']['added'].setdefault(entity_type, []).append(value)
+                        print(f"      ✅ Annotation créée avec succès pour '{date_value}'")
+                    else:
+                        print(f"      ⚠️ Impossible de créer l'annotation pour '{date_value}'")
+                        sync_result['errors'].append(f"Création échouée: {date_value}")
 
-        # 5. TRAITEMENT DES MODIFICATIONS
-        entities_to_modify = ai_analysis.get('entities_to_modify', {})
-        if entities_to_modify:
-            for entity_type, modifications in entities_to_modify.items():
-                for mod in modifications:
-                    old_value = mod.get('old_value', '')
-                    new_value = mod.get('new_value', '')
+                except Exception as e:
+                    error_msg = f"Erreur création pour '{date_value}': {str(e)}"
+                    print(f"      ❌ {error_msg}")
+                    sync_result['errors'].append(error_msg)
 
-                    # Supprimer l'ancienne valeur
-                    remove_result = remove_page_annotations_for_entity_enhanced(
-                        page=page,
-                        entity_type=entity_type,
-                        entity_value=old_value,
-                        user=user,
-                        existing_json=existing_json
-                    )
-
-                    # Ajouter la nouvelle valeur
-                    annotation_created = create_page_annotation_with_smart_positioning(
-                        page=page,
-                        entity_type=entity_type,
-                        entity_value=new_value,
-                        user=user,
-                        confidence=mod.get('confidence', 0.8),
-                        existing_json=existing_json
-                    )
-
-                    if remove_result['count'] > 0 and annotation_created:
-                        sync_result['details']['modified'].setdefault(entity_type, []).append({
-                            'from': old_value,
-                            'to': new_value
-                        })
+        print(f"\n{'=' * 80}")
+        print(f"📊 RÉSULTAT FINAL:")
+        print(f"   ✅ Créées: {sync_result['annotations_created']}")
+        print(f"   ❌ Rejetées: {sync_result['annotations_rejected']}")
+        print(f"   ⚠️ Erreurs: {len(sync_result['errors'])}")
+        if sync_result['errors']:
+            for err in sync_result['errors']:
+                print(f"      - {err}")
+        print(f"{'=' * 80}\n")
 
         return sync_result
 
     except Exception as e:
-        print(f"âš ï¸ Erreur synchronisation intelligente: {e}")
-        # Fallback vers la mÃ©thode originale
-        return synchronize_page_annotations_with_summary(page, old_summary, new_summary, user, auto_delete)
+        error_msg = f"Erreur: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        sync_result['errors'].append(error_msg)
+        return sync_result
 
 
+def create_page_annotation_if_exists(page, entity_type, entity_value, user):
+    """
+    Crée une annotation SEULEMENT si le texte existe dans la page
+    Supporte les dates multilingues (FR/EN)
+    """
+    try:
+        page_text = _get_page_text(page)
+        if not page_text:
+            print(f"   ⚠️ Pas de texte disponible")
+            return False
+
+        # Recherche simple d'abord
+        start_pos = page_text.lower().find(entity_value.lower())
+        found_text = entity_value
+
+        # Si pas trouvé et que c'est une Date, chercher équivalent FR/EN
+        if start_pos == -1 and entity_type.lower() in ['date', 'deadline', 'delay']:
+            print(f"   🔍 Recherche de date équivalente pour '{entity_value}'...")
+
+            # Extraire mois et année de entity_value
+            import re
+
+            # Normaliser la date recherchée
+            norm_target = normalize_date_format(entity_value)
+            if norm_target and '/' in norm_target:
+                target_month, target_year = norm_target.split('/')
+
+                # Rechercher toutes les dates potentielles dans le texte
+                date_pattern = r'\b(january|february|march|april|may|june|july|august|september|october|november|december|janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{4})\b'
+
+                for match in re.finditer(date_pattern, page_text, re.IGNORECASE):
+                    candidate_text = match.group(0)
+                    norm_candidate = normalize_date_format(candidate_text)
+
+                    print(f"      Candidat: '{candidate_text}' -> '{norm_candidate}'")
+
+                    if norm_candidate == norm_target:
+                        start_pos = match.start()
+                        found_text = candidate_text
+                        print(f"      ✅ Équivalent trouvé: '{found_text}'")
+                        break
+
+        if start_pos == -1:
+            print(f"   ⚠️ Texte '{entity_value}' non trouvé dans la page")
+            return False
+
+        end_pos = start_pos + len(found_text)
+
+        # Créer le type
+        annotation_type, _ = AnnotationType.objects.get_or_create(
+            name=entity_type,
+            defaults={
+                'display_name': entity_type.replace('_', ' ').title(),
+                'color': '#10b981',
+                'description': f"Auto: {entity_type}"
+            }
+        )
+
+        # Vérifier si existe déjà (avec le texte trouvé)
+        existing = Annotation.objects.filter(
+            page=page,
+            annotation_type=annotation_type,
+            selected_text__iexact=found_text
+        ).first()
+
+        if existing:
+            print(f"   ℹ️ Annotation déjà existante: '{found_text}'")
+            return False
+
+        # Créer l'annotation avec le texte réellement trouvé dans la page
+        annotation = Annotation.objects.create(
+            page=page,
+            selected_text=found_text,
+            annotation_type=annotation_type,
+            start_pos=start_pos,
+            end_pos=end_pos,
+            validation_status='expert_created',
+            validated_by=user,
+            validated_at=timezone.now(),
+            created_by=user,
+            source='expert_sync'
+        )
+
+        print(f"   ✅ Annotation créée: '{found_text}' (recherché: '{entity_value}')")
+        return True
+
+    except Exception as e:
+        print(f"   ❌ Erreur création: {e}")
+        return False
 
 def remove_page_annotations_for_entity(page, entity_type, entity_value, user, hard_delete=False):
     """
-    Supprime ou rejette les annotations d'une page qui correspondent Ã  une entitÃ©
-
-    Args:
-        page: La page concernÃ©e
-        entity_type: Type d'entitÃ© (ex: "Product", "Date")
-        entity_value: Valeur de l'entitÃ© Ã  rechercher
-        user: Utilisateur effectuant l'action
-        hard_delete: Si True, supprime dÃ©finitivement. Si False, met en status 'rejected'
-
-    Returns:
-        dict avec le nombre d'annotations affectÃ©es
+    Supprime ou rejette les annotations - VERSION AMÉLIORÉE pour dates multilingues
     """
     try:
         from django.db.models import Q
@@ -5360,58 +5515,78 @@ def remove_page_annotations_for_entity(page, entity_type, entity_value, user, ha
         )
 
         if not annotation_types.exists():
-            return {'count': 0, 'message': f'Type {entity_type} non trouvÃ©'}
+            print(f"⚠️ Type '{entity_type}' non trouvé")
+            return {'count': 0, 'message': f'Type {entity_type} non trouvé'}
 
-        # Rechercher les annotations sur cette page uniquement
+        # Rechercher les annotations sur cette page
         annotations = Annotation.objects.filter(
             page=page,
             annotation_type__in=annotation_types,
             validation_status__in=['pending', 'validated', 'expert_created']
         )
 
-        # Filtrer par valeur (recherche flexible)
         matching_annotations = []
         entity_lower = entity_value.lower().strip()
+
+        # ✅ AMÉLIORATION : normaliser la valeur cherchée si c'est une date
+        is_date_type = any(keyword in entity_type.lower() for keyword in ['date', 'deadline', 'délai'])
+        entity_normalized = normalize_date_format(entity_value) if is_date_type else None
 
         for ann in annotations:
             ann_text_lower = ann.selected_text.lower().strip()
 
-            # Correspondance exacte ou partielle
-            if (ann_text_lower == entity_lower or
-                    entity_lower in ann_text_lower or
-                    ann_text_lower in entity_lower):
+            # Correspondance exacte
+            if ann_text_lower == entity_lower:
                 matching_annotations.append(ann)
                 continue
 
-            # Pour les dates, vÃ©rifier les variantes
-            if 'date' in entity_type.lower():
-                if are_dates_equivalent(ann.selected_text, entity_value):
+            # Pour les dates : vérifier équivalence multilingue
+            if is_date_type:
+                # ✅ Normaliser l'annotation aussi
+                ann_normalized = normalize_date_format(ann.selected_text)
+
+                if entity_normalized and ann_normalized == entity_normalized:
+                    print(f"✅ Date match: '{entity_value}' == '{ann.selected_text}' (normalisé: {entity_normalized})")
                     matching_annotations.append(ann)
+                    continue
+
+                # Vérifier aussi avec are_dates_equivalent
+                if are_dates_equivalent(ann.selected_text, entity_value):
+                    print(f"✅ Date équivalente: '{entity_value}' == '{ann.selected_text}'")
+                    matching_annotations.append(ann)
+                    continue
+
+            # Correspondance partielle pour autres types
+            if entity_lower in ann_text_lower or ann_text_lower in entity_lower:
+                matching_annotations.append(ann)
+
+        if not matching_annotations:
+            print(f"⚠️ Aucune annotation trouvée pour '{entity_value}' (type: {entity_type})")
+            return {'count': 0, 'message': f'Aucune annotation trouvée pour "{entity_value}"'}
 
         count = 0
         for ann in matching_annotations:
             if hard_delete:
-                # Suppression dÃ©finitive
                 ann_id = ann.id
                 ann.delete()
-                print(f"âŒ Annotation {ann_id} supprimÃ©e (page {page.page_number})")
+                print(f"❌ Annotation {ann_id} supprimée: '{ann.selected_text}' (page {page.page_number})")
             else:
-                # Marquer comme rejetÃ©e
                 ann.validation_status = 'rejected'
                 ann.validated_by = user
                 ann.validated_at = timezone.now()
                 ann.save(update_fields=['validation_status', 'validated_by', 'validated_at'])
-                print(f"â›” Annotation {ann.id} rejetÃ©e (page {page.page_number})")
-
+                print(f"⛔ Annotation {ann.id} rejetée: '{ann.selected_text}' (page {page.page_number})")
             count += 1
 
         return {
             'count': count,
-            'message': f'{count} annotation(s) {"supprimÃ©e(s)" if hard_delete else "rejetÃ©e(s)"} pour "{entity_value}"'
+            'message': f'{count} annotation(s) {"supprimée(s)" if hard_delete else "rejetée(s)"} pour "{entity_value}"'
         }
 
     except Exception as e:
-        print(f"âŒ Erreur suppression annotations: {e}")
+        print(f"❌ Erreur suppression annotations: {e}")
+        import traceback
+        traceback.print_exc()
         return {'count': 0, 'error': str(e)}
 
 
@@ -5443,50 +5618,99 @@ def extract_entities_from_summary(summary_text):
 
 def are_dates_equivalent(date1, date2):
     """
-    VÃ©rifie si deux dates sont Ã©quivalentes malgrÃ© des formats diffÃ©rents
-    Ex: "January 2013" == "Jan 2013" == "01/2013"
+    Vérifie si deux dates sont équivalentes malgré des formats/langues différents
+    Ex: "mai 2012" == "May 2012" == "05/2012" == "2012-05"
     """
-    # Normaliser les dates
-    date1_normalized = normalize_date_format(date1)
-    date2_normalized = normalize_date_format(date2)
+    if not date1 or not date2:
+        return False
 
-    return date1_normalized == date2_normalized
+    # Normaliser les deux dates
+    norm1 = normalize_date_format(date1)
+    norm2 = normalize_date_format(date2)
+
+    if norm1 == norm2:
+        return True
+
+    # Vérifier aussi avec la fonction _is_date_like
+    ok1, month1, year1 = _is_date_like(date1)
+    ok2, month2, year2 = _is_date_like(date2)
+
+    if ok1 and ok2:
+        return month1 == month2 and year1 == year2
+
+    return False
 
 
 def normalize_date_format(date_str):
     """
-    Normalise une date dans un format standard pour comparaison
+    Normalise une date dans un format standard MM/YYYY
+    Supporte français et anglais
     """
+    if not date_str:
+        return ""
+
     import re
 
-    # Dictionnaire mois
-    months = {
-        'january': '01', 'jan': '01', 'fÃ©vrier': '02', 'february': '02',
-        'march': '03', 'mar': '03', 'april': '04', 'apr': '04',
-        'may': '05', 'june': '06', 'jun': '06', 'july': '07', 'jul': '07',
-        'august': '08', 'aug': '08', 'september': '09', 'sep': '09',
-        'october': '10', 'oct': '10', 'november': '11', 'nov': '11',
+    # Dictionnaire mois FR → numéro
+    months_fr = {
+        'janvier': '01', 'jan': '01', 'janv': '01',
+        'février': '02', 'fevrier': '02', 'fév': '02', 'fev': '02', 'feb': '02',
+        'mars': '03', 'mar': '03',
+        'avril': '04', 'avr': '04', 'apr': '04',
+        'mai': '05', 'may': '05',
+        'juin': '06', 'jun': '06',
+        'juillet': '07', 'juil': '07', 'jul': '07',
+        'août': '08', 'aout': '08', 'aug': '08',
+        'septembre': '09', 'sept': '09', 'sep': '09',
+        'octobre': '10', 'oct': '10',
+        'novembre': '11', 'nov': '11',
+        'décembre': '12', 'decembre': '12', 'déc': '12', 'dec': '12'
+    }
+
+    # Dictionnaire mois EN → numéro
+    months_en = {
+        'january': '01', 'jan': '01',
+        'february': '02', 'feb': '02',
+        'march': '03', 'mar': '03',
+        'april': '04', 'apr': '04',
+        'may': '05',
+        'june': '06', 'jun': '06',
+        'july': '07', 'jul': '07',
+        'august': '08', 'aug': '08',
+        'september': '09', 'sep': '09', 'sept': '09',
+        'october': '10', 'oct': '10',
+        'november': '11', 'nov': '11',
         'december': '12', 'dec': '12'
     }
 
+    # Combiner les deux dictionnaires
+    all_months = {**months_fr, **months_en}
+
     date_lower = date_str.lower().strip()
 
-    # Extraire mois et annÃ©e
-    for month_name, month_num in months.items():
+    # Chercher mois textuel + année
+    for month_name, month_num in all_months.items():
         if month_name in date_lower:
+            # Extraire l'année
             year_match = re.search(r'(\d{4})', date_lower)
             if year_match:
                 return f"{month_num}/{year_match.group(1)}"
 
-    # Format numÃ©rique
+    # Format numérique MM/YYYY ou MM-YYYY
     numeric_match = re.search(r'(\d{1,2})[/-](\d{4})', date_lower)
     if numeric_match:
         month = numeric_match.group(1).zfill(2)
         year = numeric_match.group(2)
         return f"{month}/{year}"
 
-    return date_str
+    # Format YYYY-MM ou YYYY/MM
+    reverse_match = re.search(r'(\d{4})[/-](\d{1,2})', date_lower)
+    if reverse_match:
+        year = reverse_match.group(1)
+        month = reverse_match.group(2).zfill(2)
+        return f"{month}/{year}"
 
+    return date_str
 @login_required
 @user_passes_test(is_expert)
 @csrf_exempt
@@ -6295,8 +6519,8 @@ def create_annotation_ajax(request):
                 print(f"❌ Fallback page summary échoué: {e2}")
 
         # Déclenchement régénération globale (async)
-        try:
-            trigger_summary_regeneration_safe(page.document, request.user, 3)
+            # Resume global (IMMEDIATE pour action manuelle expert - ignore le throttling)
+            REGENERATION_CACHE.pop(page.document.id, None); trigger_summary_regeneration_safe(page.document, request.user, 0)  # Immediate for manual expert action
         except Exception as e:
             print(f"⚠️ Erreur déclenchement régénération (create): {e}")
 
@@ -6449,3 +6673,253 @@ def annotate_page_with_groq_view(request, page_id):
 
     return JsonResponse({"success": True, "count": len(anns)})
 
+
+# expert/views.py - Ajouter cette fonction après les autres vues
+
+# expert/views.py - Ajouter ces fonctions
+
+@expert_required
+def expert_review_annotations(request, doc_id):
+    """
+    Interface de révision Expert pour valider/rejeter les annotations des annotateurs.
+    L'expert peut voir toutes les annotations pending et les valider/rejeter une par une.
+    """
+    document = get_object_or_404(RawDocument, id=doc_id, is_ready_for_expert=True)
+
+    # Récupérer toutes les annotations pending (créées par les annotateurs)
+    pending_annotations = Annotation.objects.filter(
+        page__document=document,
+        validation_status='pending'
+    ).select_related(
+        'page',
+        'annotation_type',
+        'created_by'
+    ).order_by('page__page_number', 'start_pos')
+
+    # Statistiques globales
+    total_annotations = Annotation.objects.filter(page__document=document).count()
+    validated_annotations = Annotation.objects.filter(
+        page__document=document,
+        validation_status__in=['validated', 'expert_created']
+    ).count()
+    rejected_annotations = Annotation.objects.filter(
+        page__document=document,
+        validation_status='rejected'
+    ).count()
+
+    # Grouper par page pour affichage organisé
+    pages_with_annotations = {}
+    for ann in pending_annotations:
+        page_num = ann.page.page_number
+        if page_num not in pages_with_annotations:
+            pages_with_annotations[page_num] = {
+                'page': ann.page,
+                'annotations': [],
+                'page_text_preview': (ann.page.cleaned_text or '')[
+                                     :200] + '...' if ann.page.cleaned_text else 'Pas de texte disponible'
+            }
+        pages_with_annotations[page_num]['annotations'].append(ann)
+
+    # Trier par numéro de page
+    pages_with_annotations = dict(sorted(pages_with_annotations.items()))
+
+    context = {
+        'document': document,
+        'pages_with_annotations': pages_with_annotations,
+        'total_pending': pending_annotations.count(),
+        'total_annotations': total_annotations,
+        'validated_annotations': validated_annotations,
+        'rejected_annotations': rejected_annotations,
+        'completion_percentage': int((validated_annotations / total_annotations * 100)) if total_annotations > 0 else 0,
+    }
+
+    return render(request, 'expert/review_annotations.html', context)
+
+
+@expert_required
+@csrf_exempt
+def expert_bulk_validate_annotations(request, doc_id):
+    """Validation en masse de toutes les annotations pending d'un document"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        document = get_object_or_404(RawDocument, id=doc_id)
+
+        pending_annotations = Annotation.objects.filter(
+            page__document=document,
+            validation_status='pending'
+        )
+
+        count = 0
+        for ann in pending_annotations:
+            ann.validation_status = 'validated'
+            ann.validated_by = request.user
+            ann.validated_at = timezone.now()
+            ann.save(update_fields=['validation_status', 'validated_by', 'validated_at'])
+            count += 1
+
+        # Mettre à jour le JSON global après validation en masse
+        try:
+            update_document_global_json(document, request.user)
+        except Exception as e:
+            print(f"⚠️ Erreur MAJ JSON après validation en masse: {e}")
+
+        return JsonResponse({
+            'success': True,
+            'message': f'{count} annotation(s) validée(s) avec succès',
+            'validated_count': count
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# ============================================
+# 📄 PROXY PDF POUR IFRAME
+# ============================================
+@expert_required
+def get_page_image(request, doc_id, page_num):
+    """
+    Génère et retourne une image PNG d'une page spécifique du PDF
+    """
+    from django.http import HttpResponse, Http404
+    from rawdocs.models import RawDocument
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Vérifier que le document existe
+        try:
+            document = RawDocument.objects.get(pk=doc_id)
+        except RawDocument.DoesNotExist:
+            logger.error(f"Document {doc_id} n'existe pas")
+            raise Http404(f'Document {doc_id} non trouvé')
+
+        if not document.file:
+            logger.error(f"Document {doc_id} n'a pas de fichier associé")
+            raise Http404('PDF non trouvé - aucun fichier associé')
+
+        file_path = document.file.path
+
+        # Vérifier si le fichier existe
+        import os
+        if not os.path.exists(file_path):
+            logger.error(f"Fichier PDF introuvable: {file_path}")
+            raise Http404(f'Fichier PDF introuvable: {file_path}')
+
+        # Ouvrir le PDF avec PyMuPDF
+        import fitz
+        pdf_document = fitz.open(file_path)
+
+        # Vérifier que le numéro de page est valide
+        if page_num < 1 or page_num > len(pdf_document):
+            pdf_document.close()
+            raise Http404(f'Page {page_num} invalide. Le document contient {len(pdf_document)} pages.')
+
+        # Obtenir la page (index 0-based)
+        page = pdf_document[page_num - 1]
+
+        # Convertir la page en image (zoom factor pour qualité)
+        zoom = 2.0  # Facteur de zoom pour meilleure qualité
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+
+        # Convertir en PNG
+        img_data = pix.tobytes("png")
+
+        pdf_document.close()
+
+        # Retourner l'image
+        response = HttpResponse(img_data, content_type='image/png')
+        response['Cache-Control'] = 'public, max-age=3600'  # Cache 1 heure
+        return response
+
+    except Http404:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors de la génération de l'image de la page: {e}", exc_info=True)
+        raise Http404(f'Erreur: {str(e)}')
+
+
+def expert_proxy_pdf(request, doc_id):
+    """
+    Vue proxy pour servir le PDF avec les en-têtes appropriés
+    pour permettre l'affichage dans une iframe (contournement X-Frame-Options)
+    """
+    from django.http import FileResponse, Http404, HttpResponse
+    from rawdocs.models import RawDocument
+    import os
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        document = get_object_or_404(RawDocument, pk=doc_id)
+        logger.info(f"Document trouvé: {document.id}")
+
+        if not document.file:
+            logger.error(f"Document {doc_id} n'a pas de fichier associé")
+            raise Http404('PDF non trouvé - aucun fichier associé au document')
+
+        file_path = document.file.path
+        logger.info(f"Chemin du fichier initial: {file_path}")
+
+        # Vérifier si le fichier existe, sinon essayer de corriger les chemins dupliqués
+        if not os.path.exists(file_path):
+            logger.warning(f"Fichier introuvable à: {file_path}")
+
+            # Essayer de détecter et corriger les chemins avec répertoires dupliqués
+            # Ex: media/20250921_170539/20250921_170539/E9_Guideline.pdf
+            #  -> media/20250921_170539/E9_Guideline.pdf
+            path_parts = file_path.split(os.sep)
+
+            # Chercher les répertoires dupliqués consécutifs
+            corrected_parts = []
+            skip_next = False
+            for i, part in enumerate(path_parts):
+                if skip_next:
+                    skip_next = False
+                    continue
+                if i < len(path_parts) - 1 and part == path_parts[i + 1]:
+                    # Répertoire dupliqué trouvé, garder seulement le premier
+                    corrected_parts.append(part)
+                    skip_next = True
+                    logger.info(f"Répertoire dupliqué détecté: {part}")
+                else:
+                    corrected_parts.append(part)
+
+            corrected_path = os.sep.join(corrected_parts)
+
+            if corrected_path != file_path and os.path.exists(corrected_path):
+                logger.info(f"Chemin corrigé trouvé: {corrected_path}")
+                file_path = corrected_path
+            else:
+                # Si la correction ne fonctionne pas, essayer de chercher le fichier
+                # dans les sous-répertoires du répertoire parent
+                media_root = settings.MEDIA_ROOT
+                filename = os.path.basename(file_path)
+
+                # Chercher dans media_root et ses sous-répertoires
+                for root, dirs, files in os.walk(media_root):
+                    if filename in files:
+                        potential_path = os.path.join(root, filename)
+                        logger.info(f"Fichier trouvé à: {potential_path}")
+                        file_path = potential_path
+                        break
+                else:
+                    logger.error(f"Fichier PDF introuvable après toutes les tentatives")
+                    raise Http404(f'Fichier PDF introuvable: {filename}')
+
+        # Servir le fichier avec les en-têtes appropriés
+        response = FileResponse(open(file_path, 'rb'), content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="{os.path.basename(file_path)}"'
+        response['X-Frame-Options'] = 'SAMEORIGIN'
+        response['Cache-Control'] = 'no-cache'
+
+        logger.info(f"PDF servi avec succès: {file_path}")
+        return response
+
+    except Exception as e:
+        logger.error(f"Erreur lors du chargement du PDF {doc_id}: {str(e)}")
+        raise

@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Évaluation du Modèle IA - RegExpert</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+:root {
+    --primary: #3b82f6;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #06b6d4;
+    --dark: #1e293b;
+    --light: #f8fafc;
+}
+
+body {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.evaluation-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.page-header {
+    background: linear-gradient(135deg, var(--primary), #6366f1);
+    color: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+}
+
+.page-header p {
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+.action-bar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.btn-export {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-export:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.btn-pdf {
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: white;
+}
+
+.btn-csv {
+    background: linear-gradient(135deg, var(--success), #34d399);
+    color: white;
+}
+
+.btn-json {
+    background: linear-gradient(135deg, var(--info), #22d3ee);
+    color: white;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.metric-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    border-left: 4px solid;
+}
+
+.metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.metric-card.precision { border-color: var(--primary); }
+.metric-card.recall { border-color: var(--success); }
+.metric-card.f1-score { border-color: var(--warning); }
+.metric-card.accuracy { border-color: var(--info); }
+
+.metric-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.metric-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.metric-card.precision .metric-icon {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1));
+    color: var(--primary);
+}
+
+.metric-card.recall .metric-icon {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.1));
+    color: var(--success);
+}
+
+.metric-card.f1-score .metric-icon {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(251, 191, 36, 0.1));
+    color: var(--warning);
+}
+
+.metric-card.accuracy .metric-icon {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(34, 211, 238, 0.1));
+    color: var(--info);
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 3rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--dark), #475569);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0.5rem 0;
+}
+
+.metric-description {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    line-height: 1.5;
+}
+
+.chart-container {
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    margin-bottom: 2rem;
+    position: relative;
+    min-height: 400px;
+    max-height: 400px;
+}
+
+.chart-container canvas {
+    max-height: 300px !important;
+    width: 100% !important;
+    height: 300px !important;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.chart-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--dark);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.detailed-stats {
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    margin-bottom: 2rem;
+}
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.stats-table th {
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--dark);
+    border-bottom: 2px solid #cbd5e1;
+}
+
+.stats-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.stats-table tr:hover {
+    background: #f8fafc;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.badge-success {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+}
+
+.badge-info {
+    background: rgba(6, 182, 212, 0.1);
+    color: var(--info);
+}
+
+.progress-bar {
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--success));
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.confusion-matrix {
+    display: grid;
+    grid-template-columns: auto 1fr 1fr;
+    grid-template-rows: auto 1fr 1fr;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.matrix-cell {
+    padding: 1.5rem;
+    text-align: center;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.matrix-header {
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    color: var(--dark);
+    padding: 1rem;
+}
+
+.matrix-label {
+    background: linear-gradient(135deg, var(--primary), #6366f1);
+    color: white;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.matrix-tp {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.2));
+    border: 2px solid var(--success);
+}
+
+.matrix-fp {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.2));
+    border: 2px solid var(--warning);
+}
+
+.matrix-fn {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(248, 113, 113, 0.2));
+    border: 2px solid var(--danger);
+}
+
+.matrix-tn {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(34, 211, 238, 0.2));
+    border: 2px solid var(--info);
+}
+
+@media (max-width: 768px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .comparison-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .action-bar {
+        flex-direction: column;
+    }
+}
+
+@media print {
+    body {
+        background: white;
+    }
+
+    .action-bar {
+        display: none;
+    }
+}
+</style>
+</head>
+<body>
+
+<div class="evaluation-container">
+    <!-- Header -->
+    <div class="page-header">
+        <h1><i class="fas fa-chart-line"></i> Évaluation du Modèle IA</h1>
+        <p>Analyse comparative des performances IA vs Expert - Métriques académiques</p>
+    </div>
+
+    <!-- Action Bar -->
+    <div class="action-bar">
+        <button class="btn-export btn-pdf" onclick="exportToPDF()">
+            <i class="fas fa-file-pdf"></i> Exporter PDF
+        </button>
+        <button class="btn-export btn-csv" onclick="exportToCSV()">
+            <i class="fas fa-file-csv"></i> Exporter CSV
+        </button>
+        <button class="btn-export btn-json" onclick="exportToJSON()">
+            <i class="fas fa-file-code"></i> Exporter JSON
+        </button>
+        <a href="{% url 'expert:dashboard' %}" class="btn-export" style="background: linear-gradient(135deg, #64748b, #475569); color: white; text-decoration: none;">
+            <i class="fas fa-arrow-left"></i> Retour Dashboard
+        </a>
+    </div>
+
+    <!-- Métriques Principales -->
+    <div class="metrics-grid">
+        <div class="metric-card precision">
+            <div class="metric-header">
+                <div class="metric-icon">
+                    <i class="fas fa-bullseye"></i>
+                </div>
+                <div>
+                    <div class="metric-label">Précision</div>
+                </div>
+            </div>
+            <div class="metric-value">{{ metrics.precision|floatformat:1 }}%</div>
+            <div class="metric-description">
+                TP / (TP + FP) - Proportion de prédictions positives correctes
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ metrics.precision }}%;"></div>
+            </div>
+        </div>
+
+        <div class="metric-card recall">
+            <div class="metric-header">
+                <div class="metric-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div>
+                    <div class="metric-label">Rappel (Recall)</div>
+                </div>
+            </div>
+            <div class="metric-value">{{ metrics.recall|floatformat:1 }}%</div>
+            <div class="metric-description">
+                TP / (TP + FN) - Capacité à identifier tous les cas positifs
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ metrics.recall }}%;"></div>
+            </div>
+        </div>
+
+        <div class="metric-card f1-score">
+            <div class="metric-header">
+                <div class="metric-icon">
+                    <i class="fas fa-balance-scale"></i>
+                </div>
+                <div>
+                    <div class="metric-label">F1-Score</div>
+                </div>
+            </div>
+            <div class="metric-value">{{ metrics.f1_score|floatformat:1 }}%</div>
+            <div class="metric-description">
+                2 × (Précision × Rappel) / (Précision + Rappel) - Moyenne harmonique
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ metrics.f1_score }}%;"></div>
+            </div>
+        </div>
+
+        <div class="metric-card accuracy">
+            <div class="metric-header">
+                <div class="metric-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div>
+                    <div class="metric-label">Exactitude</div>
+                </div>
+            </div>
+            <div class="metric-value">{{ metrics.accuracy|floatformat:1 }}%</div>
+            <div class="metric-description">
+                (TP + TN) / Total - Pourcentage de prédictions correctes
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ metrics.accuracy }}%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graphiques de comparaison -->
+    <div class="comparison-grid">
+        <div class="chart-container">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-chart-bar"></i>
+                    Comparaison IA vs Expert
+                </h3>
+            </div>
+            <canvas id="comparisonChart" height="300"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-chart-pie"></i>
+                    Distribution des Résultats
+                </h3>
+            </div>
+            <canvas id="distributionChart" height="300"></canvas>
+        </div>
+    </div>
+
+    <!-- Matrice de Confusion -->
+    <div class="chart-container">
+        <div class="chart-header">
+            <h3 class="chart-title">
+                <i class="fas fa-table"></i>
+                Matrice de Confusion
+            </h3>
+        </div>
+        <div class="confusion-matrix">
+            <div></div>
+            <div class="matrix-header">Prédit Positif</div>
+            <div class="matrix-header">Prédit Négatif</div>
+
+            <div class="matrix-label">Réel Positif</div>
+            <div class="matrix-cell matrix-tp">
+                <div style="font-size: 2rem; font-weight: 800;">{{ confusion_matrix.true_positive }}</div>
+                <div style="font-size: 0.85rem; margin-top: 0.5rem;">Vrais Positifs (TP)</div>
+            </div>
+            <div class="matrix-cell matrix-fn">
+                <div style="font-size: 2rem; font-weight: 800;">{{ confusion_matrix.false_negative }}</div>
+                <div style="font-size: 0.85rem; margin-top: 0.5rem;">Faux Négatifs (FN)</div>
+            </div>
+
+            <div class="matrix-label">Réel Négatif</div>
+            <div class="matrix-cell matrix-fp">
+                <div style="font-size: 2rem; font-weight: 800;">{{ confusion_matrix.false_positive }}</div>
+                <div style="font-size: 0.85rem; margin-top: 0.5rem;">Faux Positifs (FP)</div>
+            </div>
+            <div class="matrix-cell matrix-tn">
+                <div style="font-size: 2rem; font-weight: 800;">{{ confusion_matrix.true_negative }}</div>
+                <div style="font-size: 0.85rem; margin-top: 0.5rem;">Vrais Négatifs (TN)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques Détaillées -->
+    <div class="detailed-stats">
+        <h3 class="chart-title" style="margin-bottom: 1.5rem;">
+            <i class="fas fa-list"></i>
+            Statistiques Détaillées par Type
+        </h3>
+
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>Type d'Annotation</th>
+                    <th>Total IA</th>
+                    <th>Total Expert</th>
+                    <th>Corrections</th>
+                    <th>Taux de Validation</th>
+                    <th>Confiance Moyenne</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stat in detailed_stats %}
+                <tr>
+                    <td><strong>{{ stat.type }}</strong></td>
+                    <td>{{ stat.ai_count }}</td>
+                    <td>{{ stat.expert_count }}</td>
+                    <td>
+                        <span class="badge {% if stat.corrections > 0 %}badge-warning{% else %}badge-success{% endif %}">
+                            {{ stat.corrections }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge {% if stat.validation_rate >= 80 %}badge-success{% elif stat.validation_rate >= 50 %}badge-warning{% else %}badge-info{% endif %}">
+                            {{ stat.validation_rate|floatformat:1 }}%
+                        </span>
+                    </td>
+                    <td>{{ stat.avg_confidence|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Performance Temporelle -->
+    <div class="chart-container">
+        <div class="chart-header">
+            <h3 class="chart-title">
+                <i class="fas fa-clock"></i>
+                Performance Temporelle
+            </h3>
+        </div>
+        <canvas id="timelineChart" height="200"></canvas>
+    </div>
+
+    <!-- Métriques Supplémentaires -->
+    <div class="comparison-grid">
+        <div class="chart-container">
+            <h3 class="chart-title" style="margin-bottom: 1rem;">
+                <i class="fas fa-brain"></i>
+                Métriques Sémantiques
+            </h3>
+            <table class="stats-table">
+                <tr>
+                    <td><strong>Relations extraites (IA)</strong></td>
+                    <td>{{ semantic_metrics.ai_relations }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Relations validées (Expert)</strong></td>
+                    <td>{{ semantic_metrics.expert_relations }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Taux de validation relations</strong></td>
+                    <td>
+                        <span class="badge badge-success">{{ semantic_metrics.relation_validation_rate|floatformat:1 }}%</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Q&A générées (IA)</strong></td>
+                    <td>{{ semantic_metrics.ai_qa }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Q&A corrigées (Expert)</strong></td>
+                    <td>{{ semantic_metrics.expert_qa }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Taux de correction Q&A</strong></td>
+                    <td>
+                        <span class="badge badge-warning">{{ semantic_metrics.qa_correction_rate|floatformat:1 }}%</span>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title" style="margin-bottom: 1rem;">
+                <i class="fas fa-stopwatch"></i>
+                Temps de Traitement
+            </h3>
+            <table class="stats-table">
+                <tr>
+                    <td><strong>Documents traités</strong></td>
+                    <td>{{ time_metrics.documents_processed }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Temps moyen IA/document</strong></td>
+                    <td>{{ time_metrics.avg_ai_time|floatformat:2 }}s</td>
+                </tr>
+                <tr>
+                    <td><strong>Temps moyen Expert/document</strong></td>
+                    <td>{{ time_metrics.avg_expert_time|floatformat:2 }}s</td>
+                </tr>
+                <tr>
+                    <td><strong>Gain de temps</strong></td>
+                    <td>
+                        <span class="badge badge-success">{{ time_metrics.time_saved_percentage|floatformat:1 }}%</span>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variables globales pour stocker les instances de graphiques
+let comparisonChart = null;
+let distributionChart = null;
+let timelineChart = null;
+let chartsInitialized = false;  // Flag pour éviter les ré-initialisations
+
+// Données pour les graphiques avec valeurs par défaut
+const evaluationData = {
+    metrics: {
+        precision: {{ metrics.precision|default:0 }},
+        recall: {{ metrics.recall|default:0 }},
+        f1_score: {{ metrics.f1_score|default:0 }},
+        accuracy: {{ metrics.accuracy|default:0 }}
+    },
+    confusion: {
+        tp: {{ confusion_matrix.true_positive|default:0 }},
+        fp: {{ confusion_matrix.false_positive|default:0 }},
+        fn: {{ confusion_matrix.false_negative|default:0 }},
+        tn: {{ confusion_matrix.true_negative|default:0 }}
+    },
+    timeline: {{ timeline_data|safe }},
+    detailedStats: []
+};
+
+// Log pour debug
+console.log('Données d\'évaluation chargées:', evaluationData);
+
+// Fonction pour initialiser les graphiques (une seule fois)
+function initCharts() {
+    // PROTECTION : Ne pas ré-initialiser si déjà fait
+    if (chartsInitialized) {
+        console.log('Graphiques déjà initialisés, abandon...');
+        return;
+    }
+
+    console.log('Initialisation des graphiques...');
+
+    try {
+        // Détruire les graphiques existants s'ils existent
+        if (comparisonChart) {
+            comparisonChart.destroy();
+            comparisonChart = null;
+        }
+        if (distributionChart) {
+            distributionChart.destroy();
+            distributionChart = null;
+        }
+        if (timelineChart) {
+            timelineChart.destroy();
+            timelineChart = null;
+        }
+
+        // Graphique de comparaison
+        const comparisonCtx = document.getElementById('comparisonChart');
+        if (comparisonCtx) {
+            console.log('Création du graphique de comparaison...');
+            comparisonChart = new Chart(comparisonCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Précision', 'Rappel', 'F1-Score', 'Exactitude'],
+                    datasets: [{
+                        label: 'Score (%)',
+                        data: [
+                            evaluationData.metrics.precision,
+                            evaluationData.metrics.recall,
+                            evaluationData.metrics.f1_score,
+                            evaluationData.metrics.accuracy
+                        ],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(6, 182, 212, 0.8)'
+                        ],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: false,  // DÉSACTIVÉ pour éviter les boucles
+                    maintainAspectRatio: false,
+                    animation: false,
+                    responsiveAnimationDuration: 0,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+            console.log('Graphique de comparaison créé');
+        }
+
+        // Graphique de distribution
+        const distributionCtx = document.getElementById('distributionChart');
+        if (distributionCtx) {
+            console.log('Création du graphique de distribution...');
+            distributionChart = new Chart(distributionCtx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Vrais Positifs', 'Faux Positifs', 'Faux Négatifs', 'Vrais Négatifs'],
+                    datasets: [{
+                        data: [
+                            evaluationData.confusion.tp,
+                            evaluationData.confusion.fp,
+                            evaluationData.confusion.fn,
+                            evaluationData.confusion.tn
+                        ],
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(6, 182, 212, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: false,  // DÉSACTIVÉ pour éviter les boucles
+                    maintainAspectRatio: false,
+                    animation: false,
+                    responsiveAnimationDuration: 0,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            console.log('Graphique de distribution créé');
+        }
+
+        // Graphique temporel
+        const timelineCtx = document.getElementById('timelineChart');
+        if (timelineCtx) {
+            console.log('Création du graphique temporel...');
+            timelineChart = new Chart(timelineCtx.getContext('2d'), {
+                type: 'line',
+                data: evaluationData.timeline,
+                options: {
+                    responsive: false,  // DÉSACTIVÉ pour éviter les boucles
+                    maintainAspectRatio: false,
+                    animation: false,
+                    responsiveAnimationDuration: 0,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+            console.log('Graphique temporel créé');
+        }
+
+        console.log('Tous les graphiques sont créés avec succès!');
+
+        // Marquer comme initialisé pour éviter les re-créations
+        chartsInitialized = true;
+        console.log('Flag chartsInitialized mis à true');
+
+    } catch (error) {
+        console.error('Erreur lors de la création des graphiques:', error);
+        chartsInitialized = false;  // Permettre une nouvelle tentative en cas d'erreur
+    }
+}
+
+// Initialiser les graphiques une seule fois après le chargement du DOM
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM chargé, initialisation des graphiques...');
+    // Utiliser setTimeout pour éviter de bloquer le rendu
+    setTimeout(function() {
+        initCharts();
+    }, 100);
+});
+
+// Désactiver complètement le resize des graphiques pour éviter les boucles
+window.addEventListener('resize', function(e) {
+    console.log('Resize détecté mais ignoré pour éviter les boucles');
+    e.stopImmediatePropagation();
+});
+
+// Fonctions d'export
+function exportToPDF() {
+    window.print();
+}
+
+function exportToCSV() {
+    let csv = 'Type,Métrique,Valeur\n';
+    csv += `Précision,Précision,${evaluationData.metrics.precision}\n`;
+    csv += `Rappel,Recall,${evaluationData.metrics.recall}\n`;
+    csv += `F1-Score,F1-Score,${evaluationData.metrics.f1_score}\n`;
+    csv += `Exactitude,Accuracy,${evaluationData.metrics.accuracy}\n`;
+    csv += `\nMatrice de Confusion\n`;
+    csv += `Type,Valeur\n`;
+    csv += `Vrais Positifs,${evaluationData.confusion.tp}\n`;
+    csv += `Faux Positifs,${evaluationData.confusion.fp}\n`;
+    csv += `Faux Négatifs,${evaluationData.confusion.fn}\n`;
+    csv += `Vrais Négatifs,${evaluationData.confusion.tn}\n`;
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'evaluation_modele_' + new Date().toISOString().split('T')[0] + '.csv';
+    a.click();
+}
+
+function exportToJSON() {
+    const data = {
+        date: new Date().toISOString(),
+        metrics: evaluationData.metrics,
+        confusion_matrix: evaluationData.confusion,
+        detailed_stats: evaluationData.detailedStats
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'evaluation_modele_' + new Date().toISOString().split('T')[0] + '.json';
+    a.click();
+}
+</script>
+
+</body>
+</html>

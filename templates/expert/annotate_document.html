@@ -571,6 +571,61 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+// À ajouter dans templates/expert/annotate_document.html ou équivalent
+
+// Fonction à appeler après chaque modification d'annotation
+function notifyAnnotationToParent(action, annotationData) {
+    // Émettre un événement personnalisé
+    const event = new CustomEvent('annotationChanged', {
+        detail: {
+            action: action, // 'created', 'modified', 'deleted'
+            annotation: annotationData,
+            pageId: currentPageId,
+            timestamp: Date.now()
+        },
+        bubbles: true
+    });
+
+    window.dispatchEvent(event);
+
+    // Si dans une iframe, notifier le parent
+    if (window.parent !== window) {
+        window.parent.postMessage({
+            type: 'annotationChanged',
+            action: action,
+            pageId: currentPageId,
+            count: getAnnotationCount()
+        }, '*');
+    }
+
+    console.log('📝 Changement annotation notifié:', action, annotationData);
+}
+
+// Fonction helper pour compter les annotations
+function getAnnotationCount() {
+    return document.querySelectorAll('.annotation-item').length || 0;
+}
+
+// Appeler après création d'annotation
+function afterAnnotationCreated(annotation) {
+    notifyAnnotationToParent('created', annotation);
+    // Mettre à jour l'attribut data pour MutationObserver
+    document.body.setAttribute('data-annotation-count', getAnnotationCount());
+    document.body.setAttribute('data-annotation-modified', Date.now());
+}
+
+// Appeler après modification d'annotation
+function afterAnnotationModified(annotation) {
+    notifyAnnotationToParent('modified', annotation);
+    document.body.setAttribute('data-annotation-modified', Date.now());
+}
+
+// Appeler après suppression d'annotation
+function afterAnnotationDeleted(annotationId) {
+    notifyAnnotationToParent('deleted', { id: annotationId });
+    document.body.setAttribute('data-annotation-count', getAnnotationCount());
+    document.body.setAttribute('data-annotation-modified', Date.now());
+}
 </script>
 
 {% endblock %}

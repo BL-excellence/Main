@@ -1499,7 +1499,117 @@ console.log('Système de synchronisation page-level initialisé');
 console.log(`Page ${currentPageNum} sur ${totalPages} - Document ${documentId}`);
 
 
+async function savePageSummaryChanges() {
+  const el = document.getElementById('page-summary-editor');
+  if (!el || isPageAutoAnnotating) return;
 
+  const currentSummary = el.value.trim();
+  if (currentSummary === lastSavedPageSummary) {
+    console.log('⏭️ Aucun changement détecté dans le résumé');
+    return;
+  }
+
+  isPageAutoAnnotating = true;
+  updatePageSummaryStatus("🔄 Synchronisation en cours...", 'info');
+
+  console.log('\n📝 DÉBUT SAUVEGARDE RÉSUMÉ');
+  console.log('   Ancien:', lastSavedPageSummary.substring(0, 100) + '...');
+  console.log('   Nouveau:', currentSummary.substring(0, 100) + '...');
+
+  try {
+    const payload = {
+      summary_text: currentSummary,
+      auto_annotate: pageSummaryAutoSyncEnabled,
+      auto_delete: pageSummaryAutoSyncEnabled,
+      page_id: currentPageId
+    };
+
+    console.log('📤 Envoi requête:', payload);
+
+    const data = await fetchJson(ENDPOINTS.saveSummary, {
+      method: 'POST',
+      headers: {
+        'Content-Type':'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify(payload)
+    });
+
+    console.log('📥 Réponse reçue:', data);
+
+    if (!data.success) throw new Error(data.error || 'Erreur de sauvegarde');
+
+    lastSavedPageSummary = currentSummary;
+    el.classList.remove('modified');
+
+    // Afficher les résultats détaillés
+    if (data.sync_result) {
+      const {annotations_created, annotations_deleted, annotations_rejected, errors} = data.sync_result;
+
+      console.log('✅ Résultats synchronisation:');
+      console.log('   - Créées:', annotations_created);
+      console.log('   - Supprimées:', annotations_deleted);
+      console.log('   - Rejetées:', annotations_rejected);
+
+      if (errors && errors.length > 0) {
+        console.warn('⚠️ Erreurs:', errors);
+      }
+
+      let message = '';
+      const details = [];
+
+      if (annotations_created > 0) {
+        message += `✅ ${annotations_created} annotation(s) créée(s)`;
+        details.push(`${annotations_created} annotation(s) ajoutée(s) automatiquement`);
+      }
+
+      if (annotations_deleted + annotations_rejected > 0) {
+        if (message) message += ', ';
+        message += `🗑️ ${annotations_deleted + annotations_rejected} annotation(s) supprimée(s)`;
+        details.push(`${annotations_deleted + annotations_rejected} annotation(s) retirée(s)`);
+      }
+
+      if (annotations_created === 0 && annotations_deleted === 0 && annotations_rejected === 0) {
+        message = 'ℹ️ Résumé sauvegardé (aucun changement d\'annotation)';
+        details.push('Le résumé a été sauvegardé mais aucune modification d\'annotation n\'était nécessaire');
+      }
+
+      updatePageSummaryStatus(message, 'success');
+
+      // Notification avec détails
+      showPageNotification('sync-complete', {
+        title: 'Synchronisation terminée',
+        message: data.message || message,
+        details: details.map(d => ({text: d})),
+        type: errors && errors.length > 0 ? 'warning' : 'success'
+      });
+
+      // Afficher popup détails si modifications
+      if (data.sync_result.details && (annotations_created > 0 || annotations_deleted > 0)) {
+        showSyncDetails(data.sync_result.details);
+      }
+    } else {
+      updatePageSummaryStatus('✅ Résumé sauvegardé', 'success');
+    }
+
+    // Rafraîchir les annotations affichées
+    console.log('🔄 Rafraîchissement annotations...');
+    await refreshPageAnnotations();
+    console.log('✅ Annotations rafraîchies');
+
+  } catch (e) {
+    console.error('❌ Erreur synchronisation résumé:', e);
+    updatePageSummaryStatus('❌ Erreur: ' + e.message, 'error');
+    showPageNotification('sync-error', {
+      title: 'Erreur de synchronisation',
+      message: e.message,
+      type: 'error'
+    });
+  } finally {
+    isPageAutoAnnotating = false;
+    console.log('📝 FIN SAUVEGARDE RÉSUMÉ\n');
+  }
+}
 
 
 </script>

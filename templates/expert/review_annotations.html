@@ -1,0 +1,1571 @@
+{#template/expert/review_annotations.html#}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Révision Annotations - {{ document.title }}{% endblock %}
+
+{% block content %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  --primary: #0ea5e9;
+  --primary-dark: #0284c7;
+  --success: #059669;
+  --success-light: #10b981;
+  --danger: #dc2626;
+  --warning: #f59e0b;
+  --text: #1f2937;
+  --text-soft: #6b7280;
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --radius: 16px;
+  --radius-sm: 12px;
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  min-height: 100vh;
+  color: var(--text);
+}
+
+.main-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* Header Card */
+.header-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.header-top {
+  background: linear-gradient(135deg, var(--primary), var(--success));
+  color: #fff;
+  padding: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.header-info h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  opacity: 0.9;
+  font-size: 0.9rem;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.btn-outline {
+  padding: 0.6rem 1.2rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: 500;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Stats Section */
+.stats-section {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.05), rgba(16, 185, 129, 0.05));
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.stat-card {
+  background: var(--card);
+  padding: 1.25rem;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: var(--transition);
+}
+
+.stat-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 1.2rem;
+}
+
+.stat-icon.pending { background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #fff; }
+.stat-icon.validated { background: linear-gradient(135deg, var(--success), var(--success-light)); color: #fff; }
+.stat-icon.rejected { background: linear-gradient(135deg, var(--danger), #ef4444); color: #fff; }
+.stat-icon.total { background: linear-gradient(135deg, var(--primary), #38bdf8); color: #fff; }
+
+.stat-content h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+
+.stat-content p {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  margin: 0.25rem 0 0 0;
+}
+
+/* Progress Bar */
+.progress-container {
+  margin: 1.5rem 0 0 0;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.progress-bar-bg {
+  height: 12px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--success), var(--success-light));
+  border-radius: 999px;
+  transition: width 1s ease;
+}
+
+/* Actions Bar */
+.actions-bar {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.btn-action {
+  padding: 0.7rem 1.3rem;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.btn-action.primary {
+  background: linear-gradient(135deg, var(--primary), #38bdf8);
+  color: #fff;
+}
+
+.btn-action.success {
+  background: linear-gradient(135deg, var(--success), var(--success-light));
+  color: #fff;
+}
+
+.btn-action.semantic {
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+  color: #fff;
+}
+
+.btn-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  text-decoration: none;
+  color: #fff;
+}
+
+/* Annotations Content */
+.annotations-content {
+  padding: 2rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  color: var(--success);
+  margin-bottom: 1.5rem;
+}
+
+.empty-state h3 {
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: var(--text-soft);
+  margin-bottom: 2rem;
+}
+
+/* Page Section */
+.page-section {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.page-section:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow);
+}
+
+.page-header {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(16, 185, 129, 0.1));
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.page-header:hover {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(16, 185, 129, 0.15));
+}
+
+.page-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.page-number {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary), #38bdf8);
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.page-details h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.page-details p {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.page-badge {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  color: #fff;
+}
+
+.toggle-icon {
+  font-size: 1.2rem;
+  color: var(--text-soft);
+  transition: transform 0.3s;
+}
+
+.page-section.collapsed .toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.page-content {
+  max-height: 2000px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.page-section.collapsed .page-content {
+  max-height: 0;
+}
+
+/* Annotation Card */
+.annotation-card {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 1.5rem;
+  transition: var(--transition);
+}
+
+.annotation-card:last-child {
+  border-bottom: none;
+}
+
+.annotation-card:hover {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.03), rgba(16, 185, 129, 0.03));
+}
+
+.annotation-content {
+  flex: 1;
+}
+
+.annotation-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.annotation-type {
+  padding: 0.35rem 0.8rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: var(--primary);
+  color: #fff;
+}
+
+.annotation-meta {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.annotation-text {
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid var(--primary);
+  font-family: 'Courier New', monospace;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text);
+  margin-bottom: 0.75rem;
+}
+
+.annotation-context {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  font-style: italic;
+}
+
+.annotation-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.btn-validate {
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.btn-validate.accept {
+  background: linear-gradient(135deg, var(--success), var(--success-light));
+  color: #fff;
+}
+
+.btn-validate.reject {
+  background: linear-gradient(135deg, var(--danger), #ef4444);
+  color: #fff;
+}
+
+.btn-validate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-validate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-out {
+  animation: fadeOut 0.3s ease;
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .annotation-card {
+    flex-direction: column;
+  }
+
+  .annotation-actions {
+    flex-direction: row;
+  }
+}
+
+@media (max-width: 600px) {
+  .header-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+}
+
+/* Semantic Relations Styles */
+.relations-section {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(167, 139, 250, 0.05));
+  border-top: 2px solid var(--border);
+}
+
+/* PDF Viewer and Relations Side by Side Layout */
+.pdf-relations-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.pdf-viewer-panel {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  overflow: hidden;
+}
+
+.pdf-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.pdf-viewer-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pdf-viewer-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-zoom {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.btn-zoom:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.pdf-image-container {
+  width: 100%;
+  overflow: auto;
+  max-height: 800px;
+  background: #f8fafc;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 1rem;
+}
+
+.pdf-image-container img {
+  max-width: 100%;
+  height: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  transition: transform 0.3s ease;
+}
+
+.pdf-image-container.loading {
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.relations-panel {
+  overflow-y: auto;
+  max-height: 800px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .pdf-relations-container {
+    grid-template-columns: 1fr;
+  }
+
+  .pdf-image-container {
+    max-height: 500px;
+  }
+
+  .relations-panel {
+    max-height: none;
+  }
+}
+
+.relations-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.relations-header h3 {
+  font-size: 1.2rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.relations-stats {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.relation-card {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  transition: var(--transition);
+}
+
+.relation-card:hover {
+  border-color: #8b5cf6;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+}
+
+.relation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.relation-type-badge {
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.relation-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  font-size: 0.9rem;
+}
+
+.btn-icon.edit {
+  background: linear-gradient(135deg, var(--primary), #38bdf8);
+  color: #fff;
+}
+
+.btn-icon.delete {
+  background: linear-gradient(135deg, var(--danger), #ef4444);
+  color: #fff;
+}
+
+.btn-icon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.relation-content {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.entity-box {
+  background: #f8fafc;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.entity-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.entity-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+
+.entity-type {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  font-style: italic;
+}
+
+.relation-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #8b5cf6;
+  font-size: 1.5rem;
+}
+
+.relation-description {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  font-style: italic;
+}
+
+.loading-relations {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-soft);
+}
+
+.no-relations {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-soft);
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.btn-add-relation {
+  padding: 0.6rem 1.2rem;
+  background: linear-gradient(135deg, var(--success), var(--success-light));
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: var(--transition);
+}
+
+.btn-add-relation:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.analyzed-badge {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+  color: #fff;
+  margin-left: 0.5rem;
+}
+</style>
+
+<div class="main-content">
+  <!-- Header Card -->
+  <div class="header-card">
+    <!-- Header Top -->
+    <div class="header-top">
+      <div class="header-info">
+        <h1>
+          <i class="fas fa-clipboard-check"></i>
+          Révision Expert
+        </h1>
+        <div class="document-meta">
+          <span class="meta-item">
+            <i class="fas fa-file-pdf"></i>
+            {{ document.title }}
+          </span>
+          <span class="meta-item">
+            <i class="fas fa-calendar"></i>
+            {{ document.created_at|date:"d/m/Y" }}
+          </span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <a href="{% url 'expert:dashboard' %}" class="btn-outline">
+          <i class="fas fa-arrow-left"></i> Dashboard
+        </a>
+      </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon pending">
+            <i class="fas fa-clock"></i>
+          </div>
+          <div class="stat-content">
+            <h3>{{ total_pending }}</h3>
+            <p>En attente</p>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon validated">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="stat-content">
+            <h3>{{ validated_annotations }}</h3>
+            <p>Validées</p>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon rejected">
+            <i class="fas fa-times-circle"></i>
+          </div>
+          <div class="stat-content">
+            <h3>{{ rejected_annotations }}</h3>
+            <p>Rejetées</p>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon total">
+            <i class="fas fa-layer-group"></i>
+          </div>
+          <div class="stat-content">
+            <h3>{{ total_annotations }}</h3>
+            <p>Total</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="progress-container">
+        <div class="progress-label">
+          <span>Progression de validation</span>
+          <span><strong>{{ completion_percentage }}%</strong></span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" style="width: {{ completion_percentage }}%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions Bar -->
+    <div class="actions-bar">
+      <div class="action-buttons">
+        <a href="{% url 'rawdocs:annotate_document' document.id %}" class="btn-action primary">
+          <i class="fas fa-highlighter"></i>
+          Interface Annotation
+        </a>
+
+        <button onclick="validateAllAnnotations()" class="btn-action success">
+          <i class="fas fa-check-double"></i>
+          Valider Tout ({{ total_pending }})
+        </button>
+
+        <a href="{% url 'expert:view_semantic_json' document.id %}" class="btn-action semantic">
+          <i class="fas fa-brain"></i>
+          JSON Sémantique
+        </a>
+      </div>
+
+      <div>
+        <button onclick="toggleAllPages()" class="btn-outline" style="background: rgba(14, 165, 233, 0.1); border-color: var(--primary); color: var(--primary);">
+          <i class="fas fa-expand-alt"></i>
+          Tout Déplier/Replier
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Annotations Content -->
+  <div class="annotations-content">
+    {% if pages_with_annotations %}
+      {% for page_num, page_data in pages_with_annotations.items %}
+        <div class="page-section" id="page-section-{{ page_num }}">
+          <div class="page-header" onclick="togglePageSection({{ page_num }})">
+            <div class="page-info">
+              <div class="page-number">{{ page_num }}</div>
+              <div class="page-details">
+                <h4>Page {{ page_num }}</h4>
+                <p>{{ page_data.page_text_preview }}</p>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <span class="page-badge">
+                <i class="fas fa-tags"></i>
+                {{ page_data.annotations|length }} annotation(s)
+              </span>
+              <i class="fas fa-chevron-down toggle-icon"></i>
+            </div>
+          </div>
+
+          <div class="page-content">
+            {% for annotation in page_data.annotations %}
+              <div class="annotation-card" id="annotation-card-{{ annotation.id }}">
+                <div class="annotation-content">
+                  <div class="annotation-header">
+                    <span class="annotation-type" style="background: {{ annotation.annotation_type.color }};">
+                      {{ annotation.annotation_type.display_name }}
+                    </span>
+                    <span class="annotation-meta">
+                      <i class="fas fa-user"></i>
+                      {{ annotation.created_by.username }}
+                    </span>
+                    <span class="annotation-meta">
+                      <i class="fas fa-clock"></i>
+                      {{ annotation.created_at|date:"d/m/Y H:i" }}
+                    </span>
+                  </div>
+
+                  <div class="annotation-text">
+                    "{{ annotation.selected_text }}"
+                  </div>
+
+                  <div class="annotation-context">
+                    Position: {{ annotation.start_pos }} - {{ annotation.end_pos }}
+                  </div>
+                </div>
+
+                <div class="annotation-actions">
+                  <button
+                    class="btn-validate accept"
+                    onclick="validateAnnotation({{ annotation.id }}, 'validate')"
+                    id="btn-validate-{{ annotation.id }}">
+                    <i class="fas fa-check"></i>
+                    Valider
+                  </button>
+
+                  <button
+                    class="btn-validate reject"
+                    onclick="validateAnnotation({{ annotation.id }}, 'reject')"
+                    id="btn-reject-{{ annotation.id }}">
+                    <i class="fas fa-times"></i>
+                    Rejeter
+                  </button>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <h3>✨ Toutes les annotations ont été révisées !</h3>
+        <p>Aucune annotation en attente de validation pour ce document.</p>
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-top: 1.5rem;">
+          <a href="{% url 'expert:annotate_document' document.id %}" class="btn-action primary">
+            <i class="fas fa-highlighter"></i>
+            Annoter le document
+          </a>
+          <a href="{% url 'expert:view_semantic_json' document.id %}" class="btn-action semantic">
+            <i class="fas fa-brain"></i>
+            Voir le JSON sémantique
+          </a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+// Configuration
+const documentId = {{ document.id }};
+const csrftoken = getCookie('csrftoken');
+
+// Utils
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// Toggle page section and load relations if available
+async function togglePageSection(pageNum) {
+  const section = document.getElementById(`page-section-${pageNum}`);
+  if (!section) return;
+
+  const isExpanding = section.classList.contains('collapsed');
+  section.classList.toggle('collapsed');
+
+  // Si on est en train d'ouvrir la section et qu'elle n'a pas encore de relations chargées
+  if (isExpanding) {
+    const relationsContainer = section.querySelector('.relations-section');
+
+    // Vérifier si les relations n'ont pas déjà été chargées
+    if (!relationsContainer) {
+      await loadPageRelations(pageNum);
+    }
+  }
+}
+
+// Load relations for a specific page
+async function loadPageRelations(pageNum) {
+  const section = document.getElementById(`page-section-${pageNum}`);
+  if (!section) return;
+
+  const pageContent = section.querySelector('.page-content');
+  if (!pageContent) return;
+
+  // Créer le conteneur de relations s'il n'existe pas
+  let relationsSection = section.querySelector('.relations-section');
+  if (!relationsSection) {
+    relationsSection = document.createElement('div');
+    relationsSection.className = 'relations-section';
+    relationsSection.innerHTML = `
+      <div class="loading-relations">
+        <i class="fas fa-spinner fa-spin"></i> Chargement des relations sémantiques...
+      </div>
+    `;
+    pageContent.appendChild(relationsSection);
+  }
+
+  try {
+    const response = await fetch(`/expert/document/${documentId}/page/${pageNum}/relations/`, {
+      method: 'GET',
+      headers: {
+        'X-CSRFToken': csrftoken
+      }
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      displayPageRelations(pageNum, data.relations, data.is_analyzed);
+    } else {
+      relationsSection.innerHTML = `
+        <div class="no-relations">
+          <i class="fas fa-info-circle"></i> Aucune relation sémantique disponible
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des relations:', error);
+    relationsSection.innerHTML = `
+      <div class="no-relations" style="color: var(--danger);">
+        <i class="fas fa-exclamation-triangle"></i> Erreur lors du chargement des relations
+      </div>
+    `;
+  }
+}
+
+// Toggle all pages
+let allPagesExpanded = true;
+function toggleAllPages() {
+  const sections = document.querySelectorAll('.page-section');
+  sections.forEach(section => {
+    if (allPagesExpanded) {
+      section.classList.add('collapsed');
+    } else {
+      section.classList.remove('collapsed');
+    }
+  });
+  allPagesExpanded = !allPagesExpanded;
+}
+
+// Validate/Reject annotation
+async function validateAnnotation(annotationId, action) {
+  const btnValidate = document.getElementById(`btn-validate-${annotationId}`);
+  const btnReject = document.getElementById(`btn-reject-${annotationId}`);
+  const card = document.getElementById(`annotation-card-${annotationId}`);
+
+  if (!card) return;
+
+  // Disable buttons
+  if (btnValidate) btnValidate.disabled = true;
+  if (btnReject) btnReject.disabled = true;
+
+  try {
+    const response = await fetch(`/expert/api/validate/${annotationId}/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken
+      },
+      body: JSON.stringify({ action })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      // Animation de sortie
+      card.classList.add('fade-out');
+      setTimeout(() => {
+        card.remove();
+
+        // Vérifier si la section page est vide
+        const pageSection = card.closest('.page-section');
+        if (pageSection) {
+          const remainingCards = pageSection.querySelectorAll('.annotation-card');
+          if (remainingCards.length === 0) {
+            pageSection.classList.add('fade-out');
+            setTimeout(() => pageSection.remove(), 300);
+          }
+        }
+
+        // Mettre à jour les compteurs
+        updateCounters();
+      }, 300);
+
+      // Notification
+      showNotification(
+        action === 'validate' ? 'Annotation validée avec succès' : 'Annotation rejetée',
+        'success'
+      );
+    } else {
+      throw new Error(data.error || 'Erreur inconnue');
+    }
+  } catch (error) {
+    console.error('Erreur:', error);
+    showNotification('Erreur: ' + error.message, 'error');
+
+    // Re-enable buttons
+    if (btnValidate) btnValidate.disabled = false;
+    if (btnReject) btnReject.disabled = false;
+  }
+}
+
+// Validate all annotations
+async function validateAllAnnotations() {
+  if (!confirm('Voulez-vous vraiment valider TOUTES les annotations en attente ? Cette action ne peut pas être annulée.')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/expert/api/bulk-validate/${documentId}/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken
+      }
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      showNotification(data.message, 'success');
+
+      // Recharger la page après 1 seconde
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } else {
+      throw new Error(data.error || 'Erreur inconnue');
+    }
+  } catch (error) {
+    console.error('Erreur:', error);
+    showNotification('Erreur: ' + error.message, 'error');
+  }
+}
+
+// Update counters
+function updateCounters() {
+  const remainingCards = document.querySelectorAll('.annotation-card').length;
+
+  // Mettre à jour le badge "En attente"
+  const pendingStats = document.querySelectorAll('.stat-content h3');
+  if (pendingStats[0]) {
+    pendingStats[0].textContent = remainingCards;
+  }
+
+  // Si plus aucune annotation, afficher l'état vide
+  if (remainingCards === 0) {
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  }
+}
+
+// Display relations for a page
+function displayPageRelations(pageNum, relations, isAnalyzed) {
+  const section = document.getElementById(`page-section-${pageNum}`);
+  if (!section) return;
+
+  const relationsSection = section.querySelector('.relations-section');
+  if (!relationsSection) return;
+
+  if (!relations || relations.length === 0) {
+    relationsSection.innerHTML = `
+      <div class="relations-header">
+        <h3>
+          <i class="fas fa-project-diagram"></i>
+          Relations Sémantiques
+          ${isAnalyzed ? '<span class="analyzed-badge"><i class="fas fa-check"></i> Analysé</span>' : ''}
+        </h3>
+      </div>
+      <div class="no-relations">
+        <i class="fas fa-info-circle"></i> Aucune relation sémantique trouvée pour cette page
+      </div>
+    `;
+    return;
+  }
+
+  // Créer le layout côte à côte avec PDF viewer et relations
+  let html = `
+    <div class="relations-header">
+      <h3>
+        <i class="fas fa-project-diagram"></i>
+        Relations Sémantiques - Page ${pageNum}
+        ${isAnalyzed ? '<span class="analyzed-badge"><i class="fas fa-check"></i> Analysé</span>' : ''}
+      </h3>
+      <div class="relations-stats">
+        <span><i class="fas fa-link"></i> ${relations.length} relation(s)</span>
+      </div>
+    </div>
+
+    <div class="pdf-relations-container">
+      <!-- PDF Viewer Panel -->
+      <div class="pdf-viewer-panel">
+        <div class="pdf-viewer-header">
+          <h4>
+            <i class="fas fa-file-pdf"></i>
+            Page ${pageNum} du Document
+          </h4>
+          <div class="pdf-viewer-controls">
+            <button class="btn-zoom" onclick="zoomPdfPage(${pageNum}, 'in')" title="Zoom avant">
+              <i class="fas fa-search-plus"></i>
+            </button>
+            <button class="btn-zoom" onclick="zoomPdfPage(${pageNum}, 'out')" title="Zoom arrière">
+              <i class="fas fa-search-minus"></i>
+            </button>
+            <button class="btn-zoom" onclick="zoomPdfPage(${pageNum}, 'reset')" title="Réinitialiser">
+              <i class="fas fa-undo"></i>
+            </button>
+          </div>
+        </div>
+        <div class="pdf-image-container loading" id="pdf-container-${pageNum}">
+          <i class="fas fa-spinner fa-spin"></i> Chargement de la page...
+        </div>
+      </div>
+
+      <!-- Relations Panel -->
+      <div class="relations-panel">
+  `;
+
+  relations.forEach((relation, index) => {
+    const relationId = relation.id || `${pageNum}-${index}`;
+    html += `
+      <div class="relation-card" id="relation-card-${relationId}">
+        <div class="relation-header">
+          <span class="relation-type-badge">
+            <i class="fas fa-arrow-right"></i>
+            ${relation.type || 'relation'}
+          </span>
+          <div class="relation-actions">
+            <button class="btn-icon edit" onclick="editRelation(${pageNum}, ${index}, ${JSON.stringify(relation).replace(/"/g, '&quot;')})" title="Modifier">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn-icon delete" onclick="deleteRelation(${pageNum}, ${index}, '${relationId}')" title="Supprimer">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="relation-content">
+          <div class="entity-box">
+            <div class="entity-label">Source</div>
+            <div class="entity-value">${relation.source?.value || relation.source || 'N/A'}</div>
+            <div class="entity-type">${relation.source?.type || 'entité'}</div>
+          </div>
+
+          <div class="relation-arrow">
+            <i class="fas fa-long-arrow-alt-right"></i>
+          </div>
+
+          <div class="entity-box">
+            <div class="entity-label">Cible</div>
+            <div class="entity-value">${relation.target?.value || relation.target || 'N/A'}</div>
+            <div class="entity-type">${relation.target?.type || 'entité'}</div>
+          </div>
+        </div>
+
+        ${relation.description ? `
+          <div class="relation-description">
+            <i class="fas fa-quote-left"></i> ${relation.description}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  });
+
+  html += `
+      </div>
+    </div>
+  `;
+
+  relationsSection.innerHTML = html;
+
+  // Charger l'image PDF
+  loadPdfPageImage(pageNum);
+}
+
+// Load PDF page image
+let pdfZoomLevels = {}; // Store zoom level for each page
+
+async function loadPdfPageImage(pageNum) {
+  const container = document.getElementById(`pdf-container-${pageNum}`);
+  if (!container) return;
+
+  try {
+    // Initialiser le niveau de zoom si nécessaire
+    if (!pdfZoomLevels[pageNum]) {
+      pdfZoomLevels[pageNum] = 1.0;
+    }
+
+    const imageUrl = `/expert/page-image/${documentId}/${pageNum}/`;
+
+    // Créer l'élément image
+    const img = document.createElement('img');
+    img.id = `pdf-image-${pageNum}`;
+    img.src = imageUrl;
+    img.alt = `Page ${pageNum}`;
+    img.style.transform = `scale(${pdfZoomLevels[pageNum]})`;
+    img.style.transformOrigin = 'top center';
+
+    img.onload = () => {
+      container.classList.remove('loading');
+      container.innerHTML = '';
+      container.appendChild(img);
+    };
+
+    img.onerror = () => {
+      container.classList.remove('loading');
+      container.innerHTML = `
+        <div style="text-align: center; color: var(--danger);">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>Erreur lors du chargement de la page PDF</p>
+        </div>
+      `;
+    };
+
+  } catch (error) {
+    console.error('Erreur lors du chargement de l\'image PDF:', error);
+    container.classList.remove('loading');
+    container.innerHTML = `
+      <div style="text-align: center; color: var(--danger);">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>Erreur: ${error.message}</p>
+      </div>
+    `;
+  }
+}
+
+// Zoom PDF page
+function zoomPdfPage(pageNum, action) {
+  const img = document.getElementById(`pdf-image-${pageNum}`);
+  if (!img) return;
+
+  // Initialiser le niveau de zoom si nécessaire
+  if (!pdfZoomLevels[pageNum]) {
+    pdfZoomLevels[pageNum] = 1.0;
+  }
+
+  switch(action) {
+    case 'in':
+      pdfZoomLevels[pageNum] = Math.min(pdfZoomLevels[pageNum] + 0.25, 3.0);
+      break;
+    case 'out':
+      pdfZoomLevels[pageNum] = Math.max(pdfZoomLevels[pageNum] - 0.25, 0.5);
+      break;
+    case 'reset':
+      pdfZoomLevels[pageNum] = 1.0;
+      break;
+  }
+
+  img.style.transform = `scale(${pdfZoomLevels[pageNum]})`;
+}
+
+// Edit relation
+function editRelation(pageNum, relationIndex, relation) {
+  console.log('Édition de la relation:', pageNum, relationIndex, relation);
+  showNotification('Fonctionnalité d\'édition en cours de développement', 'info');
+  // TODO: Implémenter le modal d'édition
+}
+
+// Delete relation
+async function deleteRelation(pageNum, relationIndex, relationId) {
+  if (!confirm('Voulez-vous vraiment supprimer cette relation ?')) {
+    return;
+  }
+
+  const card = document.getElementById(`relation-card-${relationId}`);
+  if (card) {
+    card.classList.add('fade-out');
+  }
+
+  try {
+    const response = await fetch(`/expert/document/${documentId}/page/${pageNum}/relation/${relationIndex}/delete/`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken
+      }
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      setTimeout(() => {
+        if (card) card.remove();
+        showNotification('Relation supprimée avec succès', 'success');
+
+        // Recharger les relations de la page
+        loadPageRelations(pageNum);
+      }, 300);
+    } else {
+      throw new Error(data.error || 'Erreur lors de la suppression');
+    }
+  } catch (error) {
+    console.error('Erreur:', error);
+    showNotification('Erreur: ' + error.message, 'error');
+    if (card) {
+      card.classList.remove('fade-out');
+    }
+  }
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.className = 'notification';
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${type === 'success' ? 'linear-gradient(135deg, #059669, #10b981)' : type === 'info' ? 'linear-gradient(135deg, var(--primary), #38bdf8)' : 'linear-gradient(135deg, #dc2626, #ef4444)'};
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    animation: slideIn 0.3s ease;
+    font-weight: 500;
+  `;
+
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'info' ? 'fa-info-circle' : 'fa-exclamation-circle'}"></i>
+      <span>${message}</span>
+    </div>
+  `;
+
+  document.body.appendChild(notification);
+
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
+}
+
+// Animations CSS
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideIn {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideOut {
+    to {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+  }
+`;
+document.head.appendChild(style);
+
+// Initialize
+console.log('✅ Interface de révision Expert initialisée');
+console.log(`📄 Document: ${documentId}`);
+</script>
+
+{% endblock %}

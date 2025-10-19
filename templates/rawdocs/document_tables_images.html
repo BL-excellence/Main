@@ -1,0 +1,928 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+/* FORCE OVERRIDE TAILWIND - Styles ultra-spécifiques */
+.container-fluid.py-4 {
+    background: #f8fafc !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* Variables CSS pour la cohérence */
+:root {
+    --primary-color: #2563eb !important;
+    --primary-dark: #1d4ed8 !important;
+    --secondary-color: #64748b !important;
+    --success-color: #059669 !important;
+    --warning-color: #d97706 !important;
+    --danger-color: #dc2626 !important;
+    --light-bg: #f8fafc !important;
+    --white: #ffffff !important;
+    --gray-50: #f9fafb !important;
+    --gray-100: #f3f4f6 !important;
+    --gray-200: #e5e7eb !important;
+    --gray-300: #d1d5db !important;
+    --gray-600: #4b5563 !important;
+    --gray-700: #374151 !important;
+    --gray-800: #1f2937 !important;
+    --gray-900: #111827 !important;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* FORCE OVERRIDE - Sélecteurs ultra-spécifiques */
+div.container-fluid.py-4 div.document-header,
+.container-fluid .document-header {
+    all: unset !important;
+    display: block !important;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+    color: white !important;
+    padding: 3rem 2rem !important;
+    border-radius: 20px !important;
+    margin-bottom: 3rem !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    border: none !important;
+    width: auto !important;
+    height: auto !important;
+}
+
+div.container-fluid.py-4 div.document-header::before,
+.container-fluid .document-header::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="10" cy="90" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') !important;
+    pointer-events: none !important;
+}
+
+div.container-fluid.py-4 div.document-header h1.document-title,
+.container-fluid .document-header .document-title {
+    all: unset !important;
+    display: flex !important;
+    font-size: 2.5rem !important;
+    margin-bottom: 1rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.025em !important;
+    position: relative !important;
+    z-index: 1 !important;
+    align-items: center !important;
+    gap: 1rem !important;
+    color: white !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+div.container-fluid.py-4 div.document-header h1.document-title i,
+.container-fluid .document-header .document-title i {
+    all: unset !important;
+    display: flex !important;
+    width: 60px !important;
+    height: 60px !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-radius: 16px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 1.5rem !important;
+    backdrop-filter: blur(10px) !important;
+    color: white !important;
+}
+
+div.container-fluid.py-4 div.document-header div.document-meta,
+.container-fluid .document-header .document-meta {
+    all: unset !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 1rem !important;
+    margin-top: 2rem !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+div.container-fluid.py-4 div.document-header div.document-meta div.meta-item,
+.container-fluid .document-header .document-meta .meta-item {
+    all: unset !important;
+    display: flex !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    padding: 0.75rem 1.25rem !important;
+    border-radius: 25px !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    transition: all 0.3s ease !important;
+    color: white !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+div.container-fluid.py-4 div.document-header div.document-meta div.meta-item:hover,
+.container-fluid .document-header .document-meta .meta-item:hover {
+    background: rgba(255, 255, 255, 0.25) !important;
+    transform: translateY(-2px) !important;
+}
+
+div.container-fluid.py-4 div.document-header div.document-meta div.meta-item i,
+.container-fluid .document-header .document-meta .meta-item i {
+    opacity: 0.8 !important;
+    color: white !important;
+}
+
+/* En-tête du document moderne - Override complet */
+.document-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%) !important;
+    color: white !important;
+    padding: 3rem 2rem !important;
+    border-radius: 20px !important;
+    margin-bottom: 3rem !important;
+    box-shadow: var(--shadow-xl) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    border: none !important;
+}
+
+.document-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="10" cy="90" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+    pointer-events: none;
+}
+
+.document-title {
+    font-size: 2.5rem !important;
+    margin-bottom: 1rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.025em !important;
+    position: relative !important;
+    z-index: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 1rem !important;
+    color: white !important;
+}
+
+.document-title i {
+    width: 60px !important;
+    height: 60px !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-radius: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 1.5rem !important;
+    backdrop-filter: blur(10px) !important;
+    color: white !important;
+}
+
+.document-meta {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 1rem !important;
+    margin-top: 2rem !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+.meta-item {
+    background: rgba(255, 255, 255, 0.15) !important;
+    padding: 0.75rem 1.25rem !important;
+    border-radius: 25px !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    transition: all 0.3s ease !important;
+    color: white !important;
+}
+
+.meta-item:hover {
+    background: rgba(255, 255, 255, 0.25) !important;
+    transform: translateY(-2px) !important;
+}
+
+.meta-item i {
+    opacity: 0.8 !important;
+    color: white !important;
+}
+
+/* Cartes de résumé modernes */
+.summary-cards {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+    gap: 1.5rem !important;
+    margin-bottom: 3rem !important;
+}
+
+.summary-card {
+    background: var(--white) !important;
+    padding: 2rem !important;
+    border-radius: 16px !important;
+    box-shadow: var(--shadow-md) !important;
+    text-align: center !important;
+    border: 1px solid var(--gray-200) !important;
+    transition: all 0.3s ease !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.summary-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-color), var(--primary-dark));
+}
+
+.summary-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
+}
+
+.summary-card:nth-child(1)::before {
+    background: linear-gradient(90deg, var(--primary-color), var(--primary-dark));
+}
+
+.summary-card:nth-child(2)::before {
+    background: linear-gradient(90deg, var(--success-color), #10b981);
+}
+
+.summary-card:nth-child(3)::before {
+    background: linear-gradient(90deg, var(--warning-color), #f59e0b);
+}
+
+.summary-card:nth-child(4)::before {
+    background: linear-gradient(90deg, var(--danger-color), #ef4444);
+}
+
+.summary-number {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+}
+
+.summary-card:nth-child(2) .summary-number {
+    background: linear-gradient(135deg, var(--success-color), #10b981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.summary-card:nth-child(3) .summary-number {
+    background: linear-gradient(135deg, var(--warning-color), #f59e0b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.summary-card:nth-child(4) .summary-number {
+    background: linear-gradient(135deg, var(--danger-color), #ef4444);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.summary-label {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+}
+
+/* Boutons d'action modernes */
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 3rem;
+    flex-wrap: wrap;
+}
+
+.btn-action {
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.95rem;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-action::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-action:hover::before {
+    left: 100%;
+}
+
+.btn-primary-custom {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    color: white;
+}
+
+.btn-success-custom {
+    background: linear-gradient(135deg, var(--success-color), #10b981);
+    color: white;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-success-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    color: white;
+}
+
+.btn-secondary-custom {
+    background: linear-gradient(135deg, var(--secondary-color), var(--gray-600));
+    color: white;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    color: white;
+}
+
+/* Section de contenu */
+.content-section {
+    background: var(--white);
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+}
+
+.no-content {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--gray-600);
+}
+
+.no-content i {
+    font-size: 5rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.3;
+    color: var(--gray-400);
+}
+
+.no-content h3 {
+    color: var(--gray-700);
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.no-content p {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .document-header {
+        padding: 2rem 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .document-title {
+        font-size: 1.75rem;
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+    
+    .document-title i {
+        width: 50px;
+        height: 50px;
+        font-size: 1.25rem;
+    }
+    
+    .document-meta {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .meta-item {
+        justify-content: center;
+    }
+    
+    .summary-cards {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .summary-card {
+        padding: 1.5rem;
+    }
+    
+    .summary-number {
+        font-size: 2.5rem;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .btn-action {
+        justify-content: center;
+        padding: 0.875rem 1.5rem;
+    }
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.document-header {
+    animation: fadeInUp 0.8s ease-out;
+}
+
+.summary-card {
+    animation: fadeInUp 0.8s ease-out;
+}
+
+.summary-card:nth-child(1) { animation-delay: 0.1s; }
+.summary-card:nth-child(2) { animation-delay: 0.2s; }
+.summary-card:nth-child(3) { animation-delay: 0.3s; }
+.summary-card:nth-child(4) { animation-delay: 0.4s; }
+
+.btn-action {
+    animation: fadeInUp 0.8s ease-out 0.5s both;
+}
+
+/* STYLES ULTRA-SPÉCIFIQUES POUR FORCER L'AFFICHAGE - FINAL OVERRIDE */
+/* Cartes de résumé */
+div.container-fluid.py-4 div.summary-cards {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+    gap: 1.5rem !important;
+    margin-bottom: 3rem !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card {
+    background: #ffffff !important;
+    padding: 2rem !important;
+    border-radius: 16px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+    text-align: center !important;
+    border: 1px solid #e5e7eb !important;
+    transition: all 0.3s ease !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 4px !important;
+    background: linear-gradient(90deg, #2563eb, #1d4ed8) !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card:nth-child(2)::before {
+    background: linear-gradient(90deg, #059669, #10b981) !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card:nth-child(3)::before {
+    background: linear-gradient(90deg, #d97706, #f59e0b) !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card:nth-child(4)::before {
+    background: linear-gradient(90deg, #dc2626, #ef4444) !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card div.summary-number {
+    font-size: 3rem !important;
+    font-weight: 800 !important;
+    margin-bottom: 0.5rem !important;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    line-height: 1 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card:nth-child(2) div.summary-number {
+    background: linear-gradient(135deg, #059669, #10b981) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card:nth-child(3) div.summary-number {
+    background: linear-gradient(135deg, #d97706, #f59e0b) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card:nth-child(4) div.summary-number {
+    background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+}
+
+div.container-fluid.py-4 div.summary-cards div.summary-card div.summary-label {
+    color: #4b5563 !important;
+    font-size: 0.875rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.1em !important;
+    font-weight: 600 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* Boutons d'action */
+div.container-fluid.py-4 div.action-buttons {
+    display: flex !important;
+    gap: 1rem !important;
+    margin-bottom: 3rem !important;
+    flex-wrap: wrap !important;
+}
+
+div.container-fluid.py-4 div.action-buttons a.btn-action,
+div.container-fluid.py-4 div.action-buttons button.btn-action {
+    padding: 1rem 2rem !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    transition: all 0.3s ease !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    font-size: 0.95rem !important;
+    border: none !important;
+    cursor: pointer !important;
+    position: relative !important;
+    overflow: hidden !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+div.container-fluid.py-4 div.action-buttons a.btn-primary-custom,
+div.container-fluid.py-4 div.action-buttons button.btn-primary-custom {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    color: white !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+div.container-fluid.py-4 div.action-buttons a.btn-success-custom,
+div.container-fluid.py-4 div.action-buttons button.btn-success-custom {
+    background: linear-gradient(135deg, #059669, #10b981) !important;
+    color: white !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+div.container-fluid.py-4 div.action-buttons a.btn-secondary-custom,
+div.container-fluid.py-4 div.action-buttons button.btn-secondary-custom {
+    background: linear-gradient(135deg, #64748b, #4b5563) !important;
+    color: white !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+div.container-fluid.py-4 div.action-buttons a.btn-action:hover,
+div.container-fluid.py-4 div.action-buttons button.btn-action:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- En-tête du document -->
+    <div class="document-header" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important; color: white !important; padding: 3rem 2rem !important; border-radius: 20px !important; margin-bottom: 3rem !important; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important; position: relative !important; overflow: hidden !important;">
+        <h1 class="document-title" style="font-size: 2.5rem !important; margin-bottom: 1rem !important; font-weight: 800 !important; display: flex !important; align-items: center !important; gap: 1rem !important; color: white !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">
+            <i class="fas fa-file-alt" style="width: 60px !important; height: 60px !important; background: rgba(255, 255, 255, 0.2) !important; border-radius: 16px !important; display: flex !important; align-items: center !important; justify-content: center !important; font-size: 1.5rem !important; color: white !important;"></i>
+            {{ document.title|default:"Document sans titre" }}
+        </h1>
+        <div class="document-meta" style="display: flex !important; flex-wrap: wrap !important; gap: 1rem !important; margin-top: 2rem !important;">
+            <div class="meta-item" style="background: rgba(255, 255, 255, 0.15) !important; padding: 0.75rem 1.25rem !important; border-radius: 25px !important; font-size: 0.95rem !important; font-weight: 500 !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; display: flex !important; align-items: center !important; gap: 0.5rem !important; color: white !important; transition: all 0.3s ease !important;">
+                <i class="fas fa-calendar" style="opacity: 0.8 !important; color: white !important;"></i>
+                {{ document.created_at|date:"d/m/Y H:i" }}
+            </div>
+            <div class="meta-item" style="background: rgba(255, 255, 255, 0.15) !important; padding: 0.75rem 1.25rem !important; border-radius: 25px !important; font-size: 0.95rem !important; font-weight: 500 !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; display: flex !important; align-items: center !important; gap: 0.5rem !important; color: white !important; transition: all 0.3s ease !important;">
+                <i class="fas fa-user" style="opacity: 0.8 !important; color: white !important;"></i>
+                {{ document.owner.username|default:"Anonyme" }}
+            </div>
+            <div class="meta-item" style="background: rgba(255, 255, 255, 0.15) !important; padding: 0.75rem 1.25rem !important; border-radius: 25px !important; font-size: 0.95rem !important; font-weight: 500 !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; display: flex !important; align-items: center !important; gap: 0.5rem !important; color: white !important; transition: all 0.3s ease !important;">
+                <i class="fas fa-file-pdf" style="opacity: 0.8 !important; color: white !important;"></i>
+                {{ document.total_pages }} page{{ document.total_pages|pluralize }}
+            </div>
+            {% if document.doc_type %}
+            <div class="meta-item" style="background: rgba(255, 255, 255, 0.15) !important; padding: 0.75rem 1.25rem !important; border-radius: 25px !important; font-size: 0.95rem !important; font-weight: 500 !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; display: flex !important; align-items: center !important; gap: 0.5rem !important; color: white !important; transition: all 0.3s ease !important;">
+                <i class="fas fa-tag" style="opacity: 0.8 !important; color: white !important;"></i>
+                {{ document.doc_type }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Résumé de l'extraction -->
+    <div class="summary-cards" style="display: grid !important; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important; gap: 1.5rem !important; margin-bottom: 3rem !important;">
+        <div class="summary-card" style="background: #ffffff !important; padding: 2rem !important; border-radius: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; text-align: center !important; border: 1px solid #e5e7eb !important; transition: all 0.3s ease !important; position: relative !important; overflow: hidden !important;">
+            <div style="content: '' !important; position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; height: 4px !important; background: linear-gradient(90deg, #2563eb, #1d4ed8) !important;"></div>
+            <div class="summary-number" style="font-size: 3rem !important; font-weight: 800 !important; margin-bottom: 0.5rem !important; background: linear-gradient(135deg, #2563eb, #1d4ed8) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; background-clip: text !important; line-height: 1 !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">{{ summary.total_tables }}</div>
+            <div class="summary-label" style="color: #4b5563 !important; font-size: 0.875rem !important; text-transform: uppercase !important; letter-spacing: 0.1em !important; font-weight: 600 !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">Tableau{{ summary.total_tables|pluralize:"x" }}</div>
+        </div>
+        <div class="summary-card" style="background: #ffffff !important; padding: 2rem !important; border-radius: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; text-align: center !important; border: 1px solid #e5e7eb !important; transition: all 0.3s ease !important; position: relative !important; overflow: hidden !important;">
+            <div style="content: '' !important; position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; height: 4px !important; background: linear-gradient(90deg, #059669, #10b981) !important;"></div>
+            <div class="summary-number" style="font-size: 3rem !important; font-weight: 800 !important; margin-bottom: 0.5rem !important; background: linear-gradient(135deg, #059669, #10b981) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; background-clip: text !important; line-height: 1 !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">{{ summary.total_images }}</div>
+            <div class="summary-label" style="color: #4b5563 !important; font-size: 0.875rem !important; text-transform: uppercase !important; letter-spacing: 0.1em !important; font-weight: 600 !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">Image{{ summary.total_images|pluralize }}</div>
+        </div>
+        <div class="summary-card" style="background: #ffffff !important; padding: 2rem !important; border-radius: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; text-align: center !important; border: 1px solid #e5e7eb !important; transition: all 0.3s ease !important; position: relative !important; overflow: hidden !important;">
+            <div style="content: '' !important; position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; height: 4px !important; background: linear-gradient(90deg, #d97706, #f59e0b) !important;"></div>
+            <div class="summary-number" style="font-size: 3rem !important; font-weight: 800 !important; margin-bottom: 0.5rem !important; background: linear-gradient(135deg, #d97706, #f59e0b) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; background-clip: text !important; line-height: 1 !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">{{ total_elements }}</div>
+            <div class="summary-label" style="color: #4b5563 !important; font-size: 0.875rem !important; text-transform: uppercase !important; letter-spacing: 0.1em !important; font-weight: 600 !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">Total Éléments</div>
+        </div>
+        <div class="summary-card" style="background: #ffffff !important; padding: 2rem !important; border-radius: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; text-align: center !important; border: 1px solid #e5e7eb !important; transition: all 0.3s ease !important; position: relative !important; overflow: hidden !important;">
+            <div style="content: '' !important; position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; height: 4px !important; background: linear-gradient(90deg, #dc2626, #ef4444) !important;"></div>
+            <div class="summary-number" style="font-size: 3rem !important; font-weight: 800 !important; margin-bottom: 0.5rem !important; background: linear-gradient(135deg, #dc2626, #ef4444) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; background-clip: text !important; line-height: 1 !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">{{ summary.total_table_rows|default:0 }}</div>
+            <div class="summary-label" style="color: #4b5563 !important; font-size: 0.875rem !important; text-transform: uppercase !important; letter-spacing: 0.1em !important; font-weight: 600 !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">Lignes de Données</div>
+        </div>
+    </div>
+
+    <!-- Boutons d'action -->
+    <div class="action-buttons" style="display: flex !important; gap: 1rem !important; margin-bottom: 3rem !important; flex-wrap: wrap !important;">
+        <a href="{% url 'rawdocs:document_list' %}" class="btn-action btn-secondary-custom" style="padding: 1rem 2rem !important; border-radius: 12px !important; font-weight: 600 !important; text-decoration: none !important; transition: all 0.3s ease !important; display: inline-flex !important; align-items: center !important; gap: 0.75rem !important; font-size: 0.95rem !important; border: none !important; cursor: pointer !important; background: linear-gradient(135deg, #64748b, #4b5563) !important; color: white !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">
+            <i class="fas fa-arrow-left"></i>
+            Retour aux documents
+        </a>
+        
+        {% if summary.total_tables > 0 %}
+        <a href="{% url 'rawdocs:export_tables_excel' document.id %}" class="btn-action btn-success-custom" style="padding: 1rem 2rem !important; border-radius: 12px !important; font-weight: 600 !important; text-decoration: none !important; transition: all 0.3s ease !important; display: inline-flex !important; align-items: center !important; gap: 0.75rem !important; font-size: 0.95rem !important; border: none !important; cursor: pointer !important; background: linear-gradient(135deg, #059669, #10b981) !important; color: white !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">
+            <i class="fas fa-file-excel"></i>
+            Exporter les tableaux (Excel)
+        </a>
+        {% endif %}
+        
+        <button class="btn-action btn-primary-custom" onclick="window.print()" style="padding: 1rem 2rem !important; border-radius: 12px !important; font-weight: 600 !important; text-decoration: none !important; transition: all 0.3s ease !important; display: inline-flex !important; align-items: center !important; gap: 0.75rem !important; font-size: 0.95rem !important; border: none !important; cursor: pointer !important; background: linear-gradient(135deg, #2563eb, #1d4ed8) !important; color: white !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;">
+            <i class="fas fa-print"></i>
+            Imprimer
+        </button>
+    </div>
+
+    <!-- Contenu extrait -->
+    <div class="content-section">
+        {% if total_elements > 0 %}
+            <div class="p-3">
+                {{ combined_html|safe }}
+            </div>
+        {% else %}
+            <div class="no-content">
+                <i class="fas fa-search"></i>
+                <h3>Aucun élément trouvé</h3>
+                <p>Ce document ne contient pas de tableaux ou d'images extractibles.</p>
+                <small class="text-muted">
+                    Les éléments doivent être sous forme de tableaux structurés ou d'images intégrées pour être détectés.
+                </small>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Toast pour les notifications -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="downloadToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="fas fa-download text-success me-2"></i>
+            <strong class="me-auto">Téléchargement</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            Le téléchargement a commencé avec succès.
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestion du téléchargement Excel avec animation
+    const excelBtn = document.querySelector('a[href*="export_tables_excel"]');
+    if (excelBtn) {
+        excelBtn.addEventListener('click', function(e) {
+            // Animation du bouton
+            this.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                this.style.transform = 'scale(1)';
+            }, 150);
+            
+            // Afficher le toast de téléchargement
+            const toast = new bootstrap.Toast(document.getElementById('downloadToast'));
+            toast.show();
+            
+            // Feedback visuel temporaire
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération...';
+            setTimeout(() => {
+                this.innerHTML = '<i class="fas fa-check"></i> Téléchargé!';
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                }, 2000);
+            }, 1000);
+        });
+    }
+    
+    // Animation des statistiques au chargement
+    document.querySelectorAll('.summary-number').forEach(stat => {
+        const finalValue = parseInt(stat.textContent);
+        let currentValue = 0;
+        const increment = finalValue / 40;
+        
+        const timer = setInterval(() => {
+            currentValue += increment;
+            if (currentValue >= finalValue) {
+                stat.textContent = finalValue;
+                clearInterval(timer);
+            } else {
+                stat.textContent = Math.floor(currentValue);
+            }
+        }, 30);
+    });
+    
+    // Animation d'entrée pour les éléments
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+    
+    const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+    
+    // Observer les conteneurs de tableaux et images
+    document.querySelectorAll('.table-container, .image-container').forEach(el => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(20px)';
+        el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(el);
+    });
+    
+    // Amélioration des boutons d'action
+    document.querySelectorAll('.btn-action').forEach(button => {
+        button.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px) scale(1.02)';
+        });
+        
+        button.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0) scale(1)';
+        });
+        
+        button.addEventListener('mousedown', function() {
+            this.style.transform = 'translateY(0) scale(0.98)';
+        });
+        
+        button.addEventListener('mouseup', function() {
+            this.style.transform = 'translateY(-2px) scale(1.02)';
+        });
+    });
+    
+    // Amélioration des boutons de téléchargement d'images (nouveau sélecteur)
+    document.querySelectorAll('.download-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            // Animation du bouton
+            this.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                this.style.transform = 'scale(1)';
+            }, 150);
+            
+            // Feedback visuel
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-check"></i><span>Téléchargé!</span>';
+            setTimeout(() => {
+                this.innerHTML = originalText;
+            }, 2000);
+        });
+    });
+    
+    // Effet de parallaxe léger sur l'en-tête
+    window.addEventListener('scroll', function() {
+        const scrolled = window.pageYOffset;
+        const header = document.querySelector('.document-header');
+        
+        if (header) {
+            const rate = scrolled * -0.3;
+            header.style.transform = `translateY(${rate}px)`;
+        }
+    });
+    
+    // Animation des cartes de résumé au survol
+    document.querySelectorAll('.summary-card').forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-8px) scale(1.02)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0) scale(1)';
+        });
+    });
+    
+    // Animation des meta-items
+    document.querySelectorAll('.meta-item').forEach(item => {
+        item.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-3px) scale(1.05)';
+        });
+        
+        item.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0) scale(1)';
+        });
+    });
+});
+
+// Fonction pour imprimer seulement le contenu
+window.print = function() {
+    const printWindow = window.open('', '_blank');
+    const content = document.querySelector('.content-section').innerHTML;
+    
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Tableaux et Images - {{ document.title|default:"Document" }}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    .table-container, .image-container { margin-bottom: 30px; page-break-inside: avoid; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; font-weight: bold; }
+                    img { max-width: 100%; height: auto; }
+                    .page-section { margin-bottom: 40px; }
+                    .page-title { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+                    @media print { .no-print { display: none; } }
+                </style>
+            </head>
+            <body>${content}</body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.print();
+    printWindow.close();
+};
+</script>
+{% endblock %}

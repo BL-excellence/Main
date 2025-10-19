@@ -1,4 +1,4 @@
-# # rawdocs/groq_annotation_system.py
+ # rawdocs/groq_annotation_system.py
 # from django.shortcuts import render, get_object_or_404
 # from django.http import JsonResponse
 # from django.contrib.auth.decorators import login_required
@@ -87,7 +87,6 @@
 
 #         suggested_types = []
 
-        
 
 #         if analysis_response:
 
@@ -147,7 +146,6 @@
 
 #         annotations = self.parse_groq_response(response, page_num) if response else []
 
-        
 
 #         # Step 5: Generate schema for any types we didn't predict
 
@@ -157,7 +155,6 @@
 
 #             all_types.add(ann.get('type', ''))
 
-        
 
 #         # Update schema with any new types found
 
@@ -360,7 +357,7 @@ class GroqAnnotator:
         self._api_healthy: Optional[bool] = None
 
         if self.enabled:
-            print(f"🔍 Analyseur réglementaire GROQ initialisé (model: {self.model})")
+            print(f"[INFO] Analyseur reglementaire GROQ initialise (model: {self.model})")
             try:
                 self.test_connection()
             except Exception as e:
@@ -396,14 +393,14 @@ class GroqAnnotator:
         return self.test_connection()
 
     def complete_text(
-        self,
-        prompt: str,
-        max_tokens: int = 800,
-        temperature: float = 0.1,
-        model: Optional[str] = None,
-        system: Optional[str] = "You are a helpful assistant.",
-        json_mode: bool = False,
-        timeout: int = 120
+            self,
+            prompt: str,
+            max_tokens: int = 800,
+            temperature: float = 0.1,
+            model: Optional[str] = None,
+            system: Optional[str] = "You are a helpful assistant.",
+            json_mode: bool = False,
+            timeout: int = 120
     ) -> Optional[str]:
         """Appel chat/completions avec gestion d'erreurs et retries 429."""
         if not self.enabled:
@@ -423,12 +420,12 @@ class GroqAnnotator:
         )
 
     def chat_json(
-        self,
-        system: str,
-        user: str,
-        model: Optional[str] = None,
-        temperature: float = 0.1,
-        max_tokens: int = 400,
+            self,
+            system: str,
+            user: str,
+            model: Optional[str] = None,
+            temperature: float = 0.1,
+            max_tokens: int = 400,
     ) -> Optional[str]:
         """Chat en mode JSON forcé."""
         messages = [
@@ -501,7 +498,8 @@ class GroqAnnotator:
             system="You are an expert regulatory document analyst. Extract entities with perfect precision, never hallucinate."
         )
 
-    def parse_groq_response(self, response: str, page_num: int, original_text: Optional[str] = None) -> List[Dict[str, Any]]:
+    def parse_groq_response(self, response: str, page_num: int, original_text: Optional[str] = None) -> List[
+        Dict[str, Any]]:
         """
         Compat: parseur large spectre.
         - si original_text fourni: validation/recherche de positions
@@ -534,8 +532,8 @@ class GroqAnnotator:
                 # positions: valider / retrouver
                 if original_text:
                     if (not isinstance(start_pos, int) or not isinstance(end_pos, int)
-                        or start_pos < 0 or end_pos <= start_pos
-                        or start_pos >= len(original_text) or end_pos > len(original_text)):
+                            or start_pos < 0 or end_pos <= start_pos
+                            or start_pos >= len(original_text) or end_pos > len(original_text)):
                         found = self._find_text_position(text_val, original_text)
                         if found:
                             start_pos, end_pos, actual = found
@@ -603,13 +601,13 @@ class GroqAnnotator:
     # -------------------------------------------------------------------------
 
     def _chat(
-        self,
-        messages: List[Dict[str, str]],
-        model: Optional[str] = None,
-        temperature: float = 0.1,
-        max_tokens: int = 800,
-        json_mode: bool = False,
-        timeout: int = 120
+            self,
+            messages: List[Dict[str, str]],
+            model: Optional[str] = None,
+            temperature: float = 0.1,
+            max_tokens: int = 800,
+            json_mode: bool = False,
+            timeout: int = 120
     ) -> Optional[str]:
         if not self.enabled:
             return None
@@ -769,8 +767,8 @@ Return ONLY a JSON array like:
 
                 # (Re)validation/recherche positions
                 if (not isinstance(s, int) or not isinstance(e, int)
-                    or s < 0 or e <= s
-                    or s >= len(original_text) or e > len(original_text)):
+                        or s < 0 or e <= s
+                        or s >= len(original_text) or e > len(original_text)):
                     found = self._find_text_position(txt, original_text)
                     if found:
                         s, e, actual = found
@@ -847,8 +845,8 @@ Return ONLY a JSON array like:
             return None
 
         start_pos = pick(["start_pos", "start", "begin", "offset_start", "char_start", "from"])
-        end_pos   = pick(["end_pos", "end", "offset_end", "char_end", "to"])
-        length    = pick(["length", "len"])
+        end_pos = pick(["end_pos", "end", "offset_end", "char_end", "to"])
+        length = pick(["length", "len"])
         try:
             start_pos = int(start_pos) if start_pos is not None else None
         except Exception:

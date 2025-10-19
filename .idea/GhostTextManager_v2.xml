@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="GhostTextManager">
+    <option name="inputs">
+      <map>
+        <entry key="AttributeError at /annotation/document/267/&#10;type object 'AnnotationType' has no attribute 'REQUIRED_DOCUMENT'&#10;J'ai cette erreur quand j essaie d aller pour annoter un document">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758053320658" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="AttributeError: type object 'AnnotationType' has no attribute 'SITE'&#10;J'ai cette erreur pourquoi">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758055205970" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="Continuez">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758049603834" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="Dans cleanup_database je veux que rajouter aussi la suppression des Prodiuits dans la base">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758051859725" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="En fait dans l'affciahe du template je veux afficher tous les entités d annotations predefinies deja">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758056122017" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="En fait j'ai envie de faire quelque chose dans mon code vous voyez dans la partie annotation les entités avec les quels on fait l annotation sont genré par Mistrral je veux enlever cette generation et afficher toutes les entits existantes">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="3.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758048294941" />
+                  <option value="1758048250436" />
+                  <option value="1758048213950" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="En fait je veux faire quelque chose je veux supprimer tous les documents qui sont dans la base de données ainsi que les annotation sla libraririe tous je veux aucun document dedans">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758049246740" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="En fait je veux faire quelque chose vous voyez dans la partie library il y a une vue qui fait la Conversion pdf ver html en utilisant convertio pour le moment on a pas de bouton pour son url je veux creer un bouton pour cet url comme ca quand je clique sur lui on me fait la conversion avec Convertio et ca me donne du resultat le bouton vous pouvez le rajouter dans le document_details et client_doculent_details dans Library quand on va dans Contenu Structuré il ya les bouton Voir PDF Original et Regenerer creez un nouveau bouton qui sera Convertio faites le pour tous les documents dans la partie Library">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1757428004306" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="En fait l'affichage ca marche mais je veux que quand je cree un s'il existe deja qu il s affiche dans la barre des entités par exemple Test existe comme  entité mais ca ne s affiche pas meme quand je met Add Custom Type">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758054456420" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="Je veux que garder que les types d annotations predefinies je veux les afficher eux seulement dans le template d annotation et maintenannt is on veut rajouter on utilise Add Custom parce que sur la page il y en a pleins qui sont la bas c'est chargé je veux les enlever et garder que les predefinies">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758054175821" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="Normalement quand on cree une annotation d un document et qu on annote avec l entité Product ca doit se creer dans la partie Product du Client alorq ue la ca marche pas encore">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758051124382" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="On peut pas supprimer definitevement les types d'annotation squi sont pas predefinis je veux supprimer toutes les types d annpotations qui sont pas predefinis">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758054732144" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="Voila maintenant dans la partie annotation le dashbord je veux diminuer le nombre d entités dnans la base parce qu il y en a trop vous pouvez garder les plus pertiennts comme Product Site Adresse Substance Active Variation Type Variation Code Code etc sinon les autres il y en a pleins faut les enlever si on en a besoin on les rajoute manuelleme,t">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758052990911" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="continuez">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758054962196" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+        <entry key="hello">
+          <value>
+            <GhostTextMetaData>
+              <option name="count" value="1.0" />
+              <option name="timestamps">
+                <list>
+                  <option value="1758260414765" />
+                </list>
+              </option>
+            </GhostTextMetaData>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ai.zencoder.plugin.chat.index">
+    <option name="activeChatId" value="1fccea86-745e-457f-b901-38ac3019fc80" />
+    <option name="chatMetadata" value="{&quot;6686ab6c-e60a-4b00-afa3-d9c14500f319&quot;:{&quot;id&quot;:&quot;6686ab6c-e60a-4b00-afa3-d9c14500f319&quot;,&quot;title&quot;:&quot;Problème de sauvegarde des métadonnées&quot;,&quot;createdAt&quot;:1760831416492,&quot;updatedAt&quot;:1760838829512,&quot;isAgent&quot;:true,&quot;isNameGenerated&quot;:true,&quot;messageCount&quot;:15,&quot;lastMessagePreview&quot;:&quot;**Checking pre-action instructions**&quot;},&quot;1fccea86-745e-457f-b901-38ac3019fc80&quot;:{&quot;id&quot;:&quot;1fccea86-745e-457f-b901-38ac3019fc80&quot;,&quot;title&quot;:&quot;Annotation Interface Access Setup&quot;,&quot;createdAt&quot;:1760896188911,&quot;updatedAt&quot;:1760896729638,&quot;isAgent&quot;:true,&quot;isNameGenerated&quot;:true,&quot;messageCount&quot;:7,&quot;lastMessagePreview&quot;:&quot;You can continue if the agent is on the right track.&quot;}}" />
+  </component>
+</project>
