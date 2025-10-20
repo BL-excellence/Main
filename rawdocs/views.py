@@ -1095,41 +1095,93 @@ def annotate_document(request, doc_id):
 @csrf_exempt
 def save_manual_annotation(request):
     if request.method != 'POST':
-        return JsonResponse({'error': 'POST required'}, status=405)
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
 
     try:
-        data = json.loads(request.body)
-        page = get_object_or_404(DocumentPage, id=data['page_id'])
-        atype = get_object_or_404(AnnotationType, id=data['type_id'])
+        data = json.loads(request.body or '{}')
+
+        # Resolve page
+        page_id = data.get('page_id')
+        if not page_id:
+            return JsonResponse({'success': False, 'error': 'page_id is required'}, status=400)
+        page = get_object_or_404(DocumentPage, id=page_id)
+
+        # Resolve annotation type: accept type_id or entity_type/name
+        atype = None
+        type_id = data.get('type_id')
+        if type_id:
+            atype = get_object_or_404(AnnotationType, id=type_id)
+        else:
+            # Fallback to entity_type or type or name
+            type_name = (data.get('entity_type') or data.get('type') or data.get('name') or '').strip()
+            if not type_name:
+                return JsonResponse({'success': False, 'error': 'type_id or entity_type is required'}, status=400)
+            atype, _ = AnnotationType.objects.get_or_create(
+                name=type_name,
+                defaults={
+                    'display_name': type_name.replace('_', ' ').title(),
+                    'color': '#3b82f6',
+                    'description': f"Manual type: {type_name}"
+                }
+            )
 
         # Get mode from request, default to 'raw'
         mode = data.get('mode', 'raw')
         if mode not in ['raw', 'structured']:
             mode = 'raw'
 
+        # Sanitize positions against page text
+        selected_text = (data.get('selected_text') or '').strip()
+        if not selected_text:
+            return JsonResponse({'success': False, 'error': 'selected_text is required'}, status=400)
+
+        clean_text = page.cleaned_text or ''
+        start_pos = int(data.get('start_pos', 0) or 0)
+        end_pos = int(data.get('end_pos', 0) or 0)
+        if end_pos <= start_pos:
+            # Try to compute from selected_text
+            try:
+                idx = clean_text.lower().index(selected_text.lower()) if clean_text else -1
+            except Exception:
+                idx = -1
+            if idx >= 0:
+                start_pos = idx
+                end_pos = idx + len(selected_text)
+            else:
+                end_pos = start_pos + len(selected_text)
+
+        # Clamp to bounds
+        if start_pos < 0:
+            start_pos = 0
+        if end_pos < start_pos:
+            end_pos = start_pos
+
         ann = Annotation.objects.create(
             page=page,
             annotation_type=atype,
-            start_pos=data.get('start_pos', 0),
-            end_pos=data.get('end_pos', 0),
-            selected_text=data['selected_text'],
+            start_pos=start_pos,
+            end_pos=end_pos,
+            selected_text=selected_text[:500],
             confidence_score=100.0,
             created_by=request.user,
-            source='manual',
-            mode=mode,
-            start_xpath=data.get('start_xpath'),
-            end_xpath=data.get('end_xpath'),
-            start_offset=data.get('start_offset'),
-            end_offset=data.get('end_offset')
+            source='manual'
         )
+
+        # Mark page as annotated
+        try:
+            if getattr(page, 'is_annotated', None) is not None and page.is_annotated is False:
+                page.is_annotated = True
+                page.save(update_fields=['is_annotated'])
+        except Exception:
+            pass
 
         return JsonResponse({
             'success': True,
             'annotation_id': ann.id,
-            'mode': ann.mode
+            'mode': mode
         })
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 @login_required
@@ -2206,13 +2258,7 @@ def manual_annotation_view(request):
             selected_text=data['selected_text'],
             start_pos=data.get('start_pos', 0),
             end_pos=data.get('end_pos', 0),
-            source='manual',
-            # NEW FIELDS:
-            mode=data.get('mode', 'raw'),
-            start_xpath=data.get('start_xpath'),
-            end_xpath=data.get('end_xpath'),
-            start_offset=data.get('start_offset'),
-            end_offset=data.get('end_offset')
+            source='manual'
         )
 
         return JsonResponse({'success': True, 'annotation_id': annotation.id})
@@ -3891,15 +3937,34 @@ def mistral_suggest_annotations(request, page_id):
             )
 
             # Créer l'annotation
+            # Create annotation using valid model fields
+            sel_text = (ann_data.get('text') or '')
+            if len(sel_text) > 500:
+                sel_text = sel_text[:500]
+            try:
+                start_pos = int(ann_data.get('start_pos', 0) or 0)
+                end_pos = int(ann_data.get('end_pos', 0) or 0)
+            except Exception:
+                start_pos, end_pos = 0, 0
+            if start_pos < 0:
+                start_pos = 0
+            if end_pos < start_pos:
+                end_pos = start_pos
+            conf = ann_data.get('confidence', 0.75)
+            try:
+                conf = float(conf)
+            except Exception:
+                conf = 0.75
+            confidence_score = conf * 100 if conf <= 1.5 else conf
+
             annotation = Annotation.objects.create(
                 page=page,
-                text=ann_data['text'],
-                start_pos=ann_data['start_pos'],
-                end_pos=ann_data['end_pos'],
+                selected_text=sel_text,
+                start_pos=start_pos,
+                end_pos=end_pos,
                 annotation_type=ann_type,
-                confidence=ann_data.get('confidence', 0.75),
+                confidence_score=confidence_score,
                 created_by=request.user,
-                is_ai_generated=True,
                 ai_reasoning=ann_data.get('reasoning', 'Détecté par Mistral AI')
             )
             created_count += 1

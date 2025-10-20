@@ -318,7 +318,7 @@ body {
                         data-id="{{ ann_type.id }}" 
                         data-name="{{ ann_type.name }}" 
                         data-color="{{ ann_type.color }}"
-                        style="background: {{ ann_type.color }}; color: #ffffff; border-color: {{ ann_type.color }}; --label-color: {{ ann_type.color }};">
+                        style="background: {{ ann_type.color }}; color: #ffffff; border-color: {{ ann_type.color }};">
                     {{ ann_type.display_name }}
                 </button>
                 {% endfor %}
@@ -538,7 +538,7 @@ function saveManualAnnotation(data) {
 }
 
 function deleteAnnotation(annotationId) {
-    fetch(`/expert/api/delete-annotation/${annotationId}/`, {
+    fetch(`/expert/api/delete/${annotationId}/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': getCookie('csrftoken')

@@ -5773,7 +5773,7 @@ function saveManualAnnotation(data) {
 
     console.log(` Saving annotation with mode: ${payload.mode} (wasInStructured: ${wasInStructured})`);
 
-    fetch('/annotation/manual/', {
+    fetch("{% url 'rawdocs:save_manual_annotation' %}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -8645,7 +8645,7 @@ function syncJSONToStructuredContent(jsonAnnotations, currentAnnotations) {
             addAnnotationToStructuredContent(jsonAnn);
 
             // Save to DB
-            fetch('/annotation/manual/', {
+            fetch("{% url 'rawdocs:save_manual_annotation' %}", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
