@@ -3908,7 +3908,7 @@ def expert_save_manual_annotation(request):
             validated_by=request.user,
             validated_at=timezone.now(),
             created_by=request.user,
-            source='expert'
+            source='expert_manual'
         )
 
         # LOG (facultatif) ...

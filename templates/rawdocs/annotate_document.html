@@ -5767,8 +5767,13 @@ function saveManualAnnotation(data) {
 
     // FORCE the correct mode based on where annotation was created
     const payload = {
-        ...data,
-        mode: wasInStructured ? 'structured' : 'raw'
+        page_id: data.page_id,
+        type_id: data.type_id || data.annotation_type_id || data.type || data.entity_type_id,
+        selected_text: selectedText,
+        start_pos: typeof data.start_pos === 'number' ? data.start_pos : parseInt(data.start_pos || 0, 10),
+        end_pos: typeof data.end_pos === 'number' ? data.end_pos : parseInt(data.end_pos || 0, 10),
+        mode: wasInStructured ? 'structured' : 'raw',
+        temp_id: data.temp_id || null
     };
 
     console.log(` Saving annotation with mode: ${payload.mode} (wasInStructured: ${wasInStructured})`);
