@@ -11,7 +11,11 @@ import requests
 from groq import Groq
 import dateparser
 
-import spacy
+# Safe import for spaCy to avoid failures during management commands
+try:
+    import spacy
+except Exception:
+    spacy = None
 from PyPDF2 import PdfReader
 from langdetect import detect
 from dotenv import load_dotenv
@@ -20,7 +24,7 @@ import subprocess
 import json
 from pdfminer.high_level import extract_text
 from langdetect import detect
-import spacy
+# spaCy may be None if not installed or incompatible; avoid importing again
 from pathlib import Path
 from docx import Document
 import pdfplumber
@@ -32,9 +36,13 @@ import base64
 # Charger les variables d'environnement depuis .env
 load_dotenv()
 
-# Chargez une fois les modÃ¨les spaCy :
-NLP_FR = spacy.load("fr_core_news_sm")
-NLP_EN = spacy.load("en_core_web_sm")
+# Charge spaCy models safely; tolerate missing/incompatible spaCy during management commands
+try:
+    NLP_FR = spacy.load("fr_core_news_sm") if spacy else None
+    NLP_EN = spacy.load("en_core_web_sm") if spacy else None
+except Exception:
+    NLP_FR = None
+    NLP_EN = None
 
 # Stopwords FR/EN basiques pour nettoyage
 STOPWORDS = {

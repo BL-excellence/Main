@@ -581,6 +581,34 @@ class Annotation(models.Model):
     end_pos = models.IntegerField(help_text="Position de fin dans le texte")
     selected_text = models.CharField(max_length=500, help_text="Texte sélectionné")
 
+    # Selection mode & structured selection anchors
+    MODE_CHOICES = [
+        ('raw', 'Raw Text'),
+        ('structured', 'Structured HTML'),
+    ]
+    mode = models.CharField(
+        max_length=20,
+        choices=MODE_CHOICES,
+        default='raw',
+        help_text='Annotation mode: raw text or structured HTML'
+    )
+    start_xpath = models.TextField(
+        blank=True, null=True,
+        help_text='XPath to start node for structured annotations'
+    )
+    end_xpath = models.TextField(
+        blank=True, null=True,
+        help_text='XPath to end node for structured annotations'
+    )
+    start_offset = models.IntegerField(
+        blank=True, null=True,
+        help_text='Character offset within start node'
+    )
+    end_offset = models.IntegerField(
+        blank=True, null=True,
+        help_text='Character offset within end node'
+    )
+
     # AI confidence and context
     confidence_score = models.FloatField(default=0.0, help_text="Score IA (0.0–1.0)")
     ai_reasoning = models.TextField(blank=True, help_text="Raisonnement IA pour cette annotation")
