@@ -1,6 +1,10 @@
 # Environment variables
 .env
+<<<<<<< HEAD
 db.sqlite3
+=======
+
+>>>>>>> 5e7bf12b1709b68e47fb76454cc8ba8f689de835
 # Python
 __pycache__/
 *.py[cod]
