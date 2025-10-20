@@ -1,6 +1,5 @@
 # Environment variables
 .env
-db.sqlite3
 
 # Python
 __pycache__/
