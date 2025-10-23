@@ -9,7 +9,7 @@
 
 {% block content %}
 <div class="upload-container">
-   Messages
+
   {% if messages %}
   <div class="messages-container">
     {% for message in messages %}
@@ -21,7 +21,7 @@
   </div>
   {% endif %}
 
-   Upload Form
+
   <form method="post" enctype="multipart/form-data" class="upload-form">
     {% csrf_token %}
     <h2 class="upload-title">
@@ -63,7 +63,7 @@
     </div>
   </form>
 
-   ZIP Multi-document Results Section
+
   {% if is_zip_upload and processed_docs %}
   <div class="multi-document-container-clean">
     {# Replaced carousel with clean browser-style tabs #}
@@ -386,9 +386,9 @@
     }
   </script>
   {% elif doc and metadata %}
-   Single Document Results
+
   <div class="document-results">
-     Metadata Editor
+
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">
@@ -513,7 +513,7 @@
       </form>
     </div>
 
-     Split View: Structured Content & PDF
+
     <div class="card">
       <div class="view-tabs">
         <button type="button" class="tab-btn active" data-view="split">
@@ -528,7 +528,7 @@
       </div>
 
       <div class="split-view-container" id="splitView">
-         Structured Content Panel
+
         <div class="split-panel" id="structuredPanel">
           <div class="panel-content">
             {# Updated panel header with gradient background #}
@@ -560,7 +560,7 @@
           </div>
         </div>
 
-         PDF Panel
+
         <div class="split-panel" id="pdfPanel">
           <div class="panel-content">
             {# Updated panel header with gradient background #}
@@ -638,7 +638,7 @@
       </div>
     </div>
 
-     History Sidebar
+
     {% if logs %}
     <div class="card">
       <h3 class="card-title">

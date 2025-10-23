@@ -1059,7 +1059,7 @@ def annotate_document(request, doc_id):
     used_type_ids = Annotation.objects.filter(page__document=document).values_list('annotation_type_id', flat=True).distinct()
 
     # Default whitelist (keywords-independent)
-    whitelist = {
+    default_type_names = {
         AnnotationType.REQUIRED_DOCUMENT,
         AnnotationType.AUTHORITY,
         AnnotationType.LEGAL_REFERENCE,
@@ -1068,11 +1068,36 @@ def annotate_document(request, doc_id):
         AnnotationType.VARIATION_CODE,
         AnnotationType.REQUIRED_CONDITION,
         AnnotationType.FILE_TYPE,
+        'regulatory_authority',
+        'legal_instrument',
+        'medicinal_product',
+        'pediatric_investigation_plan',
+        'paediatric_investigation_plan',
+        'waiver',
+        'applicant_organization',
+        'procedural_reference',
+        'pharmaceutical_form',
+        'scientific_committee_opinion',
+        'therapeutic_indication',
     }
 
-    base_qs = AnnotationType.objects.filter(name__in=list(whitelist))
+    base_qs = AnnotationType.objects.filter(name__in=default_type_names)
     used_qs = AnnotationType.objects.filter(id__in=used_type_ids)
     annotation_types = (base_qs | used_qs).distinct().order_by('display_name')
+    annotation_type_ids = annotation_types.values_list('id', flat=True)
+    custom_annotation_types = list(
+        AnnotationType.objects
+        .exclude(id__in=annotation_type_ids)
+        .order_by('display_name')
+        .values('id', 'name', 'display_name', 'color')
+    )
+    manual_annotation_types = list(
+        AnnotationType.objects
+        .filter(id__in=used_type_ids)
+        .exclude(name__in=default_type_names)
+        .order_by('display_name')
+        .values('id', 'name', 'display_name', 'color')
+    )
 
     return render(request, 'rawdocs/annotate_document.html', {
         'document': document,
@@ -1086,7 +1111,10 @@ def annotate_document(request, doc_id):
         'global_analysis': global_analysis,
         'page_analysis': page_obj.regulatory_analysis if page_obj.is_regulatory_analyzed else None,
         'page_summary': page_obj.page_summary,
-        'page_importance_score': page_obj.regulatory_importance_score
+        'page_importance_score': page_obj.regulatory_importance_score,
+        'custom_annotation_types': custom_annotation_types,
+        'custom_annotation_types_json': json.dumps(custom_annotation_types),
+        'manual_annotation_types_json': json.dumps(manual_annotation_types)
     })
 
 
@@ -2642,7 +2670,7 @@ def annotate_document(request, doc_id):
                                                                                    flat=True).distinct()
 
     # Default whitelist (keywords-independent)
-    whitelist = {
+    default_type_names = {
         AnnotationType.REQUIRED_DOCUMENT,
         AnnotationType.AUTHORITY,
         AnnotationType.LEGAL_REFERENCE,
@@ -2651,11 +2679,36 @@ def annotate_document(request, doc_id):
         AnnotationType.VARIATION_CODE,
         AnnotationType.REQUIRED_CONDITION,
         AnnotationType.FILE_TYPE,
+        'regulatory_authority',
+        'legal_instrument',
+        'medicinal_product',
+        'pediatric_investigation_plan',
+        'paediatric_investigation_plan',
+        'waiver',
+        'applicant_organization',
+        'procedural_reference',
+        'pharmaceutical_form',
+        'scientific_committee_opinion',
+        'therapeutic_indication',
     }
 
-    base_qs = AnnotationType.objects.filter(name__in=list(whitelist))
+    base_qs = AnnotationType.objects.filter(name__in=default_type_names)
     used_qs = AnnotationType.objects.filter(id__in=used_type_ids)
     annotation_types = (base_qs | used_qs).distinct().order_by('display_name')
+    annotation_type_ids = annotation_types.values_list('id', flat=True)
+    custom_annotation_types = list(
+        AnnotationType.objects
+        .exclude(id__in=annotation_type_ids)
+        .order_by('display_name')
+        .values('id', 'name', 'display_name', 'color')
+    )
+    manual_annotation_types = list(
+        AnnotationType.objects
+        .filter(id__in=used_type_ids)
+        .exclude(name__in=default_type_names)
+        .order_by('display_name')
+        .values('id', 'name', 'display_name', 'color')
+    )
 
     return render(request, 'rawdocs/annotate_document.html', {
         'document': document,
@@ -2669,7 +2722,10 @@ def annotate_document(request, doc_id):
         'global_analysis': global_analysis,
         'page_analysis': page_obj.regulatory_analysis if page_obj.is_regulatory_analyzed else None,
         'page_summary': page_obj.page_summary,
-        'page_importance_score': page_obj.regulatory_importance_score
+        'page_importance_score': page_obj.regulatory_importance_score,
+        'custom_annotation_types': custom_annotation_types,
+        'custom_annotation_types_json': json.dumps(custom_annotation_types),
+        'manual_annotation_types_json': json.dumps(manual_annotation_types)
     })
 
 
