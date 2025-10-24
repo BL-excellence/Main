@@ -5,6 +5,7 @@ import time
 import os
 import json
 import re
+import uuid
 
 import requests
 from pymongo import MongoClient
@@ -1201,6 +1202,96 @@ def get_page_annotations(request, page_id):
             'page_text': '',
             'total_annotations': 0
         })
+
+
+@login_required
+def add_document_relation(request, doc_id):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    document = get_object_or_404(RawDocument, id=doc_id)
+    if not document.is_accessible_by(request.user):
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON payload'}, status=400)
+
+    source_type = (payload.get('source_type') or '').strip()
+    source_value = (payload.get('source_value') or '').strip()
+    target_type = (payload.get('target_type') or '').strip()
+    target_value = (payload.get('target_value') or '').strip()
+    relation_type = (payload.get('relation_type') or '').strip()
+
+    if not all([source_type, source_value, target_type, target_value, relation_type]):
+        return JsonResponse({'success': False, 'error': 'Champs requis manquants.'}, status=400)
+
+    direction = payload.get('direction') or 'source_to_target'
+    if direction not in {'source_to_target', 'target_to_source', 'bidirectional'}:
+        direction = 'source_to_target'
+
+    try:
+        confidence = float(payload.get('confidence', 0.85))
+    except (TypeError, ValueError):
+        confidence = 0.85
+    confidence = max(0.0, min(1.0, confidence))
+
+    comment = (payload.get('description') or '').strip()
+
+    relation_record = {
+        'id': payload.get('id') or str(uuid.uuid4()),
+        'type': relation_type,
+        'source': {
+            'type': source_type,
+            'value': source_value,
+            'annotation_id': payload.get('source_annotation_id')
+        },
+        'target': {
+            'type': target_type,
+            'value': target_value,
+            'annotation_id': payload.get('target_annotation_id')
+        },
+        'direction': direction,
+        'confidence': confidence,
+        'comment': comment,
+        'description': comment,
+        'created_by': request.user.username,
+        'created_at': timezone.now().isoformat()
+    }
+
+    base_json = document.global_annotations_json or {}
+    relations = base_json.get('relations')
+    if not isinstance(relations, list):
+        relations = []
+    relations.insert(0, relation_record)
+    base_json['relations'] = relations
+
+    # S'assurer que les m&eacute;ta-infos essentielles existent toujours
+    base_json.setdefault('document', {
+        'id': str(document.id),
+        'title': document.title,
+        'total_pages': getattr(document, 'total_pages', None)
+    })
+
+    document.global_annotations_json = base_json
+    document.save(update_fields=['global_annotations_json'])
+
+    return JsonResponse({'success': True, 'relation': relation_record})
+
+
+@login_required
+def get_document_relations(request, doc_id):
+    document = get_object_or_404(RawDocument, id=doc_id)
+    if not document.is_accessible_by(request.user):
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    base_json = document.global_annotations_json or {}
+    relations = base_json.get('relations')
+    if not isinstance(relations, list):
+        relations = []
+
+    return JsonResponse({'success': True, 'relations': relations})
 
 
 @login_required
@@ -3115,6 +3206,13 @@ def generate_document_annotation_summary(request, doc_id):
             'entities': global_entities,
             'generated_at': datetime.utcnow().isoformat() + 'Z',
         }
+        # Conserver les relations existantes saisies manuellement
+        existing_relations = []
+        if document.global_annotations_json:
+            rels = document.global_annotations_json.get('relations')
+            if isinstance(rels, list):
+                existing_relations = rels
+        global_json['relations'] = existing_relations
 
         # Résumé global basé uniquement sur les entités/valeurs
         global_summary = generate_entities_based_document_summary(

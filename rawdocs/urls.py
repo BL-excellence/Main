@@ -97,6 +97,16 @@ urlpatterns = [
         views.annotate_document,
         name='annotate_document'
     ),
+    path(
+        'annotation/document/<int:doc_id>/add-relation/',
+        views.add_document_relation,
+        name='add_document_relation'
+    ),
+    path(
+        'annotation/document/<int:doc_id>/relations/',
+        views.get_document_relations,
+        name='get_document_relations'
+    ),
 
     # 13) Annotation automatique avec Groq
     path(

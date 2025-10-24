@@ -27,6 +27,32 @@
 // Generate distinct colors for annotation types
 
 const typeColors = {};
+const ADD_RELATION_URL = "{% url 'rawdocs:add_document_relation' document.id %}";
+const LIST_RELATIONS_URL = "{% url 'rawdocs:get_document_relations' document.id %}";
+let availableAnnotations = [];
+let recentRelations = [];
+let relationModal = null;
+let relationModalOverlay = null;
+let relationForm = null;
+let relationCreateButton = null;
+let relationSourceSelect = null;
+let relationTargetSelect = null;
+let relationTypeInput = null;
+let relationDirectionSelect = null;
+let relationDirectionPreview = null;
+let relationConfidenceInput = null;
+let relationConfidenceValue = null;
+let relationCommentInput = null;
+let relationSourceSummary = null;
+let relationTargetSummary = null;
+let relationSourceBadge = null;
+let relationTargetBadge = null;
+let relationSelectionBanner = null;
+let relationToastTimer = null;
+let lastRelationTypeValue = '';
+let lastDirectionValue = 'source_to_target';
+let lastConfidenceValue = 85;
+
 
 
 
@@ -2178,7 +2204,7 @@ body {
 
     gap: 1rem;
 
-    margin-top: 1rem;
+  margin-top: 2rem;
 
     max-width: 100%;
 
@@ -2562,6 +2588,280 @@ body {
 
 </style>
 
+<style>
+/* Relations annotateur */
+.relation-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.relation-create-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: none;
+    border-radius: 999px;
+    padding: 0.6rem 1.3rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #0ea5e9 0%, #14b8a6 100%);
+    box-shadow: 0 12px 25px -18px rgba(14, 165, 233, 0.6);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.relation-create-btn i {
+    font-size: 0.95rem;
+}
+
+.relation-create-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 30px -16px rgba(14, 165, 233, 0.7);
+}
+
+.relation-create-btn:disabled {
+    background: #cbd5f5;
+    color: #94a3b8;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.relation-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    display: none;
+    z-index: 1100;
+}
+
+.relation-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1110;
+}
+
+.relation-modal__content {
+  width: min(560px, 92vw);
+  background: #fff;
+  border-radius: 12px;
+    box-shadow: 0 20px 60px -18px rgba(15, 23, 42, 0.45);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  max-height: 90vh;
+}
+
+.relation-modal__header {
+    background: linear-gradient(135deg, #0ea5e9 0%, #14b8a6 100%);
+    padding: 1.2rem 1.5rem;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.relation-modal__title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+
+.relation-modal__close {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: #fff;
+    border-radius: 999px;
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.relation-modal__close:hover {
+    background: rgba(255,255,255,0.35);
+}
+
+.relation-modal__body {
+  padding: 1rem 1.25rem;
+  display: block;
+  gap: 1.2rem;
+  background: #f8fafc;
+  overflow: auto;
+  flex: 1 1 auto; /* allow body to take available space and scroll when needed */
+}
+
+.relation-summary {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.relation-summary__card {
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    padding: 1rem;
+    box-shadow: 0 10px 30px -22px rgba(15, 23, 42, 0.3);
+}
+
+.relation-summary__title {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.76rem;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.relation-summary__content {
+    font-weight: 600;
+    color: #0f172a;
+    font-size: 0.95rem;
+}
+
+.relation-summary__badge {
+    display: inline-block;
+    margin-top: 0.45rem;
+    background: rgba(59, 130, 246, 0.18);
+    color: #1d4ed8;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.relation-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.relation-form-group label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #334155;
+}
+
+.relation-form-group select,
+.relation-form-group input,
+.relation-form-group textarea {
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.9rem;
+    transition: border 0.2s ease, box-shadow 0.2s ease;
+    background: #fff;
+    color: #0f172a;
+}
+
+.relation-form-group select:focus,
+.relation-form-group input:focus,
+.relation-form-group textarea:focus {
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+    outline: none;
+}
+
+.relation-direction-preview {
+    background: rgba(14, 165, 233, 0.1);
+    border: 1px dashed rgba(14, 165, 233, 0.35);
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.85rem;
+    color: #0f172a;
+}
+
+.relation-confidence-control {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.relation-confidence-control input[type="range"] {
+    flex: 1;
+}
+
+.relation-confidence-value {
+    font-weight: 600;
+    color: #0f172a;
+    min-width: 40px;
+    text-align: right;
+}
+
+.relation-form-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.relation-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 0.65rem 1.4rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.relation-btn--ghost {
+    background: rgba(148, 163, 184, 0.18);
+    color: #334155;
+}
+
+.relation-btn--primary {
+    background: linear-gradient(135deg, #0ea5e9 0%, #14b8a6 100%);
+    color: #fff;
+    box-shadow: 0 10px 20px -15px rgba(14, 165, 233, 0.6);
+}
+
+.relation-btn--primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 30px -18px rgba(14, 165, 233, 0.7);
+}
+
+.relation-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    gap: 0.55rem;
+    align-items: center;
+    box-shadow: 0 20px 40px -22px rgba(15, 23, 42, 0.4);
+    z-index: 1200;
+    border-left: 4px solid #0ea5e9;
+    color: #0f172a;
+    font-size: 0.88rem;
+}
+
+.relation-toast.success {
+    border-left-color: #22c55e;
+}
+
+.relation-toast.error {
+    border-left-color: #ef4444;
+}
+
+.relation-toast i {
+    color: inherit;
+}
+</style>
 
 
 <!-- Styles CSS pharma existants conserv&eacute;s identiques -->
@@ -6649,7 +6949,6 @@ body {
 
 
 
-
 <!-- Section de Contenu Structur&eacute; - SPLIT SCREEN VERSION -->
 
 <section class="structured-content-section">
@@ -6704,6 +7003,10 @@ body {
 
     </div>
 
+<button type="button" id="open-relation-modal-btn-json" class="relation-create-btn-json btn btn-sm" title="Créer une relation" style="margin-left:0.5rem; padding:0.45rem 0.75rem; background: linear-gradient(135deg,#06b6d4,#10b981); border:none; color:#fff; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:0.5rem;">
+            <i class="fas fa-circle-nodes"></i>
+            <span>Créer une relation</span>
+          </button>
 
 
     <!-- NEW: Split Screen Container -->
@@ -6899,8 +7202,75 @@ body {
 
 
 
+<!-- document-relations-full removed; relations are shown in the right panel -->
 
 
+<div id="relation-modal-overlay" class="relation-modal-overlay" aria-hidden="true"></div>
+<div id="relation-modal" class="relation-modal" role="dialog" aria-modal="true" aria-labelledby="relation-modal-title">
+    <div class="relation-modal__content">
+        <div class="relation-modal__header">
+            <h3 class="relation-modal__title" id="relation-modal-title">Nouvelle relation</h3>
+            <button type="button" class="relation-modal__close" id="relation-modal-close" aria-label="Fermer">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="relation-modal__body">
+            <div class="relation-summary">
+                <div class="relation-summary__card">
+                    <div class="relation-summary__title">Source</div>
+                    <div id="relation-source-summary" class="relation-summary__content">Sélectionnez une annotation</div>
+                    <span id="relation-source-type" class="relation-summary__badge" style="display:none;"></span>
+                </div>
+                <div class="relation-summary__card">
+                    <div class="relation-summary__title">Cible</div>
+                    <div id="relation-target-summary" class="relation-summary__content">Sélectionnez une annotation</div>
+                    <span id="relation-target-type" class="relation-summary__badge" style="display:none;"></span>
+                </div>
+            </div>
+            <form id="relation-form">
+                <div class="relation-form-group">
+                    <label for="relation-source-select">Annotation source</label>
+                    <select id="relation-source-select" required></select>
+                </div>
+                <div class="relation-form-group">
+                    <label for="relation-target-select">Annotation cible</label>
+                    <select id="relation-target-select" required></select>
+                </div>
+                <div class="relation-form-group">
+                    <label for="relation-type-input">Type de relation</label>
+                    <input type="text" id="relation-type-input" placeholder="Ex : contains" required>
+                </div>
+                <div class="relation-form-group">
+                    <label for="relation-direction">Direction</label>
+                    <select id="relation-direction">
+                        <option value="source_to_target">Source → Cible</option>
+                        <option value="target_to_source">Cible → Source</option>
+                        <option value="bidirectional">Bidirectionnelle</option>
+                    </select>
+                    <div id="relation-direction-preview" class="relation-direction-preview">Sélectionnez la source et la cible pour visualiser la direction.</div>
+                </div>
+                <div class="relation-form-group">
+                    <label for="relation-confidence">Confiance</label>
+                    <div class="relation-confidence-control">
+                        <input type="range" id="relation-confidence" min="40" max="100" step="5" value="85">
+                        <span id="relation-confidence-value" class="relation-confidence-value">85%</span>
+                    </div>
+                </div>
+                <div class="relation-form-group">
+                    <label for="relation-comment">Commentaire</label>
+                    <textarea id="relation-comment" rows="3" placeholder="Contexte ou justification (optionnel)"></textarea>
+                </div>
+                <div class="relation-form-footer">
+                    <button type="button" class="relation-btn relation-btn--ghost" id="relation-cancel-btn">Annuler</button>
+                    <button type="submit" class="relation-btn relation-btn--primary">
+                        <i class="fas fa-paper-plane"></i>
+                        Enregistrer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- Hidden raw text container preserved for downstream scripts -->
 
@@ -6911,6 +7281,262 @@ body {
 </div>
 
 
+<!-- Relation modal script: open modal, populate selects, submit to backend and refresh relations list -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const openBtn = document.getElementById('open-relation-modal-btn');
+  const modalOverlay = document.getElementById('relation-modal-overlay');
+  const modal = document.getElementById('relation-modal');
+  const closeBtn = document.getElementById('relation-modal-close');
+  const cancelBtn = document.getElementById('relation-cancel-btn');
+  const sourceSelect = document.getElementById('relation-source-select');
+  const targetSelect = document.getElementById('relation-target-select');
+  const sourceSummary = document.getElementById('relation-source-summary');
+  const targetSummary = document.getElementById('relation-target-summary');
+  const directionPreview = document.getElementById('relation-direction-preview');
+  const confidenceRange = document.getElementById('relation-confidence');
+  const confidenceValue = document.getElementById('relation-confidence-value');
+  const form = document.getElementById('relation-form');
+  const existingList = document.getElementById('existing-relations-list');
+  const existingCount = document.getElementById('existing-relations-count');
+  const existingEmpty = document.getElementById('existing-relations-empty');
+
+  function getCSRF() {
+    const el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return el ? el.value : '';
+  }
+
+  function collectAvailableAnnotations() {
+    const cards = document.querySelectorAll('.annotation-card[data-annotation-id]');
+    const annotations = [];
+    cards.forEach(card => {
+      const id = card.getAttribute('data-annotation-id');
+      // text is rendered inside .annotation-text-display (may include surrounding quotes)
+      const textEl = card.querySelector('.annotation-text-display');
+      let text = textEl ? textEl.textContent.trim() : '';
+      // strip surrounding quotes if present
+      if (text.startsWith('"') && text.endsWith('"')) {
+        text = text.substring(1, text.length-1);
+      }
+      // label/type may be in a badge or in data attributes
+      const labelEl = card.querySelector('.annotation-type-badge') || card.querySelector('.annotation-type');
+      const label = (labelEl && labelEl.textContent) ? labelEl.textContent.trim() : (card.dataset.annotationTypeDisplay || card.getAttribute('data-annotation-type-display') || '');
+      annotations.push({id, text, label});
+    });
+    return annotations;
+  }
+
+  function populateSelects() {
+    const annotations = collectAvailableAnnotations();
+    console.log('populateSelects: found annotations', annotations);
+    function buildOptions(select) {
+      select.innerHTML = '<option value="">-- Choisir --</option>';
+      annotations.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = `${a.text} — ${a.label}`;
+        select.appendChild(opt);
+      });
+    }
+    buildOptions(sourceSelect);
+    buildOptions(targetSelect);
+  }
+
+  function openModal() {
+    populateSelects();
+    modalOverlay.style.display = 'block';
+    modal.style.display = 'flex';
+    modalOverlay.setAttribute('aria-hidden','false');
+  }
+  function closeModal() {
+    modalOverlay.style.display = 'none';
+    modal.style.display = 'none';
+    modalOverlay.setAttribute('aria-hidden','true');
+    form.reset();
+    sourceSummary.textContent = 'Sélectionnez une annotation';
+    targetSummary.textContent = 'Sélectionnez une annotation';
+    directionPreview.textContent = 'Sélectionnez la source et la cible pour visualiser la direction.';
+    confidenceValue.textContent = confidenceRange.value + '%';
+  }
+
+  if (openBtn) openBtn.addEventListener('click', openModal);
+  // also bind the JSON header create button (if present)
+  const openBtnJson = document.getElementById('open-relation-modal-btn-json');
+  if (openBtnJson) openBtnJson.addEventListener('click', openModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', closeModal);
+
+  sourceSelect.addEventListener('change', function() {
+    const sel = this.value;
+    const ann = collectAvailableAnnotations().find(a=>a.id===sel);
+    sourceSummary.textContent = ann ? ann.text : 'Sélectionnez une annotation';
+    const typeEl = document.getElementById('relation-source-type');
+    if (ann && typeEl) { typeEl.textContent = ann.label; typeEl.style.display = ''; }
+  });
+  targetSelect.addEventListener('change', function(){
+    const sel = this.value;
+    const ann = collectAvailableAnnotations().find(a=>a.id===sel);
+    targetSummary.textContent = ann ? ann.text : 'Sélectionnez une annotation';
+    const typeEl = document.getElementById('relation-target-type');
+    if (ann && typeEl) { typeEl.textContent = ann.label; typeEl.style.display = ''; }
+  });
+
+  document.getElementById('relation-direction').addEventListener('change', function(){
+    const dir = this.value;
+    const s = sourceSelect.options[sourceSelect.selectedIndex]?.text || '—';
+    const t = targetSelect.options[targetSelect.selectedIndex]?.text || '—';
+    if (dir==='source_to_target') directionPreview.textContent = `${s} → ${t}`;
+    else if (dir==='target_to_source') directionPreview.textContent = `${t} → ${s}`;
+    else directionPreview.textContent = `${s} ↔ ${t}`;
+  });
+
+  confidenceRange.addEventListener('input', function(){
+    confidenceValue.textContent = this.value + '%';
+  });
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    // Build payload matching backend expectations: source_type/source_value, target_type/target_value
+    const anns = collectAvailableAnnotations();
+    const sourceAnn = anns.find(a=>a.id===sourceSelect.value);
+    const targetAnn = anns.find(a=>a.id===targetSelect.value);
+    if (!sourceAnn || !targetAnn) {
+      alert('Veuillez sélectionner une annotation source et une annotation cible.');
+      return;
+    }
+    const relType = (document.getElementById('relation-type-input').value || '').trim();
+    if (!relType) {
+      alert('Le type de relation est requis.');
+      return;
+    }
+    const payload = {
+      source_type: sourceAnn.label || '',
+      source_value: sourceAnn.text || '',
+      target_type: targetAnn.label || '',
+      target_value: targetAnn.text || '',
+      source_annotation_id: sourceAnn.id,
+      target_annotation_id: targetAnn.id,
+      relation_type: relType,
+      direction: document.getElementById('relation-direction').value,
+      confidence: (parseInt(confidenceRange.value,10) || 85) / 100.0,
+      description: document.getElementById('relation-comment').value || ''
+    };
+    try {
+      console.log('Relation payload', payload);
+      const resp = await fetch(ADD_RELATION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type':'application/json',
+          'X-CSRFToken': getCSRF()
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        alert('Erreur lors de la création: '+resp.status);
+        console.error(txt);
+        return;
+      }
+      showSuccess('Relation enregistrée');
+      closeModal();
+      await fetchDocumentRelations();
+    } catch(err) {
+      console.error(err);
+      alert('Erreur réseau');
+    }
+  });
+
+  // Small toast helper
+  function showSuccess(message, timeout=3000) {
+    let toast = document.getElementById('relation-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'relation-toast';
+      toast.style.position = 'fixed';
+      toast.style.right = '1.5rem';
+      toast.style.bottom = '4.5rem';
+      toast.style.background = 'linear-gradient(135deg,#06b6d4,#10b981)';
+      toast.style.color = '#fff';
+      toast.style.padding = '0.6rem 1rem';
+      toast.style.borderRadius = '999px';
+      toast.style.boxShadow = '0 8px 24px rgba(2,6,23,0.35)';
+      toast.style.zIndex = '1400';
+      toast.style.fontWeight = '600';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    setTimeout(()=>{
+      toast.style.transition = 'opacity 400ms ease';
+      toast.style.opacity = '0';
+    }, timeout);
+  }
+
+  async function fetchDocumentRelations(){
+    try {
+      const res = await fetch(LIST_RELATIONS_URL, {
+        method: 'GET',
+        headers: {'X-CSRFToken': getCSRF()}
+      });
+      if (!res.ok) { console.error('Failed to fetch relations', res.status); return; }
+      const data = await res.json();
+      const list = data.relations || [];
+      // Populate right-panel short list
+      existingList.innerHTML = '';
+      // Populate full document relations list
+      const fullListEl = document.getElementById('document-relations-list');
+      const fullEmptyEl = document.getElementById('document-relations-empty');
+      if (fullListEl) fullListEl.innerHTML = '';
+
+      if (list.length===0) {
+        existingEmpty.style.display='block';
+        if (fullEmptyEl) fullEmptyEl.style.display = 'block';
+      } else {
+        existingEmpty.style.display='none';
+        if (fullEmptyEl) fullEmptyEl.style.display = 'none';
+        list.forEach(r=>{
+          const relType = r.relation_type || r.type || '';
+          const sourceText = r.source_text || (r.source && (r.source.value || '')) || '';
+          const targetText = r.target_text || (r.target && (r.target.value || '')) || '';
+          const confidenceRaw = r.confidence;
+          const confidencePct = (typeof confidenceRaw === 'number' && confidenceRaw <= 1) ? Math.round(confidenceRaw*100) : (confidenceRaw || '');
+          const comment = r.comment || r.description || '';
+
+          // right-panel item
+          const el = document.createElement('div');
+          el.className = 'existing-relation';
+          el.innerHTML = `<div class="rel-type">${escapeHtml(relType)}</div>` +
+            `<div class="rel-body">${escapeHtml(sourceText||'')} → ${escapeHtml(targetText||'')}</div>` +
+            `<div class="rel-meta">Confiance: ${escapeHtml(confidencePct)}% ${comment ? '• '+escapeHtml(comment):''}</div>`;
+          existingList.appendChild(el);
+
+          // full-list item (richer)
+          if (fullListEl) {
+            const fel = document.createElement('div');
+            fel.className = 'document-relation-card';
+            fel.style.background = 'rgba(255,255,255,0.02)';
+            fel.style.border = '1px solid rgba(255,255,255,0.03)';
+            fel.style.padding = '0.75rem';
+            fel.style.borderRadius = '8px';
+            fel.innerHTML = `<div style="font-weight:600; color:#9ae6b4;">${escapeHtml(relType)}</div>` +
+              `<div style="margin-top:0.4rem;">${escapeHtml(sourceText)} → ${escapeHtml(targetText)}</div>` +
+              `<div style="margin-top:0.4rem; font-size:0.85rem; color:#94a3b8;">Confiance: ${escapeHtml(confidencePct)}% ${comment ? '• '+escapeHtml(comment):''}</div>`;
+            fullListEl.appendChild(fel);
+          }
+        });
+      }
+      existingCount.textContent = list.length;
+    } catch(err){ console.error('fetchDocumentRelations error', err); }
+  }
+
+  // initial load
+  fetchDocumentRelations();
+
+  function getCSRF() { const el = document.querySelector('input[name="csrfmiddlewaretoken"]'); return el ? el.value : ''; }
+
+});
+</script>
 
 <style>
 
@@ -7450,7 +8076,7 @@ body {
 
     border-radius: 20px;
 
-    padding: 24px;
+  padding: 36px 32px;
 
     color: #fff;
 
@@ -7458,7 +8084,7 @@ body {
 
     box-shadow: var(--pharma-shadow);
 
-    margin-bottom: 20px;
+  margin-bottom: 28px;
 
     border: none;
 
@@ -7538,15 +8164,16 @@ body {
 
 .header {
 
-    display: grid;
+  display: grid;
 
-    grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto;
 
-    gap: 20px;
+  gap: 20px;
 
-    align-items: flex-start;
+  /* align items vertically center so the action button aligns nicely */
+  align-items: center;
 
-    margin-bottom: 16px;
+  margin-bottom: 16px;
 
 }
 
@@ -18797,4 +19424,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {% endblock %}
-
