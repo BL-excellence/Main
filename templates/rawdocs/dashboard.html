@@ -683,13 +683,14 @@
     <!-- Metadata Validation Tab -->
     <div id="metadata-tab" class="tab-content hidden">
          <div class="flex justify-between items-center mb-2" style="gap:0.5rem; flex-wrap:wrap;">
-           <!-- <a href="{% url 'rawdocs:document_list' %}" class="btn btn-primary text-sm px-3 py-2 rounded-md">
-                <i class="fas fa-list"></i> Voir tous les documents
-            </a> --> 
-            <a href="{% url 'rawdocs:upload' %}" class="btn btn-primary text-sm px-3 py-2 rounded-md">
-                <i class="fas fa-upload"></i> Importer un nouveau PDF
-            </a>
-            
+            <div>
+                <a href="{% url 'rawdocs:document_list' %}" class="btn btn-primary text-sm px-3 py-2 rounded-md">
+                    <i class="fas fa-list"></i> Liste des documents
+                </a>
+                <a href="{% url 'rawdocs:upload' %}" class="btn btn-primary text-sm px-3 py-2 rounded-md">
+                    <i class="fas fa-upload"></i> Importer un nouveau PDF
+                </a>
+            </div>
         </div>  
         <div class="card">
             <h2 class="card-title" style="color: #000000;"> <!-- Noir explicitement défini -->
