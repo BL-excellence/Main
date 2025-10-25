@@ -1,5 +1,4 @@
 # rawdocs/views.py
-# Replace / consolidate the top imports block with this
 from datetime import datetime, timezone as dt_timezone
 import time
 import os
@@ -1540,9 +1539,15 @@ def ai_annotate_page_groq(request, page_id):
             pass
 
         saved_count = 0
+        seen_texts = set()
         for ann_data in annotations:
             try:
                 ann_type_name = ann_data.get('type', 'unknown').strip()
+                sel_text = (ann_data.get('text', '') or '')
+                text_key = (sel_text.lower().strip(), ann_type_name)
+                if text_key in seen_texts:
+                    continue
+                seen_texts.add(text_key)
                 ann_type, _ = AnnotationType.objects.get_or_create(
                     name=ann_type_name,
                     defaults={
@@ -1667,9 +1672,16 @@ def ai_annotate_document_groq(request, doc_id):
                     pass
 
                 saved_count = 0
+                seen_texts = set()
+
                 for ann_data in annotations:
                     try:
                         ann_type_name = ann_data.get('type', 'unknown').strip()
+                        sel_text = (ann_data.get('text', '') or '')
+                        text_key = (sel_text.lower().strip(), ann_type_name)
+                        if text_key in seen_texts:
+                            continue
+                        seen_texts.add(text_key)
                         ann_type, _ = AnnotationType.objects.get_or_create(
                             name=ann_type_name,
                             defaults={
