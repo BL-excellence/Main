@@ -553,7 +553,85 @@
         </div>
     </div>
 
-    <!-- Tabs: Métadonnées / Contenu structuré -->
+    <!-- SECTION MÉTADONNÉES UNIQUEMENT (sans tabs) -->
+    <div class="metadata-section">
+        <h2 class="section-title">Métadonnées Extraites</h2>
+        
+        <div class="metadata-grid">
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">title</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Titre</h4>
+                    <p>{{ metadata.title }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">category</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Type de Document</h4>
+                    <p>{{ metadata.doc_type }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">calendar_today</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Date de Publication</h4>
+                    <p>{{ metadata.publication_date }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">tag</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Version</h4>
+                    <p>{{ metadata.version }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">business</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Source</h4>
+                    <p>{{ metadata.source }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">public</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Pays</h4>
+                    <p>{{ metadata.country }}</p>
+                </div>
+            </div>
+            
+            <div class="metadata-item">
+                <div class="metadata-icon">
+                    <i class="material-icons">language</i>
+                </div>
+                <div class="metadata-content">
+                    <h4>Langue</h4>
+                    <p>{{ metadata.language }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DÉBUT SECTION COMMENTÉE - Tabs et Contenu structuré -->
+    {% comment %}
     <div class="metadata-section">
         <div style="display:flex; gap:12px; border-bottom:1px solid #e5e7eb; margin-bottom:16px;">
             <button id="tab-meta" class="btn" style="background:#eef2ff; color:#1e293b;">Métadonnées</button>
@@ -577,84 +655,14 @@
             </div>
         </div>
 
-        <!-- Panel Métadonnées -->
         <div id="panel-meta">
             <h2 class="section-title">Métadonnées Extraites</h2>
             
             <div class="metadata-grid">
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">title</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Titre</h4>
-                        <p>{{ metadata.title }}</p>
-                    </div>
-                </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">category</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Type de Document</h4>
-                        <p>{{ metadata.doc_type }}</p>
-                    </div>
-                </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">calendar_today</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Date de Publication</h4>
-                        <p>{{ metadata.publication_date }}</p>
-                    </div>
-                </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">tag</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Version</h4>
-                        <p>{{ metadata.version }}</p>
-                    </div>
-                </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">business</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Source</h4>
-                        <p>{{ metadata.source }}</p>
-                    </div>
-                </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">public</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Pays</h4>
-                        <p>{{ metadata.country }}</p>
-                    </div>
-                </div>
-                
-                <div class="metadata-item">
-                    <div class="metadata-icon">
-                        <i class="material-icons">language</i>
-                    </div>
-                    <div class="metadata-content">
-                        <h4>Langue</h4>
-                        <p>{{ metadata.language }}</p>
-                    </div>
-                </div>
+                ... (métadonnées grid ici)
             </div>
         </div>
 
-        <!-- Panel Contenu structuré -->
         <div id="panel-structured" style="display:none;">
             {% if structured_html %}
             <div class="structured-wrapper" style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; max-height:70vh; overflow:auto;">
@@ -669,6 +677,8 @@
             {% endif %}
         </div>
     </div>
+    {% endcomment %}
+    <!-- FIN SECTION COMMENTÉE -->
 
     <!-- Related Documents -->
     {% if related_documents %}
@@ -704,6 +714,7 @@
 </div>
 
 {% block extra_js %}
+{% comment %}
 <script>
 (function(){
   const tabMeta = document.getElementById('tab-meta');
@@ -723,7 +734,6 @@
   tabMeta.addEventListener('click', function(){ activate('meta'); });
   tabStructured.addEventListener('click', function(){ activate('structured'); });
 
-  // Default: open Structured if available
   {% if structured_html %}
   activate('structured');
   {% else %}
@@ -731,6 +741,7 @@
   {% endif %}
 })();
 </script>
+{% endcomment %}
 {% endblock %}
 
 {% endblock %}

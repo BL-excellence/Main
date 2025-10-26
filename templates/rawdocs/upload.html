@@ -248,7 +248,8 @@
                   </div>
                 </div>
                 <div class="structured-content" id="structured-content-{{ forloop.counter0 }}">
-                  <div class="zoom-container-multi" id="zoom-container-multi-{{ forloop.counter0 }}">
+                  {% if doc_data.structured_html_css %}<style>{{ doc_data.structured_html_css|safe }}</style>{% endif %}
+                  <div class="zoom-container-multi pdf-document-container" id="zoom-container-multi-{{ forloop.counter0 }}">
                     {{ doc_data.structured_html|safe }}
                   </div>
                 </div>
@@ -553,7 +554,8 @@
               </div>
             </div>
             <div class="structured-content">
-              <div class="zoom-container-single" id="zoomContainerSingle">
+              {% if structured_html_css %}<style>{{ structured_html_css|safe }}</style>{% endif %}
+              <div class="zoom-container-single pdf-document-container" id="zoomContainerSingle">
                 {{ structured_html|safe }}
               </div>
             </div>

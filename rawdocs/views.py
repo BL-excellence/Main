@@ -432,7 +432,7 @@ def upload_pdf(request):
                 text = extract_full_text(rd.file.path)
 
                 # Générer HTML structuré
-                structured_html = generate_structured_html(rd, request.user)
+                structured_html, structured_html_css = generate_structured_html(rd, request.user)
 
                 # Save extracted metadata to the model
                 if metadata:
@@ -474,6 +474,7 @@ def upload_pdf(request):
                     'metadata': metadata,
                     'extracted_text': text,
                     'structured_html': structured_html,
+                    'structured_html_css': structured_html_css,
                     'edit_form': edit_form,
                     'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
                 })
@@ -505,7 +506,7 @@ def upload_pdf(request):
                                     metadata['source'] = 'client'
 
                                     # Générer HTML structuré
-                                    structured_html = generate_structured_html(rd, request.user)
+                                    structured_html, structured_html_css = generate_structured_html(rd, request.user)
 
                                     # Sauvegarder les métadonnées dans le modèle
                                     if metadata:
@@ -544,6 +545,7 @@ def upload_pdf(request):
                                         'metadata': metadata,
                                         'extracted_text': text,
                                         'structured_html': structured_html,
+                                        'structured_html_css': structured_html_css,
                                         'edit_form': edit_form,
                                         'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
                                     })
@@ -573,7 +575,7 @@ def upload_pdf(request):
                     metadata['source'] = 'client'
 
                     # Générer HTML structuré
-                    structured_html = generate_structured_html(rd, request.user)
+                    structured_html, structured_html_css = generate_structured_html(rd, request.user)
 
                     # Save extracted metadata to the model
                     if metadata:
@@ -615,6 +617,7 @@ def upload_pdf(request):
                         'metadata': metadata,
                         'extracted_text': text,
                         'structured_html': structured_html,
+                        'structured_html_css': structured_html_css,
                         'edit_form': edit_form,
                         'logs': MetadataLog.objects.filter(document=rd).order_by('-modified_at')
                     })
@@ -660,20 +663,29 @@ def generate_structured_html(raw_document, user):
         processor = DocumentProcessor(doc)
         processor.process_document()
         structured_html = doc.formatted_content or ''
+        
+        # Extraire le CSS généré
+        generated_css = ''
+        if hasattr(doc, 'format_info') and doc.format_info:
+            generated_css = getattr(doc.format_info, 'generated_css', '') or ''
 
         # SAUVEGARDER dans RawDocument
         raw_document.structured_html = structured_html
         raw_document.structured_html_generated_at = timezone.now()
         raw_document.structured_html_method = 'document_processor'
         raw_document.structured_html_confidence = 0.0
+        # Sauvegarder aussi le CSS généré dans un champ personnalisé ou en JSON
+        if not hasattr(raw_document, 'structured_html_css'):
+            # Créer un champ temporaire pour stocker le CSS
+            raw_document._structured_html_css = generated_css
         raw_document.save()
 
         print(f"✅ HTML structuré généré et sauvé pour le document {raw_document.id}")
-        return structured_html
+        return structured_html, generated_css
 
     except Exception as e:
         print(f"⚠️ Erreur génération HTML structuré: {e}")
-        return ""
+        return "", ""
 
 
 # Fonction helper pour la validation avec extraction des pages
@@ -829,12 +841,32 @@ def edit_metadata(request, doc_id):
             'value': custom_value.value
         })
 
+    # Générer le HTML structuré et le CSS
+    structured_html = rd.structured_html or ""
+    structured_html_css = ""
+    if not structured_html:
+        structured_html, structured_html_css = generate_structured_html(rd, request.user)
+    else:
+        # Si le HTML existe déjà, extraire le CSS depuis le document
+        try:
+            from documents.models import Document as DocModel
+            doc = DocModel.objects.filter(
+                original_file=rd.file.name,
+                uploaded_by=rd.owner or request.user
+            ).first()
+            if doc and hasattr(doc, 'format_info') and doc.format_info:
+                structured_html_css = getattr(doc.format_info, 'generated_css', '') or ''
+        except Exception as e:
+            print(f"⚠️ Erreur extraction CSS: {e}")
+
     return render(request, 'rawdocs/edit_metadata.html', {
         'form': form,
         'metadata': metadata,
         'doc': rd,
         'logs': logs,
-        'custom_fields_data': custom_fields_data  # ADD THIS LINE
+        'custom_fields_data': custom_fields_data,
+        'structured_html': structured_html,
+        'structured_html_css': structured_html_css
     })
 
 
@@ -2111,6 +2143,7 @@ def document_structured(request, document_id):
 
         # Charger/générer HTML structuré
         structured_html = document.structured_html or ''
+        structured_html_css = ''
         method = document.structured_html_method or ''
         confidence = document.structured_html_confidence
         regen = request.GET.get('regen') in ['1', 'true', 'True']
@@ -2138,11 +2171,29 @@ def document_structured(request, document_id):
                 structured_html = doc.formatted_content or ''
                 method = 'document_processor'
                 confidence = None
+                
+                # Extraire le CSS généré
+                if hasattr(doc, 'format_info') and doc.format_info:
+                    structured_html_css = getattr(doc.format_info, 'generated_css', '') or ''
             except Exception as e:
                 print(f"⚠️ DocumentProcessor failed: {e}")
                 structured_html = ''
+                structured_html_css = ''
                 method = 'document_processor'
                 confidence = None
+        else:
+            # Si le HTML existe déjà, extraire le CSS depuis le document
+            if structured_html:
+                try:
+                    from documents.models import Document as DocModel
+                    doc = DocModel.objects.filter(
+                        original_file=document.file.name,
+                        uploaded_by=document.owner or request.user
+                    ).first()
+                    if doc and hasattr(doc, 'format_info') and doc.format_info:
+                        structured_html_css = getattr(doc.format_info, 'generated_css', '') or ''
+                except Exception as e:
+                    print(f"⚠️ Erreur extraction CSS: {e}")
 
         # Sauvegarde cache si on a du contenu
         if structured_html:
@@ -2156,6 +2207,7 @@ def document_structured(request, document_id):
         context = {
             'document': document,
             'structured_html': structured_html or '',
+            'structured_html_css': structured_html_css or '',
             'structured_html_method': method,
             'structured_html_confidence': confidence,
             'doc_model_id': getattr(doc, 'id', None),
@@ -2176,6 +2228,7 @@ def document_structured(request, document_id):
         context = {
             'document': document,
             'structured_html': '',
+            'structured_html_css': '',
             'structured_html_method': '',
             'structured_html_confidence': None,
             'error': str(e),
@@ -2752,6 +2805,22 @@ def annotate_document(request, doc_id):
     pnum = int(request.GET.get('page', 1))
     page_obj = get_object_or_404(DocumentPage, document=document, page_number=pnum)
 
+    # Charger le contenu structuré et le CSS
+    structured_html = document.structured_html or ''
+    structured_html_css = ''
+    
+    if structured_html:
+        try:
+            from documents.models import Document as DocModel
+            doc = DocModel.objects.filter(
+                original_file=document.file.name,
+                uploaded_by=document.owner
+            ).first()
+            if doc and hasattr(doc, 'format_info') and doc.format_info:
+                structured_html_css = getattr(doc.format_info, 'generated_css', '') or ''
+        except Exception as e:
+            print(f"⚠️ Erreur extraction CSS: {e}")
+
     # Statistiques d'analyse réglementaire
     regulatory_stats = {
         'total_pages': document.total_pages,
@@ -2820,6 +2889,9 @@ def annotate_document(request, doc_id):
         'annotation_types': annotation_types,
         'existing_annotations': page_obj.annotations.all().order_by('start_pos'),
         'total_pages': document.total_pages,
+        # Contenu structuré avec CSS
+        'structured_html': structured_html,
+        'structured_html_css': structured_html_css,
         # Nouvelles données pour l'analyse réglementaire
         'regulatory_stats': regulatory_stats,
         'global_analysis': global_analysis,

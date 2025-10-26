@@ -458,10 +458,111 @@ function validateDoc(docId) {
   })
 }
 
+// Zoom Manager for Content Editor
+class ZoomManager {
+  constructor() {
+    this.zoomLevels = new Map() // Track zoom for each document
+    this.MIN_ZOOM = 0.25
+    this.MAX_ZOOM = 3.0
+    this.ZOOM_STEP = 0.1
+  }
+
+  initZoomControls(docIndex) {
+    const container = docIndex === "single" 
+      ? document.getElementById("zoomContainerSingle")
+      : document.getElementById(`zoom-container-multi-${docIndex}`)
+    
+    if (!container) return
+
+    // Initialize zoom level
+    if (!this.zoomLevels.has(docIndex)) {
+      this.zoomLevels.set(docIndex, 1.0)
+    }
+
+    // Add zoom controls if not present
+    if (!document.getElementById(`zoom-controls-${docIndex}`)) {
+      this.createZoomControls(docIndex, container)
+    }
+  }
+
+  createZoomControls(docIndex, container) {
+    const controlsDiv = document.createElement("div")
+    controlsDiv.id = `zoom-controls-${docIndex}`
+    controlsDiv.style.cssText = `
+      position: sticky;
+      bottom: 20px;
+      right: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      padding: 8px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 100;
+      float: right;
+      margin: 16px;
+    `
+
+    controlsDiv.innerHTML = `
+      <button class="zoom-btn-minus" data-doc-index="${docIndex}" title="Zoom -">
+        <i class="fas fa-search-minus"></i>
+      </button>
+      <span class="zoom-label" data-doc-index="${docIndex}" style="min-width: 50px; text-align: center; font-weight: 600;">100%</span>
+      <button class="zoom-btn-plus" data-doc-index="${docIndex}" title="Zoom +">
+        <i class="fas fa-search-plus"></i>
+      </button>
+      <button class="zoom-btn-reset" data-doc-index="${docIndex}" title="Réinitialiser">
+        <i class="fas fa-compress"></i>
+      </button>
+    `
+
+    container.parentElement.appendChild(controlsDiv)
+
+    // Add event listeners
+    controlsDiv.querySelector(".zoom-btn-minus").addEventListener("click", () => this.zoomOut(docIndex))
+    controlsDiv.querySelector(".zoom-btn-plus").addEventListener("click", () => this.zoomIn(docIndex))
+    controlsDiv.querySelector(".zoom-btn-reset").addEventListener("click", () => this.resetZoom(docIndex))
+  }
+
+  applyZoom(docIndex, zoomLevel) {
+    const container = docIndex === "single" 
+      ? document.getElementById("zoomContainerSingle")
+      : document.getElementById(`zoom-container-multi-${docIndex}`)
+    
+    if (!container) return
+
+    zoomLevel = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, zoomLevel))
+    this.zoomLevels.set(docIndex, zoomLevel)
+
+    container.style.transform = `scale(${zoomLevel})`
+    
+    const label = document.querySelector(`.zoom-label[data-doc-index="${docIndex}"]`)
+    if (label) {
+      label.textContent = Math.round(zoomLevel * 100) + "%"
+    }
+  }
+
+  zoomIn(docIndex) {
+    const current = this.zoomLevels.get(docIndex) || 1.0
+    this.applyZoom(docIndex, current + this.ZOOM_STEP)
+  }
+
+  zoomOut(docIndex) {
+    const current = this.zoomLevels.get(docIndex) || 1.0
+    this.applyZoom(docIndex, current - this.ZOOM_STEP)
+  }
+
+  resetZoom(docIndex) {
+    this.applyZoom(docIndex, 1.0)
+  }
+}
+
 // Content Editor Manager
 class ContentEditorManager {
   constructor() {
     this.editModeStates = new Map() // Track edit mode for each document
+    this.zoomManager = new ZoomManager()
   }
 
   // Initialize single document editor
@@ -486,6 +587,9 @@ class ContentEditorManager {
     if (downloadBtn) {
       downloadBtn.addEventListener("click", () => this.downloadHtml("single"))
     }
+
+    // Initialize zoom controls
+    this.zoomManager.initZoomControls("single")
   }
 
   // Initialize multi-document editors
@@ -520,6 +624,12 @@ class ContentEditorManager {
         const docIndex = e.currentTarget.getAttribute("data-doc-index")
         this.downloadHtml(docIndex)
       })
+    })
+
+    // Initialize zoom controls for each document
+    document.querySelectorAll(".zoom-container-multi").forEach((container) => {
+      const docIndex = container.id.replace("zoom-container-multi-", "")
+      this.zoomManager.initZoomControls(docIndex)
     })
   }
 

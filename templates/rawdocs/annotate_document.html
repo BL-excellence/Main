@@ -6996,17 +6996,19 @@ body {
 
                 <div class="structured-content-body" id="structured-annotation-area" data-page-id="{{ current_page.id }}">
 
-                    {% if document.structured_html %}
+                    {% if structured_html_css %}<style>{{ structured_html_css|safe }}</style>{% endif %}
+                    <div class="pdf-document-container">
+                        {% if document.structured_html %}
 
-                        <div class="non-editable-content" id="all-pages-content">
+                            <div class="non-editable-content" id="all-pages-content">
 
-                            {{ document.structured_html|safe }}
+                                {{ document.structured_html|safe }}
 
-                        </div>
+                            </div>
 
-                    {% else %}
+                        {% else %}
 
-                        <div class="empty-state">
+                            <div class="empty-state">
 
                             <i class="far fa-file"></i>
 
@@ -7014,8 +7016,8 @@ body {
 
                         </div>
 
-                    {% endif %}
-
+                        {% endif %}
+                    </div>
                 </div>
 
             </div>

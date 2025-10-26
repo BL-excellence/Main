@@ -406,7 +406,8 @@
     </div>
     <div class="structured-panel-content">
       {% if structured_html %}
-        <div id="zoomContainer">
+        {% if structured_html_css %}<style>{{ structured_html_css|safe }}</style>{% endif %}
+        <div id="zoomContainer" class="pdf-document-container">
           {{ structured_html|safe }}
         </div>
       {% else %}

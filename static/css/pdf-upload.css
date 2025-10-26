@@ -1258,6 +1258,50 @@
 .zoom-container-multi {
   transition: transform 0.3s ease;
   transform-origin: top left;
+  padding: 16px;
+  width: max-content;
+  min-width: 100%;
+  background: white;
+}
+
+/* Ensure proper display of structured content */
+.zoom-container-single > *,
+.zoom-container-multi > * {
+  position: relative;
+  overflow: visible;
+}
+
+/* PDF text elements and cells styling */
+.zoom-container-single .pdf-text-element,
+.zoom-container-multi .pdf-text-element,
+.zoom-container-single .pdf-cell,
+.zoom-container-multi .pdf-cell {
+  position: absolute !important;
+  overflow: visible !important;
+  user-select: text !important;
+  z-index: 2 !important;
+}
+
+/* Images in structured content */
+.zoom-container-single img,
+.zoom-container-multi img {
+  position: absolute !important;
+  max-width: none !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Page styling */
+.zoom-container-single .pdf-page,
+.zoom-container-multi .pdf-page,
+.zoom-container-single .pdf-page-exact,
+.zoom-container-multi .pdf-page-exact {
+  position: relative !important;
+  background: white !important;
+  margin: 20px auto !important;
+  border: 1px solid #ddd !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important;
+  border-radius: 4px !important;
 }
 
 /* Edit mode styles */
@@ -1396,4 +1440,43 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Zoom button styles */
+.zoom-btn-minus,
+.zoom-btn-plus,
+.zoom-btn-reset {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+}
+
+.zoom-btn-minus:hover,
+.zoom-btn-plus:hover,
+.zoom-btn-reset:hover {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.zoom-btn-minus:active,
+.zoom-btn-plus:active,
+.zoom-btn-reset:active {
+  transform: translateY(0);
+}
+
+.zoom-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
 }

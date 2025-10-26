@@ -556,7 +556,7 @@
                     <i class="material-icons">summarize</i>
                     <span class="text">Résumé</span>
                 </a>
-                <a href="#" class="btn btn-outline" onclick="LibraryActions.summary({{ document.pk }}, true); return false;" title="Régénère uniquement le résumé (n’affecte pas l’analyse experte)">
+                <a href="#" class="btn btn-outline" onclick="LibraryActions.summary({{ document.pk }}, true); return false;" title="Régénère uniquement le résumé (n'affecte pas l'analyse experte)">
                     <i class="material-icons">autorenew</i>
                     <span class="text">Régénérer le résumé</span>
                 </a>
@@ -575,8 +575,9 @@
         </div>
     </div>
 
-    <!-- Tabs: Métadonnées / Contenu structuré -->
+    <!-- Section Métadonnées uniquement -->
     <div class="metadata-section">
+        <!-- SECTION CONTENU STRUCTURÉ COMMENTÉE
         <div style="display:flex; gap:12px; border-bottom:1px solid #e5e7eb; margin-bottom:16px; align-items:center;">
             <button id="tab-meta" class="btn" style="background:#eef2ff; color:#1e293b;">Métadonnées</button>
             <button id="tab-structured" class="btn" style="background:#f1f5f9; color:#1e293b;">Contenu structuré</button>
@@ -598,8 +599,9 @@
                 </a>
             </div>
         </div>
+        -->
 
-        <!-- Panel Métadonnées -->
+        <!-- Panel Métadonnées (toujours visible) -->
         <div id="panel-meta">
             <h2 class="metadata-title">
                 <i class="material-icons">info</i>
@@ -763,7 +765,7 @@
         {% endif %}
     </div>
 
-        <!-- Panel Contenu structuré -->
+        <!-- PANEL CONTENU STRUCTURÉ COMMENTÉ
         <div id="panel-structured" style="display:none;">
             {% if structured_html %}
             <div class="structured-wrapper" style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; max-height:70vh; overflow:auto;">
@@ -777,6 +779,8 @@
             </div>
             {% endif %}
         </div>
+        -->
+    </div>
 
     <!-- Content Sections -->
     <div class="content-sections">
@@ -873,7 +877,7 @@
 <script src="{% static 'js/library.js' %}"></script>
 <script>
 (function(){
-  // Onglets Meta / Structuré
+  /* SCRIPT POUR LES ONGLETS COMMENTÉ - Plus nécessaire
   const tabMeta = document.getElementById('tab-meta');
   const tabStructured = document.getElementById('tab-structured');
   const panelMeta = document.getElementById('panel-meta');
@@ -895,6 +899,7 @@
     activate('meta');
     {% endif %}
   }
+  */
 
   // Animation légère métadonnées
   document.addEventListener('DOMContentLoaded', function() {
